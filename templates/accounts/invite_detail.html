@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Invitation — {{ invitation.email }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <nav aria-label="breadcrumb" class="app-breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{% url 'accounts:user_list' %}">Users</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Invitation</li>
+                </ol>
+            </nav>
+            {% include "includes/page_header.html" with page_subtitle="Administration" page_title="Invitation Created" page_description=invitation.email %}
+
+            <div class="panel mb-4">
+                <div class="panel-header">Invitation Details</div>
+                <div class="panel-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4 text-muted">Username</dt><dd class="col-sm-8">{{ invitation.username }}</dd>
+                        <dt class="col-sm-4 text-muted">Role</dt><dd class="col-sm-8">{{ invitation.get_role_display }}</dd>
+                        <dt class="col-sm-4 text-muted">Church</dt><dd class="col-sm-8">{{ invitation.church.name }}</dd>
+                        <dt class="col-sm-4 text-muted">Expires</dt><dd class="col-sm-8">{{ invitation.expires_at|date:"M j, Y H:i" }}</dd>
+                        <dt class="col-sm-4 text-muted">Status</dt>
+                        <dd class="col-sm-8">
+                            {% if invitation.is_accepted %}
+                            <span class="badge bg-success">Accepted</span>
+                            {% elif invitation.is_revoked %}
+                            <span class="badge bg-secondary">Revoked</span>
+                            {% elif invitation.is_expired %}
+                            <span class="badge bg-danger">Expired</span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">Pending</span>
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            {% if invitation.is_valid %}
+            <div class="panel mb-4">
+                <div class="panel-header">Share Invite Link</div>
+                <div class="panel-body">
+                    <p class="small text-muted mb-2">Copy and send this link to the invitee:</p>
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control form-control-sm" id="invite-url" readonly
+                               value="{{ request.scheme }}://{{ request.get_host }}{% url 'accounts:accept_invite' invitation.token %}">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('invite-url').value)">Copy</button>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <form method="post" action="{% url 'accounts:invite_resend' invitation.pk %}">{% csrf_token %}
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Resend email</button>
+                        </form>
+                        <form method="post" action="{% url 'accounts:invite_revoke' invitation.pk %}">{% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Revoke this invitation?')">Revoke</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="mt-3">
+                <a href="{% url 'accounts:user_list' %}" class="table-link">← Back to users</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

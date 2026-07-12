@@ -1,0 +1,30 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Announcements{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-header">
+        <span>Platform announcements</span>
+        <a href="{% url 'sitecontrol:announcement_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-megaphone me-1"></i>New</a>
+    </div>
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead><tr><th>Title</th><th>Active</th><th>Login banner</th><th>Schedule</th><th></th></tr></thead>
+            <tbody>
+            {% for item in announcements %}
+            <tr>
+                <td class="fw-semibold">{{ item.title }}</td>
+                <td>{% if item.is_current %}<span class="badge bg-success">Live</span>{% elif item.is_active %}<span class="badge bg-warning text-dark">Scheduled</span>{% else %}<span class="badge bg-secondary">Off</span>{% endif %}</td>
+                <td>{% if item.show_on_login %}Yes{% else %}No{% endif %}</td>
+                <td class="small text-muted">{{ item.starts_at|default:"—" }} → {{ item.ends_at|default:"—" }}</td>
+                <td><a href="{% url 'sitecontrol:announcement_edit' item.pk %}" class="btn btn-sm btn-outline-primary">Edit</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-muted">No announcements.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Payment Methods{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Payment options offered to tenants for subscription billing.</p>{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-header">
+        <span>Methods</span>
+        <a href="{% url 'sitecontrol:payment_method_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Method</a>
+    </div>
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead><tr><th>Name</th><th>Type</th><th>Default</th><th>Active</th><th>Order</th><th></th></tr></thead>
+            <tbody>
+            {% for method in methods %}
+            <tr>
+                <td class="fw-semibold">{{ method.name }}</td>
+                <td>{{ method.get_method_type_display }}</td>
+                <td>{% if method.is_default %}<i class="bi bi-check-circle text-success"></i>{% else %}—{% endif %}</td>
+                <td>{% if method.is_active %}<span class="badge bg-success">Yes</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
+                <td>{{ method.sort_order }}</td>
+                <td><a href="{% url 'sitecontrol:payment_method_edit' method.pk %}" class="btn btn-sm btn-outline-primary">Edit</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-muted">No payment methods defined.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

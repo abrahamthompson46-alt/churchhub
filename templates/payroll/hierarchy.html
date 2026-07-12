@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Payroll Hierarchy{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Payroll" page_title="Hierarchy Payroll Roll-up" page_description="Consolidated payroll totals across churches." %}
+
+    <form method="get" class="row g-2 align-items-end mb-4 col-lg-6">
+        <div class="col-md-4">
+            <label class="form-label small text-muted">Year</label>
+            <input type="number" name="year" class="form-control form-control-sm" value="{{ year }}">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small text-muted">Month (optional)</label>
+            <input type="number" name="month" min="1" max="12" class="form-control form-control-sm" value="{{ month|default:'' }}">
+        </div>
+        <div class="col-md-4">
+            <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Filter</button>
+        </div>
+    </form>
+
+    <div class="table-responsive table-in-card">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Church</th>
+                    <th>District</th>
+                    <th class="text-end">Runs</th>
+                    <th class="text-end">Gross</th>
+                    <th class="text-end">Net</th>
+                    <th class="text-end">Employer Cost</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>{{ row.church }}</td>
+                    <td>{{ row.district }}</td>
+                    <td class="text-end">{{ row.runs }}</td>
+                    <td class="text-end">₵{{ row.gross|floatformat:2 }}</td>
+                    <td class="text-end">₵{{ row.net|floatformat:2 }}</td>
+                    <td class="text-end">₵{{ row.employer_cost|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-muted text-center py-4">No payroll data for this period.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <a href="{% url 'payroll:index' %}" class="btn btn-outline-secondary btn-sm mt-3">Back</a>
+</div>
+{% endblock %}

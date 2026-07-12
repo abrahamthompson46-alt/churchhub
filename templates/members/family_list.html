@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Families — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% url 'members:family_add' as family_url %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Families" action_url=family_url action_label="Add Family" %}
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead><tr><th>Family Name</th><th>Head</th><th>Members</th><th>Phone</th></tr></thead>
+                <tbody>
+                    {% for family in families %}
+                    <tr>
+                        <td><a href="{% url 'members:family_detail' family.pk %}" class="table-link">{{ family.name }}</a></td>
+                        <td>{{ family.head|default:"—" }}</td>
+                        <td>{{ family.member_count }}</td>
+                        <td class="text-muted">{{ family.phone|default:"—" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4">{% include "includes/empty_state.html" with icon="bi-house-heart" message="No families yet." action_url=family_url action_label="Add family" %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Billing Roll-ups{% endblock %}
+
+{% block content %}
+<div class="platform-card mb-3">
+    <div class="platform-card-header">
+        <span>Cross-denomination billing</span>
+        <a href="{% url 'sitecontrol:denomination_list' %}" class="btn btn-sm btn-outline-secondary">All denominations</a>
+    </div>
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead>
+                <tr>
+                    <th>Denomination</th>
+                    <th>Churches</th>
+                    <th>Active</th>
+                    <th>Trial</th>
+                    <th>Suspended</th>
+                    <th>No plan</th>
+                    <th>Est. MRR</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in rollups %}
+            <tr>
+                <td class="fw-semibold">{{ row.denomination.display_name|default:row.denomination.name }}</td>
+                <td>{{ row.church_count }}</td>
+                <td>{{ row.active_count }}</td>
+                <td>{{ row.trial_count }}</td>
+                <td>{{ row.suspended_count }}</td>
+                <td>{% if row.churches_without_plan %}<span class="text-warning">{{ row.churches_without_plan }}</span>{% else %}0{% endif %}</td>
+                <td>{{ row.mrr }}</td>
+                <td class="text-nowrap">
+                    <a href="{% url 'sitecontrol:denomination_billing' row.denomination.pk %}" class="btn btn-sm btn-outline-primary">Details</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="text-muted p-4">No billing data available for your assigned denominations.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

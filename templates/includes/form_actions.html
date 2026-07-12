@@ -1,0 +1,13 @@
+{% comment %}
+Standard compact form action bar.
+Usage: {% include "includes/form_actions.html" with submit_label="Save" cancel_url=url %}
+{% endcomment %}
+<div class="form-actions">
+    <button type="submit" class="btn btn-primary btn-sm">
+        {% if submit_icon %}<i class="bi {{ submit_icon }} me-1"></i>{% endif %}{{ submit_label|default:"Save" }}
+    </button>
+    {% if cancel_url %}
+    <a href="{{ cancel_url }}" class="btn btn-outline-secondary btn-sm">{{ cancel_label|default:"Cancel" }}</a>
+    {% endif %}
+    {% if extra_actions %}{{ extra_actions|safe }}{% endif %}
+</div>

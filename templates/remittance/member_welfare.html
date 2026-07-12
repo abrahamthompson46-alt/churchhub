@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% load humanize %}
+
+
+
+{% block title %}Welfare — {{ member.full_name }}{% endblock %}
+
+
+
+{% block content %}
+
+<div class="page-container">
+
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Welfare" page_title=member.full_name page_description="Contribution and assistance history" %}
+
+
+
+    <form method="get" class="row g-2 align-items-end mb-3">
+
+        <div class="col-md-3">
+
+            <label class="form-label small text-muted mb-1">From</label>
+
+            <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date|date:'Y-m-d' }}">
+
+        </div>
+
+        <div class="col-md-3">
+
+            <label class="form-label small text-muted mb-1">To</label>
+
+            <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date|date:'Y-m-d' }}">
+
+        </div>
+
+        <div class="col-md-auto d-flex gap-2">
+
+            <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+
+            <a href="{% url 'remittance:member_welfare' member.id %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+
+        </div>
+
+    </form>
+
+
+
+    <div class="d-flex flex-wrap gap-2 mb-3">
+
+        <a href="?{% if start_date %}start_date={{ start_date|date:'Y-m-d' }}&{% endif %}{% if end_date %}end_date={{ end_date|date:'Y-m-d' }}&{% endif %}export=pdf" class="btn btn-outline-secondary btn-sm">Export PDF</a>
+
+        <a href="?{% if start_date %}start_date={{ start_date|date:'Y-m-d' }}&{% endif %}{% if end_date %}end_date={{ end_date|date:'Y-m-d' }}&{% endif %}export=excel" class="btn btn-outline-secondary btn-sm">Export Excel</a>
+
+        <a href="?{% if start_date %}start_date={{ start_date|date:'Y-m-d' }}&{% endif %}{% if end_date %}end_date={{ end_date|date:'Y-m-d' }}&{% endif %}export=csv" class="btn btn-outline-secondary btn-sm">Export CSV</a>
+
+    </div>
+
+
+
+    <div class="row g-3 mb-4">
+
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Opening</p><h5 class="mb-0">₵{{ statement.opening_balance|floatformat:2|intcomma }}</h5></div></div></div>
+
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Contributed</p><h5 class="mb-0">₵{{ summary.contributed|floatformat:2|intcomma }}</h5></div></div></div>
+
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Received</p><h5 class="mb-0">₵{{ summary.received|floatformat:2|intcomma }}</h5></div></div></div>
+
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Closing</p><h5 class="mb-0">₵{{ statement.closing_balance|floatformat:2|intcomma }}</h5></div></div></div>
+
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Pending</p><h5 class="mb-0">{{ summary.pending_cases }}</h5></div></div></div>
+
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Approved</p><h5 class="mb-0">₵{{ summary.approved_awaiting_disbursement|floatformat:2|intcomma }}</h5></div></div></div>
+
+    </div>
+
+
+
+    <section class="dash-section mb-4">
+
+        <div class="dash-section__header"><h2 class="dash-section__title">Welfare Ledger</h2></div>
+
+        <div class="table-responsive table-in-card">
+
+            <table class="table table-hover table-sm mb-0">
+
+                <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Description</th><th class="text-end">In</th><th class="text-end">Out</th><th class="text-end">Balance</th></tr></thead>
+
+                <tbody>
+
+                    {% if statement.opening_balance %}
+
+                    <tr class="table-light">
+
+                        <td colspan="4" class="text-muted small">Opening balance</td>
+
+                        <td class="text-end">—</td>
+
+                        <td class="text-end">—</td>
+
+                        <td class="text-end fw-semibold">₵{{ statement.opening_balance|floatformat:2 }}</td>
+
+                    </tr>
+
+                    {% endif %}
+
+                    {% for row in statement.rows %}
+
+                    <tr>
+
+                        <td>{{ row.date }}</td>
+
+                        <td>{{ row.type }}</td>
+
+                        <td>{% if row.case_id %}<a href="{% url 'remittance:welfare_case_detail' row.case_id %}" class="table-link">{{ row.reference }}</a>{% else %}{{ row.reference|default:"—" }}{% endif %}</td>
+
+                        <td>{{ row.description|default:"—" }}</td>
+
+                        <td class="text-end">{% if row.in_amount %}₵{{ row.in_amount|floatformat:2 }}{% else %}—{% endif %}</td>
+
+                        <td class="text-end">{% if row.out_amount %}₵{{ row.out_amount|floatformat:2 }}{% else %}—{% endif %}</td>
+
+                        <td class="text-end fw-semibold">₵{{ row.balance|floatformat:2 }}</td>
+
+                    </tr>
+
+                    {% empty %}
+
+                    <tr><td colspan="7" class="text-muted text-center py-3">No welfare activity for this period.</td></tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+
+
+    <section class="dash-section">
+
+        <div class="dash-section__header"><h2 class="dash-section__title">Assistance Cases</h2></div>
+
+        <div class="table-responsive table-in-card">
+
+            <table class="table table-hover table-sm mb-0">
+
+                <thead><tr><th>Case</th><th>Date</th><th>Type</th><th class="text-end">Requested</th><th class="text-end">Approved</th><th>Status</th></tr></thead>
+
+                <tbody>
+
+                    {% for case in cases %}
+
+                    <tr>
+
+                        <td><a href="{% url 'remittance:welfare_case_detail' case.pk %}" class="table-link">{{ case.case_number }}</a></td>
+
+                        <td>{{ case.created_at|date:"j M Y" }}</td>
+
+                        <td>{{ case.get_assistance_type_display }}</td>
+
+                        <td class="text-end">₵{{ case.amount_requested|floatformat:2 }}</td>
+
+                        <td class="text-end">{% if case.amount_approved %}₵{{ case.amount_approved|floatformat:2 }}{% else %}—{% endif %}</td>
+
+                        <td>{{ case.get_status_display }}</td>
+
+                    </tr>
+
+                    {% empty %}
+
+                    <tr><td colspan="6" class="text-muted text-center py-3">No cases recorded.</td></tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+</div>
+
+{% endblock %}
+
+

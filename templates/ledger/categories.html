@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Posting Categories — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Posting Categories" page_description="Each category defines the default debit and credit accounts for a ledger entry." %}
+
+    <div class="filter-bar filter-bar--tabs mb-4">
+        <div class="btn-group btn-group-sm" role="group">
+            <a href="{% url 'ledger:categories' %}" class="btn btn-outline-secondary{% if not type_filter %} active{% endif %}">All</a>
+            {% for value, label in type_choices %}
+            <a href="?type={{ value }}" class="btn btn-outline-secondary{% if type_filter == value %} active{% endif %}">{{ label }}</a>
+            {% endfor %}
+        </div>
+        <span class="toolbar-spacer"></span>
+        <a href="{% url 'ledger:entry' %}" class="btn btn-primary btn-sm"><i class="bi bi-journal-plus me-1"></i>New Entry</a>
+    </div>
+
+    {% if categories %}
+    <div class="table-wrap table-wrap--center table-wrap--compact">
+        {% include "includes/table_open.html" with table_title="Categories" table_icon="bi-tags" %}
+        {% include "ledger/includes/category_table.html" with category_list=categories %}
+        {% include "includes/table_close.html" %}
+    </div>
+    {% else %}
+        {% for section in sections %}
+        <section class="dash-section">
+            <div class="dash-section__header">
+                <h2 class="dash-section__title">{{ section.label }} Categories</h2>
+                <span class="chip chip--muted">{{ section.categories|length }}</span>
+            </div>
+            <div class="table-wrap table-wrap--center table-wrap--compact mb-4">
+                <div class="table-responsive table-in-card">
+                    {% include "ledger/includes/category_table.html" with category_list=section.categories %}
+                </div>
+            </div>
+        </section>
+        {% empty %}
+        <div class="dash-panel text-center text-muted">
+            <p class="mb-2">No posting categories are configured for your church.</p>
+            <p class="small mb-0">Run <code>python manage.py seed_ledger</code> or re-run church onboarding.</p>
+        </div>
+        {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}

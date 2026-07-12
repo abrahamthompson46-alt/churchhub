@@ -1,0 +1,35 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Subscription Plans{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-header">
+        <span>Plans</span>
+        <a href="{% url 'sitecontrol:plan_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New Plan</a>
+    </div>
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead><tr><th>Name</th><th>Code</th><th>Monthly</th><th>Yearly</th><th>Trial</th><th>Users</th><th>Branches</th><th>Default</th><th>Active</th><th></th></tr></thead>
+            <tbody>
+            {% for plan in plans %}
+            <tr>
+                <td class="fw-semibold">{{ plan.name }}</td>
+                <td><code>{{ plan.code }}</code></td>
+                <td>{{ plan.currency }} {{ plan.price_monthly }}</td>
+                <td>{{ plan.currency }} {{ plan.effective_yearly_price }}</td>
+                <td>{{ plan.trial_days }}d</td>
+                <td>{{ plan.max_users }}</td>
+                <td>{{ plan.max_branches }}</td>
+                <td>{% if plan.is_default %}<i class="bi bi-check-circle text-success"></i>{% else %}—{% endif %}</td>
+                <td>{% if plan.is_active %}<span class="badge bg-success">Yes</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
+                <td><a href="{% url 'sitecontrol:plan_edit' plan.pk %}" class="btn btn-sm btn-outline-primary">Edit</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="10" class="text-muted">No plans defined.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

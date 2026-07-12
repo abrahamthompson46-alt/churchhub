@@ -1,0 +1,8 @@
+<div class="data-card{% if flush %} data-card--flush{% endif %}">
+    {% if table_title or table_actions %}
+    <div class="data-card__header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span>{% if table_icon %}<i class="bi {{ table_icon }} me-2 text-muted"></i>{% endif %}{{ table_title }}</span>
+        {% if table_actions %}<div class="data-card__actions">{{ table_actions|safe }}</div>{% endif %}
+    </div>
+    {% endif %}
+    <div class="table-responsive">

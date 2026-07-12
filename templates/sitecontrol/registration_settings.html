@@ -1,0 +1,64 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Registration Controls{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-body">
+        <p class="text-muted">Control who can register churches, invite users, and onboard tenants. All gates are enforced application-wide.</p>
+        <form method="post">
+            {% csrf_token %}
+            <div class="row g-3">
+                {% for field in form %}
+                <div class="col-md-{% if field.field.widget.input_type == 'checkbox' %}12{% elif field.name == 'registration_intro' %}12{% else %}6{% endif %}">
+                    {% if field.field.widget.input_type == 'checkbox' %}
+                    <div class="platform-form-check border rounded p-3 bg-light">
+                        {{ field }}
+                        <label class="form-check-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                    </div>
+                    {% else %}
+                    <label class="form-label fw-semibold">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                    {% endif %}
+                    {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            <div class="mt-4 d-flex gap-2 align-items-center">
+                <button type="submit" class="btn btn-primary">Save Registration Controls</button>
+                {% if form.instance.allow_church_self_registration %}
+                <a href="{% url 'church_apply' %}" class="btn btn-outline-secondary btn-sm" target="_blank">Preview public form</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="platform-card">
+    <div class="platform-card-header">Access matrix</div>
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead><tr><th>Action</th><th>Controlled by</th><th>Current</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>Public church application (<code>/apply/</code>)</td>
+                    <td>Allow church self-registration</td>
+                    <td>{% if form.instance.allow_church_self_registration %}<span class="badge bg-success">Open</span>{% else %}<span class="badge bg-secondary">Closed</span>{% endif %}</td>
+                </tr>
+                <tr>
+                    <td>Institution user invites</td>
+                    <td>Allow institution user invites</td>
+                    <td>{% if form.instance.allow_institution_user_invites %}<span class="badge bg-success">Allowed</span>{% else %}<span class="badge bg-danger">Blocked</span>{% endif %}</td>
+                </tr>
+                <tr>
+                    <td>Institution church onboarding</td>
+                    <td>Allow institution church onboarding</td>
+                    <td>{% if form.instance.allow_institution_church_onboarding %}<span class="badge bg-success">Allowed</span>{% else %}<span class="badge bg-danger">Blocked</span>{% endif %}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

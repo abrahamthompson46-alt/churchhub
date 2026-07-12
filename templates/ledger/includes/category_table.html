@@ -1,0 +1,37 @@
+<table class="table table-sm mb-0 align-middle">
+    <thead>
+        <tr>
+            <th>Category</th>
+            <th>Code</th>
+            <th>Debit Account</th>
+            <th>Credit Account</th>
+            <th class="text-center">Member</th>
+            <th class="text-center">Remit</th>
+            <th class="text-end">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for cat in category_list %}
+        <tr>
+            <td class="fw-medium">
+                <a href="{% url 'ledger:category_detail' cat.pk %}" class="table-link">{{ cat.name }}</a>
+            </td>
+            <td><code class="small">{{ cat.code }}</code></td>
+            <td class="small">{{ cat.default_debit_account.name }}</td>
+            <td class="small">{{ cat.default_credit_account.name }}</td>
+            <td class="text-center">
+                {% if cat.requires_member %}<i class="bi bi-check-circle text-success" title="Required"></i>{% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td class="text-center">
+                {% if cat.remit_to_district %}<i class="bi bi-arrow-up-circle text-primary" title="District remittance"></i>{% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td class="text-end text-nowrap">
+                <a href="{% url 'ledger:entry' %}?category={{ cat.pk }}" class="btn btn-sm btn-outline-primary">Use</a>
+                <a href="{% url 'ledger:category_edit' cat.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-muted text-center py-3">No categories found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>

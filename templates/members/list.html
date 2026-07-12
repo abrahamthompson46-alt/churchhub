@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Members — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container page-shell">
+    {% if can_manage %}
+    {% url 'members:add' as add_url %}
+    {% include "includes/page_header.html" with page_subtitle="People" page_title="Member Directory" page_description=church.name action_url=add_url action_label="Add Member" action_icon="bi-person-plus" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="People" page_title="Member Directory" page_description=church.name %}
+    {% endif %}
+
+    <div class="metrics-row">
+        <div class="metric-card"><span class="metric-label">Total</span><span class="metric-value">{{ stats.total }}</span></div>
+        <div class="metric-card metric-card--success"><span class="metric-label">Active</span><span class="metric-value">{{ stats.active }}</span></div>
+        <div class="metric-card"><span class="metric-label">Inactive</span><span class="metric-value">{{ stats.inactive }}</span></div>
+        <div class="metric-card metric-card--warning"><span class="metric-label">Transferred Out</span><span class="metric-value">{{ stats.transferred }}</span></div>
+    </div>
+
+    <div class="filter-bar filter-bar--sticky">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
+                <label class="form-label">Search</label>
+                {{ filter_form.q }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Status</label>
+                {{ filter_form.status }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Department</label>
+                {{ filter_form.department }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Gender</label>
+                {{ filter_form.gender }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Age Group</label>
+                {{ filter_form.age_group }}
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Filter</button>
+            </div>
+        </form>
+        <span class="toolbar-spacer"></span>
+        <div class="btn-group btn-group-sm">
+            <a href="?export=csv{% if filter_qs %}&amp;{{ filter_qs }}{% endif %}" class="btn btn-outline-secondary">CSV</a>
+            <a href="?export=excel{% if filter_qs %}&amp;{{ filter_qs }}{% endif %}" class="btn btn-outline-secondary">Excel</a>
+        </div>
+    </div>
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Department</th>
+                        <th>Gender</th>
+                        <th>Status</th>
+                        <th>Phone</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for member in members %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'members:detail' member.id %}" class="table-link">{{ member.first_name }} {{ member.last_name }}</a>
+                            {% if not member.is_active %}<span class="badge bg-secondary ms-1">Inactive</span>{% endif %}
+                        </td>
+                        <td class="text-muted">{{ member.department|default:"—" }}</td>
+                        <td>{{ member.gender }}</td>
+                        <td><span class="chip">{{ member.membership_status }}</span></td>
+                        <td class="text-muted">{{ member.phone|default:"—" }}</td>
+                        <td class="text-end text-nowrap">
+                            <a href="{% url 'members:timeline' member.id %}" class="btn btn-sm btn-outline-secondary">Timeline</a>
+                            {% if can_manage %}
+                            <a href="{% url 'members:edit' member.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            {% if can_manage %}
+                            {% url 'members:add' as add_url %}
+                            {% include "includes/empty_state.html" with icon="bi-people" message="No members found." action_url=add_url action_label="Add member" %}
+                            {% else %}
+                            {% include "includes/empty_state.html" with icon="bi-people" message="No members found." %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if is_paginated %}
+    <nav class="mt-3 d-flex justify-content-center" aria-label="Pagination">
+        <ul class="pagination pagination-sm mb-0">
+            {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filter_qs %}&amp;{{ filter_qs }}{% endif %}">Previous</a></li>
+            {% endif %}
+            <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+            {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filter_qs %}&amp;{{ filter_qs }}{% endif %}">Next</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

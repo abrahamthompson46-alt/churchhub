@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Asset Hierarchy Roll-up{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Fixed Assets" page_title="Hierarchy Roll-up" %}
+    <form method="get" class="row g-2 mb-4">
+        <div class="col-md-3">
+            <select name="conference" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">All Conferences</option>
+                {% for c in conferences %}
+                <option value="{{ c.pk }}" {% if selected_conference == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="zone" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">All Zones</option>
+                {% for z in zones %}
+                <option value="{{ z.pk }}" {% if selected_zone == z.pk|stringformat:"s" %}selected{% endif %}>{{ z.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="district" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">All Districts</option>
+                {% for d in districts %}
+                <option value="{{ d.pk }}" {% if selected_district == d.pk|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+    <div class="table-responsive table-in-card">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Church</th><th>District</th><th>Assets</th>
+                    <th class="text-end">Cost (GHS)</th><th class="text-end">Accumulated (GHS)</th><th class="text-end">NBV (GHS)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>{{ row.church }}</td>
+                    <td>{{ row.district }}</td>
+                    <td>{{ row.count }}</td>
+                    <td class="text-end">₵{{ row.cost|floatformat:2 }}</td>
+                    <td class="text-end">₵{{ row.accumulated|floatformat:2 }}</td>
+                    <td class="text-end">₵{{ row.nbv|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-center text-muted py-4">No active assets in scope.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

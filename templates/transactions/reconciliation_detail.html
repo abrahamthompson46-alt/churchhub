@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Reconciliation — {{ reconciliation.bank_account.name }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'transactions:reconciliation_list' %}">Reconciliations</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ reconciliation.statement_date }}</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle="Bank Reconciliation" page_title=reconciliation.bank_account.name page_description=reconciliation.statement_date %}
+
+    <div class="d-flex gap-2 mb-4">
+        {% if reconciliation.is_reconciled %}
+        <span class="badge bg-success">Reconciled</span>
+        {% else %}
+        <span class="badge bg-warning text-dark">In Progress</span>
+        {% endif %}
+    </div>
+
+    <div class="metrics-row mb-4">
+        <div class="metric-card"><span class="metric-label">Statement Balance</span><span class="metric-value text-currency">₵ {{ reconciliation.statement_balance|floatformat:2|intcomma }}</span></div>
+        <div class="metric-card"><span class="metric-label">Matched Ledger Total</span><span class="metric-value text-currency">₵ {{ matched_total|floatformat:2|intcomma }}</span></div>
+        <div class="metric-card {% if difference != 0 %}metric-card--danger{% else %}metric-card--success{% endif %}"><span class="metric-label">Difference</span><span class="metric-value text-currency">₵ {{ difference|floatformat:2|intcomma }}</span></div>
+    </div>
+
+    {% if not reconciliation.is_reconciled %}
+    <form method="post">
+        {% csrf_token %}
+        <div class="panel mb-4">
+            <div class="panel-header d-flex justify-content-between align-items-center">
+                <span>Ledger Lines</span>
+                <button type="submit" name="action" value="match" class="btn btn-sm btn-outline-primary">Save Matches</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead><tr><th style="width:40px"></th><th>Date</th><th>Reference</th><th>Description</th><th class="text-end">Amount</th></tr></thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td><input type="checkbox" name="matched_lines" value="{{ item.transaction_line_id }}" class="form-check-input" {% if item.is_matched %}checked{% endif %}></td>
+                            <td>{{ item.transaction_line.transaction.date }}</td>
+                            <td><code class="small">{{ item.transaction_line.transaction.reference }}</code></td>
+                            <td class="text-muted small">{{ item.transaction_line.transaction.description|default:"—"|truncatechars:30 }}</td>
+                            <td class="text-end text-currency">₵ {{ item.transaction_line.amount|floatformat:2|intcomma }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5">{% include "includes/empty_state.html" with message="No ledger lines for this period." %}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% if can_finalize and difference == 0 %}
+        <button type="submit" name="action" value="finalize" class="btn btn-success" onclick="return confirm('Finalize this reconciliation?')">Finalize Reconciliation</button>
+        {% elif can_finalize %}
+        <p class="text-muted small">Matched total must equal statement balance before finalizing.</p>
+        {% endif %}
+    </form>
+    {% else %}
+    <div class="panel">
+        <div class="panel-body">
+            <p class="mb-0">Reconciled by {{ reconciliation.reconciled_by }} on {{ reconciliation.reconciled_at|date:"M j, Y H:i" }}.</p>
+            {% if reconciliation.notes %}<p class="text-muted small mt-2 mb-0">{{ reconciliation.notes }}</p>{% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}{{ family.name }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'members:family_list' %}">Families</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ family.name }}</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle="Family" page_title=family.name page_description=family.address %}
+
+    <div class="detail-grid">
+        <div class="panel">
+            <div class="panel-header">Household Details</div>
+            <div class="panel-body">
+                <dl class="mb-0">
+                    <dt class="text-muted small">Head of Household</dt><dd>{{ family.head|default:"—" }}</dd>
+                    <dt class="text-muted small">Phone</dt><dd>{{ family.phone|default:"—" }}</dd>
+                    <dt class="text-muted small">Members</dt><dd>{{ members|length }}</dd>
+                </dl>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header">Family Members</div>
+            <ul class="list-plain">
+                {% for member in members %}
+                <li class="d-flex justify-content-between py-2 border-bottom">
+                    <a href="{% url 'members:detail' member.id %}" class="table-link">{{ member.full_name }}</a>
+                    <span class="chip">{{ member.membership_status }}</span>
+                </li>
+                {% empty %}
+                <li class="py-3 text-muted">No members assigned to this family.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

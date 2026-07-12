@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Compensation — {{ employee.full_name }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Payroll" page_title="Set Compensation" page_description=employee.full_name %}
+    <div class="form-card-inner card col-lg-8">
+        <div class="card-body p-4">
+            <form method="post">
+                {% csrf_token %}
+                {% for field in comp_form %}
+                    {% include "includes/form_field.html" with field=field %}
+                {% endfor %}
+                <hr>
+                <h3 class="h6 text-muted mb-3">Monthly Earnings</h3>
+                {% for component in components %}
+                <div class="mb-3">
+                    <label class="form-label">{{ component.name }}</label>
+                    <input type="number" name="amount_{{ component.code }}" step="0.01" min="0" class="form-control" placeholder="0.00">
+                </div>
+                {% endfor %}
+                {% if deductions %}
+                <hr>
+                <h3 class="h6 text-muted mb-3">Fixed Monthly Deductions</h3>
+                <p class="small text-muted">PAYE and SSNIT are computed automatically. Add Tier 3 pension, welfare levy, etc.</p>
+                {% for dtype in deductions %}
+                <div class="mb-3">
+                    <label class="form-label">{{ dtype.name }}</label>
+                    <input type="number" name="deduction_{{ dtype.code }}" step="0.01" min="0" class="form-control" placeholder="0.00">
+                </div>
+                {% endfor %}
+                {% endif %}
+                <button type="submit" class="btn btn-primary">Save Profile</button>
+                <a href="{% url 'payroll:employee_detail' employee.pk %}" class="btn btn-link">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

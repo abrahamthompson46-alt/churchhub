@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}{{ user_obj.username }} — User Management{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'accounts:user_list' %}">Users</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ user_obj.username }}</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle="Administration" page_title=user_obj.get_full_name|default:user_obj.username page_description=user_obj.get_role_display %}
+
+    <div class="d-flex gap-2 mb-4 align-items-center">
+        <span class="text-muted small">@{{ user_obj.username }}</span>
+        {% if user_obj.is_active %}
+            {% if not is_self %}
+            <form method="post" class="d-inline ms-auto">{% csrf_token %}
+                <input type="hidden" name="action" value="deactivate">
+                <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Deactivate this user?')">Deactivate</button>
+            </form>
+            {% else %}
+            <span class="ms-auto text-muted small">You cannot deactivate your own account.</span>
+            {% endif %}
+        {% else %}
+        <form method="post" class="d-inline ms-auto">{% csrf_token %}
+            <input type="hidden" name="action" value="activate">
+            <button type="submit" class="btn btn-success btn-sm">Activate</button>
+        </form>
+        {% endif %}
+    </div>
+
+    <div class="detail-grid">
+        <div class="panel">
+            <div class="panel-header">Edit User</div>
+            <div class="panel-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="save">
+                    {% for field in form %}
+                        {% include "includes/form_field.html" with field=field %}
+                    {% endfor %}
+                    <p class="text-muted small mb-3">
+                        Status:
+                        {% if user_obj.is_active %}<span class="badge bg-success">Active</span>
+                        {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+                        — use Activate / Deactivate above.
+                    </p>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </form>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header">Recent Activity</div>
+            <ul class="list-plain">
+                {% for log in activity %}
+                <li class="py-2 border-bottom">
+                    <div class="d-flex justify-content-between">
+                        <span class="chip">{{ log.action }}</span>
+                        <small class="text-muted">{{ log.created_at|date:"M j, H:i" }}</small>
+                    </div>
+                    {% if log.performed_by %}<small class="text-muted">by {{ log.performed_by.username }}</small>{% endif %}
+                </li>
+                {% empty %}
+                <li class="py-3 text-muted small">No activity recorded.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

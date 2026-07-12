@@ -1,0 +1,16 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block content %}
+<div class="admin-quick-links">
+    <a class="button" href="/platform/">Platform Control Panel</a>
+    <a class="button" href="/platform/settings/">Site Settings</a>
+    <a class="button" href="/platform/subscriptions/">Tenant Subscriptions</a>
+    <a class="button" href="/dashboard/">Open Application</a>
+</div>
+{{ block.super }}
+{% endblock %}
+
+{% block sidebar %}
+{{ block.super }}
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Terminology — {{ denomination.name }}{% endblock %}
+
+{% block content %}
+{% include "sitecontrol/includes/denomination_nav.html" with active_tab="terminology" %}
+
+<div class="platform-card">
+    <div class="platform-card-header">
+        <span>Hierarchy labels &amp; visibility</span>
+    </div>
+    <div class="card-body">
+        <p class="text-muted small mb-4">Configure how each organizational level appears in navigation, forms, and reports. Disable levels your denomination does not use.</p>
+        <form method="post">
+            {% csrf_token %}
+            <div class="row g-3">
+                {% for field in form %}
+                <div class="col-md-4 {% if field.field.widget.input_type == 'checkbox' %}col-12{% endif %}">
+                    {% if field.field.widget.input_type == 'checkbox' %}
+                    <div class="platform-form-check border rounded p-3 bg-light">
+                        {{ field }}
+                        <label class="form-check-label fw-semibold ms-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    </div>
+                    {% else %}
+                    <label class="form-label small fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% endif %}
+                    {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                {% if forloop.counter|divisibleby:3 %}
+                <div class="col-12"><hr class="my-1 border-light"></div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary btn-sm">Save terminology</button>
+                <a href="{% url 'sitecontrol:denomination_detail' denomination.pk %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

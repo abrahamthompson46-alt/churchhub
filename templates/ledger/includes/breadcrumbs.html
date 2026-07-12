@@ -1,0 +1,18 @@
+{% comment %}
+Ledger breadcrumb trail.
+Usage: {% include "ledger/includes/breadcrumbs.html" with crumbs=crumbs %}
+crumbs = list of {label, url?} — last item omits url for active state.
+{% endcomment %}
+{% if crumbs %}
+<nav aria-label="breadcrumb" class="app-breadcrumb">
+    <ol class="breadcrumb mb-0">
+        {% for crumb in crumbs %}
+        {% if crumb.url %}
+        <li class="breadcrumb-item"><a href="{{ crumb.url }}">{{ crumb.label }}</a></li>
+        {% else %}
+        <li class="breadcrumb-item active" aria-current="page">{{ crumb.label }}</li>
+        {% endif %}
+        {% endfor %}
+    </ol>
+</nav>
+{% endif %}

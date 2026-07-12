@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}{{ conference.name }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'organization:hierarchy' %}">Organization</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ conference.name }}</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle="Conference" page_title=conference.name page_description=conference.code %}
+
+    {% if can_manage %}
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{% url 'organization:zone_create' %}?conference={{ conference.id }}" class="btn btn-primary btn-sm">Add Zone</a>
+        <a href="{% url 'organization:conference_edit' conference.id %}" class="btn btn-outline-secondary btn-sm">Edit</a>
+    </div>
+    {% endif %}
+
+    <div class="panel">
+        <div class="panel-header">Zones ({{ zones|length }})</div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead><tr><th>Name</th><th>Code</th><th>Districts</th><th></th></tr></thead>
+                <tbody>
+                    {% for zone in zones %}
+                    <tr>
+                        <td><a href="{% url 'organization:zone_detail' zone.id %}" class="table-link">{{ zone.name }}</a></td>
+                        <td class="text-muted"><span class="chip">{{ zone.code }}</span></td>
+                        <td>{{ zone.district_count }}</td>
+                        <td class="text-end">
+                            {% if can_manage %}
+                            <a href="{% url 'organization:district_create' %}?zone={{ zone.id }}" class="table-link small">Add District</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4">{% include "includes/empty_state.html" with message="No zones yet." %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Upcoming — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Communications" page_title="Upcoming Events & Birthdays" page_description="Birthdays, meetings, and scheduled church events in one place." %}
+
+    <div class="calendar-toolbar mb-4">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-auto">
+                <label class="form-label small text-muted mb-1">Show</label>
+                <select name="category" class="form-select form-select-sm">
+                    <option value="all" {% if category == "all" %}selected{% endif %}>All</option>
+                    <option value="birthdays" {% if category == "birthdays" %}selected{% endif %}>Birthdays</option>
+                    <option value="meetings" {% if category == "meetings" %}selected{% endif %}>Meetings</option>
+                    <option value="events" {% if category == "events" %}selected{% endif %}>Scheduled Events</option>
+                </select>
+            </div>
+            <div class="col-md-auto">
+                <label class="form-label small text-muted mb-1">Next</label>
+                <select name="days" class="form-select form-select-sm">
+                    <option value="7" {% if days == 7 %}selected{% endif %}>7 days</option>
+                    <option value="30" {% if days == 30 %}selected{% endif %}>30 days</option>
+                    <option value="60" {% if days == 60 %}selected{% endif %}>60 days</option>
+                    <option value="90" {% if days == 90 %}selected{% endif %}>90 days</option>
+                </select>
+            </div>
+            <div class="col-md-auto">
+                <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="calendar-metrics mb-4">
+        <div class="calendar-metric calendar-metric--birthday">
+            <span class="calendar-metric__value">{{ counts.birthdays }}</span>
+            <span class="calendar-metric__label">Birthdays</span>
+        </div>
+        <div class="calendar-metric calendar-metric--meeting">
+            <span class="calendar-metric__value">{{ counts.meetings }}</span>
+            <span class="calendar-metric__label">Meetings</span>
+        </div>
+        <div class="calendar-metric calendar-metric--event">
+            <span class="calendar-metric__value">{{ counts.events }}</span>
+            <span class="calendar-metric__label">Events</span>
+        </div>
+        {% if counts.today_birthdays %}
+        <div class="calendar-metric calendar-metric--today">
+            <span class="calendar-metric__value">{{ counts.today_birthdays }}</span>
+            <span class="calendar-metric__label">Today</span>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if grouped_items %}
+    <div class="calendar-timeline">
+        {% for day, day_items in grouped_items.items %}
+        <section class="calendar-day">
+            <header class="calendar-day__header">
+                <div class="calendar-day__date">
+                    <span class="calendar-day__weekday">{{ day|date:"l" }}</span>
+                    <span class="calendar-day__full">{{ day|date:"F j, Y" }}</span>
+                </div>
+                {% if day == today %}
+                <span class="chip chip--success">Today</span>
+                {% elif day == tomorrow %}
+                <span class="chip chip--info">Tomorrow</span>
+                {% endif %}
+            </header>
+            <div class="calendar-day__items">
+                {% for item in day_items %}
+                <article class="calendar-item calendar-item--{{ item.kind }}">
+                    <div class="calendar-item__icon"><i class="bi {% if item.kind == 'birthday' %}bi-gift{% elif item.kind == 'meeting' %}bi-calendar-event{% else %}bi-megaphone{% endif %}"></i></div>
+                    <div class="calendar-item__body">
+                        <div class="calendar-item__top">
+                            <h3 class="calendar-item__title">
+                                {% if item.url %}
+                                <a href="{{ item.url }}" class="table-link">{{ item.title }}</a>
+                                {% else %}
+                                {{ item.title }}
+                                {% endif %}
+                            </h3>
+                            <span class="chip chip--muted calendar-item__kind">
+                                {% if item.kind == 'birthday' %}Birthday{% elif item.kind == 'meeting' %}Meeting{% else %}Event{% endif %}
+                            </span>
+                        </div>
+                        {% if item.subtitle %}
+                        <p class="calendar-item__subtitle mb-0">{{ item.subtitle }}</p>
+                        {% endif %}
+                        {% if item.kind != 'birthday' %}
+                        <p class="calendar-item__time text-muted small mb-0">{{ item.date|date:"g:i A" }}</p>
+                        {% elif item.turning_age %}
+                        <p class="calendar-item__time text-muted small mb-0">Turning {{ item.turning_age }}</p>
+                        {% endif %}
+                    </div>
+                    {% if item.kind == 'birthday' and item.member.profile_picture %}
+                    <div class="calendar-item__avatar">
+                        <img src="{{ item.member.profile_picture.url }}" alt="" class="calendar-item__photo">
+                    </div>
+                    {% elif item.kind == 'birthday' and item.member %}
+                    <div class="calendar-item__avatar calendar-item__avatar--initials">
+                        {{ item.member.first_name|first|upper }}{{ item.member.last_name|first|upper }}
+                    </div>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endfor %}
+    </div>
+    {% else %}
+    {% include "includes/empty_state.html" with icon="bi-calendar-heart" message="Nothing scheduled in this period." action_url=create_meeting_url action_label="Schedule a meeting" %}
+    {% endif %}
+</div>
+{% endblock %}

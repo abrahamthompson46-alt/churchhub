@@ -1,0 +1,47 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Audit Log{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-header">
+        <span>Platform Audit Trail</span>
+        <div class="d-flex gap-2 align-items-center">
+            {% if can_export_audit %}
+            <a href="{% url 'sitecontrol:audit_export' %}{% if query %}?q={{ query }}{% endif %}" class="btn btn-sm btn-outline-secondary">Export CSV</a>
+            {% endif %}
+            <form method="get" class="d-flex gap-2">
+                <input type="search" name="q" value="{{ query }}" class="form-control form-control-sm" placeholder="Search…">
+                <button type="submit" class="btn btn-sm btn-primary">Search</button>
+            </form>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead>
+                <tr><th>Timestamp</th><th>Operator</th><th>Action</th><th>Summary</th><th>IP</th></tr>
+            </thead>
+            <tbody>
+            {% for entry in page_obj %}
+            <tr>
+                <td class="small text-muted">{{ entry.created_at|date:"Y-m-d H:i:s" }}</td>
+                <td>{{ entry.user.username|default:"—" }}</td>
+                <td><span class="badge bg-dark">{{ entry.get_action_display }}</span></td>
+                <td>{{ entry.summary }}</td>
+                <td class="small text-muted">{{ entry.ip_address|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-muted p-4">No audit entries found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if page_obj.has_other_pages %}
+    <div class="platform-card-body border-top d-flex justify-content-between">
+        {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}&q={{ query }}">Previous</a>{% else %}<span></span>{% endif %}
+        <span class="text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}&q={{ query }}">Next</a>{% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

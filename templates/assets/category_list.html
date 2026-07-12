@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Asset Categories{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Fixed Assets" page_title="Asset Categories" %}
+    <div class="mb-3">
+        <a href="{% url 'assets:category_create' %}" class="btn btn-primary btn-sm">Custom Category</a>
+        <a href="{% url 'assets:policy_edit' %}" class="btn btn-outline-secondary btn-sm">Depreciation Policy</a>
+    </div>
+    <div class="table-responsive table-in-card">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th><th>Code</th><th>GRA Class</th><th>Life (months)</th><th>Method</th><th>Source</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat in categories %}
+                <tr>
+                    <td>{{ cat.name }}</td>
+                    <td>{{ cat.code }}</td>
+                    <td>{{ cat.get_gra_asset_class_display }}</td>
+                    <td>{{ cat.useful_life_months }}</td>
+                    <td>{{ cat.get_depreciation_method_display }}</td>
+                    <td>{% if cat.is_custom %}Custom{% else %}Platform{% endif %}</td>
+                    <td><a href="{% url 'assets:category_edit' cat.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center text-muted py-4">No categories — run church financial setup.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

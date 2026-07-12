@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ case.case_number }} — Welfare Case{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Welfare" page_title=case.case_number page_description=case.member.full_name %}
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Requested</p><h5 class="mb-0">₵{{ case.amount_requested|floatformat:2 }}</h5></div></div></div>
+        <div class="col-md-3"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Approved</p><h5 class="mb-0">{% if case.amount_approved %}₵{{ case.amount_approved|floatformat:2 }}{% else %}—{% endif %}</h5></div></div></div>
+        <div class="col-md-3"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Status</p><h5 class="mb-0">{{ case.get_status_display }}</h5></div></div></div>
+        <div class="col-md-3"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Priority</p><h5 class="mb-0">{{ case.get_priority_display }}</h5></div></div></div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="panel mb-4">
+                <div class="panel-header">Case Details</div>
+                <div class="panel-body">
+                    <dl class="detail-dl row mb-0">
+                        <dt class="col-sm-4">Member</dt><dd class="col-sm-8"><a href="{% url 'remittance:member_welfare' case.member_id %}" class="table-link">{{ case.member.full_name }}</a></dd>
+                        <dt class="col-sm-4">Assistance Type</dt><dd class="col-sm-8">{{ case.get_assistance_type_display }}</dd>
+                        <dt class="col-sm-4">Reason</dt><dd class="col-sm-8">{{ case.reason }}</dd>
+                        <dt class="col-sm-4">Created</dt><dd class="col-sm-8">{{ case.created_at }} {% if case.created_by %}by {{ case.created_by }}{% endif %}</dd>
+                        {% if case.reviewed_at %}<dt class="col-sm-4">Reviewed</dt><dd class="col-sm-8">{{ case.reviewed_at }}{% if case.review_notes %} — {{ case.review_notes }}{% endif %}</dd>{% endif %}
+                        {% if case.approved_at %}<dt class="col-sm-4">Decision</dt><dd class="col-sm-8">{{ case.approved_at }}{% if case.approved_by %} by {{ case.approved_by }}{% endif %}</dd>{% endif %}
+                        {% if case.rejection_reason %}<dt class="col-sm-4">Rejection</dt><dd class="col-sm-8">{{ case.rejection_reason }}</dd>{% endif %}
+                        {% if case.disbursed_at %}<dt class="col-sm-4">Disbursed</dt><dd class="col-sm-8">{{ case.disbursed_at }}{% if case.disbursed_by %} by {{ case.disbursed_by }}{% endif %}</dd>{% endif %}
+                        {% if case.disbursement_transaction %}<dt class="col-sm-4">Transaction</dt><dd class="col-sm-8"><a href="{% url 'transactions:transaction_detail' case.disbursement_transaction_id %}" class="table-link">{{ case.disbursement_transaction.reference }}</a></dd>{% endif %}
+                    </dl>
+                </div>
+            </div>
+
+            <div class="panel mb-4">
+                <div class="panel-header">Activity Ledger</div>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Description</th><th class="text-end">Amount</th></tr></thead>
+                        <tbody>
+                            {% for entry in ledger_entries %}
+                            <tr>
+                                <td>{{ entry.entry_date }}</td>
+                                <td>{{ entry.get_entry_type_display }}</td>
+                                <td>{{ entry.reference|default:"—" }}</td>
+                                <td>{{ entry.description|default:"—" }}</td>
+                                <td class="text-end">{% if entry.direction == 'IN' %}+{% elif entry.direction == 'OUT' %}-{% endif %}₵{{ entry.amount|floatformat:2 }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="text-muted text-center py-3">No ledger entries.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">Attachments</div>
+                <div class="panel-body">
+                    <ul class="list-plain mb-3">
+                        {% for att in attachments %}
+                        <li><a href="{{ att.file.url }}" class="table-link" target="_blank" rel="noopener">{{ att.label|default:att.file.name }}</a> <span class="text-muted small">{{ att.uploaded_at }}</span></li>
+                        {% empty %}
+                        <li class="text-muted">No attachments.</li>
+                        {% endfor %}
+                    </ul>
+                    {% if can_manage and case.status != 'DISBURSED' %}
+                    <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="upload_attachment">
+                        <div class="col-md-4">{{ attachment_form.label }}</div>
+                        <div class="col-md-5">{{ attachment_form.file }}</div>
+                        <div class="col-md-3"><button type="submit" class="btn btn-sm btn-outline-primary w-100">Upload</button></div>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="panel">
+                <div class="panel-header">Actions</div>
+                <div class="panel-body d-grid gap-2">
+                    {% if case.status == 'PENDING' and can_manage %}
+                    <form method="post" action="{% url 'remittance:welfare_case_action' case.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="review">
+                        <input type="hidden" name="next" value="{% url 'remittance:welfare_case_detail' case.pk %}">
+                        <label class="form-label small text-muted">Review notes</label>
+                        <textarea name="review_notes" class="form-control form-control-sm mb-2" rows="2"></textarea>
+                        <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Send to Review</button>
+                    </form>
+                    <form method="post" action="{% url 'remittance:welfare_case_action' case.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="cancel">
+                        <input type="hidden" name="next" value="{% url 'remittance:welfare' %}">
+                        <button type="submit" class="btn btn-sm btn-outline-warning w-100">Cancel Case</button>
+                    </form>
+                    {% endif %}
+
+                    {% if case.status == 'PENDING' or case.status == 'UNDER_REVIEW' %}
+                    {% if can_approve %}
+                    <form method="post" action="{% url 'remittance:welfare_case_action' case.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="approve">
+                        <input type="hidden" name="next" value="{% url 'remittance:welfare_case_detail' case.pk %}">
+                        <label class="form-label small text-muted">Approve amount</label>
+                        <input type="number" name="amount_approved" step="0.01" min="0.01" placeholder="{{ case.amount_requested }}" class="form-control form-control-sm mb-2">
+                        <button type="submit" class="btn btn-sm btn-success w-100">Approve</button>
+                    </form>
+                    <form method="post" action="{% url 'remittance:welfare_case_action' case.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="reject">
+                        <input type="hidden" name="next" value="{% url 'remittance:welfare_case_detail' case.pk %}">
+                        <label class="form-label small text-muted">Rejection reason</label>
+                        <textarea name="rejection_reason" class="form-control form-control-sm mb-2" rows="2"></textarea>
+                        <button type="submit" class="btn btn-sm btn-outline-danger w-100">Reject</button>
+                    </form>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if case.status == 'APPROVED' and can_manage %}
+                    <form method="post" action="{% url 'remittance:welfare_case_action' case.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="disburse">
+                        <input type="hidden" name="next" value="{% url 'remittance:welfare_case_detail' case.pk %}">
+                        <label class="form-label small text-muted">Pay from</label>
+                        <select name="payment_account_type" class="form-select form-select-sm mb-2">
+                            <option value="CASH">Cash</option>
+                            <option value="BANK">Bank</option>
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-primary w-100">Disburse ₵{{ case.amount_approved|floatformat:2 }}</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

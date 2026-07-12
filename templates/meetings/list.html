@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Meetings — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% url 'meetings:create' as schedule_url %}
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="People" page_title="Meetings" page_description="Search board and church meetings, minutes, and decisions." action_url=schedule_url action_label="Schedule" action_icon="bi-plus-lg" %}
+
+    <form method="get" class="filter-bar mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Search</label>
+                {{ filter_form.q }}
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Type</label>
+                {{ filter_form.meeting_type }}
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Status</label>
+                {{ filter_form.status }}
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Minutes</label>
+                {{ filter_form.minutes_status }}
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small text-muted mb-1">From</label>
+                {{ filter_form.date_from }}
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small text-muted mb-1">To</label>
+                {{ filter_form.date_to }}
+            </div>
+            <div class="col-md-auto d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                <a href="{% url 'meetings:list' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+            </div>
+        </div>
+    </form>
+
+    {% if pending_count %}
+    <div class="alert alert-warning py-2 small mb-3 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-hourglass-split me-1"></i>{{ pending_count }} meeting minute(s) awaiting approval.</span>
+        <a href="{% url 'meetings:pending_minutes' %}" class="fw-semibold">Review queue →</a>
+    </div>
+    {% endif %}
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Minutes</th>
+                        <th>Department</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in meetings %}
+                    <tr>
+                        <td><a href="{% url 'meetings:detail' m.pk %}" class="table-link fw-semibold">{{ m.title }}</a></td>
+                        <td><span class="chip chip--muted">{{ m.get_meeting_type_display }}</span></td>
+                        <td>{{ m.scheduled_at|date:"M j, Y g:i A" }}</td>
+                        <td><span class="chip">{{ m.get_status_display }}</span></td>
+                        <td>
+                            <span class="chip {% if m.minutes_status == 'APPROVED' %}chip--success{% elif m.minutes_status == 'PENDING_APPROVAL' %}chip--warning{% elif m.minutes_status == 'REJECTED' %}chip--danger{% else %}chip--muted{% endif %}">
+                                {{ m.get_minutes_status_display }}
+                            </span>
+                        </td>
+                        <td>{{ m.department.name|default:"—" }}</td>
+                        <td class="text-end"><a href="{% url 'meetings:detail' m.pk %}" class="btn btn-sm btn-outline-primary">View</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7">{% include "includes/empty_state.html" with icon="bi-calendar-event" message="No meetings match your search." action_url=schedule_url action_label="Schedule meeting" %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Mission Control — {{ institution_display_name|default:"ChurchHub" }}{% endblock %}
+
+{% block content %}
+<div class="page-container control-center{% if is_control_center %} control-center--executive{% endif %}">
+
+    <header class="cc-hero dashboard-welcome dashboard-welcome--{{ dashboard_role }}">
+        <div class="cc-hero__grid">
+            <div class="cc-hero__main">
+                <p class="cc-eyebrow">{% if is_control_center %}Mission Control{% else %}Operations Center{% endif %}</p>
+                <h1>Good day{% if user.first_name %}, {{ user.first_name }}{% endif %}</h1>
+                <p class="cc-hero__meta">
+                    {{ current_time|date:"l, F j, Y" }} · {{ role_label }}
+                    {% if active_church %} · {{ active_church.name }}{% elif executive_kpis %} · {{ executive_kpis.church_count }} churches in scope{% endif %}
+                </p>
+                {% if role_focus.headline %}
+                <p class="dashboard-role-focus mb-0">{{ role_focus.headline }}</p>
+                {% endif %}
+            </div>
+
+            {% if org_health %}
+            <div class="cc-hero__health">
+                <div class="cc-health-pill cc-health-pill--{{ org_health.status }}">
+                    <span class="cc-health-pill__dot"></span>
+                    {{ org_health.label }}
+                </div>
+                <div class="cc-health-stats">
+                    {% if org_health.overdue_remittances %}
+                    <span class="cc-health-stat cc-health-stat--danger">{{ org_health.overdue_remittances }} overdue</span>
+                    {% endif %}
+                    {% if org_health.pending_approvals %}
+                    <span class="cc-health-stat">{{ org_health.pending_approvals }} approvals</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if quick_actions %}
+            <div class="cc-hero__actions quick-actions">
+                {% for action in quick_actions|slice:":5" %}
+                <a href="{% if action.report_key %}{% url 'reports:run' action.report_key %}{% else %}{% url action.url_name %}{% endif %}" class="quick-action-btn">
+                    {% if action.icon %}<i class="bi {{ action.icon }}"></i>{% endif %}{{ action.label }}
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </header>
+
+    {% if is_control_center and executive_kpis %}
+    <section class="cc-kpi-grid mb-4" aria-label="Executive KPIs">
+        <a href="{% url 'organization:hierarchy' %}" class="cc-kpi-card">
+            <span class="cc-kpi-card__label">Churches</span>
+            <span class="cc-kpi-card__value">{{ executive_kpis.church_count }}</span>
+            <span class="cc-kpi-card__hint">{{ executive_kpis.district_count }} districts</span>
+        </a>
+        <a href="{% url 'members:list' %}" class="cc-kpi-card">
+            <span class="cc-kpi-card__label">Active Members</span>
+            <span class="cc-kpi-card__value">{{ executive_kpis.member_count|intcomma }}</span>
+            <span class="cc-kpi-card__hint">Across scope</span>
+        </a>
+        <a href="{% url 'reports:run' 'hierarchy_rollup' %}" class="cc-kpi-card cc-kpi-card--primary">
+            <span class="cc-kpi-card__label">Tithe MTD</span>
+            <span class="cc-kpi-card__value text-currency">₵{{ executive_kpis.mtd_tithe|floatformat:0|intcomma }}</span>
+            <span class="cc-kpi-card__hint">{{ executive_kpis.period_label }}</span>
+        </a>
+        <a href="{% url 'reports:run' 'hierarchy_rollup' %}" class="cc-kpi-card cc-kpi-card--teal">
+            <span class="cc-kpi-card__label">Combined MTD</span>
+            <span class="cc-kpi-card__value text-currency">₵{{ executive_kpis.mtd_combined|floatformat:0|intcomma }}</span>
+            <span class="cc-kpi-card__hint">{{ executive_kpis.period_label }}</span>
+        </a>
+        <a href="{% url 'dashboard:cutoff' %}" class="cc-kpi-card cc-kpi-card--warning">
+            <span class="cc-kpi-card__label">Remittance Payable</span>
+            <span class="cc-kpi-card__value text-currency">₵{{ executive_kpis.mtd_remittance_payable|floatformat:0|intcomma }}</span>
+            <span class="cc-kpi-card__hint">Month to date</span>
+        </a>
+        <a href="{% url 'transactions:pending_approvals' %}" class="cc-kpi-card cc-kpi-card--danger">
+            <span class="cc-kpi-card__label">Action Items</span>
+            <span class="cc-kpi-card__value">{{ executive_kpis.action_items }}</span>
+            <span class="cc-kpi-card__hint">{{ executive_kpis.pending_transactions }} txn · {{ executive_kpis.overdue_remittances }} overdue</span>
+        </a>
+    </section>
+    {% endif %}
+
+    <div class="row g-4">
+        <div class="col-xl-4">
+            <section class="cc-panel cc-panel--priority mb-4">
+                <div class="cc-panel__header">
+                    <h2 class="cc-panel__title"><i class="bi bi-lightning-charge"></i> Action Queue</h2>
+                    <span class="cc-panel__badge">{{ action_queue|length }}</span>
+                </div>
+                <ul class="cc-action-queue list-plain mb-0">
+                    {% for item in action_queue %}
+                    <li class="cc-action-item cc-action-item--{{ item.priority }}">
+                        <a href="{% if item.report_key %}{% url 'reports:run' item.report_key %}{% elif item.url_name %}{% url item.url_name %}{{ item.url_suffix|default:'' }}{% else %}#{% endif %}" class="cc-action-item__link">
+                            <span class="cc-action-item__icon"><i class="bi {{ item.icon }}"></i></span>
+                            <span class="cc-action-item__body">
+                                <span class="cc-action-item__title">{{ item.title }}</span>
+                                <span class="cc-action-item__subtitle">{{ item.subtitle }}</span>
+                            </span>
+                            {% if item.count %}<span class="cc-action-item__count">{{ item.count }}</span>{% endif %}
+                        </a>
+                    </li>
+                    {% empty %}
+                    <li class="cc-action-empty">
+                        <i class="bi bi-check-circle text-success"></i>
+                        <p class="mb-0">All clear — no pending actions in your queue.</p>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </section>
+
+            {% if compliance_snapshot and compliance_snapshot.overdue_remittances %}
+            <section class="cc-panel mb-4">
+                <div class="cc-panel__header">
+                    <h2 class="cc-panel__title"><i class="bi bi-shield-exclamation"></i> Compliance</h2>
+                </div>
+                <ul class="list-plain cc-compliance-list mb-0">
+                    {% for row in compliance_snapshot.overdue_remittances %}
+                    <li class="cc-compliance-item">
+                        <span class="fw-medium">{{ row.church }}</span>
+                        <span class="text-muted small d-block">{{ row.month }}</span>
+                        <span class="text-currency text-danger fw-semibold">₵{{ row.amount|floatformat:2|intcomma }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <a href="{% url 'dashboard:cutoff' %}" class="cc-panel__footer-link">Manage cut-offs →</a>
+            </section>
+            {% endif %}
+
+            {% if role_focus.focus %}
+            <div class="role-focus-chips mb-4">
+                {% for item in role_focus.focus %}
+                <span class="chip chip--muted"><i class="bi bi-dot"></i>{{ item }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-xl-8">
+            {% if is_control_center and church_leaderboard %}
+            <section class="cc-panel mb-4">
+                <div class="cc-panel__header">
+                    <h2 class="cc-panel__title"><i class="bi bi-trophy"></i> Church Performance — {{ executive_kpis.period_label }}</h2>
+                    <a href="{% url 'reports:run' 'hierarchy_rollup' %}" class="dash-section__link">Full roll-up →</a>
+                </div>
+                <div class="table-responsive table-in-card">
+                    <table class="table table-sm table-hover mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Church</th>
+                                <th>District</th>
+                                <th class="text-end">Members</th>
+                                <th class="text-end">Giving MTD</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in church_leaderboard %}
+                            <tr>
+                                <td class="text-muted">{{ forloop.counter }}</td>
+                                <td class="fw-medium">{{ row.church }}</td>
+                                <td class="text-muted small">{{ row.district }}</td>
+                                <td class="text-end">{{ row.members|intcomma }}</td>
+                                <td class="text-end text-currency fw-semibold">₵{{ row.mtd_giving|floatformat:0|intcomma }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="text-muted text-center py-3">No giving data for this period.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            {% endif %}
+
+            {% if hierarchy_rollup %}
+            <section class="cc-panel mb-4">
+                <div class="cc-panel__header">
+                    <h2 class="cc-panel__title"><i class="bi bi-bar-chart-steps"></i> District Roll-up — {{ current_time|date:"F Y" }}</h2>
+                    <a href="{% url 'reports:run' 'hierarchy_rollup' %}" class="dash-section__link">Full report →</a>
+                </div>
+                <div class="table-responsive table-in-card">
+                    <table class="table table-sm table-hover mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th>District</th>
+                                <th class="text-end">Churches</th>
+                                <th class="text-end">Tithe</th>
+                                <th class="text-end">Combined</th>
+                                <th class="text-end">Remittance payable</th>
+                                <th class="text-end">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in hierarchy_rollup %}
+                            <tr>
+                                <td class="fw-medium">{{ row.district }}</td>
+                                <td class="text-end">{{ row.church_count }}</td>
+                                <td class="text-end text-currency">₵{{ row.tithe|floatformat:0|intcomma }}</td>
+                                <td class="text-end text-currency">₵{{ row.combined|floatformat:0|intcomma }}</td>
+                                <td class="text-end text-currency">₵{{ row.remittance_payable|floatformat:0|intcomma }}</td>
+                                <td class="text-end text-currency fw-semibold">₵{{ row.total|floatformat:0|intcomma }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            {% endif %}
+
+            {% if show_finance and has_active_church %}
+            <div class="row g-4 mb-4">
+                <div class="col-lg-7">
+                    <section class="cc-panel mb-0">
+                        <div class="cc-panel__header">
+                            <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Income vs Expense — 6 months</h2>
+                        </div>
+                        <div class="cc-panel__body">
+                            <canvas id="trendChart" height="90"></canvas>
+                        </div>
+                    </section>
+                </div>
+                <div class="col-lg-5">
+                    <section class="cc-panel mb-0 h-100">
+                        <div class="cc-panel__header">
+                            <h2 class="cc-panel__title">Church Finance MTD</h2>
+                        </div>
+                        <div class="cc-mini-kpis">
+                            <div class="cc-mini-kpi"><span>Tithe</span><strong class="text-currency">₵{{ tithe_total|floatformat:0|intcomma }}</strong></div>
+                            <div class="cc-mini-kpi"><span>Combined</span><strong class="text-currency">₵{{ combined_total|floatformat:0|intcomma }}</strong></div>
+                            <div class="cc-mini-kpi"><span>Remittance payable</span><strong class="text-currency">₵{{ monthly_cutoff_total|floatformat:0|intcomma }}</strong></div>
+                            <div class="cc-mini-kpi"><span>Net balance</span><strong class="text-currency">₵{{ net_balance|floatformat:0|intcomma }}</strong></div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+            {% elif show_finance and not has_active_church %}
+            <div class="alert-banner alert-warning mb-4">
+                <span>Select a church from the toolbar to view church-level financial charts.</span>
+            </div>
+            {% endif %}
+
+            {% if upcoming_preview %}
+            <section class="cc-panel mb-4">
+                <div class="cc-panel__header">
+                    <h2 class="cc-panel__title"><i class="bi bi-calendar-heart"></i> Upcoming</h2>
+                    <a href="{% url 'announcements:upcoming_calendar' %}" class="dash-section__link">Calendar →</a>
+                </div>
+                <div class="calendar-metrics calendar-metrics--compact mb-3 px-3 pt-3">
+                    <span class="calendar-metric calendar-metric--birthday calendar-metric--sm">
+                        <span class="calendar-metric__value">{{ upcoming_counts.birthdays }}</span>
+                        <span class="calendar-metric__label">Birthdays</span>
+                    </span>
+                    <span class="calendar-metric calendar-metric--meeting calendar-metric--sm">
+                        <span class="calendar-metric__value">{{ upcoming_counts.meetings }}</span>
+                        <span class="calendar-metric__label">Meetings</span>
+                    </span>
+                    <span class="calendar-metric calendar-metric--event calendar-metric--sm">
+                        <span class="calendar-metric__value">{{ upcoming_counts.events }}</span>
+                        <span class="calendar-metric__label">Events</span>
+                    </span>
+                </div>
+                <ul class="list-plain dash-panel dash-panel--flat mb-0 px-3 pb-3">
+                    {% for item in upcoming_preview|slice:":5" %}
+                    <li class="calendar-preview-item calendar-preview-item--{{ item.kind }}">
+                        <span class="calendar-preview-item__icon"><i class="bi {% if item.kind == 'birthday' %}bi-gift{% elif item.kind == 'meeting' %}bi-calendar-event{% else %}bi-megaphone{% endif %}"></i></span>
+                        <div class="flex-grow-1">
+                            {% if item.url %}<a href="{{ item.url }}" class="table-link">{{ item.title }}</a>{% else %}<span class="fw-semibold">{{ item.title }}</span>{% endif %}
+                            <div class="text-muted" style="font-size:0.75rem">{{ item.date|date:"M j" }}{% if item.subtitle %} · {{ item.subtitle }}{% endif %}</div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </section>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not is_control_center %}
+    {% if show_finance and has_active_church %}
+    <div class="row g-3 dash-finance-cards mb-4">
+        <div class="col-sm-6 col-xl-3">
+            <div class="stat-card bg-gradient-primary">
+                <p class="stat-label">Tithe (MTD)</p>
+                <p class="stat-value">₵{{ tithe_total|floatformat:2|intcomma }}</p>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="stat-card bg-gradient-teal">
+                <p class="stat-label">Combined (MTD)</p>
+                <p class="stat-value">₵{{ combined_total|floatformat:2|intcomma }}</p>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="stat-card bg-gradient-success">
+                <p class="stat-label">Income (MTD)</p>
+                <p class="stat-value">₵{{ church_income_total|floatformat:2|intcomma }}</p>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="stat-card bg-gradient-danger">
+                <p class="stat-label">Expenses (MTD)</p>
+                <p class="stat-value">₵{{ expense_total|floatformat:2|intcomma }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if show_members %}
+    <div class="dash-inline-stats mb-4">
+        <div class="dash-inline-stat">
+            <span class="dash-inline-stat__label">Active Members</span>
+            <span class="dash-inline-stat__value"><a href="{% url 'members:list' %}">{{ member_count }}</a></span>
+        </div>
+        <div class="dash-inline-stat dash-inline-stat--warning">
+            <span class="dash-inline-stat__label">Pending Transfers</span>
+            <span class="dash-inline-stat__value"><a href="{% url 'members:transfer_list' %}">{{ pending_transfers|default:0 }}</a></span>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if dashboard_role == 'secretary' and upcoming_meetings is not None %}
+    <div class="row g-4 mt-1">
+        <div class="col-lg-6">
+            <section class="cc-panel mb-0">
+                <div class="cc-panel__header">
+                    <h2 class="cc-panel__title"><i class="bi bi-calendar-event"></i> Upcoming Meetings</h2>
+                    <a href="{% url 'meetings:list' %}" class="dash-section__link">All meetings →</a>
+                </div>
+                <ul class="list-plain dash-panel dash-panel--flat mb-0 px-3 pb-3">
+                    {% for meeting in next_meetings %}
+                    <li class="d-flex justify-content-between align-items-start gap-2 py-2">
+                        <div>
+                            <a href="{% url 'meetings:detail' meeting.pk %}" class="table-link">{{ meeting.title }}</a>
+                            <div class="text-muted" style="font-size:0.75rem">{{ meeting.scheduled_at|date:"M j, Y · g:i A" }}</div>
+                        </div>
+                        <span class="chip chip--muted">{{ meeting.get_meeting_type_display }}</span>
+                    </li>
+                    {% empty %}
+                    <li class="text-muted text-center py-3">No upcoming meetings scheduled.</li>
+                    {% endfor %}
+                </ul>
+            </section>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if show_finance and has_active_church %}
+<script>
+const ctx = document.getElementById('trendChart');
+if (ctx) {
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: {{ trend_labels|safe }},
+            datasets: [
+                { label: 'Income', data: {{ income_data|safe }}, backgroundColor: '#047857', borderRadius: 4, borderSkipped: false },
+                { label: 'Expense', data: {{ expense_data|safe }}, backgroundColor: '#b91c1c', borderRadius: 4, borderSkipped: false }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 12, font: { size: 11 } } } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: '#e8edf4' }, border: { display: false }, ticks: { font: { size: 10 } } },
+                x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 10 } } }
+            }
+        }
+    });
+}
+</script>
+{% endif %}
+{% endblock %}

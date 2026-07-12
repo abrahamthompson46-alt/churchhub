@@ -1,0 +1,24 @@
+{% load churchhub_tags %}
+{% if messages %}
+<div class="flash-stack" id="flash-stack" aria-live="polite" aria-atomic="false">
+    {% for message in messages %}
+    {% with variant=message.tags|alert_class %}
+    <div class="app-flash app-flash--{{ variant }} alert-dismissible fade show"
+         role="alert"
+         data-flash-duration="{% if variant == 'danger' %}10000{% elif variant == 'warning' %}8000{% else %}6000{% endif %}">
+        <div class="app-flash__icon" aria-hidden="true">
+            <i class="bi bi-{{ message.tags|message_icon }}"></i>
+        </div>
+        <div class="app-flash__content">
+            <p class="app-flash__title">{{ message|message_title:message.tags }}</p>
+            {% with body=message|message_body %}
+            {% if body %}<p class="app-flash__body">{{ body }}</p>{% endif %}
+            {% endwith %}
+        </div>
+        <button type="button" class="app-flash__close btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
+        <div class="app-flash__progress" aria-hidden="true"></div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+</div>
+{% endif %}

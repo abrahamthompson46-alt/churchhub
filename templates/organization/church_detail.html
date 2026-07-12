@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}{{ church.name }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'organization:hierarchy' %}">Organization</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'organization:district_detail' church.district_id %}">{{ church.district.name }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ church.name }}</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle="Church" page_title=church.name page_description=church.address %}
+
+    {% if not church.is_active %}
+    <div class="alert alert-warning">This church is marked <strong>inactive</strong> and is hidden from operational workflows.</div>
+    {% endif %}
+
+    {% if can_manage %}
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{% url 'organization:church_edit' church.id %}" class="btn btn-outline-secondary btn-sm">Edit Church</a>
+        {% if is_global_admin %}
+        <a href="{% url 'organization:church_transfer' church.id %}" class="btn btn-outline-primary btn-sm">Transfer</a>
+        {% endif %}
+        <form method="post" action="{% url 'organization:church_toggle_active' church.id %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-{% if church.is_active %}warning{% else %}success{% endif %} btn-sm">
+                Mark as {% if church.is_active %}Inactive{% else %}Active{% endif %}
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="detail-grid">
+        <div class="panel">
+            <div class="panel-header">Details</div>
+            <div class="panel-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Code</dt><dd class="col-sm-8"><span class="chip">{{ church.code }}</span></dd>
+                    <dt class="col-sm-4">District</dt><dd class="col-sm-8"><a href="{% url 'organization:district_detail' church.district_id %}" class="table-link">{{ church.district.name }}</a></dd>
+                    <dt class="col-sm-4">Zone</dt><dd class="col-sm-8"><a href="{% url 'organization:zone_detail' church.district.zone_id %}" class="table-link">{{ church.district.zone.name }}</a></dd>
+                    <dt class="col-sm-4">Conference</dt><dd class="col-sm-8"><a href="{% url 'organization:conference_detail' church.district.zone.conference_id %}" class="table-link">{{ church.district.zone.conference.name }}</a></dd>
+                </dl>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header">Summary</div>
+            <div class="panel-body">
+                <ul class="list-unstyled mb-0">
+                    <li class="d-flex justify-content-between py-2 border-bottom"><span>Active Members</span><strong>{{ member_count }}</strong></li>
+                    <li class="d-flex justify-content-between py-2 border-bottom"><span>Accounts</span><strong>{{ account_count }}</strong></li>
+                    <li class="d-flex justify-content-between py-2"><span>Transactions</span><strong>{{ txn_count }}</strong></li>
+                </ul>
+                <div class="d-grid gap-2 mt-3">
+                    <a href="{% url 'dashboard:home' %}?church={{ church.id }}" class="btn btn-primary btn-sm">Open Dashboard</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

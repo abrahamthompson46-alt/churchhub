@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Remove Override — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container narrow-form">
+    {% include "includes/page_header.html" with page_subtitle="Permissions" page_title="Remove Override" page_description="This user will revert to role-based permissions for this capability." %}
+
+    <div class="data-card">
+        <div class="card-body">
+            <p><strong>{{ override.user.username }}</strong> — {{ override.permission.name }}
+                ({% if override.granted %}grant{% else %}deny{% endif %})</p>
+            <form method="post" class="d-flex gap-2">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm">Remove Override</button>
+                <a href="{% url 'permissions:override_list' %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

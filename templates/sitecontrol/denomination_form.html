@@ -1,0 +1,26 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-header">{{ title }}</div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data" class="platform-form-grid">
+            {% csrf_token %}
+            {% for field in form %}
+            <div class="{% if field.field.widget.input_type == 'checkbox' %}platform-form-check{% elif field.name == 'registration_intro' %}full-width{% else %}{% endif %}">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+            <div class="full-width d-flex gap-2 mt-2">
+                <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                <a href="{% url 'sitecontrol:denomination_list' %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Billing — {{ denomination.name }}{% endblock %}
+
+{% block content %}
+{% include "sitecontrol/includes/denomination_nav.html" with active_tab="billing" %}
+
+<div class="metrics-row mb-3">
+    <div class="platform-stat">
+        <div class="platform-stat-value">{{ summary.church_count }}</div>
+        <div class="platform-stat-label">Churches</div>
+    </div>
+    <div class="platform-stat">
+        <div class="platform-stat-value">{{ summary.active_count }}</div>
+        <div class="platform-stat-label">Active subs</div>
+    </div>
+    <div class="platform-stat">
+        <div class="platform-stat-value">{{ summary.trial_count }}</div>
+        <div class="platform-stat-label">Trial</div>
+    </div>
+    <div class="platform-stat">
+        <div class="platform-stat-value">{{ summary.suspended_count }}</div>
+        <div class="platform-stat-label">Suspended</div>
+    </div>
+    <div class="platform-stat">
+        <div class="platform-stat-value">{{ summary.mrr }}</div>
+        <div class="platform-stat-label">Est. MRR</div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="platform-card">
+            <div class="platform-card-header">Plan distribution</div>
+            <ul class="list-group list-group-flush">
+                {% for row in summary.plans %}
+                <li class="list-group-item d-flex justify-content-between small">
+                    <span>{{ row.plan__name|default:"Unknown" }}</span>
+                    <span class="badge bg-secondary">{{ row.count }}</span>
+                </li>
+                {% empty %}
+                <li class="list-group-item text-muted small">No subscriptions yet.</li>
+                {% endfor %}
+            </ul>
+            {% if summary.churches_without_plan %}
+            <div class="card-body border-top py-2">
+                <span class="badge bg-warning text-dark">{{ summary.churches_without_plan }} church(es) without a plan</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="platform-card">
+            <div class="platform-card-header">Denomination audit trail</div>
+            <div class="table-responsive">
+                <table class="platform-table mb-0">
+                    <thead>
+                        <tr><th>When</th><th>Action</th><th>Summary</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for entry in audit_entries %}
+                    <tr>
+                        <td class="small text-muted text-nowrap">{{ entry.created_at|date:"M j, H:i" }}</td>
+                        <td class="small"><span class="badge bg-dark">{{ entry.get_action_display }}</span></td>
+                        <td class="small">{{ entry.summary }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-muted p-3">No audit entries for this denomination yet.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

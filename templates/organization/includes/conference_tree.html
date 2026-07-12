@@ -1,0 +1,35 @@
+<div class="hierarchy-district ms-2 mb-3">
+    <div class="d-flex align-items-center gap-2 mb-2">
+        <i class="bi bi-globe text-muted"></i>
+        <a href="{% url 'organization:conference_detail' conference.id %}" class="small fw-bold text-uppercase text-muted text-decoration-none">{{ conference.name }}</a>
+        <span class="text-muted">({{ conference.code }})</span>
+        {% if can_manage %}
+        <a href="{% url 'organization:zone_create' %}?conference={{ conference.id }}" class="small">Add Zone</a>
+        {% endif %}
+    </div>
+    {% for zone in conference.zones.all %}
+    <div class="hierarchy-zone ms-3">
+        <div class="hierarchy-zone-title">
+            <i class="bi bi-diagram-3 me-1"></i>
+            <a href="{% url 'organization:zone_detail' zone.id %}" class="text-decoration-none">{{ zone.name }}</a>
+            <span class="text-muted fw-normal">({{ zone.code }})</span>
+        </div>
+        {% for district in zone.districts.all %}
+        <div class="hierarchy-district">
+            <a href="{% url 'organization:district_detail' district.id %}" class="small fw-bold text-uppercase text-muted text-decoration-none">{{ district.name }}</a>
+            <ul class="hierarchy-church-list">
+                {% for church in district.churches.all %}
+                <li><a href="{% url 'organization:church_detail' church.id %}" class="table-link">{{ church.name }}</a> <span class="text-muted">({{ church.code }})</span></li>
+                {% empty %}
+                <li class="text-muted small">No churches{% if can_manage %} — <a href="{% url 'organization:church_create' %}?district={{ district.id }}">Add one</a>{% endif %}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% empty %}
+        <p class="text-muted small ms-3 mb-0">No districts{% if can_manage %} — <a href="{% url 'organization:district_create' %}?zone={{ zone.id }}">Add district</a>{% endif %}</p>
+        {% endfor %}
+    </div>
+    {% empty %}
+    <p class="text-muted small ms-3 mb-0">No zones{% if can_manage %} — <a href="{% url 'organization:zone_create' %}?conference={{ conference.id }}">Add zone</a>{% endif %}</p>
+    {% endfor %}
+</div>

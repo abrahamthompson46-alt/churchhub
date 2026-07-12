@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}User Management — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% url 'accounts:invite_user' as invite_url %}
+    {% if institution_invites_allowed %}
+    {% include "includes/page_header.html" with page_subtitle="Administration" page_title="User Management" page_description="Manage church staff accounts and roles." action_url=invite_url action_label="Invite User" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Administration" page_title="User Management" page_description="User invitations are disabled by the platform owner." %}
+    {% endif %}
+
+    <div class="filter-bar">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
+                <label class="form-label">Search</label>
+                <input type="search" name="q" value="{{ q }}" class="form-control form-control-sm field-search" placeholder="Username or name…">
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Role</label>
+                <select name="role" class="form-select form-select-sm">
+                    <option value="">All roles</option>
+                    {% for value, label in role_choices %}
+                    <option value="{{ value }}" {% if role_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Status</label>
+                <select name="is_active" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    <option value="1" {% if status_filter == "1" %}selected{% endif %}>Active</option>
+                    <option value="0" {% if status_filter == "0" %}selected{% endif %}>Inactive</option>
+                </select>
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Filter</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="data-card mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Church</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'accounts:user_detail' u.pk %}" class="table-link">{{ u.get_full_name|default:u.username }}</a>
+                            <br><span class="text-muted small">@{{ u.username }}</span>
+                        </td>
+                        <td><span class="chip">{{ u.get_role_display }}</span></td>
+                        <td class="text-muted">{{ u.church|default:"—" }}</td>
+                        <td>
+                            {% if u.is_active %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end text-nowrap">
+                            {% if can_manage_permissions %}
+                            <a href="{% url 'permissions:user_effective' u.pk %}" class="btn btn-sm btn-outline-primary">Permissions</a>
+                            {% endif %}
+                            <a href="{% url 'accounts:user_detail' u.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">{% include "includes/empty_state.html" with icon="bi-person-x" message="No users found." %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page_obj.paginator.num_pages > 1 %}
+        <nav class="p-3" aria-label="Users pagination">
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&amp;q={{ q }}&amp;role={{ role_filter }}&amp;is_active={{ status_filter }}">Previous</a></li>
+                {% endif %}
+                <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&amp;q={{ q }}&amp;role={{ role_filter }}&amp;is_active={{ status_filter }}">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+
+    {% if pending_invites %}
+    <div class="panel">
+        <div class="panel-header">Pending Invitations</div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Church</th>
+                        <th>Expires</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in pending_invites %}
+                    <tr>
+                        <td>{{ inv.email }}</td>
+                        <td>{{ inv.username }}</td>
+                        <td>{{ inv.get_role_display }}</td>
+                        <td>{{ inv.church.name }}</td>
+                        <td class="text-muted small">{{ inv.expires_at|date:"M j, Y" }}</td>
+                        <td class="text-end text-nowrap">
+                            <a href="{% url 'accounts:invite_detail' inv.pk %}" class="table-link me-2">Details</a>
+                            {% if inv.is_valid %}
+                            <form method="post" action="{% url 'accounts:invite_resend' inv.pk %}" class="d-inline">{% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Resend</button>
+                            </form>
+                            <form method="post" action="{% url 'accounts:invite_revoke' inv.pk %}" class="d-inline">{% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Revoke this invitation?')">Revoke</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

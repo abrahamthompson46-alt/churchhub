@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ category.name }} — Ledger{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% url 'ledger:index' as ledger_url %}
+    {% url 'ledger:categories' as categories_url %}
+    {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
+
+    {% include "includes/page_header.html" with page_subtitle=category.get_transaction_type_display page_title=category.name page_description="Posting template — debit and credit accounts are applied automatically when you record an entry." %}
+
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="dash-panel">
+                <div class="dash-section__header mb-3">
+                    <h2 class="dash-section__title">Posting Rules</h2>
+                    <span class="chip chip--muted"><code>{{ category.code }}</code></span>
+                </div>
+                <dl class="row mb-0 ledger-confirm-dl">
+                    <dt class="col-sm-5 text-muted">Transaction Type</dt>
+                    <dd class="col-sm-7">{{ category.get_transaction_type_display }}</dd>
+
+                    <dt class="col-sm-5 text-muted">Debit Account</dt>
+                    <dd class="col-sm-7 fw-semibold">{{ category.default_debit_account.name }}</dd>
+
+                    <dt class="col-sm-5 text-muted">Credit Account</dt>
+                    <dd class="col-sm-7 fw-semibold">{{ category.default_credit_account.name }}</dd>
+
+                    <dt class="col-sm-5 text-muted">Default Narration</dt>
+                    <dd class="col-sm-7">{{ category.default_narration|default:"—" }}</dd>
+
+                    <dt class="col-sm-5 text-muted">Member Required</dt>
+                    <dd class="col-sm-7">{% if category.requires_member %}Yes{% else %}No{% endif %}</dd>
+
+                    <dt class="col-sm-5 text-muted">District Remittance</dt>
+                    <dd class="col-sm-7">{% if category.remit_to_district %}Policy-driven retain/remit split on post{% else %}Flat credit to template account{% endif %}</dd>
+                </dl>
+                <div class="mt-4 pt-3 border-top">
+                    <a href="{% url 'ledger:entry' %}?category={{ category.pk }}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-journal-plus me-1"></i>Post Entry with This Category
+                    </a>
+                    <a href="{% url 'ledger:category_edit' category.pk %}" class="btn btn-outline-secondary btn-sm ms-1">Edit</a>
+                    <a href="{% url 'ledger:categories' %}?type={{ category.transaction_type }}" class="btn btn-outline-secondary btn-sm ms-1">All {{ category.get_transaction_type_display }} Categories</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <section class="dash-section mb-4">
+                <div class="dash-section__header">
+                    <h2 class="dash-section__title">Sample Journal Entry</h2>
+                </div>
+                <p class="text-muted small mb-2">For a ₵ 100.00 transaction using this category:</p>
+                {% include "ledger/includes/journal_preview.html" with draft=sample_draft %}
+            </section>
+
+            <section class="dash-section mb-0">
+                <div class="dash-section__header">
+                    <h2 class="dash-section__title">Recent Entries</h2>
+                    <a href="{% url 'ledger:entries' %}?type={{ category.transaction_type }}" class="dash-section__link">All entries →</a>
+                </div>
+                {% include "includes/table_open.html" with flush=True %}
+                <table class="table table-sm mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th>Reference</th>
+                            <th>Date</th>
+                            <th class="text-end">Amount</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in recent_entries %}
+                        <tr>
+                            <td><a href="{% url 'transactions:transaction_detail' t.pk %}" class="table-link small">{{ t.reference }}</a></td>
+                            <td class="small text-muted">{{ t.date|date:"M j, Y" }}</td>
+                            <td class="text-end text-currency small">₵ {{ t.receipt_total|floatformat:2|intcomma }}</td>
+                            <td><span class="chip chip--{% if t.approval_status == 'APPROVED' %}success{% elif t.approval_status == 'PENDING' %}warning{% else %}muted{% endif %}">{{ t.get_approval_status_display }}</span></td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4">{% include "includes/empty_state.html" with icon="bi-journal" message="No entries posted with this category yet." action_url=entry_url action_label="Post first entry" %}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% include "includes/table_close.html" %}
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

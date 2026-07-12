@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Employees — Payroll{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Payroll" page_title="Employees" page_description="Staff and stipend recipients at {{ active_church.name }}." %}
+    <div class="d-flex gap-2 mb-3">
+        <a href="{% url 'payroll:employee_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Add Employee</a>
+        <a href="{% url 'payroll:index' %}" class="btn btn-outline-secondary btn-sm">Payroll Home</a>
+    </div>
+    <div class="table-wrap table-wrap--center table-wrap--compact">
+        <div class="table-responsive table-in-card">
+            <table class="table table-hover table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>No.</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp in employees %}
+                    <tr>
+                        <td>{{ emp.employee_number }}</td>
+                        <td>{{ emp.full_name }}</td>
+                        <td>{{ emp.get_employment_type_display }}</td>
+                        <td>{% if emp.department %}{{ emp.department.name }}{% else %}—{% endif %}</td>
+                        <td>{{ emp.get_status_display }}</td>
+                        <td class="text-end"><a href="{% url 'payroll:employee_detail' emp.pk %}" class="btn btn-sm btn-outline-secondary">View</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="text-muted text-center py-4">No employees registered.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

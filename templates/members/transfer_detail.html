@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Transfer — {{ transfer.member }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'members:transfer_list' %}">Transfers</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ transfer.member }}</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle="Member Transfer" page_title=transfer.member %}
+
+    <p class="page-lead mb-4">{{ transfer.from_church.name }} → {{ transfer.to_church.name }} · <span class="chip">{{ transfer.status }}</span></p>
+
+    <div class="detail-grid">
+        <div class="panel">
+            <div class="panel-header">Transfer Details</div>
+            <div class="panel-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted">Transfer Date</dt><dd class="col-sm-8">{{ transfer.transfer_date }}</dd>
+                    <dt class="col-sm-4 text-muted">Requested By</dt><dd class="col-sm-8">{{ transfer.requested_by|default:"—" }}</dd>
+                    <dt class="col-sm-4 text-muted">Reason</dt><dd class="col-sm-8">{{ transfer.reason|default:"—"|linebreaksbr }}</dd>
+                    {% if transfer.processed_by %}
+                    <dt class="col-sm-4 text-muted">Processed By</dt><dd class="col-sm-8">{{ transfer.processed_by }} ({{ transfer.processed_at|date:"M j, Y H:i" }})</dd>
+                    <dt class="col-sm-4 text-muted">Notes</dt><dd class="col-sm-8">{{ transfer.notes|default:"—" }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        {% if can_process %}
+        <div class="panel">
+            <div class="panel-header">Process Transfer</div>
+            <div class="panel-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" name="action" value="complete" class="btn btn-success btn-sm">Complete Transfer</button>
+                        <button type="submit" name="action" value="reject" class="btn btn-outline-danger btn-sm">Reject</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

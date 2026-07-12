@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            {% include "includes/page_header.html" with page_subtitle="Payroll" page_title=title %}
+            <div class="form-card-inner card">
+                <div class="card-body p-4">
+                    <form method="post">
+                        {% csrf_token %}
+                        {% for field in form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <a href="{% url 'payroll:policy_index' %}" class="btn btn-link">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

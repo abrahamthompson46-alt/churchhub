@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Roles — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Permissions" page_title="Application Roles" page_description="Each role receives a default set of permissions from the matrix." %}
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Role</th>
+                        <th>Permissions Granted</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in roles %}
+                    <tr>
+                        <td class="fw-medium">{{ r.label }}</td>
+                        <td>
+                            <span class="chip">{{ r.granted_count }} / {{ r.total }}</span>
+                        </td>
+                        <td class="text-end">
+                            <a href="{% url 'permissions:role_detail' r.role %}" class="btn btn-sm btn-outline-primary">View</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

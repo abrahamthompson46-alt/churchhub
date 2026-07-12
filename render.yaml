@@ -1,0 +1,57 @@
+# Render Blueprint — ChurchHub production stack
+# Deploy: connect repo at https://dashboard.render.com → New → Blueprint
+# Or: render blueprint apply
+
+services:
+  - type: web
+    name: churchhub
+    runtime: python
+    # Use `free` for trials (cold starts) or `starter` for always-on production
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: chmod +x scripts/render_build.sh scripts/render_start.sh && ./scripts/render_build.sh
+    startCommand: ./scripts/render_start.sh
+    healthCheckPath: /health/
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.0"
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_SETTINGS_MODULE
+        value: church_system.settings
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false
+        value: churchhub.onrender.com
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        sync: false
+        value: https://churchhub.onrender.com
+      - key: CHURCHHUB_PUBLIC_URL
+        sync: false
+        value: https://churchhub.onrender.com
+      - key: CHURCHHUB_BOOTSTRAP
+        value: "1"
+      - key: DJANGO_SUPERUSER_USERNAME
+        value: platform
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false
+        value: owner@your-domain.example
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: churchhub-db
+          property: connectionString
+      - key: WEB_CONCURRENCY
+        value: "2"
+
+databases:
+  - name: churchhub-db
+    plan: basic-256mb
+    region: frankfurt
+    databaseName: churchhub
+    user: churchhub

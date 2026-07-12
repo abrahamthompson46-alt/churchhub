@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Reports — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Analytics" page_title="Report Center" page_description="Generate and export reports by period, church, and department." %}
+
+    <div class="report-grid">
+        {% for r in reports %}
+        <article class="report-card">
+            <div class="report-card-icon"><i class="bi {{ r.icon }}"></i></div>
+            <h3>{{ r.label }}</h3>
+            <p>{{ r.description }}</p>
+            <a href="{% url 'reports:run' r.key %}" class="btn btn-primary btn-sm">Run Report <i class="bi bi-arrow-right ms-1"></i></a>
+        </article>
+        {% empty %}
+        {% include "includes/empty_state.html" with icon="bi-file-bar-graph" message="No reports available for your role." %}
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

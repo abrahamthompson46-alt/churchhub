@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Permission Matrix — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Permissions" page_title="Role-Permission Matrix" page_description="Check a cell to grant a permission to a role. User-specific overrides are managed separately." %}
+
+    <form method="post" class="data-card mb-4">
+        {% csrf_token %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle permission-matrix mb-0">
+                <thead>
+                    <tr>
+                        <th class="matrix-sticky">Permission</th>
+                        {% for role, label in roles %}
+                        <th class="text-center matrix-role-col">{{ label }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for section in matrix_rows %}
+                    <tr class="matrix-category-row">
+                        <td colspan="{{ roles|length|add:1 }}"><strong>{{ section.category }}</strong></td>
+                    </tr>
+                    {% for row in section.rows %}
+                    <tr>
+                        <td class="matrix-sticky">
+                            <span class="fw-medium">{{ row.permission.name }}</span>
+                            <span class="d-block small text-muted">{{ row.permission.description|truncatewords:14 }}</span>
+                            {% if row.implies %}
+                            <span class="d-block small text-info">Implies: {{ row.implies|join:", " }}</span>
+                            {% endif %}
+                            {% if row.conflicts_with %}
+                            <span class="d-block small text-warning">Conflicts: {{ row.conflicts_with|join:", " }}</span>
+                            {% endif %}
+                        </td>
+                        </td>
+                        {% for cell in row.cells %}
+                        <td class="text-center">
+                            <div class="form-check d-flex justify-content-center mb-0">
+                                <input type="checkbox" class="form-check-input matrix-check"
+                                       name="{{ cell.field_name }}"
+                                       id="{{ cell.field_name }}"
+                                       {% if cell.granted %}checked{% endif %}>
+                            </div>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer d-flex flex-wrap gap-2 justify-content-between">
+            <button type="submit" name="save" class="btn btn-primary btn-sm">
+                <i class="bi bi-check-lg me-1"></i>Save Matrix
+            </button>
+            <div class="d-flex gap-2">
+                <a href="{% url 'permissions:index' %}" class="btn btn-outline-secondary btn-sm">Back</a>
+                <a href="{% url 'permissions:export_matrix' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-download me-1"></i>Export CSV
+                </a>
+                <button type="submit" name="reset_defaults" class="btn btn-outline-danger btn-sm"
+                        onclick="return confirm('Reset entire matrix to defaults?');">
+                    Reset to Defaults
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

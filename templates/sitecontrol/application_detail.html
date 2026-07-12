@@ -1,0 +1,114 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}{{ application.church_name }}{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Application · {{ application.get_status_display }}</p>{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="platform-card">
+            <div class="platform-card-header">Application details</div>
+            <div class="platform-card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Church</dt><dd class="col-sm-8">{{ application.church_name }} ({{ application.church_code }})</dd>
+                    <dt class="col-sm-4">Type</dt><dd class="col-sm-8">{{ application.get_application_type_display }}</dd>
+                    {% if application.district %}
+                    <dt class="col-sm-4">District</dt><dd class="col-sm-8">{{ application.district.name }} · {{ application.district.zone.name }}</dd>
+                    {% else %}
+                    <dt class="col-sm-4">New path</dt>
+                    <dd class="col-sm-8">{{ application.conference_name }} / {{ application.zone_name }} / {{ application.district_name }}</dd>
+                    {% endif %}
+                    <dt class="col-sm-4">Address</dt><dd class="col-sm-8">{{ application.address|default:"—" }}</dd>
+                    <dt class="col-sm-4">Contact</dt><dd class="col-sm-8">{{ application.contact_name }} · {{ application.contact_email }}{% if application.contact_phone %} · {{ application.contact_phone }}{% endif %}</dd>
+                    <dt class="col-sm-4">Username</dt><dd class="col-sm-8"><code>{{ application.applicant_username }}</code></dd>
+                    {% if application.applicant_notes %}
+                    <dt class="col-sm-4">Notes</dt><dd class="col-sm-8">{{ application.applicant_notes }}</dd>
+                    {% endif %}
+                    <dt class="col-sm-4">Submitted</dt><dd class="col-sm-8">{{ application.created_at|date:"Y-m-d H:i" }}{% if application.ip_address %} · {{ application.ip_address }}{% endif %}</dd>
+                </dl>
+            </div>
+        </div>
+
+        {% if application.status == 'APPROVED' and application.created_church %}
+        <div class="platform-card">
+            <div class="platform-card-header">Provisioned resources</div>
+            <div class="platform-card-body">
+                <p class="mb-2"><strong>Church:</strong> <a href="{% url 'sitecontrol:tenant_detail' application.created_church.pk %}">{{ application.created_church.name }}</a></p>
+                {% if application.invitation %}
+                <p class="mb-0"><strong>Invite link:</strong> <a href="{% url 'accounts:accept_invite' application.invitation.token %}">{% url 'accounts:accept_invite' application.invitation.token %}</a></p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if application.review_notes %}
+        <div class="platform-card">
+            <div class="platform-card-header">Review notes</div>
+            <div class="platform-card-body">{{ application.review_notes|linebreaks }}</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        {% if application.is_pending %}
+        <div class="platform-card">
+            <div class="platform-card-header">Review</div>
+            <div class="platform-card-body">
+                <p class="small text-muted">Approving creates the church, assigns a subscription plan, and sends an invite to the applicant.</p>
+                <form method="post" action="{% url 'sitecontrol:application_approve' application.pk %}" class="mb-3">
+                    {% csrf_token %}
+                    <div class="mb-2">
+                        <label class="form-label">Plan</label>
+                        {{ form.plan }}
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label">Status</label>
+                            {{ form.status }}
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Billing</label>
+                            {{ form.billing_interval }}
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Payment method</label>
+                        {{ form.payment_method }}
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Payment reference</label>
+                        {{ form.payment_reference }}
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label">Trial days</label>
+                            {{ form.trial_days }}
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">First user role</label>
+                            {{ form.admin_role }}
+                        </div>
+                    </div>
+                    <label class="form-label">Notes (optional)</label>
+                    {{ form.review_notes }}
+                    <button type="submit" class="btn btn-success w-100 mt-3" onclick="return confirm('Approve and provision this church?')">
+                        <i class="bi bi-check-lg me-1"></i>Approve
+                    </button>
+                </form>
+                <form method="post" action="{% url 'sitecontrol:application_reject' application.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Reject this application?')">Reject without notes</button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="platform-card">
+            <div class="platform-card-body">
+                <p class="mb-1"><strong>Reviewed by:</strong> {{ application.reviewed_by.username|default:"—" }}</p>
+                <p class="mb-0 text-muted small">{{ application.reviewed_at|date:"Y-m-d H:i" }}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

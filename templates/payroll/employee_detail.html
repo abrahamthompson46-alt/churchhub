@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}{{ employee.full_name }} — Payroll{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Payroll" page_title=employee.full_name page_description=employee.job_title|default:employee.get_employment_type_display %}
+
+    <div class="dash-inline-stats mb-4">
+        <div class="dash-inline-stat">
+            <span class="dash-inline-stat__label">Employee No.</span>
+            <span class="dash-inline-stat__value">{{ employee.employee_number }}</span>
+        </div>
+        <div class="dash-inline-stat">
+            <span class="dash-inline-stat__label">YTD Gross ({{ ytd.year }})</span>
+            <span class="dash-inline-stat__value">₵{{ ytd.gross|floatformat:2 }}</span>
+        </div>
+        <div class="dash-inline-stat">
+            <span class="dash-inline-stat__label">YTD PAYE</span>
+            <span class="dash-inline-stat__value">₵{{ ytd.paye|floatformat:2 }}</span>
+        </div>
+    </div>
+
+    <p class="small text-muted mb-2">Paying unit: <strong>{{ unit_label }}</strong>{% if employee.user %} · Portal user: {{ employee.user.username }}{% endif %}</p>
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{% url 'payroll:employee_edit' employee.pk %}" class="btn btn-outline-secondary btn-sm">Edit</a>
+        <a href="{% url 'payroll:compensation_create' employee.pk %}" class="btn btn-primary btn-sm">Set Compensation</a>
+        <a href="{% url 'payroll:loan_create' employee.pk %}" class="btn btn-outline-secondary btn-sm">Add Loan/Advance</a>
+        <a href="{% url 'payroll:tax_certificate' employee.pk %}?year={{ ytd.year }}" class="btn btn-outline-secondary btn-sm" target="_blank">Tax Certificate</a>
+        <a href="{% url 'payroll:employee_list' %}" class="btn btn-link btn-sm">Back</a>
+    </div>
+
+    <section class="dash-section mb-4">
+        <div class="dash-section__header"><h2 class="dash-section__title">Compensation Profiles</h2></div>
+        <div class="table-responsive table-in-card">
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Effective From</th><th>Active</th><th>Components</th></tr></thead>
+                <tbody>
+                    {% for comp in compensations %}
+                    <tr>
+                        <td>{{ comp.effective_from }}</td>
+                        <td>{% if comp.is_active %}Yes{% else %}No{% endif %}</td>
+                        <td>
+                            {% for line in comp.lines.all %}
+                                {% if line.line_type == "EARNING" %}{{ line.pay_component.name }}: ₵{{ line.amount|floatformat:2 }}{% if not forloop.last %}; {% endif %}{% endif %}
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-muted">No compensation profile — set one before running payroll.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    {% if loans %}
+    <section class="dash-section">
+        <div class="dash-section__header"><h2 class="dash-section__title">Active Loans</h2></div>
+        <div class="table-responsive table-in-card">
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Description</th><th class="text-end">Balance</th><th class="text-end">Monthly</th></tr></thead>
+                <tbody>
+                    {% for loan in loans %}
+                    <tr>
+                        <td>{{ loan.description|default:"Loan" }}</td>
+                        <td class="text-end">₵{{ loan.balance|floatformat:2 }}</td>
+                        <td class="text-end">₵{{ loan.monthly_recovery|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

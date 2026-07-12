@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Settlement Batches — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Settlement Batches" page_description="Hierarchy settlements between church, district, conference, union, and general conference." %}
+
+    {% if can_edit %}
+    <section class="dash-section mb-4">
+        <div class="dash-section__header">
+            <h2 class="dash-section__title">Create Draft</h2>
+        </div>
+        <div class="form-card-inner card">
+            <div class="card-body p-4">
+                <form method="post" class="row g-3 align-items-end">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_draft">
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">Offering</label>
+                        {{ draft_form.offering_type }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">Period Start</label>
+                        {{ draft_form.period_start }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">Period End</label>
+                        {{ draft_form.period_end }}
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">
+                            <i class="bi bi-plus-lg me-1"></i>Create Draft
+                        </button>
+                    </div>
+                </form>
+                <p class="small text-muted mb-0 mt-2">Church drafts use approved remittance payable balances for the period. Higher levels apply settlement policies configured in Remittance Policies.</p>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <div class="table-wrap table-wrap--center table-wrap--compact">
+        {% include "includes/table_open.html" with table_title="Recent Batches" table_icon="bi-arrow-up-right-circle" %}
+        <div class="table-responsive table-in-card">
+            <table class="table table-hover table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Offering</th>
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Period</th>
+                        <th class="text-end">Gross</th>
+                        <th class="text-end">Retain</th>
+                        <th class="text-end">Remit</th>
+                        <th>Status</th>
+                        {% if can_edit %}<th></th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for batch in batches %}
+                    <tr>
+                        <td>{{ batch.get_offering_type_display }}</td>
+                        <td>{{ batch.get_from_unit_type_display }}</td>
+                        <td>{{ batch.get_to_unit_type_display }}</td>
+                        <td>{{ batch.period_start }} – {{ batch.period_end }}</td>
+                        <td class="text-end">₵{{ batch.gross_received|floatformat:2 }}</td>
+                        <td class="text-end">₵{{ batch.retain_amount|floatformat:2 }}</td>
+                        <td class="text-end">₵{{ batch.remit_amount|floatformat:2 }}</td>
+                        <td><span class="badge bg-secondary-subtle text-secondary">{{ batch.get_status_display }}</span></td>
+                        {% if can_edit %}
+                        <td class="text-end">
+                            {% if batch.status == "DRAFT" and batch.from_unit_type == "CHURCH" %}
+                            <form method="post" action="{% url 'remittance:settlement_post' batch.pk %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Post</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if can_edit %}9{% else %}8{% endif %}" class="text-muted text-center py-4">No settlement batches recorded yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "includes/table_close.html" %}
+    </div>
+
+    <a href="{% url 'remittance:index' %}" class="btn btn-outline-secondary btn-sm mt-3">Back to Policies</a>
+</div>
+{% endblock %}

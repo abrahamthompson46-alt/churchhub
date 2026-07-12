@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ member }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container page-shell">
+    <div class="row justify-content-center">
+        <div class="col-lg-9 col-xl-8">
+            <nav aria-label="breadcrumb" class="app-breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{% url 'members:list' %}">Members</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'members:detail' member.id %}" class="table-link">{{ member.first_name }} {{ member.last_name }}</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Edit</li>
+                </ol>
+            </nav>
+            {% include "includes/page_header.html" with page_subtitle="Members" page_title="Edit Member" page_description=member.church.name %}
+            <div class="form-card-inner card compact-form">
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" novalidate>
+                        {% csrf_token %}
+                        {% for field in form %}
+                            {% include "includes/form_field.html" with field=field %}
+                        {% endfor %}
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary btn-sm">Update Member</button>
+                            <a href="{% url 'members:timeline' member.id %}" class="btn btn-outline-secondary btn-sm">Timeline</a>
+                            <a href="{% url 'members:list' %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

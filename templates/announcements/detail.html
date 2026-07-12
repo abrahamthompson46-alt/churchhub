@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ announcement.title }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'announcements:announcement_list' %}">Announcements</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ announcement.title|truncatechars:40 }}</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle="Communications" page_title=announcement.title %}
+
+    <article class="announcement-card panel {% if announcement.is_pinned %}pinned{% endif %}">
+        {% if announcement.is_pinned %}<span class="badge bg-primary pinned-badge">Pinned</span>{% endif %}
+        {% if announcement.is_rejected %}<span class="badge bg-danger">Rejected</span>{% endif %}
+        {% if announcement.is_archived %}<span class="badge bg-secondary">Archived</span>{% endif %}
+        {% if not announcement.is_approved and not announcement.is_rejected and not announcement.is_archived %}
+        <span class="badge bg-warning text-dark">Pending</span>
+        {% endif %}
+        <p class="announcement-meta mb-3">
+            {{ announcement.created_at|date:"F j, Y" }}
+            {% if announcement.church %} &middot; {{ announcement.church.name }}{% else %} &middot; General{% endif %}
+            {% if announcement.approved_by %} &middot; Approved by {{ announcement.approved_by.get_full_name|default:announcement.approved_by.username }}{% endif %}
+            {% if view_count %} &middot; {{ view_count }} view{{ view_count|pluralize }}{% endif %}
+        </p>
+        {% if announcement.is_rejected and announcement.rejection_reason %}
+        <div class="alert alert-warning small">Rejection reason: {{ announcement.rejection_reason }}</div>
+        {% endif %}
+        {% if announcement.publish_at %}
+        <p class="text-muted small"><i class="bi bi-clock me-1"></i>Scheduled publish: {{ announcement.publish_at|date:"M j, Y g:i A" }}</p>
+        {% endif %}
+        <div class="announcement-content">{{ announcement.content|linebreaks }}</div>
+        {% if announcement.event_date %}
+        <p class="text-muted mt-3 mb-0"><i class="bi bi-calendar-event me-1"></i>Event: {{ announcement.event_date|date:"M j, Y g:i A" }}</p>
+        {% endif %}
+        {% if announcement.images.all %}
+        <div class="announcement-images mt-3">
+            {% for img in announcement.images.all %}
+            <img src="{{ img.image.url }}" alt="" class="announcement-image">
+            {% endfor %}
+        </div>
+        {% endif %}
+    </article>
+
+    <div class="d-flex gap-2 mt-4">
+        <a href="{% url 'announcements:announcement_list' %}" class="btn btn-outline-secondary btn-sm">Back to list</a>
+        {% if can_edit %}
+        <a href="{% url 'announcements:edit_announcement' announcement.pk %}" class="btn btn-primary btn-sm">Edit</a>
+        {% endif %}
+        {% if can_archive %}
+        <form method="post" action="{% url 'announcements:archive_announcement' announcement.pk %}">{% csrf_token %}
+            <input type="hidden" name="next" value="{% url 'announcements:announcement_list' %}">
+            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Archive this announcement?')">Archive</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

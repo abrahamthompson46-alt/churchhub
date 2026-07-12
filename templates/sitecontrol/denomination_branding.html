@@ -1,0 +1,55 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Branding — {{ denomination.name }}{% endblock %}
+
+{% block content %}
+{% include "sitecontrol/includes/denomination_nav.html" with active_tab="branding" %}
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="platform-card">
+            <div class="platform-card-header">
+                <span>Institution branding</span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-4">Shown on login, dashboard, and public registration for this denomination.</p>
+                <form method="post" enctype="multipart/form-data" class="platform-form-grid">
+                    {% csrf_token %}
+                    {% for field in form %}
+                    <div class="{% if field.field.widget.input_type == 'checkbox' %}platform-form-check{% elif field.name == 'registration_intro' %}full-width{% endif %}">
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                        {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
+                    {% endfor %}
+                    <div class="full-width d-flex gap-2 mt-2">
+                        <button type="submit" class="btn btn-primary btn-sm">Save branding</button>
+                        <a href="{% url 'sitecontrol:denomination_detail' denomination.pk %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="platform-card">
+            <div class="platform-card-header">Preview</div>
+            <div class="card-body text-center">
+                {% if denomination.logo %}
+                <img src="{{ denomination.logo.url }}" alt="" class="img-fluid mb-3" style="max-height:80px">
+                {% else %}
+                <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:64px;height:64px;background:{{ denomination.primary_color|default:'#1d4ed8' }};color:#fff;font-size:1.5rem">
+                    <i class="bi bi-building-fill"></i>
+                </div>
+                {% endif %}
+                <h6 class="fw-bold mb-1">{{ denomination.display_name|default:denomination.name }}</h6>
+                <p class="text-muted small mb-3">{{ denomination.tagline|default:"Your church management portal" }}</p>
+                <div class="d-flex justify-content-center gap-2">
+                    <span class="rounded" style="width:32px;height:32px;background:{{ denomination.primary_color|default:'#1d4ed8' }}"></span>
+                    <span class="rounded" style="width:32px;height:32px;background:{{ denomination.accent_color|default:'#0e7490' }}"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

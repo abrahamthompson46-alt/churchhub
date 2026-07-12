@@ -1,0 +1,52 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Denominations{% endblock %}
+
+{% block content %}
+<div class="platform-card mb-3">
+    <div class="platform-card-header">
+        <span>Multi-denomination tenants</span>
+        <div class="d-flex gap-2">
+            <form method="post" action="{% url 'sitecontrol:denomination_seed' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Sync built-in profiles</button>
+            </form>
+            <a href="{% url 'sitecontrol:denomination_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add</a>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Code</th>
+                    <th>Churches</th>
+                    <th>Registration</th>
+                    <th>Default</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for d in denominations %}
+            <tr>
+                <td class="fw-semibold">{{ d.display_name|default:d.name }}</td>
+                <td><code>{{ d.code }}</code></td>
+                <td>{{ d.conferences.count }}</td>
+                <td>{% if d.allow_public_registration %}<span class="badge bg-success">Open</span>{% else %}<span class="badge bg-secondary">Closed</span>{% endif %}</td>
+                <td>{% if d.is_default %}<i class="bi bi-check-circle text-success"></i>{% else %}—{% endif %}</td>
+                <td>{% if d.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
+                <td class="text-nowrap">
+                    <a href="{% url 'sitecontrol:denomination_detail' d.pk %}" class="btn btn-sm btn-outline-secondary">View</a>
+                    <a href="{% url 'sitecontrol:denomination_edit' d.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-muted">No denominations yet. Run “Sync built-in profiles”.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<p class="small text-muted mb-0">Each denomination is an isolated tenant boundary. Institution users cannot access data from other denominations.</p>
+{% endblock %}

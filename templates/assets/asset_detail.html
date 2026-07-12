@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}{{ asset.asset_code }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Fixed Assets" page_title=asset.name %}
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <span class="badge text-bg-secondary">{{ asset.get_status_display }}</span>
+        <span class="badge text-bg-light border">{{ asset.get_gra_asset_class_display }}</span>
+        {% if can_manage and asset.is_editable %}
+        <a href="{% url 'assets:asset_edit' asset.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+        {% endif %}
+        {% if can_manage and asset.is_editable %}
+        <form method="post" action="{% url 'assets:asset_submit' asset.pk %}" class="d-inline">{% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-primary">Submit for Approval</button>
+        </form>
+        {% endif %}
+        {% if can_approve and asset.pending_approval %}
+        <form method="post" action="{% url 'assets:asset_approve' asset.pk %}" class="d-inline">{% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-success">Approve</button>
+        </form>
+        {% endif %}
+        <a href="{% url 'assets:asset_list' %}" class="btn btn-sm btn-outline-secondary">Back</a>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold">Asset Details</div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Code</dt><dd class="col-sm-8">{{ asset.asset_code }}</dd>
+                        <dt class="col-sm-4">Category</dt><dd class="col-sm-8">{{ asset.category.name }}</dd>
+                        <dt class="col-sm-4">Location</dt><dd class="col-sm-8">{{ asset.location|default:"—" }}</dd>
+                        <dt class="col-sm-4">Serial No.</dt><dd class="col-sm-8">{{ asset.serial_number|default:"—" }}</dd>
+                        <dt class="col-sm-4">Purchase Date</dt><dd class="col-sm-8">{{ asset.purchase_date }}</dd>
+                        <dt class="col-sm-4">Supplier</dt><dd class="col-sm-8">{{ asset.supplier_name|default:"—" }}</dd>
+                        <dt class="col-sm-4">Invoice Ref</dt><dd class="col-sm-8">{{ asset.invoice_reference|default:"—" }}</dd>
+                        <dt class="col-sm-4">Custodian</dt><dd class="col-sm-8">{{ asset.custodian_member|default:asset.custodian_name|default:"—" }}</dd>
+                        <dt class="col-sm-4">Insurance Expiry</dt><dd class="col-sm-8">{{ asset.insurance_expiry|default:"—" }}</dd>
+                        <dt class="col-sm-4">Warranty Expiry</dt><dd class="col-sm-8">{{ asset.warranty_expiry|default:"—" }}</dd>
+                    </dl>
+                    {% if asset.description %}<p class="mt-3 mb-0 text-muted">{{ asset.description }}</p>{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold">Financial Summary</div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-6">Acquisition Cost</dt><dd class="col-sm-6 text-end">₵{{ asset.acquisition_cost|floatformat:2 }}</dd>
+                        <dt class="col-sm-6">Salvage Value</dt><dd class="col-sm-6 text-end">₵{{ asset.salvage_value|floatformat:2 }}</dd>
+                        <dt class="col-sm-6">Accumulated Depreciation</dt><dd class="col-sm-6 text-end">₵{{ asset.accumulated_depreciation|floatformat:2 }}</dd>
+                        <dt class="col-sm-6 fw-semibold">Net Book Value</dt><dd class="col-sm-6 text-end fw-semibold">₵{{ asset.net_book_value|floatformat:2 }}</dd>
+                        <dt class="col-sm-6">Useful Life</dt><dd class="col-sm-6 text-end">{{ asset.useful_life_months }} months</dd>
+                        <dt class="col-sm-6">Depreciation Method</dt><dd class="col-sm-6 text-end">{{ asset.get_depreciation_method_display }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if can_approve and asset.pending_approval %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold">Reject Asset</div>
+        <div class="card-body">
+            <form method="post" action="{% url 'assets:asset_reject' asset.pk %}">
+                {% csrf_token %}
+                {{ reject_form.reason }}
+                <button type="submit" class="btn btn-sm btn-outline-danger mt-2">Reject</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if asset.rejection_reason %}
+    <div class="alert alert-warning">Rejected: {{ asset.rejection_reason }}</div>
+    {% endif %}
+
+    {% if can_manage and asset.status == 'ACTIVE' %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold">Dispose Asset</div>
+        <div class="card-body">
+            <form method="post" action="{% url 'assets:asset_dispose' asset.pk %}">
+                {% csrf_token %}
+                <textarea name="notes" class="form-control mb-2" rows="2" placeholder="Disposal notes"></textarea>
+                <button type="submit" class="btn btn-sm btn-outline-danger">Mark Disposed</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-semibold">Depreciation History</div>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead><tr><th>Period</th><th class="text-end">Amount</th><th>Method</th></tr></thead>
+                        <tbody>
+                        {% for entry in depreciation_entries %}
+                        <tr>
+                            <td>{{ entry.period_year }}-{{ entry.period_month|stringformat:"02d" }}</td>
+                            <td class="text-end">₵{{ entry.amount|floatformat:2 }}</td>
+                            <td>{{ entry.method_used }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="text-muted text-center py-3">No depreciation posted yet.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-semibold">Maintenance Log</div>
+                {% if can_manage %}
+                <div class="card-body border-bottom">
+                    <form method="post" action="{% url 'assets:maintenance_add' asset.pk %}">
+                        {% csrf_token %}
+                        {% for field in maintenance_form %}
+                        <div class="mb-2">
+                            <label class="form-label small">{{ field.label }}</label>
+                            {{ field }}
+                        </div>
+                        {% endfor %}
+                        <button type="submit" class="btn btn-sm btn-primary">Add Record</button>
+                    </form>
+                </div>
+                {% endif %}
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead><tr><th>Date</th><th>Description</th><th class="text-end">Cost</th></tr></thead>
+                        <tbody>
+                        {% for log in maintenance_logs %}
+                        <tr>
+                            <td>{{ log.service_date }}</td>
+                            <td>{{ log.description|truncatechars:60 }}</td>
+                            <td class="text-end">₵{{ log.cost|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="text-muted text-center py-3">No maintenance records.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

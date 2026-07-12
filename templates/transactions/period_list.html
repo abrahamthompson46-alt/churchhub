@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+
+
+{% block title %}Period Lock — ChurchHub{% endblock %}
+
+
+
+{% block content %}
+
+<div class="page-container">
+
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Financial Periods & Working Day" page_description=church.name %}
+
+
+
+    <div id="working-day" class="panel mb-4">
+
+        <div class="panel-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+
+            <span>Working Day</span>
+
+            {% if working_day_is_open %}
+
+            <span class="badge bg-success"><i class="bi bi-unlock-fill me-1"></i>Open — {{ working_status.working_date|date:"l, j F Y" }}</span>
+
+            {% elif working_status.working_date %}
+
+            <span class="badge bg-warning text-dark"><i class="bi bi-lock-fill me-1"></i>Closed</span>
+
+            {% else %}
+
+            <span class="badge bg-secondary"><i class="bi bi-calendar-x me-1"></i>No day open</span>
+
+            {% endif %}
+
+        </div>
+
+        <div class="panel-body">
+
+            <div class="row g-4">
+
+                <div class="col-lg-5">
+
+                    <dl class="row small mb-0">
+
+                        <dt class="col-sm-5">System date</dt>
+
+                        <dd class="col-sm-7">{{ working_status.system_date|date:"l, j F Y" }}</dd>
+
+                        <dt class="col-sm-5">Working date</dt>
+
+                        <dd class="col-sm-7">
+
+                            {% if working_status.working_date %}
+
+                            {{ working_status.working_date|date:"l, j F Y" }}
+
+                            {% else %}—{% endif %}
+
+                        </dd>
+
+                        <dt class="col-sm-5">Opened by</dt>
+
+                        <dd class="col-sm-7">{% if active_working_day and active_working_day.opened_by %}{{ active_working_day.opened_by }}{% else %}—{% endif %}</dd>
+
+                        <dt class="col-sm-5">Opened at</dt>
+
+                        <dd class="col-sm-7">{% if active_working_day %}{{ active_working_day.opened_at|date:"j M Y, H:i" }}{% else %}—{% endif %}</dd>
+
+                    </dl>
+
+                    <p class="small text-muted mt-3 mb-0">Receipts and expenses post to the open working date. Close the day when treasury work is complete.</p>
+
+                </div>
+
+                {% if can_manage_working_day %}
+
+                <div class="col-lg-7">
+
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+
+                            <div class="border rounded p-3 h-100 bg-light">
+
+                                <h6 class="fw-semibold small text-uppercase text-muted mb-3">Open day</h6>
+
+                                <form method="post" action="{% url 'transactions:working_day_open' %}">
+
+                                    {% csrf_token %}
+
+                                    {% for field in open_form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+
+                                    <button type="submit" class="btn btn-success btn-sm" {% if working_day_is_open %}disabled{% endif %}>Open working day</button>
+
+                                </form>
+
+                            </div>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <div class="border rounded p-3 h-100 bg-light">
+
+                                <h6 class="fw-semibold small text-uppercase text-muted mb-3">Close day</h6>
+
+                                <form method="post" action="{% url 'transactions:working_day_close' %}">
+
+                                    {% csrf_token %}
+
+                                    {% for field in close_form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+
+                                    <button type="submit" class="btn btn-warning btn-sm" {% if not working_day_is_open %}disabled{% endif %} onclick="return confirm('Close the working day? No new transactions until a day is opened.')">Close working day</button>
+
+                                </form>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+        {% if recent_working_days %}
+
+        <div class="table-responsive border-top">
+
+            <table class="table table-sm table-hover mb-0">
+
+                <thead><tr><th>Date</th><th>Status</th><th>Opened</th><th>Closed</th><th>Notes</th></tr></thead>
+
+                <tbody>
+
+                {% for day in recent_working_days %}
+
+                <tr>
+
+                    <td>{{ day.date|date:"j M Y" }}</td>
+
+                    <td>{% if day.status == "OPEN" %}<span class="badge bg-success">Open</span>{% else %}<span class="badge bg-secondary">Closed</span>{% endif %}</td>
+
+                    <td class="small text-muted">{% if day.opened_by %}{{ day.opened_by }}{% else %}—{% endif %}</td>
+
+                    <td class="small text-muted">{% if day.closed_by %}{{ day.closed_by }}{% else %}—{% endif %}</td>
+
+                    <td class="small text-muted">{{ day.notes|default:"—" }}</td>
+
+                </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% endif %}
+
+    </div>
+
+
+
+    <div class="filter-bar">
+
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+
+            <a href="?year={{ year|add:'-1' }}" class="btn btn-outline-secondary btn-sm">{{ year|add:"-1" }}</a>
+
+            <span class="chip">{{ year }}</span>
+
+            <a href="?year={{ year|add:'1' }}" class="btn btn-outline-secondary btn-sm">{{ year|add:"1" }}</a>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="detail-grid">
+
+        <div>
+
+            <div class="panel">
+
+                <div class="panel-header">Monthly Status</div>
+
+                <div class="table-responsive">
+
+                    <table class="table table-hover mb-0">
+
+                        <thead><tr><th>Month</th><th>Status</th><th>Locked By</th><th>Notes</th><th></th></tr></thead>
+
+                        <tbody>
+
+                            {% for m in months %}
+
+                            <tr>
+
+                                <td><strong>{{ m.label }}</strong></td>
+
+                                <td>
+
+                                {% if m.is_locked %}
+
+                                <span class="badge bg-danger"><i class="bi bi-lock-fill me-1"></i>Locked</span>
+
+                                {% else %}
+
+                                <span class="badge bg-success">Open</span>
+
+                                {% endif %}
+
+                                </td>
+
+                                <td class="text-muted small">{% if m.period and m.period.locked_by %}{{ m.period.locked_by }}{% else %}—{% endif %}</td>
+
+                                <td class="text-muted small">{% if m.period %}{{ m.period.notes|default:"—" }}{% else %}—{% endif %}</td>
+
+                                <td class="text-end">
+
+                                    {% if can_lock %}
+
+                                        {% if m.is_locked %}
+
+                                        <form method="post" action="{% url 'transactions:period_unlock' %}" class="d-inline">
+
+                                            {% csrf_token %}
+
+                                            <input type="hidden" name="year" value="{{ year }}">
+
+                                            <input type="hidden" name="month" value="{{ m.month }}">
+
+                                            <button type="submit" class="btn btn-sm btn-outline-success">Unlock</button>
+
+                                        </form>
+
+                                        {% else %}
+
+                                        <form method="post" action="{% url 'transactions:period_lock' %}" class="d-inline">
+
+                                            {% csrf_token %}
+
+                                            <input type="hidden" name="year" value="{{ year }}">
+
+                                            <input type="hidden" name="month" value="{{ m.month }}">
+
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Lock {{ m.label }} {{ year }}? No new transactions will be allowed.')">Lock</button>
+
+                                        </form>
+
+                                        {% endif %}
+
+                                    {% endif %}
+
+                                </td>
+
+                            </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        {% if can_lock %}
+
+        <div>
+
+            <div class="panel">
+
+                <div class="panel-header">Lock Period</div>
+
+                <div class="panel-body">
+
+                    <form method="post" action="{% url 'transactions:period_lock' %}">
+
+                        {% csrf_token %}
+
+                        {% for field in lock_form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+
+                        <button type="submit" class="btn btn-danger btn-sm">Lock Period</button>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+            <p class="small text-muted mt-3">Locked periods block new receipts, expenses, approvals, and voids for that month.</p>
+
+        </div>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}
+

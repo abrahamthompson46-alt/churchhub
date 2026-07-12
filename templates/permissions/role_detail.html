@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}{{ role_label }} — Permissions{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Permissions" page_title=role_label page_description="Default permissions assigned to this role via the matrix." %}
+
+    {% for category, items in permissions_by_category.items %}
+    <div class="data-card mb-3">
+        <div class="data-card__header">{{ category }}</div>
+        <ul class="list-plain mb-0">
+            {% for item in items %}
+            <li class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                    <span class="fw-medium">{{ item.permission.name }}</span>
+                    <span class="d-block small text-muted">{{ item.permission.description }}</span>
+                </div>
+                {% if item.granted %}
+                <span class="chip chip--success"><i class="bi bi-check-lg"></i> Granted</span>
+                {% else %}
+                <span class="chip chip--muted">Denied</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endfor %}
+
+    <a href="{% url 'permissions:matrix' %}" class="btn btn-outline-secondary btn-sm">Edit Matrix</a>
+</div>
+{% endblock %}

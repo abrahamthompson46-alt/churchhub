@@ -1,0 +1,319 @@
+{% load static %}
+
+
+
+<header class="ch-navbar">
+
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-menubar">
+
+        <div class="container-fluid navbar-shell">
+
+            <div class="navbar-top-row">
+
+                <a class="navbar-brand ch-brand" href="{% url 'dashboard:home' %}" title="ChurchHub Home">
+
+                    <span class="ch-brand-mark"><i class="bi bi-building-fill"></i></span>
+
+                    <span class="ch-brand-name">ChurchHub</span>
+
+                </a>
+
+
+
+                <div class="navbar-utilities">
+
+                    {% if can_switch_church and available_churches %}
+
+                    <form method="get" action="{% url 'dashboard:home' %}" class="brand-church-switch d-none d-lg-block">
+
+                        <select name="church" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Switch church context">
+
+                            <option value="" {% if not active_church %}selected{% endif %}>All churches</option>
+
+                            {% for c in available_churches %}
+
+                            <option value="{{ c.id }}" {% if active_church and active_church.id == c.id %}selected{% endif %}>{{ c.name }}</option>
+
+                            {% endfor %}
+
+                        </select>
+
+                    </form>
+
+                    {% endif %}
+
+
+
+                    {% if show_working_day_status %}
+
+                    <div class="working-day-chip{% if working_day_is_open %} working-day-chip--open{% elif working_date %} working-day-chip--closed{% else %} working-day-chip--unset{% endif %}" title="System date and working day status">
+
+                        <span class="working-day-chip__line">
+
+                            <i class="bi bi-calendar3"></i>
+
+                            <span>{{ system_date|date:"D, j M Y" }}</span>
+
+                        </span>
+
+                        <span class="working-day-chip__line working-day-chip__status">
+
+                            {% if working_day_is_open %}
+
+                            <i class="bi bi-unlock-fill"></i> {{ working_date|date:"j M" }} — Open
+
+                            {% elif working_date %}
+
+                            <i class="bi bi-lock-fill"></i> {{ working_date|date:"j M" }} — Closed
+
+                            {% else %}
+
+                            <i class="bi bi-exclamation-circle"></i> No day open
+
+                            {% endif %}
+
+                        </span>
+
+                    </div>
+
+                    {% endif %}
+
+
+
+                    <a href="{% url 'dashboard:notifications' %}" class="tool-btn" title="Notifications">
+
+                        <i class="bi bi-bell"></i>
+
+                        {% if unread_notification_count %}
+
+                        <span class="tool-badge">{{ unread_notification_count }}</span>
+
+                        {% endif %}
+
+                    </a>
+
+
+
+                    <div class="dropdown hover-dropdown">
+
+                        <button class="account-btn account-btn--icon" type="button" data-bs-toggle="dropdown"
+
+                                aria-expanded="false" title="{{ user.get_full_name|default:user.username }}">
+
+                            <span class="account-avatar">{{ user.get_full_name|default:user.username|slice:":1"|upper }}</span>
+
+                        </button>
+
+                        <ul class="dropdown-menu dropdown-menu-end nav-account-menu shadow-lg">
+
+                            <li class="px-3 py-2 border-bottom mb-1">
+
+                                <div class="fw-semibold small">{{ user.get_full_name|default:user.username }}</div>
+
+                                <div class="text-muted" style="font-size:0.75rem">{{ user.get_role_display|default:user.role }}</div>
+
+                            </li>
+
+                            {% for item in account_navigation %}
+
+                            <li>
+
+                                {% if item.url_name == 'admin:index' %}
+
+                                <a class="dropdown-item{% if current_view == item.url_name %} active{% endif %}" href="/admin/">
+
+                                    <i class="bi {{ item.icon }}"></i>{{ item.label }}
+
+                                </a>
+
+                                {% else %}
+
+                                <a class="dropdown-item{% if current_view == item.url_name %} active{% endif %}"
+
+                                   href="{% url item.url_name %}">
+
+                                    <i class="bi {{ item.icon }}"></i>{{ item.label }}
+
+                                    {% if item.url_name == 'dashboard:notifications' and unread_notification_count %}
+
+                                    <span class="badge bg-danger ms-auto">{{ unread_notification_count }}</span>
+
+                                    {% endif %}
+
+                                </a>
+
+                                {% endif %}
+
+                            </li>
+
+                            {% endfor %}
+
+                        </ul>
+
+                    </div>
+
+                </div>
+
+
+
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+
+                        aria-controls="mainNav" aria-expanded="false" aria-label="Open menu">
+
+                    <span class="navbar-toggler-icon"></span>
+
+                </button>
+
+            </div>
+
+
+
+            <div class="collapse navbar-collapse" id="mainNav">
+
+                {% if can_switch_church and available_churches %}
+
+                <form method="get" action="{% url 'dashboard:home' %}" class="brand-church-switch d-lg-none w-100 mb-2">
+
+                    <select name="church" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Switch church context">
+
+                        <option value="" {% if not active_church %}selected{% endif %}>All churches</option>
+
+                        {% for c in available_churches %}
+
+                        <option value="{{ c.id }}" {% if active_church and active_church.id == c.id %}selected{% endif %}>{{ c.name }}</option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </form>
+
+                {% endif %}
+
+
+
+                <ul class="navbar-nav nav-primary align-items-lg-center">
+
+                    {% for menu in main_navigation %}
+
+                    {% if menu.type == "link" %}
+
+                    <li class="nav-item">
+
+                        <a class="nav-link{% if current_view == menu.url_name %} active{% endif %}"
+
+                           href="{% url menu.url_name %}">
+
+                            <i class="bi {{ menu.icon }}"></i>
+
+                            <span>{{ menu.label }}</span>
+
+                        </a>
+
+                    </li>
+
+                    {% else %}
+
+                    <li class="nav-item dropdown dropdown-mega position-static hover-dropdown">
+
+                        <a class="nav-link dropdown-toggle{% if menu.id == module_key %} active{% endif %}"
+
+                           href="#" role="button" data-bs-toggle="dropdown" data-bs-auto-close="outside"
+
+                           aria-expanded="false" id="nav-{{ menu.id }}" aria-haspopup="true">
+
+                            <i class="bi {{ menu.icon }}"></i>
+
+                            <span>{{ menu.label }}</span>
+
+                        </a>
+
+                        <div class="dropdown-menu nav-mega nav-mega--full" aria-labelledby="nav-{{ menu.id }}">
+
+                            <div class="nav-mega-inner">
+
+                                {% if menu.sections %}
+
+                                <div class="nav-mega-grid">
+
+                                    {% for section in menu.sections %}
+
+                                    <div class="nav-mega-col nav-mega-col--{{ section.theme|default:'default' }}">
+
+                                        <p class="nav-mega-title">{{ section.title }}</p>
+
+                                        <div class="nav-mega-links">
+
+                                            {% for item in section.items %}
+
+                                            <a class="nav-mega-link{% if item.report_key and report_key == item.report_key %} active{% elif not item.report_key and current_view == item.url_name %} active{% endif %}"
+
+                                               href="{% if item.report_key %}{% url 'reports:run' item.report_key %}{% else %}{% url item.url_name %}{% endif %}">
+
+                                                {% if item.icon %}<i class="bi {{ item.icon }}"></i>{% endif %}
+
+                                                <span>{{ item.label }}</span>
+
+                                            </a>
+
+                                            {% endfor %}
+
+                                        </div>
+
+                                    </div>
+
+                                    {% endfor %}
+
+                                </div>
+
+                                {% elif menu.items %}
+
+                                <div class="nav-mega-grid nav-mega-grid--single">
+
+                                    <div class="nav-mega-col nav-mega-col--default">
+
+                                        <div class="nav-mega-links">
+
+                                            {% for item in menu.items %}
+
+                                            <a class="nav-mega-link{% if current_view == item.url_name %} active{% endif %}"
+
+                                               href="{% url item.url_name %}">
+
+                                                {% if item.icon %}<i class="bi {{ item.icon }}"></i>{% endif %}
+
+                                                <span>{{ item.label }}</span>
+
+                                            </a>
+
+                                            {% endfor %}
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                                {% endif %}
+
+                            </div>
+
+                        </div>
+
+                    </li>
+
+                    {% endif %}
+
+                    {% endfor %}
+
+                </ul>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+</header>
+
+

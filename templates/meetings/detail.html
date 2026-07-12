@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}{{ meeting.title }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Meeting" page_title=meeting.title %}
+
+    <div class="meeting-header mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <p class="text-muted mb-2">
+                    {{ meeting.scheduled_at|date:"l, F j, Y · g:i A" }}
+                    {% if meeting.location %} · {{ meeting.location }}{% endif %}
+                </p>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="chip">{{ meeting.get_meeting_type_display }}</span>
+                    <span class="chip">{{ meeting.get_status_display }}</span>
+                    <span class="chip {% if meeting.minutes_status == 'APPROVED' %}chip--success{% elif meeting.minutes_status == 'PENDING_APPROVAL' %}chip--warning{% elif meeting.minutes_status == 'REJECTED' %}chip--danger{% else %}chip--muted{% endif %}">
+                        Minutes: {{ meeting.get_minutes_status_display }}
+                    </span>
+                    {% if meeting.minutes_locked %}<span class="chip chip--success"><i class="bi bi-lock-fill me-1"></i>Locked</span>{% endif %}
+                </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                {% if can_edit_metadata %}
+                <a href="{% url 'meetings:edit' meeting.pk %}" class="btn btn-sm btn-outline-primary">Edit Meeting</a>
+                {% endif %}
+            </div>
+        </div>
+        {% if meeting.chair_person or meeting.secretary_name %}
+        <p class="small text-muted mt-2 mb-0">
+            {% if meeting.chair_person %}<strong>Chair:</strong> {{ meeting.chair_person }}{% endif %}
+            {% if meeting.secretary_name %} · <strong>Secretary:</strong> {{ meeting.secretary_name }}{% endif %}
+        </p>
+        {% endif %}
+    </div>
+
+    {% if meeting.minutes_status == 'REJECTED' and meeting.minutes_rejection_reason %}
+    <div class="alert alert-danger py-2 small mb-3">
+        <strong>Returned for revision:</strong> {{ meeting.minutes_rejection_reason }}
+    </div>
+    {% elif meeting.minutes_status == 'PENDING_APPROVAL' %}
+    <div class="alert alert-warning py-2 small mb-3">
+        Minutes are awaiting approval from an authorized reviewer.
+        {% if meeting.minutes_submitted_by %}Submitted by {{ meeting.minutes_submitted_by.get_full_name|default:meeting.minutes_submitted_by.username }} on {{ meeting.minutes_submitted_at|date:"M j, Y g:i A" }}.{% endif %}
+    </div>
+    {% elif meeting.minutes_status == 'APPROVED' %}
+    <div class="alert alert-success py-2 small mb-3">
+        Official minutes approved{% if meeting.minutes_approved_by %} by {{ meeting.minutes_approved_by.get_full_name|default:meeting.minutes_approved_by.username }}{% endif %}
+        {% if meeting.minutes_approved_at %} on {{ meeting.minutes_approved_at|date:"M j, Y g:i A" }}{% endif %}.
+    </div>
+    {% endif %}
+
+    <div class="detail-grid">
+        <div>
+            <div class="panel mb-4">
+                <div class="panel-header">Agenda</div>
+                <div class="panel-body">{{ meeting.agenda|linebreaks|default:"—" }}</div>
+            </div>
+
+            <div class="panel mb-4">
+                <div class="panel-header d-flex justify-content-between align-items-center">
+                    <span>Official Minutes</span>
+                    {% if meeting.minutes_editable and can_edit_minutes %}
+                    <span class="chip chip--muted">Draft</span>
+                    {% endif %}
+                </div>
+                <div class="panel-body">
+                    {% if meeting.minutes_editable and can_edit_minutes %}
+                    <form method="post" action="{% url 'meetings:action' meeting.pk %}">{% csrf_token %}
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">{% include "includes/form_field.html" with field=minutes_form.status %}</div>
+                            <div class="col-md-4">{% include "includes/form_field.html" with field=minutes_form.ended_at %}</div>
+                            <div class="col-md-4">{% include "includes/form_field.html" with field=minutes_form.chair_person %}</div>
+                            <div class="col-md-4">{% include "includes/form_field.html" with field=minutes_form.secretary_name %}</div>
+                        </div>
+                        <div class="minutes-sections">
+                            <div class="minutes-section">
+                                <label class="form-label small fw-semibold">1. Opening & Quorum</label>
+                                {{ minutes_form.minutes_opening }}
+                            </div>
+                            <div class="minutes-section">
+                                <label class="form-label small fw-semibold">2. Previous Minutes</label>
+                                {{ minutes_form.minutes_previous }}
+                            </div>
+                            <div class="minutes-section">
+                                <label class="form-label small fw-semibold">3. Deliberations & Reports</label>
+                                {{ minutes_form.minutes_deliberations }}
+                            </div>
+                            <div class="minutes-section">
+                                <label class="form-label small fw-semibold">4. Motions</label>
+                                {{ minutes_form.minutes_motions }}
+                            </div>
+                            <div class="minutes-section">
+                                <label class="form-label small fw-semibold">5. Votes & Outcomes</label>
+                                {{ minutes_form.minutes_votes }}
+                            </div>
+                            <div class="minutes-section">
+                                <label class="form-label small fw-semibold">6. Adjournment</label>
+                                {{ minutes_form.minutes_adjournment }}
+                            </div>
+                            <div class="minutes-section">
+                                <label class="form-label small fw-semibold">Supplementary Notes</label>
+                                {{ minutes_form.minutes }}
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <button type="submit" name="action" value="save_minutes" class="btn btn-sm btn-primary">Save Draft</button>
+                            {% if can_submit_minutes %}
+                            <button type="submit" name="action" value="submit_minutes" class="btn btn-sm btn-outline-primary">Submit for Approval</button>
+                            {% endif %}
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="minutes-readonly">
+                        {% include "meetings/_minutes_section.html" with label="Opening & Quorum" content=meeting.minutes_opening %}
+                        {% include "meetings/_minutes_section.html" with label="Previous Minutes" content=meeting.minutes_previous %}
+                        {% include "meetings/_minutes_section.html" with label="Deliberations & Reports" content=meeting.minutes_deliberations %}
+                        {% include "meetings/_minutes_section.html" with label="Motions" content=meeting.minutes_motions %}
+                        {% include "meetings/_minutes_section.html" with label="Votes & Outcomes" content=meeting.minutes_votes %}
+                        {% include "meetings/_minutes_section.html" with label="Adjournment" content=meeting.minutes_adjournment %}
+                        {% include "meetings/_minutes_section.html" with label="Supplementary Notes" content=meeting.minutes %}
+                    </div>
+                    {% endif %}
+
+                    {% if can_approve_minutes %}
+                    <div class="border-top pt-3 mt-3">
+                        <p class="small text-muted mb-2">Checker — approve or return these minutes.</p>
+                        <div class="d-flex flex-wrap gap-2 align-items-start">
+                            <form method="post" action="{% url 'meetings:action' meeting.pk %}" class="d-inline">{% csrf_token %}
+                                <input type="hidden" name="action" value="approve_minutes">
+                                <button type="submit" class="btn btn-sm btn-success">Approve Minutes</button>
+                            </form>
+                            <form method="post" action="{% url 'meetings:action' meeting.pk %}" class="d-flex flex-wrap gap-2 align-items-end">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="reject_minutes">
+                                <div>{{ reject_form.rejection_reason }}</div>
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Return for Revision</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="panel mb-4">
+                <div class="panel-header">Decisions & Resolutions</div>
+                <ul class="list-plain">
+                    {% for d in meeting.decisions.all %}
+                    <li class="py-2 border-bottom">
+                        {% if d.motion_text %}<p class="small text-muted mb-1"><strong>Motion:</strong> {{ d.motion_text }}</p>{% endif %}
+                        <p class="mb-1">{{ d.decision_text }}</p>
+                        {% if d.vote_result %}<span class="chip chip--muted">{{ d.vote_result }}</span>{% endif %}
+                    </li>
+                    {% empty %}
+                    <li class="py-2 text-muted">No decisions recorded.</li>
+                    {% endfor %}
+                </ul>
+                {% if can_edit_minutes %}
+                <div class="panel-body border-top">
+                    <form method="post" action="{% url 'meetings:decision_add' meeting.pk %}">{% csrf_token %}
+                        {% for field in decision_form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Add Decision</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">Attachments ({{ meeting.attachments.count }})</div>
+                {% if meeting.attachments.all %}
+                <ul class="list-plain">
+                    {% for file in meeting.attachments.all %}
+                    <li class="d-flex justify-content-between align-items-center py-2 border-bottom gap-2">
+                        <div>
+                            <a href="{{ file.file.url }}" class="table-link" target="_blank" rel="noopener">{{ file.label|default:file.file.name }}</a>
+                            <div class="text-muted small">{{ file.uploaded_at|date:"M j, Y" }}{% if file.uploaded_by %} · {{ file.uploaded_by.get_full_name|default:file.uploaded_by.username }}{% endif %}</div>
+                        </div>
+                        {% if can_edit_minutes %}
+                        <form method="post" action="{% url 'meetings:action' meeting.pk %}">{% csrf_token %}
+                            <input type="hidden" name="action" value="delete_attachment">
+                            <input type="hidden" name="attachment_id" value="{{ file.pk }}">
+                            <button type="submit" class="btn btn-sm btn-link text-danger" onclick="return confirm('Remove this file?')">Remove</button>
+                        </form>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="panel-body text-muted">No files uploaded.</div>
+                {% endif %}
+                {% if can_edit_minutes %}
+                <div class="panel-body border-top">
+                    <form method="post" action="{% url 'meetings:action' meeting.pk %}" enctype="multipart/form-data">{% csrf_token %}
+                        <input type="hidden" name="action" value="upload_attachment">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-5">{% include "includes/form_field.html" with field=attachment_form.label %}</div>
+                            <div class="col-md-5">{% include "includes/form_field.html" with field=attachment_form.file %}</div>
+                            <div class="col-md-2"><button type="submit" class="btn btn-sm btn-outline-primary w-100">Upload</button></div>
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div>
+            <div class="panel mb-4">
+                <div class="panel-header">Attendance ({{ meeting.attendees.count }})</div>
+                <form method="post" action="{% url 'meetings:attendance' meeting.pk %}">{% csrf_token %}
+                    <div class="panel-body" style="max-height:320px;overflow-y:auto">
+                        <p class="small text-muted">Check members on the roll, then mark who was present.</p>
+                        {% for m in members %}
+                        <div class="d-flex align-items-center gap-2 py-1 border-bottom">
+                            <input class="form-check-input" type="checkbox" name="members" value="{{ m.pk }}" id="roll{{ m.pk }}" {% if m.pk in attendee_ids %}checked{% endif %}>
+                            <label class="form-check-label flex-grow-1" for="roll{{ m.pk }}">{{ m.full_name }}</label>
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="checkbox" name="present" value="{{ m.pk }}" id="present{{ m.pk }}" {% if m.pk in present_ids %}checked{% endif %}>
+                                <label class="form-check-label small text-muted" for="present{{ m.pk }}">Present</label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% if can_manage_members %}
+                    <div class="panel-body border-top pt-2"><button type="submit" class="btn btn-sm btn-primary">Save Attendance</button></div>
+                    {% endif %}
+                </form>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">Action Items</div>
+                <ul class="list-plain">
+                    {% for a in meeting.action_items.all %}
+                    <li class="py-2 border-bottom small">
+                        <span class="chip">{{ a.get_status_display }}</span>
+                        {{ a.description }}
+                        {% if a.assigned_to %}<div class="text-muted">Assigned: {{ a.assigned_to.full_name }}</div>{% endif %}
+                    </li>
+                    {% empty %}
+                    <li class="py-2 text-muted">None yet.</li>
+                    {% endfor %}
+                </ul>
+                {% if can_edit_minutes %}
+                <div class="panel-body border-top">
+                    <form method="post" action="{% url 'meetings:action_add' meeting.pk %}">{% csrf_token %}
+                        {% for field in action_form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Add Action Item</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

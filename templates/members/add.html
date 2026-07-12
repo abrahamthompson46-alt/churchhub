@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Add Member — ChurchHub{% endblock %}
+
+{% block content %}
+{% include "includes/form_open.html" with breadcrumbs=breadcrumbs form_subtitle="People" form_title="Add Member" form_description="Register a new church member in the directory." %}
+<form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% for field in form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+    <div class="d-flex gap-2 pt-3">
+        <button type="submit" class="btn btn-primary">Save Member</button>
+        <a href="{% url 'members:list' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% include "includes/form_close.html" %}
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Departments — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% if can_manage %}
+    {% url 'members:department_add' as dept_url %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Departments" action_url=dept_url action_label="Add Department" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Departments" %}
+    {% endif %}
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead><tr><th>Name</th><th>Description</th><th>Members</th></tr></thead>
+                <tbody>
+                    {% for dept in departments %}
+                    <tr>
+                        <td><strong>{{ dept.name }}</strong></td>
+                        <td class="text-muted">{{ dept.description|default:"—"|truncatewords:12 }}</td>
+                        <td>{{ dept.member_count }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3">
+                        {% if can_manage %}
+                        {% url 'members:department_add' as dept_url %}
+                        {% include "includes/empty_state.html" with icon="bi-diagram-2" message="No departments yet." action_url=dept_url action_label="Add department" %}
+                        {% else %}
+                        {% include "includes/empty_state.html" with icon="bi-diagram-2" message="No departments yet." %}
+                        {% endif %}
+                    </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

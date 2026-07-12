@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ChurchHub — Enterprise Church Management System">
+    <title>{% block title %}{{ institution_display_name|default:site_name|default:"ChurchHub" }}{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'vendor/fonts/plus-jakarta-sans/plus-jakarta-sans.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/font/bootstrap-icons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260714">
+    <meta name="theme-color" content="{{ institution_primary_color|default:'#0f2942' }}">
+    {% if institution_primary_color %}
+    <style>
+        :root {
+            --ch-primary: {{ institution_primary_color }};
+            --ch-primary-hover: {{ institution_primary_color }};
+            --ch-accent: {{ institution_accent_color|default:'#0e7490' }};
+        }
+    </style>
+    {% endif %}
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="app-body {% block body_class %}{% endblock %}">
+    {% if user.is_authenticated and not user.is_platform_user %}
+        {% include "includes/navbar.html" %}
+    {% endif %}
+
+    {% if impersonation_active %}
+    <div class="alert alert-danger border-0 rounded-0 mb-0 py-2 px-3 text-center small d-flex flex-wrap justify-content-center align-items-center gap-2">
+        <span><i class="bi bi-exclamation-triangle-fill me-1"></i>
+            <strong>Support impersonation active</strong> — acting as {{ user.username }}. Actions are audited.
+        </span>
+        <form method="post" action="{% url 'sitecontrol:impersonate_end' %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-light">End Impersonation</button>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if platform_announcement and not user.is_platform_user %}
+    <div class="alert alert-info border-0 rounded-0 mb-0 py-2 px-3 text-center small">
+        <strong>{{ platform_announcement.title }}:</strong> {{ platform_announcement.message|truncatewords:30 }}
+    </div>
+    {% endif %}
+
+    {% if site_settings.platform_banner_enabled and site_settings.platform_banner_message and not user.is_platform_user %}
+    <div class="alert alert-warning border-0 rounded-0 mb-0 py-2 px-3 text-center small">
+        {{ site_settings.platform_banner_message }}
+    </div>
+    {% endif %}
+
+    {% include "includes/messages.html" %}
+
+    <main class="main-content {% if not user.is_authenticated %}main-content--auth{% endif %}">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% if user.is_authenticated %}
+    <footer class="app-footer">
+        <div class="page-container d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span class="text-muted small">&copy; {% now "Y" %} {{ institution_display_name|default:site_name|default:"ChurchHub" }}</span>
+            <span class="text-muted small">Enterprise Church Management</span>
+        </div>
+    </footer>
+    {% endif %}
+
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/navigation.js' %}"></script>
+    <script src="{% static 'js/app.js' %}"></script>
+    <script src="{% static 'js/member-picker.js' %}"></script>
+    <script src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

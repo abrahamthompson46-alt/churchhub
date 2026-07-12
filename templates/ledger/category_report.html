@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}GL by Category — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="GL by Category" page_description="Approved ledger entry volume grouped by posting category." %}
+
+    <div class="filter-bar">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
+                <label class="form-label">From</label>
+                <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm">
+            </div>
+            <div class="filter-field">
+                <label class="form-label">To</label>
+                <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm">
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Filter</button>
+                <a href="{% url 'ledger:category_report' %}" class="btn btn-link btn-sm text-muted">Clear</a>
+                <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}export=csv" class="btn btn-outline-secondary btn-sm">CSV</a>
+                <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}export=excel" class="btn btn-outline-secondary btn-sm">Excel</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-wrap table-wrap--center">
+        {% include "includes/table_open.html" with table_title="Category totals" table_icon="bi-bar-chart" %}
+        <table class="table table-sm mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Code</th>
+                    <th>Type</th>
+                    <th class="text-end">Entries</th>
+                    <th class="text-end">Volume</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td><a href="{% url 'ledger:category_detail' row.category.pk %}" class="table-link">{{ row.category.name }}</a></td>
+                    <td><code class="small">{{ row.category.code }}</code></td>
+                    <td class="small">{{ row.category.get_transaction_type_display }}</td>
+                    <td class="text-end">{{ row.count }}</td>
+                    <td class="text-end text-currency">₵ {{ row.volume|floatformat:2|intcomma }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-muted text-center py-3">No approved ledger entries in this range.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% include "includes/table_close.html" %}
+    </div>
+</div>
+{% endblock %}

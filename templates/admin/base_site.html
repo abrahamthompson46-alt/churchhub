@@ -1,0 +1,31 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | ChurchHub{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin/css/churchhub_admin.css' %}">
+{% endblock %}
+
+{% block branding %}
+<div id="branding">
+    <h1 id="site-name">
+        <a href="{% url 'admin:index' %}">
+            <span class="brand-mark">CH</span>
+            ChurchHub Platform
+        </a>
+    </h1>
+    <p class="brand-tagline">Site Owner Console</p>
+</div>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block footer %}
+<div id="footer">
+    <a href="/platform/">Platform Control Panel</a> ·
+    <a href="/dashboard/">Application</a> ·
+    ChurchHub &copy; {% now "Y" %}
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Record Receipt — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <nav aria-label="breadcrumb" class="app-breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{% url 'transactions:pending_approvals' %}">Finance</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Record Receipt</li>
+                </ol>
+            </nav>
+            {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Record Receipt" page_description="Receipt will be pending until approved by an authorized officer." %}
+            <div class="form-card-inner card">
+                <div class="card-body p-4 p-md-5">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+                        <h6 class="text-muted text-uppercase small fw-semibold mb-3">Offering Amounts</h6>
+                        {% for field in form %}
+                            {% if field.name in "tithe_amount combined_amount income_amount" or field.name|slice:":8" == "offering" %}
+                                {% include "includes/form_field.html" with field=field %}
+                            {% endif %}
+                        {% endfor %}
+                        <hr class="my-4">
+                        <h6 class="text-muted text-uppercase small fw-semibold mb-3">Payment Details</h6>
+                        {% for field in form %}
+                            {% if field.name not in "tithe_amount combined_amount income_amount" and field.name|slice:":8" != "offering" %}
+                                {% include "includes/form_field.html" with field=field %}
+                            {% endif %}
+                        {% endfor %}
+                        <div class="d-flex gap-2 pt-2">
+                            <button type="submit" class="btn btn-success">Submit Receipt</button>
+                            <a href="{% url 'transactions:pending_approvals' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

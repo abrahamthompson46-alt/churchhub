@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Permission Overrides — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% url 'permissions:override_create' as create_url %}
+    {% include "includes/page_header.html" with page_subtitle="Permissions" page_title="User Overrides" page_description="Grant or deny specific permissions for individual users. Overrides take precedence over the role matrix." action_url=create_url action_label="Add Override" action_icon="bi-plus-lg" %}
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Permission</th>
+                        <th>Effect</th>
+                        <th>Expires</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in overrides %}
+                    <tr>
+                        <td>{{ o.user.username }}</td>
+                        <td>{{ o.permission.name }}</td>
+                        <td>
+                            {% if o.granted %}
+                            <span class="chip chip--success">Grant</span>
+                            {% else %}
+                            <span class="chip chip--danger">Deny</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ o.expires_at|date:"M j, Y H:i"|default:"—" }}</td>
+                        <td>
+                            {% if o.is_effective %}
+                            <span class="chip chip--success">Active</span>
+                            {% else %}
+                            <span class="chip chip--muted">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <a href="{% url 'permissions:override_edit' o.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            <a href="{% url 'permissions:override_delete' o.pk %}" class="btn btn-sm btn-outline-danger">Remove</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">{% include "includes/empty_state.html" with icon="bi-sliders" message="No permission overrides configured." action_url=create_url action_label="Add override" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

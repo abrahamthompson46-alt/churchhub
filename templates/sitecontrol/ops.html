@@ -1,0 +1,45 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Operations{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Platform health signals and operational tools.</p>{% endblock %}
+
+{% block content %}
+<div class="platform-stat-grid">
+    <div class="platform-stat-card"><div class="label">Database</div><div class="value {% if signals.db_ok %}text-success{% else %}text-danger{% endif %}">{% if signals.db_ok %}OK{% else %}Down{% endif %}</div></div>
+    <div class="platform-stat-card"><div class="label">Cache</div><div class="value {% if signals.cache_ok %}text-success{% else %}text-danger{% endif %}">{% if signals.cache_ok %}OK{% else %}Down{% endif %}</div></div>
+    <div class="platform-stat-card"><div class="label">Settings</div><div class="value {% if signals.settings_loaded %}text-success{% else %}text-danger{% endif %}">{% if signals.settings_loaded %}Loaded{% else %}Error{% endif %}</div></div>
+    <div class="platform-stat-card"><div class="label">Maintenance</div><div class="value {% if settings_obj.maintenance_mode %}text-warning{% else %}text-success{% endif %}">{% if settings_obj.maintenance_mode %}ON{% else %}Off{% endif %}</div></div>
+</div>
+
+<div class="platform-card">
+    <div class="platform-card-header">Email Test</div>
+    <div class="platform-card-body">
+        <form method="post" class="row g-3 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="email_test">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Recipient</label>
+                <input type="email" name="recipient" class="form-control" value="{{ settings_obj.support_email }}" placeholder="ops@example.com">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary">Send test email</button>
+            </div>
+        </form>
+        <p class="text-muted small mt-3 mb-0">Uses current SMTP settings. Failures are logged to the platform audit trail when successful.</p>
+    </div>
+</div>
+
+<div class="platform-card">
+    <div class="platform-card-header">Subscription Maintenance</div>
+    <div class="platform-card-body">
+        <p class="mb-3">Mark all ACTIVE and TRIAL subscriptions past their expiry date as EXPIRED. Replaces the <code>expire_subscriptions</code> management command.</p>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="expire_subscriptions">
+            <button type="submit" class="btn btn-outline-warning" onclick="return confirm('Expire all due subscriptions now?')">
+                Expire due subscriptions
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

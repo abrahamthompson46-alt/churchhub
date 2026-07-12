@@ -1,0 +1,375 @@
+"""Tests for dashboard services and views."""
+
+from datetime import timedelta
+from decimal import Decimal
+
+from django.contrib.auth import get_user_model
+from django.test import Client, RequestFactory, TestCase
+from django.urls import reverse
+from django.utils import timezone
+
+from accounts.models import UserRole
+from dashboard.models import Notification
+from dashboard.services import (
+    get_action_queue,
+    get_dashboard_role,
+    get_executive_kpis,
+    get_financial_summary,
+    get_hierarchy_rollup,
+    get_role_focus,
+    notify_user,
+)
+from dashboard.utils import safe_internal_redirect
+from organization.models import Church, Conference, District, Zone
+from sitecontrol.denomination_services import ensure_builtin_denominations
+from sitecontrol.models import Denomination
+from transactions.models import MonthlyCutoff
+from transactions.services import approve_transaction, open_working_day, record_receipt
+
+User = get_user_model()
+
+
+class DashboardTestMixin:
+    @classmethod
+    def setUpTestData(cls):
+        cls.conference = Conference.objects.create(code="T1", name="Test Conference")
+        cls.zone = Zone.objects.create(conference=cls.conference, code="Z1", name="Test Zone")
+        cls.district = District.objects.create(zone=cls.zone, code="D1", name="Test District")
+        cls.church = Church.objects.create(district=cls.district, code="C1", name="Test Church")
+
+
+class SafeRedirectTests(TestCase):
+    def test_allows_relative_path(self):
+        self.assertEqual(safe_internal_redirect("/members/", "/"), "/members/")
+
+    def test_blocks_open_redirect(self):
+        self.assertEqual(safe_internal_redirect("https://evil.example/", "/safe/"), "/safe/")
+        self.assertEqual(safe_internal_redirect("//evil.example/", "/safe/"), "/safe/")
+        self.assertEqual(safe_internal_redirect("", "/safe/"), "/safe/")
+
+
+class ServiceTests(DashboardTestMixin, TestCase):
+    def test_notify_user_creates_notification(self):
+        user = User.objects.create_user(
+            username="u1", password="pass12345", role=UserRole.MEMBER, church=self.church
+        )
+        n = notify_user(user, "Test", "Hello world", category="INFO")
+        self.assertIsNotNone(n)
+        self.assertEqual(Notification.objects.filter(user=user).count(), 1)
+
+    def test_dashboard_role_treasury(self):
+        user = User.objects.create_user(
+            username="t1", password="pass12345", role=UserRole.TREASURY, church=self.church
+        )
+        self.assertEqual(get_dashboard_role(user), "treasury")
+
+    def test_dashboard_role_secretary(self):
+        user = User.objects.create_user(
+            username="s1", password="pass12345", role=UserRole.SECRETARY, church=self.church
+        )
+        self.assertEqual(get_dashboard_role(user), "secretary")
+
+    def test_secretary_role_even_with_manage_finances(self):
+        """SECRETARY identity wins over manage_finances permission."""
+        user = User.objects.create_user(
+            username="s_fin", password="pass12345", role=UserRole.SECRETARY, church=self.church
+        )
+        self.assertEqual(get_dashboard_role(user), "secretary")
+        self.assertNotEqual(get_dashboard_role(user), "finance")
+
+    def test_local_pastor_is_leadership(self):
+        user = User.objects.create_user(
+            username="pastor1", password="pass12345", role=UserRole.LOCAL_PASTOR, church=self.church
+        )
+        self.assertEqual(get_dashboard_role(user), "leadership")
+
+    def test_district_pastor_is_district_overseer(self):
+        user = User.objects.create_user(
+            username="dp1", password="pass12345", role=UserRole.DISTRICT_PASTOR, church=self.church
+        )
+        self.assertEqual(get_dashboard_role(user), "district_overseer")
+        focus = get_role_focus("district_overseer")
+        self.assertIn("District", focus["headline"])
+
+    def test_monthly_cutoff_total_uses_payable_types(self):
+        treasury = User.objects.create_user(
+            username="t_kpi", password="pass12345", role=UserRole.TREASURY, church=self.church
+        )
+        pastor = User.objects.create_user(
+            username="p_kpi", password="pass12345", role=UserRole.LOCAL_PASTOR, church=self.church
+        )
+        open_working_day(self.church, timezone.localdate(), pastor)
+        txn = record_receipt(
+            church=self.church,
+            created_by=treasury,
+            tithe_amount=Decimal("100.00"),
+            combined_amount=Decimal("50.00"),
+            income_amount=Decimal("10.00"),
+        )
+        approve_transaction(txn, pastor)
+
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = treasury
+        request.session = {"current_church_id": str(self.church.id)}
+
+        # Avoid creating MonthlyCutoff so KPI computes from payable lines
+        MonthlyCutoff.objects.filter(church=self.church).delete()
+        summary = get_financial_summary(request)
+        # Tithe remittance payable 100 + combined remittance payable 25 (50% of 50)
+        self.assertEqual(summary["monthly_cutoff_total"], Decimal("125.00"))
+        self.assertEqual(summary["kpi_period_label"], "Month to date")
+        self.assertEqual(summary["cutoff_metric_label"], "Remittance payable (MTD)")
+
+
+class HierarchyScopeTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        ensure_builtin_denominations()
+        cls.sda = Denomination.objects.get(code="sda")
+        cls.methodist = Denomination.objects.get(code="methodist")
+
+        conf_sda = Conference.objects.create(name="SDA Dash Conf", code="SDADC", denomination=cls.sda)
+        conf_meth = Conference.objects.create(name="Meth Dash Conf", code="METHDC", denomination=cls.methodist)
+        z_sda = Zone.objects.create(conference=conf_sda, name="ZS", code="ZS")
+        z_meth = Zone.objects.create(conference=conf_meth, name="ZM", code="ZM")
+        d_sda = District.objects.create(zone=z_sda, name="District SDA", code="DS")
+        d_meth = District.objects.create(zone=z_meth, name="District Meth", code="DM")
+        cls.church_sda = Church.objects.create(district=d_sda, name="SDA Dash Church", code="SDC")
+        cls.church_meth = Church.objects.create(district=d_meth, name="Meth Dash Church", code="MDC")
+
+    def test_hierarchy_rollup_only_manageable_churches(self):
+        go = User.objects.create_user(
+            username="go_sda",
+            password="pass12345",
+            role=UserRole.GENERAL_OVERSEER,
+            denomination=self.sda,
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = go
+        rows = get_hierarchy_rollup(request, go)
+        names = {r["district"] for r in rows}
+        self.assertIn("District SDA", names)
+        self.assertNotIn("District Meth", names)
+        self.assertTrue(all("remittance_payable" in r for r in rows))
+
+
+class ViewTests(DashboardTestMixin, TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.treasury = User.objects.create_user(
+            username="treasury",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+
+    def test_home_requires_login(self):
+        response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_home_renders_for_treasury(self):
+        self.client.login(username="treasury", password="pass12345")
+        response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Good day")
+
+    def test_notification_inbox(self):
+        notify_user(self.treasury, "Alert", "Test message")
+        self.client.login(username="treasury", password="pass12345")
+        response = self.client.get(reverse("dashboard:notifications"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Test message")
+
+    def test_mark_all_read(self):
+        notify_user(self.treasury, "A", "One")
+        notify_user(self.treasury, "B", "Two")
+        self.client.login(username="treasury", password="pass12345")
+        response = self.client.post(reverse("dashboard:notification_mark_all_read"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            Notification.objects.filter(user=self.treasury, read=False).count(), 0
+        )
+
+    def test_notification_count_api(self):
+        notify_user(self.treasury, "A", "One")
+        self.client.login(username="treasury", password="pass12345")
+        response = self.client.get(reverse("dashboard:notification_count"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["count"], 1)
+
+    def test_cutoff_page(self):
+        self.client.login(username="treasury", password="pass12345")
+        session = self.client.session
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        response = self.client.get(reverse("dashboard:cutoff"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_cutoff_get_does_not_create_monthly_cutoff(self):
+        self.client.login(username="treasury", password="pass12345")
+        session = self.client.session
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        before = MonthlyCutoff.objects.filter(church=self.church).count()
+        response = self.client.get(reverse("dashboard:cutoff"))
+        self.assertEqual(response.status_code, 200)
+        after = MonthlyCutoff.objects.filter(church=self.church).count()
+        self.assertEqual(before, after)
+
+    def test_cutoff_without_finance_forbidden(self):
+        member = User.objects.create_user(
+            username="member_no_fin",
+            password="pass12345",
+            role=UserRole.MEMBER,
+            church=self.church,
+        )
+        self.client.login(username="member_no_fin", password="pass12345")
+        response = self.client.get(reverse("dashboard:cutoff"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_switcher_clears_session_with_empty_church(self):
+        self.client.login(username="treasury", password="pass12345")
+        session = self.client.session
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        response = self.client.get(reverse("dashboard:switch_church") + "?church=")
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn("current_church_id", self.client.session)
+
+    def test_home_clears_church_with_all(self):
+        self.client.login(username="treasury", password="pass12345")
+        session = self.client.session
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        response = self.client.get(reverse("dashboard:home") + "?church=all", follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("current_church_id", self.client.session)
+
+    def test_open_redirect_blocked_on_notification_follow(self):
+        n = notify_user(
+            self.treasury,
+            "Phish",
+            "Click me",
+            action_url="https://evil.example/steal",
+        )
+        self.client.login(username="treasury", password="pass12345")
+        response = self.client.post(
+            reverse("dashboard:notification_mark_read", kwargs={"pk": n.pk}),
+            {"follow": "1"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn("evil.example", response.url)
+        self.assertTrue(
+            response.url.endswith(reverse("dashboard:notifications"))
+            or response.url == reverse("dashboard:notifications")
+        )
+
+    def test_notification_follow_allows_internal_path(self):
+        n = notify_user(
+            self.treasury,
+            "Go",
+            "Internal",
+            action_url="/dashboard/notifications/",
+        )
+        self.client.login(username="treasury", password="pass12345")
+        response = self.client.post(
+            reverse("dashboard:notification_mark_read", kwargs={"pk": n.pk}),
+            {"follow": "1"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "/dashboard/notifications/")
+
+    def test_home_shows_hierarchy_rollup_for_overseer(self):
+        overseer = User.objects.create_user(
+            username="overseer",
+            password="pass12345",
+            role=UserRole.GENERAL_OVERSEER,
+        )
+        self.client.login(username="overseer", password="pass12345")
+        response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "District Roll-up")
+        self.assertContains(response, "Mission Control")
+        self.assertContains(response, "Action Queue")
+
+    def test_executive_kpis_for_overseer(self):
+        overseer = User.objects.create_user(
+            username="go_kpi",
+            password="pass12345",
+            role=UserRole.GENERAL_OVERSEER,
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = overseer
+        request.session = {}
+        kpis = get_executive_kpis(request, overseer)
+        self.assertIsNotNone(kpis)
+        self.assertGreaterEqual(kpis["church_count"], 1)
+
+    def test_action_queue_structure(self):
+        treasury = User.objects.create_user(
+            username="t_queue",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = treasury
+        request.session = {"current_church_id": str(self.church.id)}
+        queue = get_action_queue(request, treasury)
+        self.assertIsInstance(queue, list)
+
+    def test_home_shows_secretary_meetings_panel(self):
+        secretary = User.objects.create_user(
+            username="secretary",
+            password="pass12345",
+            role=UserRole.SECRETARY,
+            church=self.church,
+        )
+        self.client.login(username="secretary", password="pass12345")
+        response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Upcoming Meetings")
+
+    def test_home_200_for_overseer_and_secretary(self):
+        overseer = User.objects.create_user(
+            username="ov2", password="pass12345", role=UserRole.GENERAL_OVERSEER
+        )
+        secretary = User.objects.create_user(
+            username="sec2", password="pass12345", role=UserRole.SECRETARY, church=self.church
+        )
+        for username in ("treasury", "ov2", "sec2"):
+            self.client.login(username=username, password="pass12345")
+            response = self.client.get(reverse("dashboard:home"))
+            self.assertEqual(response.status_code, 200, username)
+
+
+class HealthCheckTests(TestCase):
+    def test_health_includes_database_ok(self):
+        response = self.client.get(reverse("health_check"))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "ok")
+        self.assertEqual(data["checks"]["database"], "ok")
+
+
+class PurgeNotificationsCommandTests(DashboardTestMixin, TestCase):
+    def test_purge_old_notifications(self):
+        from django.core.management import call_command
+
+        user = User.objects.create_user(
+            username="purge_u", password="pass12345", role=UserRole.MEMBER, church=self.church
+        )
+        old_read = notify_user(user, "Old", "read")
+        old_read.read = True
+        old_read.save(update_fields=["read"])
+        Notification.objects.filter(pk=old_read.pk).update(
+            created_at=timezone.now() - timedelta(days=100)
+        )
+        fresh = notify_user(user, "Fresh", "keep")
+        call_command("purge_old_notifications")
+        self.assertFalse(Notification.objects.filter(pk=old_read.pk).exists())
+        self.assertTrue(Notification.objects.filter(pk=fresh.pk).exists())

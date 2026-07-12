@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <nav aria-label="breadcrumb" class="app-breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{% url 'members:transfer_list' %}">Transfers</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
+                </ol>
+            </nav>
+            {% include "includes/page_header.html" with page_subtitle="Members" page_title=title page_description="Move a member to another church within the hierarchy." %}
+            <div class="form-card-inner card">
+                <div class="card-body p-4 p-md-5">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {% for field in form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+                        <div class="d-flex gap-2 pt-2">
+                            <button type="submit" class="btn btn-primary">Submit Request</button>
+                            <a href="{% url 'members:transfer_list' %}" class="btn btn-link">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Platform Operators{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-header">
+        <span>Site owner accounts</span>
+        <a href="{% url 'sitecontrol:operator_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Add Operator</a>
+    </div>
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>Denominations</th><th>Break-glass</th><th>Active</th><th></th></tr></thead>
+            <tbody>
+            {% for op in operators %}
+            <tr>
+                <td class="fw-semibold">{{ op.username }}</td>
+                <td>{{ op.get_full_name|default:"—" }}</td>
+                <td>{{ op.email|default:"—" }}</td>
+                <td class="small">
+                    {% for d in op.managed_denominations.all %}
+                    <span class="badge bg-secondary me-1">{{ d.code }}</span>
+                    {% empty %}
+                    <span class="text-muted">Global</span>
+                    {% endfor %}
+                </td>
+                <td>{% if op.is_superuser %}<span class="badge bg-dark">Admin</span>{% else %}—{% endif %}</td>
+                <td>{% if op.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
+                <td class="text-nowrap">
+                    <a href="{% url 'sitecontrol:operator_edit' op.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                    {% if op.is_active and op.pk != user.pk %}
+                    <form method="post" action="{% url 'sitecontrol:operator_deactivate' op.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Deactivate this operator?')">Deactivate</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-muted">No platform operators. Create one to manage the control room.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

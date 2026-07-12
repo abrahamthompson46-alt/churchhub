@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — ChurchHub{% endblock %}
+
+{% block content %}
+{% include "includes/form_open.html" with form_subtitle="Finance" form_title=title %}
+{% if scope_label %}<p class="text-muted small mb-3">{{ scope_label }}</p>{% endif %}
+<form method="post" novalidate>
+    {% csrf_token %}
+    {% for field in form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+    <div class="d-flex gap-2 pt-3">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="{% url 'budgets:list' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% include "includes/form_close.html" %}
+{% endblock %}

@@ -1,0 +1,19 @@
+<aside class="auth-split-brand auth-split-brand--platform">
+    <div class="auth-split-brand-inner">
+        {% if site_logo %}
+        <img src="{{ site_logo.url }}" alt="" class="auth-platform-logo mb-4">
+        {% else %}
+        <div class="brand-mark auth-platform-mark mb-4"><i class="bi bi-grid-1x2-fill"></i></div>
+        {% endif %}
+        <p class="auth-platform-eyebrow mb-2">Platform</p>
+        <h2 class="auth-split-title">{{ site_name|default:"ChurchHub" }}</h2>
+        <p class="auth-split-tagline">
+            Enterprise church management — members, finance, meetings, and reports in one secure platform.
+        </p>
+        <ul class="auth-feature-list">
+            <li><i class="bi bi-shield-check"></i> Role-based access &amp; audit trails</li>
+            <li><i class="bi bi-diagram-3"></i> {{ hierarchy_chain|default:"Conference → church hierarchy" }}</li>
+            <li><i class="bi bi-graph-up"></i> Financial integrity &amp; reporting</li>
+        </ul>
+    </div>
+</aside>

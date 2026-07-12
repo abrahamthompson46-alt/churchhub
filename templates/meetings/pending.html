@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Pending Minutes — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Meetings" page_title="Pending Minutes Approval" page_description="Review submitted minutes before they are locked as official records." %}
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Meeting</th>
+                        <th>Type</th>
+                        <th>Held</th>
+                        <th>Submitted by</th>
+                        <th>Submitted</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in meetings %}
+                    <tr>
+                        <td><a href="{% url 'meetings:detail' m.pk %}" class="table-link">{{ m.title }}</a></td>
+                        <td>{{ m.get_meeting_type_display }}</td>
+                        <td>{{ m.scheduled_at|date:"M j, Y" }}</td>
+                        <td>{{ m.minutes_submitted_by.get_full_name|default:m.minutes_submitted_by.username }}</td>
+                        <td>{{ m.minutes_submitted_at|date:"M j, Y g:i A" }}</td>
+                        <td class="text-end text-nowrap">
+                            <a href="{% url 'meetings:detail' m.pk %}" class="btn btn-sm btn-outline-secondary">Review</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6">{% include "includes/empty_state.html" with icon="bi-check-circle" message="No minutes awaiting approval." %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

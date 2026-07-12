@@ -1,0 +1,124 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}{{ church.name }}{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">{{ church.district.name }} · {{ church.zone.name }} · {{ church.conference.name }}</p>{% endblock %}
+
+{% block content %}
+<div class="platform-stat-grid">
+    <div class="platform-stat-card"><div class="label">Members</div><div class="value">{{ stats.members }}</div></div>
+    <div class="platform-stat-card"><div class="label">Users</div><div class="value">{{ stats.users }} / {{ stats.user_limit }}</div></div>
+    <div class="platform-stat-card"><div class="label">Transactions</div><div class="value">{{ stats.transactions }}</div></div>
+    <div class="platform-stat-card"><div class="label">Plan</div><div class="value" style="font-size:1rem">{{ stats.subscription.plan.name }}</div></div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="platform-card">
+            <div class="platform-card-header">
+                <span>Institution Users</span>
+                {% if can_manage_lifecycle %}
+                <a href="{% url 'sitecontrol:tenant_edit' church.pk %}" class="btn btn-sm btn-outline-primary">Edit Tenant</a>
+                {% endif %}
+            </div>
+            <div class="table-responsive">
+                <table class="platform-table mb-0">
+                    <thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Active</th>{% if can_impersonate %}<th></th>{% endif %}</tr></thead>
+                    <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td>{{ u.username }}</td>
+                        <td>{{ u.get_full_name|default:"—" }}</td>
+                        <td>{{ u.get_role_display }}</td>
+                        <td>{% if u.is_active %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-x-circle text-danger"></i>{% endif %}</td>
+                        {% if can_impersonate %}
+                        <td>
+                            {% if u.is_active %}
+                            <form method="post" action="{% url 'sitecontrol:impersonate_start' u.pk %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-warning" title="Support impersonation (audited)">Impersonate</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="{% if can_impersonate %}5{% else %}4{% endif %}" class="text-muted">No users assigned.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% if stats.subscription.lifecycle_notes %}
+        <div class="platform-card mt-4">
+            <div class="platform-card-header">Lifecycle Notes</div>
+            <div class="platform-card-body">
+                <pre class="mb-0 small text-muted" style="white-space:pre-wrap">{{ stats.subscription.lifecycle_notes }}</pre>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    <div class="col-lg-4">
+        <div class="platform-card">
+            <div class="platform-card-header">Subscription</div>
+            <div class="platform-card-body">
+                <p><strong>Status:</strong> {{ stats.subscription.get_status_display }}</p>
+                <p><strong>Plan:</strong> {{ stats.subscription.plan.name }}</p>
+                <p><strong>Billing:</strong> {{ stats.subscription.get_billing_interval_display }}</p>
+                {% if stats.subscription.payment_method %}
+                <p><strong>Payment:</strong> {{ stats.subscription.payment_method.name }}</p>
+                {% endif %}
+                {% if stats.subscription.payment_reference %}
+                <p><strong>Reference:</strong> <code>{{ stats.subscription.payment_reference }}</code></p>
+                {% endif %}
+                {% if stats.subscription.price_snapshot %}
+                <p><strong>Price locked:</strong>
+                    {{ stats.subscription.price_snapshot.currency|default:stats.subscription.plan.currency }}
+                    {% if stats.subscription.billing_interval == 'YEARLY' %}
+                    {{ stats.subscription.price_snapshot.price_yearly }}/yr
+                    {% else %}
+                    {{ stats.subscription.price_snapshot.price_monthly }}/mo
+                    {% endif %}
+                </p>
+                {% endif %}
+                <p><strong>Started:</strong> {{ stats.subscription.started_at }}</p>
+                <p><strong>Expires:</strong> {{ stats.subscription.expires_at|default:"No expiry" }}</p>
+                {% if stats.subscription.next_billing_at %}
+                <p class="mb-0"><strong>Next billing:</strong> {{ stats.subscription.next_billing_at }}</p>
+                {% else %}
+                <p class="mb-0"><strong>Next billing:</strong> —</p>
+                {% endif %}
+                <div class="mt-3 d-grid gap-2">
+                    {% if can_manage_lifecycle %}
+                    <a href="{% url 'sitecontrol:subscription_edit' stats.subscription.pk %}" class="btn btn-sm btn-primary">Manage Subscription</a>
+                    <form method="post" action="{% url 'sitecontrol:tenant_reprovision_financials' church.pk %}" onsubmit="return confirm('Re-run financial seeding for this church?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Re-provision Financials</button>
+                    </form>
+                        {% if stats.subscription.status == "SUSPENDED" %}
+                        <form method="post" action="{% url 'sitecontrol:tenant_reactivate' church.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-success w-100">Reactivate Tenant</button>
+                        </form>
+                        {% elif stats.subscription.status != "EXPIRED" or church.is_active %}
+                        <form method="post" action="{% url 'sitecontrol:tenant_suspend' church.pk %}" class="d-grid gap-2">
+                            {% csrf_token %}
+                            <input type="text" name="reason" class="form-control form-control-sm" placeholder="Suspension reason (optional)">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Suspend Tenant</button>
+                        </form>
+                        {% endif %}
+                        {% if church.is_active %}
+                        <hr>
+                        <form method="post" action="{% url 'sitecontrol:tenant_offboard' church.pk %}" class="d-grid gap-2" onsubmit="return confirm('Offboard permanently deactivates users. Data is retained. Continue?');">
+                            {% csrf_token %}
+                            <input type="text" name="reason" class="form-control form-control-sm" placeholder="Offboard reason">
+                            <input type="text" name="confirm" class="form-control form-control-sm" placeholder='Type OFFBOARD to confirm' required>
+                            <button type="submit" class="btn btn-sm btn-danger">Offboard Tenant</button>
+                        </form>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

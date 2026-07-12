@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Transfer {{ church.name }} — ChurchHub{% endblock %}
+
+{% block content %}
+{% include "includes/form_open.html" with form_subtitle="Organization" form_title="Transfer Church" %}
+<p class="text-muted small mb-3">Move <strong>{{ church.name }}</strong> to another district within the same denomination.</p>
+<form method="post" novalidate>
+    {% csrf_token %}
+    {% for field in form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+    <div class="d-flex gap-2 pt-3">
+        <button type="submit" class="btn btn-primary">Transfer Church</button>
+        <a href="{% url 'organization:church_detail' church.id %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% include "includes/form_close.html" %}
+{% endblock %}

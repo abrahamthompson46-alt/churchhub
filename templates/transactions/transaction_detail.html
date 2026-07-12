@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ transaction.reference }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'transactions:transaction_list' %}">Transactions</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ transaction.reference }}</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle=transaction.transaction_type page_title=transaction.reference page_description=transaction.church.name %}
+
+    <div class="d-flex flex-wrap gap-2 mb-4">
+            <span class="badge {% if transaction.approval_status == 'APPROVED' %}bg-success{% elif transaction.approval_status == 'PENDING' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ transaction.approval_status }}</span>
+            {% if transaction.is_voided %}<span class="badge bg-dark">VOIDED</span>{% endif %}
+        <a href="{% url 'transactions:transaction_receipt' transaction.id %}" class="btn btn-outline-secondary btn-sm">Print Receipt</a>
+    </div>
+
+    <div class="detail-grid">
+        <div>
+            <div class="panel mb-4">
+                <div class="panel-header">Journal Lines</div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead><tr><th>Account</th><th>Type</th><th class="text-end">Amount</th></tr></thead>
+                        <tbody>
+                            {% for line in transaction.lines.all %}
+                            <tr>
+                                <td>{{ line.account.name }}</td>
+                                <td class="text-muted small">{{ line.account.account_type }}</td>
+                                <td class="text-end text-currency {% if line.amount < 0 %}text-danger{% else %}text-success{% endif %}">₵ {{ line.amount|floatformat:2|intcomma }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {% if transaction.reversals.exists %}
+            <div class="panel">
+                <div class="panel-header">Reversals</div>
+                <ul class="list-plain">
+                    {% for rev in transaction.reversals.all %}
+                    <li class="d-flex justify-content-between py-2 border-bottom">
+                        <a href="{% url 'transactions:transaction_detail' rev.id %}" class="table-link">{{ rev.reference }}</a>
+                        <span class="text-muted small">{{ rev.date }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+
+        <div>
+            <div class="panel mb-4">
+                <div class="panel-header">Details</div>
+                <div class="panel-body">
+                    <dl class="mb-0 small">
+                        <dt class="text-muted">Date</dt><dd>{{ transaction.date }}</dd>
+                        <dt class="text-muted">Description</dt><dd>{{ transaction.description|default:"—" }}</dd>
+                        <dt class="text-muted">Created By</dt><dd>{{ transaction.created_by|default:"—" }}</dd>
+                        {% if transaction.approved_by %}
+                        <dt class="text-muted">Approved By</dt><dd>{{ transaction.approved_by }} ({{ transaction.approved_at|date:"M j, Y" }})</dd>
+                        {% endif %}
+                        {% if transaction.reversal_of %}
+                        <dt class="text-muted">Reversal Of</dt><dd><a href="{% url 'transactions:transaction_detail' transaction.reversal_of_id %}" class="table-link">{{ transaction.reversal_of.reference }}</a></dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+
+            {% if can_void %}
+            <div class="panel border-danger">
+                <div class="panel-header text-danger">Void Transaction</div>
+                <div class="panel-body">
+                    <p class="small text-muted">Creates an equal-and-opposite reversal entry. Requires an open financial period.</p>
+                    <form method="post" action="{% url 'transactions:void_transaction' transaction.id %}">
+                        {% csrf_token %}
+                        {% include "includes/form_field.html" with field=void_form.reason %}
+                        <button type="submit" class="btn btn-outline-danger btn-sm w-100" onclick="return confirm('Void this transaction? This cannot be undone.')">Void Transaction</button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

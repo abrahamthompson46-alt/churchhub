@@ -1,0 +1,54 @@
+{% load humanize %}
+<div class="table-wrap table-wrap--center table-wrap--compact mt-4 mb-4">
+    <div class="table-responsive table-in-card">
+        <table class="table table-sm mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Account</th>
+                    <th class="text-end">Debit</th>
+                    <th class="text-end">Credit</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if draft.lines %}
+                    {% for line in draft.lines %}
+                    <tr>
+                        <td>{{ line.account_name }}</td>
+                        <td class="text-end {% if line.debit %}text-currency fw-medium{% else %}text-muted{% endif %}">
+                            {% if line.debit %}₵ {{ line.debit|floatformat:2|intcomma }}{% else %}—{% endif %}
+                        </td>
+                        <td class="text-end {% if line.credit %}text-currency fw-medium{% else %}text-muted{% endif %}">
+                            {% if line.credit %}₵ {{ line.credit|floatformat:2|intcomma }}{% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                <tr>
+                    <td>{{ draft.debit_account_name }}</td>
+                    <td class="text-end text-currency fw-medium">₵ {{ draft.amount|floatformat:2|intcomma }}</td>
+                    <td class="text-end text-muted">—</td>
+                </tr>
+                <tr>
+                    <td>{{ draft.credit_account_name }}</td>
+                    <td class="text-end text-muted">—</td>
+                    <td class="text-end text-currency fw-medium">₵ {{ draft.amount|floatformat:2|intcomma }}</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% if draft.offering_type %}
+<p class="text-muted small mb-0">
+    Remittance policy applied for <strong>{{ draft.offering_type }}</strong>
+    {% if draft.retain_amount or draft.remit_amount %}
+    (retain ₵ {{ draft.retain_amount|default:"0"|floatformat:2|intcomma }},
+    remit ₵ {{ draft.remit_amount|default:"0"|floatformat:2|intcomma }}).
+    {% endif %}
+</p>
+{% endif %}
+{% if draft.budget_warning %}
+<p class="text-warning small mb-0 mt-2">
+    <i class="bi bi-exclamation-triangle me-1"></i>{{ draft.budget_warning }}
+</p>
+{% endif %}

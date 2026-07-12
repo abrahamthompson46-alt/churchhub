@@ -1,0 +1,25 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Feature Registry{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-body">
+        <p class="text-muted">Global killswitches — when disabled, the module is unavailable to <strong>all</strong> tenants regardless of subscription plan.</p>
+        <form method="post">
+            {% csrf_token %}
+            <div class="row g-2">
+                {% for field in form %}
+                <div class="col-md-6">
+                    <div class="platform-form-check border rounded p-3 bg-light">
+                        {{ field }}
+                        <label class="form-check-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="mt-4"><button type="submit" class="btn btn-primary">Save Feature Registry</button></div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Church Onboarding — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <nav aria-label="breadcrumb" class="app-breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{% url 'organization:hierarchy' %}">Organization</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Onboard Church</li>
+                </ol>
+            </nav>
+            {% include "includes/page_header.html" with page_subtitle="Organization" page_title="Church Onboarding" page_description="Add a church to an existing district or create a full hierarchy path." %}
+
+            <ul class="nav nav-tabs mb-4">
+                <li class="nav-item">
+                    <a class="nav-link{% if mode != 'full' %} active{% endif %}" href="{% url 'organization:church_onboard' %}">Existing District</a>
+                </li>
+                {% if allow_full_mode %}
+                <li class="nav-item">
+                    <a class="nav-link{% if mode == 'full' %} active{% endif %}" href="{% url 'organization:church_onboard' %}?mode=full">Full Setup</a>
+                </li>
+                {% endif %}
+            </ul>
+
+            <div class="form-card-inner card">
+                <div class="card-body p-4 p-md-5">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        <input type="hidden" name="mode" value="{{ mode }}">
+
+                        {% if mode == 'full' %}
+                        <h6 class="text-muted text-uppercase small mb-3">Conference</h6>
+                        {% for field in form %}
+                            {% if field.name == 'conference_name' or field.name == 'conference_code' %}
+                                {% include "includes/form_field.html" with field=field %}
+                            {% endif %}
+                        {% endfor %}
+                        <h6 class="text-muted text-uppercase small mb-3 mt-2">Zone</h6>
+                        {% for field in form %}
+                            {% if field.name == 'zone_name' or field.name == 'zone_code' %}
+                                {% include "includes/form_field.html" with field=field %}
+                            {% endif %}
+                        {% endfor %}
+                        <h6 class="text-muted text-uppercase small mb-3 mt-2">District</h6>
+                        {% for field in form %}
+                            {% if field.name == 'district_name' or field.name == 'district_code' %}
+                                {% include "includes/form_field.html" with field=field %}
+                            {% endif %}
+                        {% endfor %}
+                        <h6 class="text-muted text-uppercase small mb-3 mt-2">Church</h6>
+                        {% for field in form %}
+                            {% if field.name == 'church_name' or field.name == 'church_code' or field.name == 'address' or field.name == 'setup_financials' %}
+                                {% include "includes/form_field.html" with field=field %}
+                            {% endif %}
+                        {% endfor %}
+                        {% else %}
+                        {% for field in form %}
+                            {% include "includes/form_field.html" with field=field %}
+                        {% endfor %}
+                        {% endif %}
+
+                        <div class="d-flex gap-2 pt-2">
+                            <button type="submit" class="btn btn-primary">Onboard Church</button>
+                            <a href="{% url 'organization:hierarchy' %}" class="btn btn-link">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Activity Log — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Administration" page_title="User Activity Log" page_description="Login, role changes, and account events for managed users." %}
+
+    <div class="filter-bar">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
+                <label class="form-label">Action</label>
+                <select name="action" class="form-select form-select-sm">
+                    <option value="">All actions</option>
+                    {% for value, label in action_choices %}
+                    <option value="{{ value }}" {% if action_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Filter</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Performed By</th>
+                        <th>IP</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td class="text-muted small text-nowrap">{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
+                        <td><a href="{% url 'accounts:user_detail' log.user_id %}" class="table-link">{{ log.user.username }}</a></td>
+                        <td><span class="chip">{{ log.get_action_display }}</span></td>
+                        <td class="text-muted">{{ log.performed_by.username|default:"—" }}</td>
+                        <td class="text-muted small">{{ log.ip_address|default:"—" }}</td>
+                        <td class="small text-muted">{{ log.details|default:"—" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">{% include "includes/empty_state.html" with icon="bi-journal" message="No activity logged yet." %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page_obj.paginator.num_pages > 1 %}
+        <nav class="p-3" aria-label="Activity log pagination">
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&amp;action={{ action_filter }}">Previous</a></li>
+                {% endif %}
+                <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&amp;action={{ action_filter }}">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

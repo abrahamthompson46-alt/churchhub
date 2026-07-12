@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ member.full_name }} — Giving Statement{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Finance" page_title="Giving Statement" page_description=member.full_name %}
+
+    <div class="metrics-row">
+        <div class="metric-card metric-card--primary"><span class="metric-label">Tithe ({{ year }})</span><span class="metric-value text-currency">₵ {{ summary.TITHE|floatformat:0|intcomma }}</span></div>
+        <div class="metric-card metric-card--success"><span class="metric-label">Combined</span><span class="metric-value text-currency">₵ {{ summary.COMBINED|floatformat:0|intcomma }}</span></div>
+        {% if summary.welfare_contributed %}
+        <div class="metric-card"><span class="metric-label">Welfare In</span><span class="metric-value text-currency">₵ {{ summary.welfare_contributed|floatformat:0|intcomma }}</span></div>
+        <div class="metric-card"><span class="metric-label">Welfare Out</span><span class="metric-value text-currency">₵ {{ summary.welfare_received|floatformat:0|intcomma }}</span></div>
+        {% endif %}
+        <div class="metric-card"><span class="metric-label">Total</span><span class="metric-value text-currency">₵ {{ summary.total|floatformat:0|intcomma }}</span></div>
+    </div>
+
+    {% if summary.welfare_contributed or summary.welfare_received %}
+    <div class="mb-3">
+        <a href="{% url 'remittance:member_welfare' member.id %}?year={{ year }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-heart-pulse me-1"></i>Full Welfare Statement
+        </a>
+    </div>
+    {% endif %}
+
+    <div class="export-toolbar">
+        <span class="chip">Annual statement · {{ year }}</span>
+        <div class="btn-group btn-group-sm">
+            <a href="?year={{ year }}&export=csv" class="btn btn-outline-secondary">CSV</a>
+            <a href="?year={{ year }}&export=excel" class="btn btn-outline-secondary">Excel</a>
+            <a href="?year={{ year }}&export=pdf" class="btn btn-outline-secondary">PDF</a>
+        </div>
+    </div>
+
+    {% include "includes/table_open.html" with table_title="Contributions" table_icon="bi-list-check" %}
+            <table class="table mb-0">
+                <thead><tr><th>Date</th><th>Reference</th><th>Account</th><th class="text-end">Amount</th></tr></thead>
+                <tbody>
+                    {% for l in lines %}
+                    <tr>
+                        <td>{{ l.transaction.date }}</td>
+                        <td><code class="small">{{ l.transaction.reference }}</code></td>
+                        <td>{{ l.account.name }}</td>
+                        <td class="text-end text-currency">₵ {{ l.amount|floatformat:2|intcomma }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4">{% include "includes/empty_state.html" with icon="bi-inbox" message="No contributions recorded." %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+    {% include "includes/table_close.html" %}
+</div>
+{% endblock %}

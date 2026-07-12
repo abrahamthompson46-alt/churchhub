@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Monthly Cut-off — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Dashboard" page_title="Monthly Cut-off" page_description="Remittance payable totals (tithe + combined) for the current month. Viewing does not create or update records." %}
+
+    <div class="metrics-row mb-4">
+        <div class="metric-card">
+            <span class="metric-label">Remittance payable (MTD)</span>
+            <span class="metric-value text-currency">₵ {{ monthly_total|floatformat:2|intcomma }}</span>
+        </div>
+    </div>
+
+    {% if can_recompute %}
+    <form method="post" action="{% url 'dashboard:cutoff' %}" class="mb-4">
+        {% csrf_token %}
+        <input type="hidden" name="recompute" value="1">
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-arrow-repeat"></i> Recompute cut-off
+        </button>
+        <span class="text-muted small ms-2">Recalculates and saves from remittance payable accounts.</span>
+    </form>
+    {% endif %}
+
+    {% if cutoff %}
+    <div class="panel">
+        <div class="panel-header">
+            Breakdown
+            {% if not cutoff_persisted %}
+            <span class="badge bg-secondary ms-2">Preview — not saved</span>
+            {% endif %}
+        </div>
+        <div class="panel-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-4">Tithe remittance payable</dt>
+                <dd class="col-sm-8 text-currency">₵ {{ cutoff.total_tithe|floatformat:2|intcomma }}</dd>
+                <dt class="col-sm-4">Combined remittance payable</dt>
+                <dd class="col-sm-8 text-currency">₵ {{ cutoff.total_combined|floatformat:2|intcomma }}</dd>
+                <dt class="col-sm-4">Remitted</dt>
+                <dd class="col-sm-8">
+                    {% if cutoff.transferred %}
+                    <span class="badge bg-success">Completed</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark">Pending</span>
+                    {% endif %}
+                </dd>
+            </dl>
+            {% if not cutoff.transferred and can_remit %}
+            <form method="post" action="{% url 'transactions:record_remittance' %}" class="mt-4">
+                {% csrf_token %}
+                <input type="hidden" name="month" value="{{ cutoff.month|date:'Y-m-d' }}">
+                <input type="hidden" name="idempotency_key" value="remit-{{ cutoff.month|date:'Y-m' }}">
+                <button type="submit" class="btn btn-primary">Record District Remittance</button>
+            </form>
+            {% elif not cutoff_persisted and can_recompute %}
+            <p class="text-muted small mt-3 mb-0">Recompute and save the cut-off before recording remittance.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

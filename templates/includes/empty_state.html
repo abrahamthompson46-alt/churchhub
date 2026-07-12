@@ -1,0 +1,11 @@
+{% comment %}
+Empty state block.
+Usage: {% include "includes/empty_state.html" with icon="bi-inbox" message="Nothing here yet." action_url=url action_label="Add item" %}
+{% endcomment %}
+<div class="empty-state">
+    {% if icon %}<div class="empty-state-icon"><i class="bi {{ icon }}"></i></div>{% endif %}
+    <p class="empty-state-text">{{ message|default:"No records found." }}</p>
+    {% if action_url and action_label %}
+    <a href="{{ action_url }}" class="btn btn-primary btn-sm mt-2">{{ action_label }}</a>
+    {% endif %}
+</div>

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Budget vs Actual — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% if church %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Budget vs Actual" page_description=church.name %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Budget vs Actual" %}
+    {% endif %}
+
+    <div class="filter-bar">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
+                <label class="form-label">Year</label>
+                <input type="number" name="year" value="{{ year }}" class="form-control form-control-sm field-w-xs" min="2020" max="2099">
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Apply</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Account</th>
+                        <th class="text-end">Budgeted</th>
+                        <th class="text-end">Actual</th>
+                        <th class="text-end">Variance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td>{{ row.account }}</td>
+                        <td class="text-end text-currency">₵ {{ row.budgeted|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency">₵ {{ row.actual|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency fw-semibold {% if row.variance < 0 %}text-danger{% else %}text-success{% endif %}">₵ {{ row.variance|floatformat:2|intcomma }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">{% include "includes/empty_state.html" with icon="bi-pie-chart" message="No budgets defined for {{ year }}. Add budgets in Admin." %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

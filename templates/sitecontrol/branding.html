@@ -1,0 +1,28 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Branding{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="platform-form-grid">
+                {% for field in form %}
+                <div>
+                    <label class="form-label fw-semibold">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.name == 'logo' and settings_obj.logo %}
+                    <div class="mt-2"><img src="{{ settings_obj.logo.url }}" alt="Logo" style="max-height:48px"></div>
+                    {% endif %}
+                    {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary">Save Branding</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Remittance Policies — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Remittance Policies" page_description="Configurable retain and remit percentages per hierarchy level." %}
+
+    {% if fund_balances %}
+    <section class="dash-section mb-4">
+        <div class="dash-section__header">
+            <h2 class="dash-section__title">Fund Balances</h2>
+            <span class="chip chip--muted">{{ active_church.name }}</span>
+        </div>
+        <div class="dash-inline-stats">
+            {% for row in fund_balances %}
+            <div class="dash-inline-stat">
+                <span class="dash-inline-stat__label">{{ row.label }}</span>
+                <span class="dash-inline-stat__value">₵{{ row.balance|floatformat:2 }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <div class="filter-bar mb-4">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small text-muted mb-1">Unit Type</label>
+                <select name="unit_type" class="form-select form-select-sm">
+                    {% for value, label in unit_type_choices %}
+                    <option value="{{ value }}"{% if unit_type == value %} selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label small text-muted mb-1">Unit</label>
+                <select name="unit_id" class="form-select form-select-sm">
+                    {% for value, label in unit_choices %}
+                    <option value="{{ value }}"{% if unit_id == value %} selected{% endif %}>{{ label }}</option>
+                    {% empty %}
+                    <option value="{{ unit_id }}">{{ unit_label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Filter</button>
+                {% if can_edit %}
+                <a href="{% url 'remittance:policy_create' %}?unit_type={{ unit_type }}&unit_id={{ unit_id }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-lg me-1"></i>Add Policy
+                </a>
+                {% endif %}
+            </div>
+        </form>
+        <p class="small text-muted mt-2 mb-0">Viewing policies for <strong>{{ unit_label }}</strong></p>
+    </div>
+
+    <div class="table-wrap table-wrap--center table-wrap--compact">
+        {% include "includes/table_open.html" with table_title="Active Policies" table_icon="bi-percent" %}
+        <div class="table-responsive table-in-card">
+            <table class="table table-hover table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Offering</th>
+                        <th>Scope</th>
+                        <th class="text-end">Retain</th>
+                        <th class="text-end">Remit</th>
+                        <th>Effective</th>
+                        <th>Status</th>
+                        {% if can_edit %}<th></th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for policy in policies %}
+                    <tr>
+                        <td>{{ policy.get_offering_type_display }}</td>
+                        <td>{{ policy.get_application_scope_display }}</td>
+                        <td class="text-end">{{ policy.retain_percent }}%</td>
+                        <td class="text-end">{{ policy.remit_percent }}%</td>
+                        <td>{{ policy.effective_from }}{% if policy.effective_to %} – {{ policy.effective_to }}{% endif %}</td>
+                        <td>
+                            {% if policy.is_active %}
+                            <span class="badge bg-success-subtle text-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                        {% if can_edit %}
+                        <td class="text-end">
+                            <a href="{% url 'remittance:policy_edit' policy.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if can_edit %}7{% else %}6{% endif %}" class="text-muted text-center py-4">
+                            No policies configured for this unit.
+                            {% if can_edit %}<a href="{% url 'remittance:policy_create' %}?unit_type={{ unit_type }}&unit_id={{ unit_id }}">Add one</a>.{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "includes/table_close.html" %}
+    </div>
+
+    <div class="mt-3 d-flex gap-2">
+        <a href="{% url 'remittance:settlements' %}" class="btn btn-outline-secondary btn-sm">Settlement Batches</a>
+        <a href="{% url 'remittance:welfare' %}" class="btn btn-outline-secondary btn-sm">Welfare Register</a>
+    </div>
+</div>
+{% endblock %}

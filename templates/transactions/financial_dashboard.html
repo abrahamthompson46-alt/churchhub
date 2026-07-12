@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Cash & Bank Statement — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Cash & Bank Statement" page_description="Approved cash and bank movements only. For full general ledger reports, use the Report Center." %}
+
+    <p class="mb-3"><a href="{% url 'reports:index' %}" class="btn btn-outline-secondary btn-sm">Open Report Center</a></p>
+
+    <div class="filter-bar">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
+                <label class="form-label">Start</label>
+                <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date|default:'' }}">
+            </div>
+            <div class="filter-field">
+                <label class="form-label">End</label>
+                <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date|default:'' }}">
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Apply</button>
+            </div>
+        </form>
+        <span class="toolbar-spacer"></span>
+        <div class="btn-group btn-group-sm">
+            <a href="?export=csv{% if start_date %}&amp;start_date={{ start_date }}{% endif %}{% if end_date %}&amp;end_date={{ end_date }}{% endif %}" class="btn btn-outline-secondary">CSV</a>
+            <a href="?export=excel{% if start_date %}&amp;start_date={{ start_date }}{% endif %}{% if end_date %}&amp;end_date={{ end_date }}{% endif %}" class="btn btn-outline-secondary">Excel</a>
+            <a href="?export=pdf{% if start_date %}&amp;start_date={{ start_date }}{% endif %}{% if end_date %}&amp;end_date={{ end_date }}{% endif %}" class="btn btn-outline-secondary">PDF</a>
+        </div>
+    </div>
+
+    <div class="metrics-row">
+        <div class="metric-card"><span class="metric-label">Total Receipts</span><span class="metric-value text-currency">₵ {{ total_receipt|floatformat:2|intcomma }}</span></div>
+        <div class="metric-card metric-card--success"><span class="metric-label">Total Expenses</span><span class="metric-value text-currency">₵ {{ total_expense|floatformat:2|intcomma }}</span></div>
+        <div class="metric-card metric-card--danger"><span class="metric-label">Balance</span><span class="metric-value text-currency">₵ {{ final_balance|floatformat:2|intcomma }}</span></div>
+    </div>
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr><th>Date</th><th>Reference</th><th>Type</th><th>Description</th><th class="text-end">Receipt</th><th class="text-end">Expense</th><th class="text-end">Balance</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td>{{ row.date }}</td>
+                        <td><code class="small">{{ row.reference|default:"—" }}</code></td>
+                        <td><span class="chip">{{ row.type }}</span></td>
+                        <td class="text-muted">{{ row.description|default:"—"|truncatechars:30 }}</td>
+                        <td class="text-end text-currency">{% if row.receipt %}₵ {{ row.receipt|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                        <td class="text-end text-currency">{% if row.expense %}₵ {{ row.expense|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                        <td class="text-end text-currency fw-semibold">₵ {{ row.balance|floatformat:2|intcomma }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7">{% include "includes/empty_state.html" with icon="bi-graph-up" message="No transactions for this period." %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page_obj.has_other_pages %}
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <span class="text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if start_date %}&amp;start_date={{ start_date }}{% endif %}{% if end_date %}&amp;end_date={{ end_date }}{% endif %}">Previous</a></li>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if start_date %}&amp;start_date={{ start_date }}{% endif %}{% if end_date %}&amp;end_date={{ end_date }}{% endif %}">Next</a></li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

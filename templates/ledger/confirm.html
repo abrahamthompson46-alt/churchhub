@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Confirm Ledger Entry — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
+
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Confirm Ledger Entry" page_description="Review the journal entry before posting to the ledger." %}
+
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="data-card p-4">
+                <div class="dash-section__header mb-3">
+                    <h2 class="dash-section__title">Journal Entry Preview</h2>
+                    <span class="chip chip--info">{{ draft.transaction_type }}</span>
+                </div>
+
+                <dl class="row mb-0 ledger-confirm-dl">
+                    <dt class="col-sm-4 text-muted">Category</dt>
+                    <dd class="col-sm-8 fw-semibold">{{ draft.category_name }}</dd>
+
+                    <dt class="col-sm-4 text-muted">Date</dt>
+                    <dd class="col-sm-8">{{ draft.date }}</dd>
+
+                    {% if draft.member_name %}
+                    <dt class="col-sm-4 text-muted">Member</dt>
+                    <dd class="col-sm-8">{{ draft.member_name }}</dd>
+                    {% endif %}
+
+                    <dt class="col-sm-4 text-muted">Narration</dt>
+                    <dd class="col-sm-8">{{ draft.narration }}</dd>
+
+                    <dt class="col-sm-4 text-muted">Amount</dt>
+                    <dd class="col-sm-8 text-currency fw-bold fs-5">₵ {{ draft.amount|floatformat:2|intcomma }}</dd>
+                </dl>
+
+                {% include "ledger/includes/journal_preview.html" with draft=draft %}
+
+                <p class="text-muted small mb-4">
+                    <i class="bi bi-info-circle me-1"></i>
+                    The entry will be saved as <strong>Pending</strong> until approved through the standard approval workflow.
+                </p>
+
+                <form method="post" class="d-flex justify-content-between gap-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
+                    <button type="submit" name="action" value="back" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-arrow-left me-1"></i>Edit
+                    </button>
+                    <button type="submit" name="action" value="confirm" class="btn btn-primary btn-sm">
+                        <i class="bi bi-check2-circle me-1"></i>Confirm &amp; Save
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

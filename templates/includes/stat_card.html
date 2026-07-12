@@ -1,0 +1,8 @@
+{% comment %}
+Stat metric card.
+Usage: {% include "includes/stat_card.html" with label="Active" value=42 variant="success" %}
+{% endcomment %}
+<div class="metric-card metric-card--{{ variant|default:'default' }}">
+    <span class="metric-label">{{ label }}</span>
+    <span class="metric-value">{{ value }}</span>
+</div>

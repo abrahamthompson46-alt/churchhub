@@ -1,0 +1,29 @@
+<div class="auth-tenant-header text-center mb-4">
+    {% if tenant_logo or denomination_logo %}
+    <img src="{% if tenant_logo %}{{ tenant_logo.url }}{% else %}{{ denomination_logo.url }}{% endif %}" alt="" class="auth-tenant-logo mb-3">
+    {% else %}
+    <div class="brand-mark auth-tenant-mark mx-auto mb-3"><i class="bi bi-building-fill"></i></div>
+    {% endif %}
+    <p class="auth-tenant-eyebrow mb-1">{% if active_denomination %}Institution{% else %}Organization{% endif %}</p>
+    <h2 class="auth-tenant-name h5 mb-0">
+        {% if tenant_display_name %}
+            {{ tenant_display_name }}
+        {% elif active_denomination %}
+            {{ active_denomination.display_name|default:active_denomination.name }}
+        {% else %}
+            {{ site_name|default:"ChurchHub" }}
+        {% endif %}
+    </h2>
+    {% if active_denomination and active_denomination.tagline %}
+    <p class="text-muted small mt-2 mb-0">{{ active_denomination.tagline }}</p>
+    {% endif %}
+</div>
+
+<div class="auth-platform-mobile text-center mb-4 d-lg-none">
+    {% if site_logo %}
+    <img src="{{ site_logo.url }}" alt="" class="auth-platform-logo-sm mb-2">
+    {% else %}
+    <div class="brand-mark auth-platform-mark-sm mx-auto mb-2"><i class="bi bi-grid-1x2-fill"></i></div>
+    {% endif %}
+    <div class="small text-muted">{{ site_name|default:"ChurchHub" }}</div>
+</div>

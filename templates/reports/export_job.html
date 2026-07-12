@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Report Export{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Reports" page_title=meta.label|default:"Export" %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <p><strong>Status:</strong> {{ job.get_status_display }}</p>
+            <p><strong>Format:</strong> {{ job.export_format|upper }}</p>
+            {% if job.status == 'COMPLETE' and job.export_file %}
+            <a href="{% url 'reports:export_job_download' job.pk %}" class="btn btn-primary">Download</a>
+            {% elif job.status == 'FAILED' %}
+            <div class="alert alert-danger">{{ job.error_message }}</div>
+            {% else %}
+            <p class="text-muted">Preparing your export… refresh this page in a few seconds.</p>
+            <meta http-equiv="refresh" content="3">
+            {% endif %}
+            <a href="{% url 'reports:run' job.report_key %}" class="btn btn-outline-secondary ms-2">Back to report</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

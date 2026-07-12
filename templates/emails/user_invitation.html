@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
+  <h2 style="color: #1e3a5f;">You're invited to {{ site_name }}</h2>
+  <p><strong>{{ invited_by }}</strong> has invited you to join <strong>{{ church_name }}</strong>.</p>
+  <p>
+    <a href="{{ accept_url }}" style="background:#1d4ed8;color:#fff;padding:10px 16px;text-decoration:none;border-radius:6px;">
+      Accept invitation
+    </a>
+  </p>
+  <p>Username: <code>{{ invitation.username }}</code><br>
+  Expires: {{ expires_at }}</p>
+  <p style="color:#6b7280;font-size:12px;">If you did not expect this invitation, you can ignore this email.</p>
+</body>
+</html>

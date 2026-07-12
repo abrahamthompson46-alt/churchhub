@@ -1,0 +1,117 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Platform Control — {{ site_name|default:"ChurchHub" }}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'vendor/fonts/plus-jakarta-sans/plus-jakarta-sans.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/font/bootstrap-icons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/platform.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="platform-body">
+<div class="platform-shell">
+    <aside class="platform-sidebar">
+        <div class="platform-sidebar-brand">
+            <a href="{% url 'sitecontrol:dashboard' %}">
+                <span class="platform-brand-icon"><i class="bi bi-sliders2"></i></span>
+                <span class="platform-brand-text">
+                    <span class="name">{{ site_name|default:"ChurchHub" }}</span>
+                    <span class="tag">Platform Control</span>
+                </span>
+            </a>
+        </div>
+        <nav class="platform-nav" aria-label="Platform navigation">
+            {% for section in platform_navigation %}
+            <div class="platform-nav-section">
+                <div class="platform-nav-section-title">{{ section.label }}</div>
+                {% for item in section.items %}
+                <a href="{% url item.url_name %}"
+                   class="platform-nav-link{% if platform_view == item.url_name %} active{% endif %}">
+                    <i class="bi {{ item.icon }}"></i>
+                    <span>{{ item.label }}</span>
+                </a>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </nav>
+        <div class="platform-sidebar-footer">
+            <div class="text-white-50">Site Owner Console</div>
+            <div class="mt-1">&copy; {% now "Y" %} {{ site_name|default:"ChurchHub" }}</div>
+        </div>
+    </aside>
+
+    <div class="platform-main">
+        <header class="platform-topbar">
+            <div>
+                {% if breadcrumbs %}
+                <nav class="platform-breadcrumb" aria-label="Breadcrumb">
+                    {% for crumb in breadcrumbs %}
+                        {% if not forloop.first %} / {% endif %}
+                        {% if crumb.url %}
+                        <a href="{{ crumb.url }}">{{ crumb.label }}</a>
+                        {% else %}
+                        <span>{{ crumb.label }}</span>
+                        {% endif %}
+                    {% endfor %}
+                </nav>
+                {% endif %}
+                <h1 class="platform-topbar-title">{% block page_title %}Control Room{% endblock %}</h1>
+                {% block page_subtitle %}{% endblock %}
+            </div>
+            <div class="platform-topbar-actions">
+                {% if platform_denominations %}
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        {% if platform_active_denomination %}{{ platform_active_denomination.display_name|default:platform_active_denomination.name }}{% else %}All denominations{% endif %}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        {% for d in platform_denominations %}
+                        <li>
+                            <form method="post" action="{% url 'sitecontrol:denomination_set_context' d.pk %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.path }}">
+                                <button type="submit" class="dropdown-item{% if platform_active_denomination and platform_active_denomination.pk == d.pk %} active{% endif %}">{{ d.display_name|default:d.name }}</button>
+                            </form>
+                        </li>
+                        {% endfor %}
+                        {% if operator_has_global_access %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form method="post" action="{% url 'sitecontrol:clear_denomination_context' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.path }}">
+                                <button type="submit" class="dropdown-item">Clear filter (global)</button>
+                            </form>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if user.is_superuser and user.is_platform_user %}
+                <a href="/admin/" class="btn btn-outline-secondary btn-sm" title="Break-glass only">
+                    <i class="bi bi-shield-lock me-1"></i>Admin
+                </a>
+                {% endif %}
+                <div class="platform-user-chip">
+                    <span class="platform-user-avatar">{{ user.get_full_name|default:user.username|slice:":1"|upper }}</span>
+                    <span>{{ user.get_full_name|default:user.username }}</span>
+                </div>
+                <a href="{% url 'dashboard:logout' %}" class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-box-arrow-right"></i>
+                </a>
+            </div>
+        </header>
+
+        <main class="platform-content">
+            {% include "includes/messages.html" %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+<script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Spiritual Gifts — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% url 'members:spiritual_gift_add' as gift_url %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Spiritual Gifts" action_url=gift_url action_label="Add Gift Type" %}
+
+    <div class="row g-3">
+        {% for g in gifts %}
+        <div class="col-md-4">
+            <div class="panel h-100">
+                <div class="panel-body">
+                    <h6 class="mb-1">{{ g.name }}</h6>
+                    <p class="small text-muted mb-0">{{ g.description|default:"—" }}</p>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            {% include "includes/empty_state.html" with icon="bi-gift" message="No gift types defined." action_url=gift_url action_label="Add gift type" %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

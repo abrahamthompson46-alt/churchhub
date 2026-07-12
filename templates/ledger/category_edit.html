@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ category.code }} — Ledger{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Edit Category" page_description="Update posting template accounts and labels. Code cannot be changed." %}
+
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <form method="post" class="data-card p-4">
+                {% csrf_token %}
+                <p class="small text-muted mb-3">Code: <code>{{ category.code }}</code> · Type: {{ category.get_transaction_type_display }}</p>
+                {% include "includes/form_field.html" with field=form.name %}
+                {% include "includes/form_field.html" with field=form.default_narration %}
+                <div class="row g-3">
+                    <div class="col-md-6">{% include "includes/form_field.html" with field=form.default_debit_account %}</div>
+                    <div class="col-md-6">{% include "includes/form_field.html" with field=form.default_credit_account %}</div>
+                </div>
+                <div class="row g-3 mt-1">
+                    <div class="col-md-4">{% include "includes/form_field.html" with field=form.sort_order %}</div>
+                    <div class="col-md-4 d-flex align-items-end pb-3">
+                        <div class="form-check">
+                            {{ form.requires_member }}
+                            <label class="form-check-label" for="{{ form.requires_member.id_for_label }}">Requires member</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end pb-3">
+                        <div class="form-check">
+                            {{ form.is_active }}
+                            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Active</label>
+                        </div>
+                    </div>
+                </div>
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger small">{{ form.non_field_errors }}</div>
+                {% endif %}
+                <div class="d-flex justify-content-between gap-2 mt-3">
+                    <a href="{% url 'ledger:category_detail' category.pk %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+                    <button type="submit" class="btn btn-primary btn-sm">Save Category</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

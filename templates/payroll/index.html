@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Payroll — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Payroll" page_description="Employee compensation, statutory deductions, and payroll runs for {{ active_church.name }}." %}
+
+    <div class="dash-inline-stats mb-4">
+        <div class="dash-inline-stat">
+            <span class="dash-inline-stat__label">Active Employees</span>
+            <span class="dash-inline-stat__value">{{ employee_count }}</span>
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{% url 'payroll:employee_list' %}" class="btn btn-outline-secondary btn-sm">Employees</a>
+        <a href="{% url 'payroll:employee_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Add Employee</a>
+        <a href="{% url 'payroll:run_list' %}" class="btn btn-outline-secondary btn-sm">Payroll Runs</a>
+        <a href="{% url 'payroll:run_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New Run</a>
+        {% if can_hierarchy %}
+        <a href="{% url 'payroll:hierarchy' %}" class="btn btn-outline-secondary btn-sm">Hierarchy Roll-up</a>
+        {% endif %}
+        {% if can_policy %}
+        <a href="{% url 'payroll:policy_index' %}" class="btn btn-outline-secondary btn-sm">Policies</a>
+        {% endif %}
+    </div>
+    {% if over_budget_count %}
+    <div class="alert alert-warning py-2 small">{{ over_budget_count }} run(s) exceed the salary budget.</div>
+    {% endif %}
+
+    <div class="table-wrap table-wrap--center table-wrap--compact">
+        {% include "includes/table_open.html" with table_title="Recent Payroll Runs" table_icon="bi-calendar2-check" %}
+        <div class="table-responsive table-in-card">
+            <table class="table table-hover table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Reference</th>
+                        <th>Period</th>
+                        <th class="text-end">Gross</th>
+                        <th class="text-end">Net</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in runs %}
+                    <tr>
+                        <td>{{ run.reference }}</td>
+                        <td>{{ run.period_label }}</td>
+                        <td class="text-end">₵{{ run.total_gross|floatformat:2 }}</td>
+                        <td class="text-end">₵{{ run.total_net|floatformat:2 }}</td>
+                        <td><span class="badge bg-secondary-subtle text-secondary">{{ run.get_status_display }}</span></td>
+                        <td class="text-end"><a href="{% url 'payroll:run_detail' run.pk %}" class="btn btn-sm btn-outline-secondary">Open</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="text-muted text-center py-4">No payroll runs yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "includes/table_close.html" %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+*.pyc
+__pycache__
+db.sqlite3
+staticfiles
+media
+.venv
+venv
+.cursor
+*.md
+!README.md

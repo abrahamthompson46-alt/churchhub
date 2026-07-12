@@ -1,0 +1,16 @@
+{% load static %}
+<div class="member-picker{% if required %} member-picker--required{% endif %}" data-member-picker data-input-id="{{ input_id }}" data-search-url="{% url 'members:search' %}"{% if initial_member %} data-initial-id="{{ initial_member.id }}" data-initial-name="{{ initial_member.full_name }}" data-initial-photo="{% if initial_member.profile_picture %}{{ initial_member.profile_picture.url }}{% endif %}" data-initial-subtitle="{{ initial_member.phone|default:'' }}{% if initial_member.department %} · {{ initial_member.department.name }}{% endif %}"{% endif %}>
+    <input type="hidden" name="{{ field_name }}" id="{{ input_id }}" value="{{ value|default:'' }}"{% if required %} required{% endif %}>
+    <div class="member-picker__selected d-none">
+        <div class="member-picker__avatar" data-picker-avatar></div>
+        <div class="member-picker__meta">
+            <span class="member-picker__name" data-picker-name></span>
+            <span class="member-picker__subtitle text-muted" data-picker-subtitle></span>
+        </div>
+        <button type="button" class="btn btn-sm btn-link text-muted member-picker__clear" data-picker-clear aria-label="Clear member">&times;</button>
+    </div>
+    <div class="member-picker__search-wrap">
+        <input type="text" class="form-control form-control-sm member-picker__input" placeholder="{{ placeholder|default:'Search member by name or phone…' }}" autocomplete="off" data-picker-input aria-label="Search members">
+        <div class="member-picker__results d-none" data-picker-results role="listbox"></div>
+    </div>
+</div>

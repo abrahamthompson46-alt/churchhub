@@ -1,0 +1,70 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Provision Tenant{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Complete church setup: hierarchy, financials, subscription, and admin invite — no CLI required.</p>{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-body">
+        <form method="post" id="tenant-provision-form">
+            {% csrf_token %}
+            <h6 class="text-uppercase text-muted small fw-bold mb-3">Organization</h6>
+            <div class="platform-form-grid mb-4">
+                {% for field in form %}
+                {% if field.name in "denomination setup_mode church_name church_code address district conference_name conference_code zone_name zone_code district_name district_code" %}
+                <div class="{% if field.name in 'address setup_mode' or field.field.widget.input_type == 'radio' %}full-width{% endif %}" data-field="{{ field.name }}">
+                    {% if field.field.widget.input_type == 'radio' %}
+                    <label class="form-label fw-semibold d-block">{{ field.label }}</label>
+                    {% for radio in field %}<div class="form-check">{{ radio.tag }} <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label></div>{% endfor %}
+                    {% else %}
+                    <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% endif %}
+                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                    {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+
+            <h6 class="text-uppercase text-muted small fw-bold mb-3">First Admin User</h6>
+            <div class="platform-form-grid mb-4">
+                {% for field in form %}
+                {% if field.name in "admin_email admin_username admin_first_name admin_role send_invite" %}
+                <div class="{% if field.field.widget.input_type == 'checkbox' %}full-width{% endif %}">
+                    {% if field.field.widget.input_type == 'checkbox' %}
+                    <div class="platform-form-check">{{ field }}<label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label></div>
+                    {% else %}
+                    <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% endif %}
+                    {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+
+            <h6 class="text-uppercase text-muted small fw-bold mb-3">Subscription &amp; Billing</h6>
+            <div class="platform-form-grid mb-4">
+                {% for field in form %}
+                {% if field.name in "plan status billing_interval payment_method payment_reference trial_days" %}
+                <div>
+                    <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                    {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="mt-2">
+                <button type="submit" class="btn btn-primary" onclick="return confirm('Provision this tenant now?')">
+                    <i class="bi bi-magic me-1"></i>Provision Tenant
+                </button>
+                <a href="{% url 'sitecontrol:tenant_list' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

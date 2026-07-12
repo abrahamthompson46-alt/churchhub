@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Effective Permissions — {{ target_user.username }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Permissions" page_title=target_user.username page_description=target_user.get_role_display %}
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            {% for category, items in grouped_permissions.items %}
+            <div class="data-card mb-3">
+                <div class="data-card__header">{{ category }}</div>
+                <ul class="list-plain mb-0">
+                    {% for item in items %}
+                    <li class="d-flex justify-content-between py-2 border-bottom">
+                        <span>{{ item.name }}</span>
+                        {% if item.allowed %}
+                        <span class="chip chip--success">Allowed</span>
+                        {% else %}
+                        <span class="chip chip--muted">Denied</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="col-lg-4">
+            <div class="data-card">
+                <div class="data-card__header">Overrides</div>
+                <ul class="list-plain mb-0">
+                    {% for o in overrides %}
+                    <li class="py-2 border-bottom small">
+                        {{ o.permission.name }} —
+                        {% if o.granted %}<span class="text-success">Grant</span>{% else %}<span class="text-danger">Deny</span>{% endif %}
+                        {% if not o.is_effective %}<span class="text-muted">(inactive)</span>{% endif %}
+                    </li>
+                    {% empty %}
+                    <li class="text-muted py-2">No overrides.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

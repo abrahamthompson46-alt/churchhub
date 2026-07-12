@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Payroll Policies{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Payroll" page_title="Payroll Policies" page_description="PAYE bands and statutory contribution rules — never hardcoded in calculation logic." %}
+    <div class="mb-3">
+        <a href="{% url 'payroll:policy_rule_create' %}" class="btn btn-primary btn-sm">Add Statutory Rule</a>
+        <a href="{% url 'payroll:index' %}" class="btn btn-outline-secondary btn-sm">Back</a>
+    </div>
+
+    <section class="dash-section mb-4">
+        <div class="dash-section__header"><h2 class="dash-section__title">PAYE Tax Tables</h2></div>
+        {% for table in tables %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <h3 class="h6">{{ table.name }} <span class="text-muted">from {{ table.effective_from }}</span>
+                    <a href="{% url 'payroll:policy_band_add' table.pk %}" class="btn btn-sm btn-outline-secondary ms-2">Add Band</a>
+                </h3>
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>From</th><th>To</th><th class="text-end">Rate</th></tr></thead>
+                    <tbody>
+                        {% for band in table.bands.all %}
+                        <tr>
+                            <td>₵{{ band.lower_limit|floatformat:2 }}</td>
+                            <td>{% if band.upper_limit %}₵{{ band.upper_limit|floatformat:2 }}{% else %}—{% endif %}</td>
+                            <td class="text-end">{{ band.rate_percent }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-muted">No tax tables configured.</p>
+        {% endfor %}
+    </section>
+
+    <section class="dash-section">
+        <div class="dash-section__header"><h2 class="dash-section__title">Statutory Rules</h2></div>
+        <div class="table-responsive table-in-card">
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Code</th><th>Name</th><th class="text-end">EE %</th><th class="text-end">ER %</th><th>Applies To</th><th>Active</th></tr></thead>
+                <tbody>
+                    {% for rule in rules %}
+                    <tr>
+                        <td>{{ rule.code }}</td>
+                        <td>{{ rule.name }}</td>
+                        <td class="text-end">{{ rule.employee_rate }}</td>
+                        <td class="text-end">{{ rule.employer_rate }}</td>
+                        <td>{{ rule.get_applies_to_display }}</td>
+                        <td>{% if rule.is_active %}Yes{% else %}No{% endif %}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="text-muted text-center py-3">No rules.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

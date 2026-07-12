@@ -1,0 +1,35 @@
+/* ChurchHub Django Admin customizations */
+
+.custom-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 0 1rem;
+}
+
+.custom-header #site-name a {
+    color: #fff;
+    text-decoration: none;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: #cbd5e1;
+    font-size: 0.875rem;
+}
+
+.dashboard-btn {
+    background: #2563eb;
+    color: #fff !important;
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.dashboard-btn:hover {
+    background: #1d4ed8;
+}

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ member.full_name }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% url 'members:edit' member.id as edit_url %}
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="People" page_title=member.full_name page_description=member.church.name %}
+
+    <div class="member-hero">
+        <div class="member-hero-avatar">{{ member.first_name|first|upper }}{{ member.last_name|first|upper }}</div>
+        <div class="flex-grow-1">
+            <span class="chip chip--{% if member.is_active %}success{% else %}warning{% endif %}">{{ member.membership_status }}</span>
+            {% if member.department %}<span class="chip ms-1">{{ member.department.name }}</span>{% endif %}
+            {% if member.phone %}<p class="text-muted small mb-0 mt-2"><i class="bi bi-telephone me-1"></i>{{ member.phone }}</p>{% endif %}
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            {% if can_manage %}
+            <a href="{{ edit_url }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil me-1"></i>Edit</a>
+            <a href="{% url 'members:record_add' %}?member={{ member.id }}" class="btn btn-outline-secondary btn-sm">Record</a>
+            <a href="{% url 'members:assign_gift' member.id %}" class="btn btn-outline-secondary btn-sm">Gift</a>
+            <a href="{% url 'members:member_export' member.id %}" class="btn btn-outline-secondary btn-sm">Export</a>
+            {% endif %}
+            <a href="{% url 'members:timeline' member.id %}" class="btn btn-outline-secondary btn-sm">Timeline</a>
+            {% if show_welfare %}
+            <a href="{% url 'remittance:member_welfare' member.id %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-heart-pulse me-1"></i>Welfare</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="detail-grid">
+        <div>
+            <div class="panel mb-4">
+                <div class="panel-header"><i class="bi bi-person me-2 text-muted"></i>Personal Information</div>
+                <div class="panel-body">
+                    <dl class="detail-dl row mb-0">
+                        <dt class="col-sm-4">Gender</dt><dd class="col-sm-8">{{ member.gender }}</dd>
+                        <dt class="col-sm-4">Marital Status</dt><dd class="col-sm-8">{{ member.get_marital_status_display|default:"—" }}</dd>
+                        <dt class="col-sm-4">Membership #</dt><dd class="col-sm-8">{{ member.membership_number|default:"—" }}</dd>
+                        <dt class="col-sm-4">Date of Birth</dt><dd class="col-sm-8">{{ member.date_of_birth|default:"—" }}{% if member.age %} <span class="text-muted">({{ member.age }} yrs{% if member.age_group %}, {{ member.age_group }}{% endif %})</span>{% endif %}</dd>
+                        <dt class="col-sm-4">Date Joined</dt><dd class="col-sm-8">{{ member.date_joined|default:"—" }}</dd>
+                        <dt class="col-sm-4">Baptism</dt><dd class="col-sm-8">{% if member.baptism_date %}{{ member.baptism_date }}{% if member.baptism_place %} — {{ member.baptism_place }}{% endif %}{% else %}—{% endif %}</dd>
+                        <dt class="col-sm-4">Attendance</dt><dd class="col-sm-8">{{ attendance_count }} meetings present</dd>
+                        <dt class="col-sm-4">Address</dt><dd class="col-sm-8">{{ member.address|default:"—" }}</dd>
+                        <dt class="col-sm-4">Family</dt>
+                        <dd class="col-sm-8">
+                            {% if member.family %}
+                            <a href="{% url 'members:family_detail' member.family_id %}" class="table-link">{{ member.family.name }}</a>
+                            {% else %}—{% endif %}
+                        </dd>
+                        <dt class="col-sm-4">Occupation</dt><dd class="col-sm-8">{{ member.occupation|default:"—" }}</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-journal-text me-2 text-muted"></i>Recent Records</span>
+                    {% if can_manage %}
+                    <a href="{% url 'members:record_add' %}?member={{ member.id }}" class="btn btn-sm btn-link">Add</a>
+                    {% endif %}
+                </div>
+                <ul class="list-plain">
+                    {% for record in records %}
+                    <li>
+                        <a href="{% url 'members:record_detail' record.pk %}" class="table-link d-block fw-semibold">{{ record.title }}</a>
+                        <div class="d-flex justify-content-between align-items-center mt-1">
+                            <span class="chip chip--info">{{ record.record_type }}</span>
+                            <small class="text-muted">{{ record.event_date }}</small>
+                        </div>
+                    </li>
+                    {% empty %}
+                    <li class="text-muted py-3">No records yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div>
+            <div class="panel mb-4">
+                <div class="panel-header">Quick Links</div>
+                <div class="panel-body d-grid gap-2">
+                    {% if can_manage %}
+                    <a href="{% url 'members:transfer_create' %}?member={{ member.id }}" class="btn btn-outline-secondary btn-sm text-start"><i class="bi bi-arrow-left-right me-2"></i>Request Transfer</a>
+                    {% endif %}
+                    <a href="{% url 'giving:member_statement' member.id %}" class="btn btn-outline-secondary btn-sm text-start"><i class="bi bi-wallet2 me-2"></i>Giving Statement</a>
+                    {% if show_welfare %}
+                    <a href="{% url 'remittance:member_welfare' member.id %}" class="btn btn-outline-primary btn-sm text-start"><i class="bi bi-heart-pulse me-2"></i>Welfare Statement</a>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if show_welfare and welfare_summary %}
+            <div class="panel mb-4">
+                <div class="panel-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-heart-pulse me-2 text-muted"></i>Welfare</span>
+                    <a href="{% url 'remittance:member_welfare' member.id %}" class="btn btn-sm btn-link">View all</a>
+                </div>
+                <div class="panel-body">
+                    <div class="row g-2 text-center small">
+                        <div class="col-4">
+                            <p class="text-muted mb-0">Contributed</p>
+                            <p class="fw-semibold mb-0">₵{{ welfare_summary.contributed|floatformat:2|intcomma }}</p>
+                        </div>
+                        <div class="col-4">
+                            <p class="text-muted mb-0">Received</p>
+                            <p class="fw-semibold mb-0">₵{{ welfare_summary.received|floatformat:2|intcomma }}</p>
+                        </div>
+                        <div class="col-4">
+                            <p class="text-muted mb-0">Open</p>
+                            <p class="fw-semibold mb-0">{{ welfare_summary.open_requests }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if transfers %}
+            <div class="panel">
+                <div class="panel-header">Transfer History</div>
+                <ul class="list-plain">
+                    {% for t in transfers %}
+                    <li class="small">
+                        <a href="{% url 'members:transfer_detail' t.pk %}" class="table-link">{{ t.from_church.name }} → {{ t.to_church.name }}</a>
+                        <span class="chip ms-1">{{ t.status }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

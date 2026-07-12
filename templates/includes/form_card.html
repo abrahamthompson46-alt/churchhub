@@ -1,0 +1,16 @@
+{% comment %}
+Centered form layout.
+Usage:
+{% include "includes/form_card.html" with form_title="Add Member" %}
+  <form>...</form>
+{% endcomment %}
+<div class="form-card">
+    <div class="card">
+        {% if form_title %}
+        <div class="card-header">{{ form_title }}</div>
+        {% endif %}
+        <div class="card-body p-4">
+            {{ content }}
+        </div>
+    </div>
+</div>

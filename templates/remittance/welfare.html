@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% load humanize static %}
+
+{% block title %}Welfare Register — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Welfare Register" page_description="Contributions, assistance cases, and fund control at {{ active_church.name }}." %}
+
+    <form method="get" class="d-flex flex-wrap align-items-end gap-2 mb-3">
+        <div>
+            <label class="form-label small text-muted mb-1">Year</label>
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">
+                {% for y in year_choices %}
+                <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <p class="text-muted small mb-1">Fund Balance</p>
+                    <h4 class="mb-0">₵{{ dashboard.fund_balance|floatformat:2|intcomma }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <p class="text-muted small mb-1">Contributions {{ year }}</p>
+                    <h4 class="mb-0">₵{{ dashboard.contributions_ytd|floatformat:2|intcomma }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <p class="text-muted small mb-1">Disbursed {{ year }}</p>
+                    <h4 class="mb-0">₵{{ dashboard.disbursed_ytd|floatformat:2|intcomma }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <p class="text-muted small mb-1">Pending / Approved</p>
+                    <h4 class="mb-0">{{ dashboard.pending_cases }} / {{ dashboard.approved_awaiting }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if can_manage %}
+    <div class="row g-3 mb-4">
+        <div class="col-lg-7">
+            <section class="dash-section h-100">
+                <div class="dash-section__header"><h2 class="dash-section__title">Request Assistance</h2></div>
+                <div class="form-card-inner card">
+                    <div class="card-body p-4">
+                        <form method="post" class="row g-3">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="create_case">
+                            <div class="col-md-5">
+                                <label class="form-label small text-muted mb-1">Member</label>
+                                {% include "includes/member_picker.html" with input_id="case_member_id" field_name="member" value=case_form.member.value required=True %}
+                                {% if case_form.member.errors %}
+                                <div class="invalid-feedback d-block">{{ case_form.member.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-1">Type</label>
+                                {{ case_form.assistance_type }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-1">Priority</label>
+                                {{ case_form.priority }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted mb-1">Amount Requested</label>
+                                {{ case_form.amount_requested }}
+                            </div>
+                            <div class="col-md-9">
+                                <label class="form-label small text-muted mb-1">Reason</label>
+                                {{ case_form.reason }}
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary btn-sm">Submit Case</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <div class="col-lg-5">
+            <section class="dash-section h-100">
+                <div class="dash-section__header"><h2 class="dash-section__title">Record Contribution</h2></div>
+                <div class="form-card-inner card">
+                    <div class="card-body p-4">
+                        <form method="post" class="row g-3">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="record_contribution">
+                            <div class="col-12">
+                                <label class="form-label small text-muted mb-1">Member</label>
+                                {% include "includes/member_picker.html" with input_id="contrib_member_id" field_name="member" value=contribution_form.member.value required=True %}
+                                {% if contribution_form.member.errors %}
+                                <div class="invalid-feedback d-block">{{ contribution_form.member.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-1">Amount</label>
+                                {{ contribution_form.amount }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-1">Date</label>
+                                {{ contribution_form.contribution_date }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-1">Payment</label>
+                                {{ contribution_form.payment_account_type }}
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small text-muted mb-1">Notes</label>
+                                {{ contribution_form.notes }}
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-outline-primary btn-sm">Post Contribution</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+    {% endif %}
+
+    <section class="dash-section mb-4">
+        <div class="dash-section__header"><h2 class="dash-section__title">Recent Contributions</h2></div>
+        <div class="table-wrap table-wrap--center table-wrap--compact">
+            <div class="table-responsive table-in-card">
+                <table class="table table-hover table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Member</th>
+                            <th class="text-end">Amount</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in contributions %}
+                        <tr>
+                            <td>{{ row.contribution_date }}</td>
+                            <td>
+                                {% if row.member %}
+                                <a href="{% url 'remittance:member_welfare' row.member_id %}" class="table-link">{{ row.member.full_name }}</a>
+                                {% else %}<span class="text-muted">Anonymous</span>{% endif %}
+                            </td>
+                            <td class="text-end">₵{{ row.amount|floatformat:2 }}</td>
+                            <td>{{ row.notes|default:"—" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-muted text-center py-3">No welfare contributions recorded.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="dash-section">
+        <div class="dash-section__header"><h2 class="dash-section__title">Assistance Cases</h2></div>
+        <div class="table-wrap table-wrap--center table-wrap--compact">
+            <div class="table-responsive table-in-card">
+                <table class="table table-hover table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Case</th>
+                            <th>Member</th>
+                            <th>Type</th>
+                            <th class="text-end">Requested</th>
+                            <th class="text-end">Approved</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for case in cases %}
+                        <tr>
+                            <td><a href="{% url 'remittance:welfare_case_detail' case.pk %}" class="table-link fw-semibold">{{ case.case_number|default:case.pk }}</a></td>
+                            <td><a href="{% url 'remittance:member_welfare' case.member_id %}" class="table-link">{{ case.member.full_name }}</a></td>
+                            <td>{{ case.get_assistance_type_display }}</td>
+                            <td class="text-end">₵{{ case.amount_requested|floatformat:2 }}</td>
+                            <td class="text-end">{% if case.amount_approved %}₵{{ case.amount_approved|floatformat:2 }}{% else %}—{% endif %}</td>
+                            <td><span class="chip chip--{% if case.status == 'DISBURSED' %}success{% elif case.status == 'REJECTED' or case.status == 'CANCELLED' %}warning{% elif case.status == 'APPROVED' %}info{% else %}secondary{% endif %}">{{ case.get_status_display }}</span></td>
+                            <td class="text-end"><a href="{% url 'remittance:welfare_case_detail' case.pk %}" class="btn btn-sm btn-outline-secondary">Open</a></td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="7" class="text-muted text-center py-3">No assistance cases yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/member-picker.js' %}"></script>
+{% endblock %}

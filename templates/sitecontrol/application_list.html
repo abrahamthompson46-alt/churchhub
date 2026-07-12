@@ -1,0 +1,48 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Registration Applications{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-header">
+        <span>Church applications</span>
+        <form method="get" class="d-flex gap-2">
+            <select name="status" class="form-select form-select-sm" style="width:auto">
+                <option value="">All statuses</option>
+                {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead>
+                <tr><th>Submitted</th><th>Church</th><th>Contact</th><th>Type</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+            {% for app in page_obj %}
+            <tr>
+                <td class="small text-muted">{{ app.created_at|date:"M j, Y H:i" }}</td>
+                <td class="fw-semibold">{{ app.church_name }} <code class="small">{{ app.church_code }}</code></td>
+                <td>{{ app.contact_name }}<br><small class="text-muted">{{ app.contact_email }}</small></td>
+                <td>{{ app.get_application_type_display }}</td>
+                <td><span class="badge bg-{% if app.status == 'PENDING' %}warning text-dark{% elif app.status == 'APPROVED' %}success{% elif app.status == 'REJECTED' %}danger{% else %}secondary{% endif %}">{{ app.get_status_display }}</span></td>
+                <td><a href="{% url 'sitecontrol:application_detail' app.pk %}" class="btn btn-sm btn-outline-primary">Review</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-muted p-4">No applications found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if page_obj.has_other_pages %}
+    <div class="platform-card-body border-top d-flex justify-content-between">
+        {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}&status={{ status_filter }}">Previous</a>{% else %}<span></span>{% endif %}
+        <span class="text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}&status={{ status_filter }}">Next</a>{% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

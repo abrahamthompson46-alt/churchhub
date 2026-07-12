@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Budget Planning — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% url 'budgets:create' as add_base_url %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Annual Budget" page_description=scope_label action_url=create_url action_label="Add Line" action_icon="bi-plus-lg" %}
+
+    <ul class="nav nav-pills nav-fill gap-2 mb-3 flex-wrap">
+        {% for tab_level, tab_label in level_tabs %}
+        <li class="nav-item">
+            <a class="nav-link {% if level == tab_level %}active{% endif %}"
+               href="{% url 'budgets:list' %}?year={{ year }}&level={{ tab_level }}">{{ tab_label }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-6">
+            <div class="stat-card">
+                <div class="stat-label">Total Budgeted</div>
+                <div class="stat-value text-currency">₵ {{ kpis.total_budgeted|floatformat:2|intcomma }}</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card">
+                <div class="stat-label">Total Actual</div>
+                <div class="stat-value text-currency">₵ {{ kpis.total_actual|floatformat:2|intcomma }}</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card">
+                <div class="stat-label">Net Variance</div>
+                <div class="stat-value text-currency {% if kpis.total_variance < 0 %}text-danger{% else %}text-success{% endif %}">₵ {{ kpis.total_variance|floatformat:2|intcomma }}</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card">
+                <div class="stat-label">Lines / Over Budget</div>
+                <div class="stat-value">{{ kpis.line_count }} <span class="text-muted fs-6">/ {{ kpis.over_budget_count }} alert</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="filter-bar">
+        <form method="get" class="filter-form">
+            <input type="hidden" name="level" value="{{ level }}">
+            <div class="filter-field">
+                <label class="form-label">Year</label>
+                {{ form.year }}
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Apply</button>
+            </div>
+        </form>
+        <span class="toolbar-spacer"></span>
+        <div class="btn-group btn-group-sm">
+            <a href="?year={{ year }}&level={{ level }}&export=csv" class="btn btn-outline-secondary"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+            <a href="?year={{ year }}&level={{ level }}&export=excel" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+            <a href="?year={{ year }}&level={{ level }}&export=pdf" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
+        </div>
+        {% if church %}<span class="chip ms-2"><i class="bi bi-building"></i> {{ church.name }}</span>{% endif %}
+    </div>
+
+    {% include "includes/table_open.html" with table_title="Budget vs Actual" table_icon="bi-pie-chart" %}
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>Account</th>
+                        {% if level == "DEPARTMENT" %}<th>Department</th>{% endif %}
+                        <th>Type</th>
+                        <th class="text-end">Budgeted</th>
+                        <th class="text-end">Actual</th>
+                        <th class="text-end">Variance</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td>{{ row.account }}</td>
+                        {% if level == "DEPARTMENT" %}<td>{{ row.department|default:"—" }}</td>{% endif %}
+                        <td><span class="chip chip-sm">{{ row.account_type }}</span></td>
+                        <td class="text-end text-currency">₵ {{ row.budgeted|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency">
+                            {% if row.tracks_actual %}₵ {{ row.actual|floatformat:2|intcomma }}{% else %}<span class="text-muted">Allocation</span>{% endif %}
+                        </td>
+                        <td class="text-end text-currency {% if row.favorable %}text-success{% else %}text-danger{% endif %}">
+                            {% if row.tracks_actual %}₵ {{ row.variance|floatformat:2|intcomma }}{% else %}—{% endif %}
+                        </td>
+                        <td>
+                            {% if not row.tracks_actual %}
+                            <span class="badge text-bg-secondary">Planned</span>
+                            {% elif row.favorable %}
+                            <span class="badge text-bg-success">On track</span>
+                            {% else %}
+                            <span class="badge text-bg-danger">Over budget</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7">{% include "includes/empty_state.html" with icon="bi-calculator" message="No budget lines for this year and scope." action_url=create_url action_label="Add budget line" %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+    {% include "includes/table_close.html" %}
+
+    <div class="mt-4">
+    {% include "includes/table_open.html" with table_title="Budget Lines" table_icon="bi-list-ul" %}
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>Account</th>
+                        {% if level == "DEPARTMENT" %}<th>Department</th>{% endif %}
+                        <th>Level</th>
+                        <th class="text-end">Amount</th>
+                        <th>Notes</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for b in budgets %}
+                    <tr>
+                        <td class="fw-semibold">{{ b.account.name }}</td>
+                        {% if level == "DEPARTMENT" %}<td>{{ b.department.name|default:"—" }}</td>{% endif %}
+                        <td><span class="chip">{{ b.get_level_display }}</span></td>
+                        <td class="text-end text-currency">₵ {{ b.amount|floatformat:2|intcomma }}</td>
+                        <td class="text-muted small">{{ b.notes|default:"—" }}</td>
+                        <td class="text-end text-nowrap">
+                            <a href="{% url 'budgets:edit' b.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            <form method="post" action="{% url 'budgets:delete' b.pk %}" class="d-inline">{% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this budget line?')">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="text-muted">No lines defined.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+    {% include "includes/table_close.html" %}
+    </div>
+</div>
+{% endblock %}

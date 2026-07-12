@@ -1,0 +1,605 @@
+# transactions/views.py
+
+import uuid
+
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
+from django.db.models import Sum
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_POST
+
+from permissions.checks import can_approve_transactions, can_manage_finances
+from church_system.church_scope import filter_by_church, get_active_church, require_church
+from church_system.flash import flash_error, flash_exception, flash_success, flash_warning
+from members.models import Member
+from transactions.forms import (
+    BankReconciliationForm,
+    ExpenseForm,
+    PeriodLockForm,
+    ReceiptForm,
+    VoidTransactionForm,
+    WorkingDayCloseForm,
+    WorkingDayOpenForm,
+)
+from transactions.idempotency import (
+    IdempotencyReplay,
+    MissingIdempotencyKey,
+    claim_financial_idempotency,
+    complete_financial_idempotency,
+)
+from transactions.models import BankReconciliation, FinancialAuditLog, Transaction
+from transactions.reporting import (
+    build_statement_rows,
+    export_statement_csv,
+    export_statement_excel,
+    export_statement_pdf,
+)
+from transactions.services import (
+    PeriodLockedError,
+    WorkingDayClosedError,
+    approve_transaction as svc_approve,
+    close_working_day,
+    create_bank_reconciliation,
+    finalize_bank_reconciliation,
+    generate_monthly_cutoff,
+    get_active_working_day,
+    get_financial_periods,
+    get_recent_working_days,
+    get_working_day_status,
+    lock_financial_period,
+    open_working_day,
+    record_district_remittance,
+    record_expense,
+    record_receipt,
+    reject_transaction as svc_reject,
+    resolve_transaction_date,
+    unlock_financial_period,
+    update_reconciliation_matches,
+    void_transaction,
+)
+
+
+def _finance_required(view_func):
+    @login_required
+    def _wrapped(request, *args, **kwargs):
+        if not can_manage_finances(request.user):
+            raise PermissionDenied
+        return view_func(request, *args, **kwargs)
+    return _wrapped
+
+
+@_finance_required
+def pending_approvals(request):
+    transactions_qs = filter_by_church(
+        Transaction.objects.filter(approval_status="PENDING"),
+        request,
+    ).select_related("member", "church").prefetch_related("lines__account").order_by("-date")
+    paginator = Paginator(transactions_qs, 50)
+    transactions = paginator.get_page(request.GET.get("page"))
+    return render(request, "transactions/pending.html", {
+        "transactions": transactions,
+        "page_obj": transactions,
+        "can_approve": can_approve_transactions(request.user),
+    })
+
+
+@login_required
+@require_POST
+def approve_transaction_view(request, pk):
+    if not can_approve_transactions(request.user):
+        raise PermissionDenied
+    transaction = get_object_or_404(
+        filter_by_church(Transaction.objects.all(), request),
+        pk=pk,
+    )
+    try:
+        svc_approve(transaction, request.user)
+        flash_success(request, f"{transaction.reference} approved.")
+        if transaction.created_by_id and transaction.created_by_id != request.user.id:
+            from dashboard.services import notify_user
+            notify_user(
+                transaction.created_by,
+                title="Transaction Approved",
+                message=f"{transaction.reference} has been approved.",
+                category="FINANCE",
+                action_url=f"/transactions/transactions/{transaction.pk}/",
+            )
+    except ValueError as exc:
+        flash_exception(request, str(exc))
+    return redirect("transactions:pending_approvals")
+
+
+@login_required
+@require_POST
+def reject_transaction_view(request, pk):
+    if not can_approve_transactions(request.user):
+        raise PermissionDenied
+    transaction = get_object_or_404(
+        filter_by_church(Transaction.objects.all(), request),
+        pk=pk,
+    )
+    try:
+        svc_reject(transaction, request.user)
+        flash_success(request, f"{transaction.reference} rejected.")
+    except ValueError as exc:
+        flash_exception(request, str(exc))
+    return redirect("transactions:pending_approvals")
+
+
+@login_required
+@require_POST
+def bulk_approve(request):
+    if not can_approve_transactions(request.user):
+        raise PermissionDenied
+    ids = request.POST.getlist("transaction_ids")
+    qs = filter_by_church(Transaction.objects.filter(id__in=ids, approval_status="PENDING"), request)
+    count = 0
+    skipped = 0
+    for txn in qs:
+        try:
+            svc_approve(txn, request.user)
+            count += 1
+        except ValueError:
+            skipped += 1
+    if skipped:
+        flash_warning(request, f"{skipped} transaction(s) could not be approved.")
+    flash_success(request, f"{count} transaction(s) approved.")
+    return redirect("transactions:pending_approvals")
+
+
+@_finance_required
+def transaction_receipt(request, pk):
+    transaction = get_object_or_404(
+        filter_by_church(Transaction.objects.all(), request),
+        pk=pk,
+    )
+    return render(request, "transactions/receipt.html", {"transaction": transaction})
+
+
+@_finance_required
+def financial_dashboard(request):
+    start_date = request.GET.get("start_date")
+    end_date = request.GET.get("end_date")
+
+    transactions = filter_by_church(
+        Transaction.objects.filter(approval_status="APPROVED", is_voided=False),
+        request,
+    ).order_by("date", "created_at")
+
+    if start_date:
+        transactions = transactions.filter(date__gte=parse_date(start_date))
+    if end_date:
+        transactions = transactions.filter(date__lte=parse_date(end_date))
+
+    rows, total_receipt, total_expense, final_balance = build_statement_rows(transactions)
+    export = request.GET.get("export")
+    church = get_active_church(request)
+    period = f"{start_date or 'start'} to {end_date or 'today'}"
+
+    if export == "csv":
+        return export_statement_csv(rows)
+    if export == "excel":
+        return export_statement_excel(rows)
+    if export == "pdf":
+        return export_statement_pdf(rows, church_name=church.name if church else "", period=period)
+
+    paginator = Paginator(rows, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(request, "transactions/financial_dashboard.html", {
+        "rows": page_obj,
+        "page_obj": page_obj,
+        "total_receipt": total_receipt,
+        "total_expense": total_expense,
+        "final_balance": final_balance,
+        "start_date": start_date,
+        "end_date": end_date,
+        "church": church,
+    })
+
+
+@_finance_required
+def record_receipt_view(request):
+    church = require_church(request)
+    default_date = resolve_transaction_date(church)
+    initial = {"idempotency_key": str(uuid.uuid4()), "date": default_date}
+    form = ReceiptForm(request.POST or None, church=church, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        idem_record = None
+        try:
+            idem_record = claim_financial_idempotency(
+                church,
+                request.user,
+                "RECEIPT",
+                form.cleaned_data.get("idempotency_key"),
+            )
+            txn = record_receipt(
+                church=church,
+                created_by=request.user,
+                tithe_amount=form.cleaned_data["tithe_amount"],
+                combined_amount=form.cleaned_data["combined_amount"],
+                income_amount=form.cleaned_data["income_amount"],
+                special_offerings=form.get_special_offerings(),
+                payment_account_type=form.cleaned_data["payment_account_type"],
+                description=form.cleaned_data["description"],
+                member=form.cleaned_data.get("member"),
+                date=form.cleaned_data.get("date"),
+            )
+            complete_financial_idempotency(idem_record, txn)
+            flash_success(request, f"Receipt {txn.reference} recorded and pending approval.")
+            return redirect("transactions:pending_approvals")
+        except IdempotencyReplay as exc:
+            flash_warning(
+                request,
+                f"Duplicate submission ignored. Existing receipt {exc.existing_transaction.reference}.",
+            )
+            return redirect("transactions:pending_approvals")
+        except MissingIdempotencyKey as exc:
+            flash_error(request, str(exc))
+        except (PeriodLockedError, WorkingDayClosedError) as exc:
+            flash_exception(request, str(exc))
+    return render(request, "transactions/record_receipt.html", {"form": form})
+
+
+@_finance_required
+def record_expense_view(request):
+    church = require_church(request)
+    default_date = resolve_transaction_date(church)
+    initial = {"idempotency_key": str(uuid.uuid4()), "date": default_date}
+    form = ExpenseForm(request.POST or None, church=church, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        idem_record = None
+        try:
+            idem_record = claim_financial_idempotency(
+                church,
+                request.user,
+                "EXPENSE",
+                form.cleaned_data.get("idempotency_key"),
+            )
+            txn = record_expense(
+                church=church,
+                created_by=request.user,
+                amount=form.cleaned_data["amount"],
+                payment_account_type=form.cleaned_data["payment_account_type"],
+                description=form.cleaned_data["description"],
+                date=form.cleaned_data.get("date"),
+                expense_account=form.cleaned_data.get("expense_account"),
+            )
+            complete_financial_idempotency(idem_record, txn)
+            flash_success(request, f"Expense {txn.reference} recorded and pending approval.")
+            return redirect("transactions:pending_approvals")
+        except IdempotencyReplay as exc:
+            flash_warning(
+                request,
+                f"Duplicate submission ignored. Existing expense {exc.existing_transaction.reference}.",
+            )
+            return redirect("transactions:pending_approvals")
+        except MissingIdempotencyKey as exc:
+            flash_error(request, str(exc))
+        except (PeriodLockedError, WorkingDayClosedError) as exc:
+            flash_exception(request, str(exc))
+    return render(request, "transactions/record_expense.html", {"form": form})
+
+
+@_finance_required
+def audit_log(request):
+    logs_qs = filter_by_church(
+        FinancialAuditLog.objects.select_related("performed_by", "transaction", "church"),
+        request,
+    ).order_by("-created_at")
+    paginator = Paginator(logs_qs, 50)
+    logs = paginator.get_page(request.GET.get("page"))
+    return render(request, "transactions/audit_log.html", {"logs": logs, "page_obj": logs})
+
+
+@_finance_required
+@require_POST
+def record_remittance_view(request):
+    church = require_church(request)
+    month_str = request.POST.get("month")
+    month_date = parse_date(month_str) if month_str else timezone.now().date()
+    cutoff = generate_monthly_cutoff(church, month_date)
+    amount = cutoff.total_payable
+    if amount <= 0:
+        flash_warning(request, "No payable amount for this period.")
+        return redirect("dashboard:cutoff")
+    idem_key = request.POST.get("idempotency_key") or f"remit-{church.pk}-{month_str}"
+    try:
+        idem_record = claim_financial_idempotency(
+            church,
+            request.user,
+            "REMITTANCE",
+            idem_key,
+        )
+        remit = record_district_remittance(
+            church=church,
+            created_by=request.user,
+            amount=amount,
+            month_date=month_date,
+            description=f"District remittance for {month_date.strftime('%B %Y')}",
+        )
+        complete_financial_idempotency(idem_record, remit)
+    except IdempotencyReplay as exc:
+        flash_warning(
+            request,
+            f"Remittance already recorded ({exc.existing_transaction.reference}).",
+        )
+        return redirect("dashboard:cutoff")
+    except (MissingIdempotencyKey, ValueError) as exc:
+        flash_error(request, str(exc))
+        return redirect("dashboard:cutoff")
+    flash_success(request, f"District remittance of ₵{amount} recorded and pending approval.")
+    return redirect("dashboard:cutoff")
+
+
+@_finance_required
+def budget_report(request):
+    """Legacy route — consolidated into the budgets planning hub."""
+    year = request.GET.get("year", timezone.now().year)
+    level = request.GET.get("level", "CHURCH")
+    return redirect(f"/budgets/?year={year}&level={level}")
+
+
+@_finance_required
+def transaction_list(request):
+    transactions = filter_by_church(
+        Transaction.objects.select_related("member", "church", "created_by"),
+        request,
+    ).prefetch_related("lines__account").order_by("-date", "-created_at")
+
+    status = request.GET.get("status", "")
+    txn_type = request.GET.get("type", "")
+    if status:
+        transactions = transactions.filter(approval_status=status)
+    if txn_type:
+        transactions = transactions.filter(transaction_type=txn_type)
+
+    show_voided = request.GET.get("voided", "")
+    if show_voided != "1":
+        transactions = transactions.filter(is_voided=False)
+
+    paginator = Paginator(transactions, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(request, "transactions/transaction_list.html", {
+        "transactions": page_obj,
+        "page_obj": page_obj,
+        "status_filter": status,
+        "type_filter": txn_type,
+        "can_void": can_approve_transactions(request.user),
+    })
+
+
+@_finance_required
+def transaction_detail(request, pk):
+    transaction = get_object_or_404(
+        filter_by_church(
+            Transaction.objects.prefetch_related("lines__account", "reversals"),
+            request,
+        ),
+        pk=pk,
+    )
+    void_form = VoidTransactionForm()
+    can_void = (
+        can_approve_transactions(request.user)
+        and transaction.approval_status == "APPROVED"
+        and not transaction.is_voided
+        and not transaction.reversal_of_id
+    )
+    return render(request, "transactions/transaction_detail.html", {
+        "transaction": transaction,
+        "void_form": void_form,
+        "can_void": can_void,
+    })
+
+
+@login_required
+@require_POST
+def void_transaction_view(request, pk):
+    if not can_approve_transactions(request.user):
+        raise PermissionDenied
+    transaction = get_object_or_404(
+        filter_by_church(Transaction.objects.all(), request),
+        pk=pk,
+    )
+    form = VoidTransactionForm(request.POST)
+    reason = form.data.get("reason", "") if form.is_valid() else request.POST.get("reason", "")
+    try:
+        reversal = void_transaction(transaction, request.user, reason=reason)
+        flash_success(
+            request,
+            f"{transaction.reference} voided. Reversal: {reversal.reference}.",
+        )
+    except (ValueError, PeriodLockedError, WorkingDayClosedError) as exc:
+        flash_exception(request, str(exc))
+    return redirect("transactions:transaction_detail", pk=pk)
+
+
+@_finance_required
+def period_list(request):
+    church = require_church(request)
+    year = int(request.GET.get("year", timezone.now().year))
+    months = get_financial_periods(church, year)
+    lock_form = PeriodLockForm(initial={"year": year, "month": timezone.now().month})
+    working_status = get_working_day_status(church)
+    active_day = get_active_working_day(church)
+    open_form = WorkingDayOpenForm(initial={"date": timezone.localdate()})
+    close_form = WorkingDayCloseForm()
+    return render(request, "transactions/period_list.html", {
+        "months": months,
+        "year": year,
+        "church": church,
+        "lock_form": lock_form,
+        "can_lock": can_approve_transactions(request.user),
+        "working_status": working_status,
+        "active_working_day": active_day,
+        "open_form": open_form,
+        "close_form": close_form,
+        "recent_working_days": get_recent_working_days(church),
+        "can_manage_working_day": can_approve_transactions(request.user),
+    })
+
+
+@login_required
+@require_POST
+def working_day_open(request):
+    if not can_approve_transactions(request.user):
+        raise PermissionDenied
+    church = require_church(request)
+    form = WorkingDayOpenForm(request.POST)
+    if form.is_valid():
+        try:
+            day = open_working_day(
+                church,
+                form.cleaned_data["date"],
+                request.user,
+                notes=form.cleaned_data.get("notes", ""),
+            )
+            flash_success(request, f"Working day opened for {day.date:%d %b %Y}.")
+        except (ValueError, PeriodLockedError) as exc:
+            flash_exception(request, str(exc))
+    else:
+        flash_exception(request, "Invalid working day date.")
+    return redirect("transactions:period_list")
+
+
+@login_required
+@require_POST
+def working_day_close(request):
+    if not can_approve_transactions(request.user):
+        raise PermissionDenied
+    church = require_church(request)
+    form = WorkingDayCloseForm(request.POST)
+    if form.is_valid():
+        try:
+            day = close_working_day(church, request.user, notes=form.cleaned_data.get("notes", ""))
+            flash_success(request, f"Working day closed for {day.date:%d %b %Y}.")
+        except ValueError as exc:
+            flash_exception(request, str(exc))
+    else:
+        flash_exception(request, "Could not close working day.")
+    return redirect("transactions:period_list")
+
+
+@login_required
+@require_POST
+def period_lock(request):
+    if not can_approve_transactions(request.user):
+        raise PermissionDenied
+    church = require_church(request)
+    form = PeriodLockForm(request.POST)
+    if form.is_valid():
+        try:
+            lock_financial_period(
+                church,
+                form.cleaned_data["year"],
+                form.cleaned_data["month"],
+                request.user,
+                notes=form.cleaned_data.get("notes", ""),
+            )
+            flash_success(request, "Financial period locked.")
+        except Exception as exc:
+            flash_exception(request, str(exc))
+    else:
+        flash_exception(request, "Invalid period.")
+    return redirect(f"{reverse('transactions:period_list')}?year={request.POST.get('year', timezone.now().year)}")
+
+
+@login_required
+@require_POST
+def period_unlock(request):
+    if not can_approve_transactions(request.user):
+        raise PermissionDenied
+    church = require_church(request)
+    year = int(request.POST.get("year"))
+    month = int(request.POST.get("month"))
+    try:
+        unlock_financial_period(church, year, month, request.user)
+        flash_success(request, "Financial period unlocked.")
+    except ValueError as exc:
+        flash_exception(request, str(exc))
+    return redirect(f"{reverse('transactions:period_list')}?year={year}")
+
+
+@_finance_required
+def reconciliation_list(request):
+    reconciliations_qs = filter_by_church(
+        BankReconciliation.objects.select_related("bank_account", "reconciled_by"),
+        request,
+    ).order_by("-statement_date")
+    paginator = Paginator(reconciliations_qs, 25)
+    reconciliations = paginator.get_page(request.GET.get("page"))
+    return render(request, "transactions/reconciliation_list.html", {
+        "reconciliations": reconciliations,
+        "page_obj": reconciliations,
+    })
+
+
+@_finance_required
+def reconciliation_create(request):
+    church = require_church(request)
+    form = BankReconciliationForm(request.POST or None, church=church)
+    if request.method == "POST" and form.is_valid():
+        try:
+            recon = create_bank_reconciliation(
+                church=church,
+                bank_account=form.cleaned_data["bank_account"],
+                statement_date=form.cleaned_data["statement_date"],
+                statement_balance=form.cleaned_data["statement_balance"],
+                user=request.user,
+                notes=form.cleaned_data.get("notes", ""),
+            )
+            flash_success(request, "Bank reconciliation started.")
+            return redirect("transactions:reconciliation_detail", pk=recon.pk)
+        except ValueError as exc:
+            flash_exception(request, str(exc))
+    return render(request, "transactions/reconciliation_form.html", {"form": form})
+
+
+@_finance_required
+def reconciliation_detail(request, pk):
+    recon = get_object_or_404(
+        filter_by_church(
+            BankReconciliation.objects.select_related("bank_account", "reconciled_by"),
+            request,
+        ),
+        pk=pk,
+    )
+    items = recon.items.select_related(
+        "transaction_line__transaction"
+    ).order_by("-transaction_line__transaction__date")
+
+    if request.method == "POST" and not recon.is_reconciled:
+        action = request.POST.get("action")
+        if action == "match":
+            matched_ids = request.POST.getlist("matched_lines")
+            try:
+                update_reconciliation_matches(recon, matched_ids, request.user)
+                flash_success(request, "Matches updated.")
+            except ValueError as exc:
+                flash_exception(request, str(exc))
+            return redirect("transactions:reconciliation_detail", pk=pk)
+        if action == "finalize" and can_approve_transactions(request.user):
+            try:
+                finalize_bank_reconciliation(recon, request.user)
+                flash_success(request, "Reconciliation finalized.")
+            except ValueError as exc:
+                flash_exception(request, str(exc))
+            return redirect("transactions:reconciliation_detail", pk=pk)
+
+    matched_total = sum(
+        item.transaction_line.amount for item in items if item.is_matched
+    )
+    difference = recon.statement_balance - matched_total
+
+    return render(request, "transactions/reconciliation_detail.html", {
+        "reconciliation": recon,
+        "items": items,
+        "matched_total": matched_total,
+        "difference": difference,
+        "can_finalize": can_approve_transactions(request.user) and not recon.is_reconciled,
+    })

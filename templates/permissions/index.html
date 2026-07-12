@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Permissions — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% url 'permissions:matrix' as matrix_url %}
+    {% url 'permissions:override_list' as overrides_url %}
+    {% url 'permissions:audit_log' as audit_url %}
+    {% include "includes/page_header.html" with page_subtitle="System" page_title="Permissions & Roles" page_description="Manage the role-permission matrix, user overrides, and audit trail." action_url=matrix_url action_label="Edit Matrix" action_icon="bi-grid-3x3-gap" %}
+
+    <div class="metrics-row mb-4">
+        <div class="metric-card metric-card--primary">
+            <span class="metric-label">Roles</span>
+            <span class="metric-value">{{ role_count }}</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Permissions</span>
+            <span class="metric-value">{{ permission_count }}</span>
+        </div>
+        <div class="metric-card metric-card--warning">
+            <span class="metric-label">Active Overrides</span>
+            <span class="metric-value">{{ override_count }}</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Audit Events</span>
+            <span class="metric-value">{{ audit_count }}</span>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-4">
+            <a href="{{ matrix_url }}" class="report-card d-block text-decoration-none h-100">
+                <div class="report-card__icon"><i class="bi bi-grid-3x3-gap"></i></div>
+                <h3 class="report-card__title">Role Matrix</h3>
+                <p class="report-card__desc">Configure which permissions each role receives by default.</p>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{% url 'permissions:role_list' %}" class="report-card d-block text-decoration-none h-100">
+                <div class="report-card__icon"><i class="bi bi-person-badge"></i></div>
+                <h3 class="report-card__title">Roles</h3>
+                <p class="report-card__desc">Review permission coverage per role.</p>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ overrides_url }}" class="report-card d-block text-decoration-none h-100">
+                <div class="report-card__icon"><i class="bi bi-sliders"></i></div>
+                <h3 class="report-card__title">User Overrides</h3>
+                <p class="report-card__desc">Grant or deny permissions for individual users.</p>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ audit_url }}" class="report-card d-block text-decoration-none h-100">
+                <div class="report-card__icon"><i class="bi bi-journal-check"></i></div>
+                <h3 class="report-card__title">Audit Log</h3>
+                <p class="report-card__desc">Track matrix changes and override events.</p>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{% url 'permissions:export_matrix' %}" class="report-card d-block text-decoration-none h-100">
+                <div class="report-card__icon"><i class="bi bi-download"></i></div>
+                <h3 class="report-card__title">Export Matrix</h3>
+                <p class="report-card__desc">Download the current matrix as CSV.</p>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Transactions — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="All Transactions" %}
+
+    <div class="filter-bar">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select form-control-sm">
+                    <option value="">All</option>
+                    <option value="PENDING" {% if status_filter == 'PENDING' %}selected{% endif %}>Pending</option>
+                    <option value="APPROVED" {% if status_filter == 'APPROVED' %}selected{% endif %}>Approved</option>
+                    <option value="REJECTED" {% if status_filter == 'REJECTED' %}selected{% endif %}>Rejected</option>
+                </select>
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Type</label>
+                <select name="type" class="form-select form-control-sm">
+                    <option value="">All</option>
+                    <option value="RECEIPT" {% if type_filter == 'RECEIPT' %}selected{% endif %}>Receipt</option>
+                    <option value="EXPENSE" {% if type_filter == 'EXPENSE' %}selected{% endif %}>Expense</option>
+                    <option value="TRANSFER" {% if type_filter == 'TRANSFER' %}selected{% endif %}>Transfer</option>
+                    <option value="PAYROLL" {% if type_filter == 'PAYROLL' %}selected{% endif %}>Payroll</option>
+                    <option value="CAPITAL" {% if type_filter == 'CAPITAL' %}selected{% endif %}>Capital</option>
+                </select>
+            </div>
+            <div class="filter-field">
+                <div class="form-check mb-1">
+                    <input class="form-check-input" type="checkbox" name="voided" value="1" id="show-voided">
+                    <label class="form-check-label small" for="show-voided">Include voided</label>
+                </div>
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Filter</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Reference</th>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Description</th>
+                        <th class="text-end">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in transactions %}
+                    <tr class="{% if t.is_voided %}table-secondary{% endif %}">
+                        <td><a href="{% url 'transactions:transaction_detail' t.id %}" class="table-link"><code class="small">{{ t.reference }}</code></a></td>
+                        <td>{{ t.date }}</td>
+                        <td><span class="chip">{{ t.transaction_type }}</span></td>
+                        <td>
+                            {% if t.approval_status == 'APPROVED' %}<span class="badge bg-success">{{ t.approval_status }}</span>
+                            {% elif t.approval_status == 'PENDING' %}<span class="badge bg-warning text-dark">{{ t.approval_status }}</span>
+                            {% else %}<span class="badge bg-secondary">{{ t.approval_status }}</span>{% endif %}
+                            {% if t.is_voided %}<span class="badge bg-dark">VOID</span>{% endif %}
+                        </td>
+                        <td class="text-muted small">{{ t.description|default:"—"|truncatechars:35 }}</td>
+                        <td class="text-end text-currency">₵ {{ t.receipt_total|floatformat:2|intcomma }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">{% include "includes/empty_state.html" with icon="bi-receipt" message="No transactions found." %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page_obj.has_other_pages %}
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <span class="text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&amp;status={{ status_filter }}&amp;type={{ type_filter }}">Previous</a></li>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&amp;status={{ status_filter }}&amp;type={{ type_filter }}">Next</a></li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,400 @@
+/* ChurchHub Platform Control Room */
+
+:root {
+    --pf-sidebar: #0c1929;
+    --pf-sidebar-hover: #152a42;
+    --pf-sidebar-active: #1e3a5f;
+    --pf-sidebar-text: #94a3b8;
+    --pf-sidebar-text-active: #f1f5f9;
+    --pf-topbar: #ffffff;
+    --pf-bg: #f0f4f8;
+    --pf-card: #ffffff;
+    --pf-border: #dde4ee;
+    --pf-accent: #1d4ed8;
+    --pf-accent-soft: #eff6ff;
+    --pf-navy: #0f2942;
+    --pf-success: #047857;
+    --pf-warning: #b45309;
+    --pf-danger: #b91c1c;
+    --pf-sidebar-width: 260px;
+}
+
+body.platform-body {
+    margin: 0;
+    background: var(--pf-bg);
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    color: var(--pf-navy);
+    min-height: 100vh;
+}
+
+.platform-shell {
+    display: flex;
+    min-height: 100vh;
+}
+
+.platform-sidebar {
+    width: var(--pf-sidebar-width);
+    flex-shrink: 0;
+    background: linear-gradient(180deg, var(--pf-sidebar) 0%, #0a1420 100%);
+    color: var(--pf-sidebar-text);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 1040;
+    overflow-y: auto;
+}
+
+.platform-sidebar-brand {
+    padding: 1.25rem 1.25rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.platform-sidebar-brand a {
+    text-decoration: none;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.platform-brand-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--pf-accent), #0e7490);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    color: #fff;
+}
+
+.platform-brand-text .name {
+    display: block;
+    font-weight: 700;
+    font-size: 1rem;
+    line-height: 1.2;
+}
+
+.platform-brand-text .tag {
+    display: block;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--pf-sidebar-text);
+    margin-top: 2px;
+}
+
+.platform-nav {
+    flex: 1;
+    padding: 0.75rem 0.65rem 1.5rem;
+}
+
+.platform-nav-section {
+    margin-bottom: 1.25rem;
+}
+
+.platform-nav-section-title {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(148, 163, 184, 0.7);
+    padding: 0 0.75rem 0.4rem;
+    font-weight: 600;
+}
+
+.platform-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 8px;
+    color: var(--pf-sidebar-text);
+    text-decoration: none;
+    font-size: 0.875rem;
+    margin-bottom: 2px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.platform-nav-link i {
+    font-size: 1rem;
+    width: 1.25rem;
+    text-align: center;
+    opacity: 0.85;
+}
+
+.platform-nav-link:hover {
+    background: var(--pf-sidebar-hover);
+    color: var(--pf-sidebar-text-active);
+}
+
+.platform-nav-link.active {
+    background: var(--pf-sidebar-active);
+    color: #fff;
+    font-weight: 600;
+}
+
+.platform-sidebar-footer {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 0.75rem;
+}
+
+.platform-main {
+    flex: 1;
+    margin-left: var(--pf-sidebar-width);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.platform-topbar {
+    background: var(--pf-topbar);
+    border-bottom: 1px solid var(--pf-border);
+    padding: 0.85rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+}
+
+.platform-topbar-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--pf-navy);
+    margin: 0;
+}
+
+.platform-topbar-meta {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.platform-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.platform-user-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.75rem 0.35rem 0.35rem;
+    background: var(--pf-bg);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.platform-user-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--pf-accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+}
+
+.platform-content {
+    padding: 1.5rem;
+    flex: 1;
+}
+
+.platform-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.platform-stat-card {
+    background: var(--pf-card);
+    border: 1px solid var(--pf-border);
+    border-radius: 12px;
+    padding: 1.1rem 1.25rem;
+    box-shadow: 0 1px 2px rgba(15, 41, 66, 0.04);
+}
+
+.platform-stat-card .label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+.platform-stat-card .value {
+    font-size: 1.65rem;
+    font-weight: 700;
+    color: var(--pf-navy);
+    line-height: 1.1;
+}
+
+.platform-card {
+    background: var(--pf-card);
+    border: 1px solid var(--pf-border);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(15, 41, 66, 0.05);
+    margin-bottom: 1.25rem;
+}
+
+.platform-card-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--pf-border);
+    font-weight: 700;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.platform-card-body {
+    padding: 1.25rem;
+}
+
+.platform-alert {
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    border: 1px solid transparent;
+}
+
+.platform-alert--danger {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #991b1b;
+}
+
+.platform-alert--warning {
+    background: #fffbeb;
+    border-color: #fde68a;
+    color: #92400e;
+}
+
+.platform-alert--info {
+    background: var(--pf-accent-soft);
+    border-color: #bfdbfe;
+    color: #1e40af;
+}
+
+.platform-table {
+    width: 100%;
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+.platform-table th {
+    background: var(--pf-navy);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.65rem 1rem;
+    border: none;
+}
+
+.platform-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--pf-border);
+    vertical-align: middle;
+}
+
+.platform-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.platform-breadcrumb {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+}
+
+.platform-breadcrumb a {
+    color: var(--pf-accent);
+    text-decoration: none;
+}
+
+.platform-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.platform-form-grid .full-width {
+    grid-column: 1 / -1;
+}
+
+.platform-form-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+}
+
+@media (max-width: 991px) {
+    .platform-sidebar {
+        transform: translateX(-100%);
+    }
+    .platform-main {
+        margin-left: 0;
+    }
+    .platform-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* v3 compact platform forms */
+.platform-content .form-control,
+.platform-content .form-select {
+    font-size: 0.78rem;
+    padding: 0.28rem 0.55rem;
+    min-height: calc(1.35em + 0.56rem);
+}
+
+.platform-content .form-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #64748b;
+    margin-bottom: 0.2rem;
+}
+
+.platform-content .btn {
+    font-size: 0.78rem;
+    padding: 0.32rem 0.75rem;
+}
+
+.platform-form-grid {
+    gap: 0.65rem 1rem;
+}
+
+.platform-sidebar-link {
+    font-size: 0.8125rem;
+    padding: 0.45rem 0.85rem;
+}
+
+.platform-topbar {
+    padding: 0.65rem 1.25rem;
+}
+
+.platform-breadcrumb {
+    font-size: 0.75rem;
+}

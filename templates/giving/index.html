@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Giving — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Member Giving" page_description="Contribution overview and annual statements." %}
+
+    <div class="filter-bar">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
+                <label class="form-label">Year</label>
+                <input type="number" name="year" value="{{ year }}" class="form-control form-control-sm field-w-xs" min="2020" max="2099">
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Apply</button>
+            </div>
+        </form>
+    </div>
+
+    {% include "includes/table_open.html" with table_title="Top Contributors" table_icon="bi-wallet2" %}
+            <table class="table mb-0">
+                <thead><tr><th>Member</th><th class="text-end">Tithe + Offering ({{ year }})</th><th class="text-end"></th></tr></thead>
+                <tbody>
+                    {% for row in leaders %}
+                    <tr>
+                        <td><a href="{% url 'giving:member_statement' row.member.pk %}?year={{ year }}" class="table-link">{{ row.member.full_name }}</a></td>
+                        <td class="text-end text-currency fw-semibold">₵ {{ row.total|floatformat:2|intcomma }}</td>
+                        <td class="text-end"><a href="{% url 'giving:member_statement' row.member.pk %}?year={{ year }}" class="btn btn-sm btn-outline-primary">Statement</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3">{% include "includes/empty_state.html" with icon="bi-cash" message="No giving records for this year." %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+    {% include "includes/table_close.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Organization Tree{% endblock %}
+
+{% block content %}
+<div class="platform-stat-grid mb-4">
+    <div class="platform-stat-card"><div class="label">Conferences</div><div class="value">{{ tree.conferences|length }}</div></div>
+    <div class="platform-stat-card"><div class="label">Total Churches</div><div class="value">{{ tree.church_count }}</div></div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="platform-card">
+            <div class="platform-card-header">Conferences</div>
+            <div class="table-responsive">
+                <table class="platform-table mb-0">
+                    <thead><tr><th>Name</th><th>Code</th><th>Zones</th></tr></thead>
+                    <tbody>
+                    {% for conf in tree.conferences %}
+                    <tr><td>{{ conf.name }}</td><td><code>{{ conf.code }}</code></td><td>{{ conf.zone_count }}</td></tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-muted">No conferences.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="platform-card">
+            <div class="platform-card-header">Zones</div>
+            <div class="table-responsive">
+                <table class="platform-table mb-0">
+                    <thead><tr><th>Zone</th><th>Conference</th></tr></thead>
+                    <tbody>
+                    {% for zone in zones %}
+                    <tr><td>{{ zone.name }}</td><td>{{ zone.conference.name }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="platform-card">
+            <div class="platform-card-header">Districts</div>
+            <div class="table-responsive">
+                <table class="platform-table mb-0">
+                    <thead><tr><th>District</th><th>Zone</th></tr></thead>
+                    <tbody>
+                    {% for district in districts %}
+                    <tr><td>{{ district.name }}</td><td>{{ district.zone.name }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

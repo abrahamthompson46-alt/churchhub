@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Assign Leadership — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            {% include "includes/page_header.html" with page_subtitle="Members" page_title="Assign Leadership Role" %}
+            <div class="form-card-inner card">
+                <div class="card-body p-4 p-md-5">
+                    <form method="post">
+                        {% csrf_token %}
+                        {% for field in form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+                        <div class="d-flex gap-2 pt-2">
+                            <button type="submit" class="btn btn-primary">Save</button>
+                            <a href="{% url 'members:leadership_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}{{ run.reference }} — Payroll{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Payroll" page_title=run.reference page_description=unit_label %}
+
+    <div class="dash-inline-stats mb-4">
+        <div class="dash-inline-stat"><span class="dash-inline-stat__label">Status</span><span class="dash-inline-stat__value">{{ run.get_status_display }}</span></div>
+        <div class="dash-inline-stat"><span class="dash-inline-stat__label">Gross</span><span class="dash-inline-stat__value">₵{{ run.total_gross|floatformat:2 }}</span></div>
+        <div class="dash-inline-stat"><span class="dash-inline-stat__label">Net</span><span class="dash-inline-stat__value">₵{{ run.total_net|floatformat:2 }}</span></div>
+        <div class="dash-inline-stat"><span class="dash-inline-stat__label">Employer Cost</span><span class="dash-inline-stat__value">₵{{ run.total_employer_cost|floatformat:2 }}</span></div>
+    </div>
+
+    {% if run.budget_warning.over_budget %}
+    <div class="alert alert-warning py-2 small mb-3">{{ run.budget_warning.message }}</div>
+    {% elif run.budget_warning.has_budget %}
+    <div class="alert alert-success py-2 small mb-3">Within salary budget — projected ₵{{ run.budget_warning.projected }} of ₵{{ run.budget_warning.budgeted }}.</div>
+    {% endif %}
+    {% if run.budget_warning.skipped_count %}
+    <div class="alert alert-warning py-2 small mb-3">{{ run.budget_warning.skipped_count }} employee(s) were skipped during calculation. Review compensation and loan balances.</div>
+    {% endif %}
+
+    {% if run.status == "REJECTED" %}
+    <div class="alert alert-danger py-2 small mb-3">Rejected: {{ run.rejection_reason|default:"No reason given." }}</div>
+    {% endif %}
+
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        {% if run.status == "DRAFT" or run.status == "CALCULATED" %}
+        <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="calculate"><button class="btn btn-primary btn-sm">Calculate</button></form>
+        {% endif %}
+        {% if run.status == "CALCULATED" and can_approve %}
+        <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="approve"><button class="btn btn-success btn-sm">Pastor Approve</button></form>
+        {% endif %}
+        {% if run.status == "APPROVED" and can_post and not run.treasury_approved_by %}
+        <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="treasury_approve"><button class="btn btn-success btn-sm">Treasury Review</button></form>
+        {% endif %}
+        {% if run.status == "APPROVED" and can_post and run.treasury_approved_by %}
+        <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="post"><input type="hidden" name="idempotency_key" value="post-{{ run.pk }}"><button class="btn btn-primary btn-sm">Post to Ledger</button></form>
+        {% endif %}
+        {% if run.status == "POSTED" and can_pay %}
+        <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="pay"><input type="hidden" name="idempotency_key" value="pay-{{ run.pk }}"><button class="btn btn-success btn-sm">Mark Paid</button></form>
+        {% endif %}
+        {% if run.status == "CALCULATED" or run.status == "APPROVED" %}
+        <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="collapse" data-bs-target="#rejectForm">Reject</button>
+        {% endif %}
+        {% if run.status == "REJECTED" %}
+        <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="reopen"><button class="btn btn-outline-secondary btn-sm">Reopen Draft</button></form>
+        {% endif %}
+        {% if run.status != "POSTED" and run.status != "PAID" and run.status != "VOID" %}
+        <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline" onsubmit="return confirm('Void this payroll run?');">{% csrf_token %}<input type="hidden" name="action" value="void"><button class="btn btn-outline-secondary btn-sm">Void</button></form>
+        {% endif %}
+        {% if run.status == "POSTED" or run.status == "PAID" %}
+        {% if can_post or can_approve %}
+        <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline" onsubmit="return confirm('Reverse this payroll run in the ledger?');">{% csrf_token %}<input type="hidden" name="action" value="reverse"><input type="hidden" name="reason" value="Manual reversal"><button class="btn btn-outline-danger btn-sm">Reverse</button></form>
+        {% endif %}
+        {% if can_pay %}
+        <a href="{% url 'payroll:run_export_csv' run.pk %}" class="btn btn-outline-secondary btn-sm">Bank CSV</a>
+        {% endif %}
+        <a href="{% url 'payroll:run_export_register' run.pk %}" class="btn btn-outline-secondary btn-sm">Register CSV</a>
+        <a href="{% url 'payroll:run_paye_pdf' run.pk %}" class="btn btn-outline-secondary btn-sm" target="_blank">PAYE Schedule</a>
+        <a href="{% url 'payroll:run_ssnit_pdf' run.pk %}" class="btn btn-outline-secondary btn-sm" target="_blank">SSNIT Schedule</a>
+        {% endif %}
+    </div>
+
+    <div class="collapse mb-3" id="rejectForm">
+        <div class="card card-body">
+            <form method="post" action="{% url 'payroll:run_action' run.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="reject">
+                {% include "includes/form_field.html" with field=reject_form.reason %}
+                <button type="submit" class="btn btn-danger btn-sm mt-2">Confirm Reject</button>
+            </form>
+        </div>
+    </div>
+
+    {% if run.approved_by %}
+    <p class="small text-muted">Pastor approved by {{ run.approved_by.get_full_name|default:run.approved_by.username }} on {{ run.approved_at|date:"M j, Y" }}.</p>
+    {% endif %}
+    {% if run.treasury_approved_by %}
+    <p class="small text-muted">Treasury reviewed by {{ run.treasury_approved_by.get_full_name|default:run.treasury_approved_by.username }} on {{ run.treasury_approved_at|date:"M j, Y" }}.</p>
+    {% endif %}
+
+    {% if statutory %}
+    <section class="dash-section mb-4">
+        <div class="dash-section__header"><h2 class="dash-section__title">Statutory Filing Totals</h2></div>
+        <div class="dash-inline-stats">
+            <div class="dash-inline-stat"><span class="dash-inline-stat__label">PAYE</span><span class="dash-inline-stat__value">₵{{ statutory.paye|floatformat:2 }}</span></div>
+            <div class="dash-inline-stat"><span class="dash-inline-stat__label">SSNIT (EE)</span><span class="dash-inline-stat__value">₵{{ statutory.ssnit_employee|floatformat:2 }}</span></div>
+            <div class="dash-inline-stat"><span class="dash-inline-stat__label">SSNIT (ER)</span><span class="dash-inline-stat__value">₵{{ statutory.ssnit_employer|floatformat:2 }}</span></div>
+        </div>
+        {% if statutory_liabilities %}
+        <p class="small text-muted mt-2 mb-0">{{ statutory_liabilities.remittance_hint }}</p>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if dept_costs %}
+    <section class="dash-section mb-4">
+        <div class="dash-section__header"><h2 class="dash-section__title">Department Cost Analysis</h2></div>
+        <div class="table-responsive table-in-card">
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Department</th><th>Headcount</th><th class="text-end">Gross</th><th class="text-end">Net</th><th class="text-end">Employer Cost</th></tr></thead>
+                <tbody>
+                    {% for row in dept_costs %}
+                    <tr>
+                        <td>{{ row.department }}</td>
+                        <td>{{ row.count }}</td>
+                        <td class="text-end">₵{{ row.gross|floatformat:2 }}</td>
+                        <td class="text-end">₵{{ row.net|floatformat:2 }}</td>
+                        <td class="text-end">₵{{ row.employer_cost|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="dash-section">
+        <div class="dash-section__header"><h2 class="dash-section__title">Payroll Register</h2></div>
+        <div class="table-responsive table-in-card">
+            <table class="table table-hover table-sm mb-0">
+                <thead>
+                    <tr><th>Employee</th><th>Dept</th><th class="text-end">Gross</th><th class="text-end">Deductions</th><th class="text-end">Net</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for row in register %}
+                    <tr>
+                        <td>{{ row.name }} <span class="text-muted small">({{ row.employee_number }})</span></td>
+                        <td>{{ row.department }}</td>
+                        <td class="text-end">₵{{ row.gross|floatformat:2 }}</td>
+                        <td class="text-end">₵{{ row.deductions|floatformat:2 }}</td>
+                        <td class="text-end">₵{{ row.net|floatformat:2 }}</td>
+                        <td class="text-end">
+                            {% if row.line_pk %}
+                            <a href="{% url 'payroll:payslip_pdf' row.line_pk %}" class="btn btn-sm btn-outline-secondary" target="_blank">Payslip</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="text-center text-muted py-4">Calculate the run to see the register.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

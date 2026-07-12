@@ -1,0 +1,88 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}{{ denomination.name }}{% endblock %}
+
+{% block content %}
+{% include "sitecontrol/includes/denomination_nav.html" with active_tab="overview" %}
+
+{% if alerts %}
+<div class="mb-3">
+    {% for alert in alerts %}
+    <div class="alert alert-{{ alert.level }} py-2 small mb-2">{{ alert.text }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="platform-card">
+            <div class="platform-card-header">
+                <span>{{ denomination.display_name|default:denomination.name }}</span>
+                <a href="{% url 'sitecontrol:denomination_edit' denomination.pk %}" class="btn btn-sm btn-outline-primary">Edit profile</a>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">{{ denomination.tagline|default:"No tagline set." }}</p>
+                <dl class="row small mb-0">
+                    <dt class="col-sm-4">Code</dt><dd class="col-sm-8"><code>{{ denomination.code }}</code></dd>
+                    <dt class="col-sm-4">Hierarchy chain</dt><dd class="col-sm-8">{{ hierarchy_chain }}</dd>
+                    <dt class="col-sm-4">Conferences</dt><dd class="col-sm-8">{{ conference_count }}</dd>
+                    <dt class="col-sm-4">Churches</dt><dd class="col-sm-8">{{ church_count }}</dd>
+                    <dt class="col-sm-4">Public registration</dt>
+                    <dd class="col-sm-8">{% if denomination.allow_public_registration %}Enabled{% else %}Disabled{% endif %}</dd>
+                    <dt class="col-sm-4">Apply URL</dt>
+                    <dd class="col-sm-8"><code>/apply/?denomination={{ denomination.code }}</code></dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="platform-card mt-3">
+            <div class="platform-card-header">
+                <span>Billing snapshot</span>
+                <a href="{% url 'sitecontrol:denomination_billing' denomination.pk %}" class="btn btn-sm btn-outline-secondary">Full report</a>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 text-center">
+                    <div class="col"><div class="fw-bold fs-5">{{ billing.active_count }}</div><div class="text-muted small">Active</div></div>
+                    <div class="col"><div class="fw-bold fs-5">{{ billing.trial_count }}</div><div class="text-muted small">Trial</div></div>
+                    <div class="col"><div class="fw-bold fs-5">{{ billing.mrr }}</div><div class="text-muted small">Est. MRR</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="platform-card">
+            <div class="platform-card-header">Hierarchy labels</div>
+            <ul class="list-group list-group-flush small">
+                {% for key, label in terminology.labels.items %}
+                {% if label %}
+                <li class="list-group-item d-flex justify-content-between">
+                    <span class="text-muted text-uppercase">{{ key|cut:"_" }}</span>
+                    <span class="fw-semibold">{{ label }}</span>
+                </li>
+                {% endif %}
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="platform-card mt-3">
+            <div class="platform-card-header">Recent audit</div>
+            <ul class="list-group list-group-flush small">
+                {% for entry in recent_audit %}
+                <li class="list-group-item">
+                    <div class="text-muted">{{ entry.created_at|date:"M j, H:i" }}</div>
+                    <div>{{ entry.summary }}</div>
+                </li>
+                {% empty %}
+                <li class="list-group-item text-muted">No recent activity.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <form method="post" action="{% url 'sitecontrol:denomination_set_context' denomination.pk %}" class="mt-3">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="btn btn-outline-primary btn-sm w-100">Use as platform filter context</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

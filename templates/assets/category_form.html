@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+
+
+{% block title %}{{ title }}{% endblock %}
+
+
+
+{% block content %}
+
+<div class="page-container page-shell">
+
+    {% include "includes/page_header.html" with page_subtitle="Fixed Assets" page_title=title %}
+
+    <div class="form-card-inner card compact-form">
+
+        <div class="card-body">
+
+            <form method="post" novalidate>
+
+                {% csrf_token %}
+
+                {% for field in form %}
+
+                    {% include "includes/form_field.html" with field=field %}
+
+                {% endfor %}
+
+                {% url 'assets:category_list' as cancel_url %}
+
+                {% include "includes/form_actions.html" with submit_label="Save" cancel_url=cancel_url %}
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+

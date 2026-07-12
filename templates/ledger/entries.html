@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Ledger Entries — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% url 'ledger:entry' as new_entry_url %}
+    {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Ledger Entries" page_description="Transactions posted through the category-driven ledger workflow." action_url=new_entry_url action_label="New Entry" action_icon="bi-journal-plus" %}
+
+    <div class="filter-bar">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">All statuses</option>
+                    <option value="PENDING"{% if status_filter == 'PENDING' %} selected{% endif %}>Pending</option>
+                    <option value="APPROVED"{% if status_filter == 'APPROVED' %} selected{% endif %}>Approved</option>
+                    <option value="REJECTED"{% if status_filter == 'REJECTED' %} selected{% endif %}>Rejected</option>
+                </select>
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Type</label>
+                <select name="type" class="form-select form-select-sm">
+                    <option value="">All types</option>
+                    <option value="RECEIPT"{% if type_filter == 'RECEIPT' %} selected{% endif %}>Receipt</option>
+                    <option value="EXPENSE"{% if type_filter == 'EXPENSE' %} selected{% endif %}>Expense</option>
+                    <option value="TRANSFER"{% if type_filter == 'TRANSFER' %} selected{% endif %}>Transfer</option>
+                </select>
+            </div>
+            <div class="filter-field">
+                <label class="form-label">From</label>
+                <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm">
+            </div>
+            <div class="filter-field">
+                <label class="form-label">To</label>
+                <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm">
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Category</label>
+                <select name="category" class="form-select form-select-sm">
+                    <option value="">All categories</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.pk }}"{% if category_filter == cat.pk|stringformat:"s" %} selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Member</label>
+                <select name="member" class="form-select form-select-sm">
+                    <option value="">All members</option>
+                    {% for m in members %}
+                    <option value="{{ m.pk }}"{% if member_filter == m.pk|stringformat:"s" %} selected{% endif %}>{{ m.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Filter</button>
+                <a href="{% url 'ledger:entries' %}" class="btn btn-link btn-sm text-muted">Clear</a>
+                <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}export=csv" class="btn btn-outline-secondary btn-sm">CSV</a>
+                <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}export=excel" class="btn btn-outline-secondary btn-sm">Excel</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-wrap table-wrap--center">
+        {% include "includes/table_open.html" with table_title="Entries" table_icon="bi-journal-text" %}
+        <table class="table table-sm mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Reference</th>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Date</th>
+                    <th>Narration</th>
+                    <th class="text-end">Amount</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in entries %}
+                <tr>
+                    <td><a href="{% url 'transactions:transaction_detail' t.pk %}" class="table-link small">{{ t.reference }}</a></td>
+                    <td><span class="chip chip--muted">{{ t.get_transaction_type_display }}</span></td>
+                    <td class="small"><a href="{% url 'ledger:category_detail' t.ledger_category_id %}" class="table-link">{{ t.ledger_category.name }}</a></td>
+                    <td class="small text-muted">{{ t.date|date:"M j, Y" }}</td>
+                    <td class="small text-truncate" style="max-width: 12rem">{{ t.description|truncatechars:40 }}</td>
+                    <td class="text-end text-currency small">₵ {{ t.receipt_total|floatformat:2|intcomma }}</td>
+                    <td>
+                        <span class="chip chip--{% if t.approval_status == 'APPROVED' %}success{% elif t.approval_status == 'PENDING' %}warning{% else %}muted{% endif %}">
+                            {{ t.get_approval_status_display }}
+                        </span>
+                        {% if t.is_voided %}<span class="chip chip--danger ms-1">Voided</span>{% endif %}
+                    </td>
+                    <td class="text-end text-nowrap">
+                        <a href="{% url 'transactions:transaction_detail' t.pk %}" class="btn btn-sm btn-outline-secondary">View</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8">{% include "includes/empty_state.html" with icon="bi-journal" message="No ledger entries match your filters." action_url=new_entry_url action_label="New entry" %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% include "includes/table_close.html" %}
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="mt-3" aria-label="Ledger entries pagination">
+        <ul class="pagination pagination-sm justify-content-center mb-0">
+            {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ status_filter }}&type={{ type_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&category={{ category_filter }}&member={{ member_filter }}">Previous</a></li>
+            {% endif %}
+            <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+            {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ status_filter }}&type={{ type_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&category={{ category_filter }}&member={{ member_filter }}">Next</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

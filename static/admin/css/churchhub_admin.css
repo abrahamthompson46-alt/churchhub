@@ -1,0 +1,101 @@
+/* ChurchHub custom Django admin theme */
+
+:root {
+    --ch-primary: #1e3a5f;
+    --ch-primary-dark: #152a45;
+    --ch-accent: #2563eb;
+    --ch-surface: #f8fafc;
+}
+
+#header {
+    background: linear-gradient(135deg, var(--ch-primary) 0%, var(--ch-primary-dark) 100%);
+    color: #fff;
+    border-bottom: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+#header a:link, #header a:visited { color: #fff; }
+
+#branding { padding: 12px 20px; }
+
+#site-name {
+    font-weight: 700;
+    font-size: 1.25rem;
+    margin: 0;
+}
+
+#site-name a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+}
+
+.brand-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.15);
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+.brand-tagline {
+    margin: 2px 0 0 42px;
+    font-size: 0.75rem;
+    opacity: 0.85;
+}
+
+div.breadcrumbs {
+    background: var(--ch-surface);
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.module h2, .module caption, #content h1 {
+    background: var(--ch-primary);
+}
+
+.button, input[type=submit], input[type=button], .submit-row input, a.button {
+    background: var(--ch-accent) !important;
+    border-radius: 6px;
+}
+
+#content-main .module {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.admin-quick-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+    padding: 16px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+.admin-quick-links .button {
+    padding: 8px 14px;
+}
+
+#footer {
+    padding: 12px 20px;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.85rem;
+    border-top: 1px solid #e2e8f0;
+    background: var(--ch-surface);
+}
+
+#footer a { color: var(--ch-accent); }
+
+.login #header { background: var(--ch-primary); }
+.login #container { border-radius: 12px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12); }
+
+.login .submit-row { text-align: center; }

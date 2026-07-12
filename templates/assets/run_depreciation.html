@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Run Depreciation{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Fixed Assets" page_title="Run Monthly Depreciation" %}
+    <p class="text-muted">Post depreciation for all active assets for the selected month.</p>
+    <form method="post" class="card border-0 shadow-sm mb-4" style="max-width:420px">
+        <div class="card-body">
+            {% csrf_token %}
+            {% for field in form %}
+            <div class="mb-3">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+            </div>
+            {% endfor %}
+            <div class="d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary">Run Depreciation</button>
+                <button type="submit" name="async" value="1" class="btn btn-outline-primary">Queue Background Run</button>
+                <a href="?preview=1&year={{ form.year.value|default:preview_year }}&month={{ form.month.value|default:preview_month }}" class="btn btn-outline-secondary">Preview</a>
+                <a href="{% url 'assets:index' %}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </div>
+    </form>
+
+    {% if preview %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white fw-semibold">
+            Preview — {{ preview.asset_count }} asset(s), total ₵{{ preview.total|floatformat:2 }}
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Code</th><th>Name</th><th class="text-end">Amount (GHS)</th></tr></thead>
+                <tbody>
+                {% for row in preview.rows %}
+                <tr>
+                    <td>{{ row.code }}</td>
+                    <td>{{ row.name }}</td>
+                    <td class="text-end">₵{{ row.amount|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="text-muted text-center py-3">No depreciation due for this period.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

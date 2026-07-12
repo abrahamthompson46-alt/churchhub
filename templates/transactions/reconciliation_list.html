@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Bank Reconciliations — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Bank Reconciliations" %}
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Bank Account</th>
+                        <th>Statement Date</th>
+                        <th class="text-end">Statement Balance</th>
+                        <th class="text-end">Book Balance</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in reconciliations %}
+                    <tr>
+                        <td>{{ r.bank_account.name }}</td>
+                        <td>{{ r.statement_date }}</td>
+                        <td class="text-end text-currency">₵ {{ r.statement_balance|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency">₵ {{ r.book_balance|floatformat:2|intcomma }}</td>
+                        <td>
+                            {% if r.is_reconciled %}
+                            <span class="badge bg-success">Reconciled</span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">In Progress</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end"><a href="{% url 'transactions:reconciliation_detail' r.pk %}" class="table-link">Open</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">{% include "includes/empty_state.html" with icon="bi-bank" message="No reconciliations yet." %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page_obj.has_other_pages %}
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <span class="text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

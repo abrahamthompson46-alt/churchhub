@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ meta.label }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Analytics" page_title=meta.label page_description=meta.description %}
+
+    <div class="filter-panel">
+        <p class="filter-panel-title">Report filters</p>
+        <form method="get" class="filter-form" id="report-filter-form">
+            <div class="filter-field">
+                <label class="form-label">Period</label>
+                {{ form.period }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">From</label>
+                {{ form.start_date }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">To</label>
+                {{ form.end_date }}
+            </div>
+            {% if show_hierarchy %}
+            <div class="filter-field">
+                <label class="form-label">Conference</label>
+                {{ form.conference }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Zone</label>
+                {{ form.zone }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">District</label>
+                {{ form.district }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Church</label>
+                {{ form.church }}
+            </div>
+            {% endif %}
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-play-fill me-1"></i>Generate</button>
+            </div>
+        </form>
+    </div>
+
+    {% if data %}
+    <div class="export-toolbar">
+        <span class="chip"><i class="bi bi-calendar3"></i> {{ data.period_label }} · {{ data.start_date }} – {{ data.end_date }}</span>
+        {% if data.truncated %}
+        <span class="chip text-warning"><i class="bi bi-exclamation-triangle"></i> Results truncated</span>
+        {% endif %}
+        <div class="btn-group btn-group-sm">
+            <a href="{{ export_links.csv }}" class="btn btn-outline-secondary">CSV</a>
+            <a href="{{ export_links.excel }}" class="btn btn-outline-secondary">Excel</a>
+            <a href="{{ export_links.pdf }}" class="btn btn-outline-secondary">PDF</a>
+            <a href="{{ export_links.async_csv }}" class="btn btn-outline-secondary" title="Queue background export">Async CSV</a>
+        </div>
+    </div>
+    {% include "includes/table_open.html" with table_title="Results" table_icon="bi-table" %}
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>{% for h in data.headers %}<th{% if forloop.counter > 1 %} class="text-end"{% endif %}>{{ h }}</th>{% endfor %}</tr>
+                </thead>
+                <tbody>
+                    {% for row in data.rows %}
+                    <tr>
+                        {% for cell in row %}
+                        <td{% if not forloop.first %} class="text-end text-currency"{% endif %}>{{ cell }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="{{ data.headers|length }}">{% include "includes/empty_state.html" with icon="bi-inbox" message="No data for this period." %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+    {% include "includes/table_close.html" %}
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if show_hierarchy %}
+<script>
+(function () {
+  const form = document.getElementById("report-filter-form");
+  if (!form) return;
+  const conf = form.querySelector('[data-hierarchy="conference"]');
+  const zone = form.querySelector('[data-hierarchy="zone"]');
+  const dist = form.querySelector('[data-hierarchy="district"]');
+  const church = form.querySelector('[data-hierarchy="church"]');
+  if (!conf || !zone || !dist || !church) return;
+
+  function onChangeClearBelow(changed) {
+    if (changed === conf) { zone.value = ""; dist.value = ""; church.value = ""; }
+    else if (changed === zone) { dist.value = ""; church.value = ""; }
+    else if (changed === dist) { church.value = ""; }
+  }
+  [conf, zone, dist].forEach(el => {
+    el.addEventListener("change", () => onChangeClearBelow(el));
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

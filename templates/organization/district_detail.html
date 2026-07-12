@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}{{ district.name }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'organization:hierarchy' %}">Organization</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'organization:zone_detail' district.zone_id %}">{{ district.zone.name }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ district.name }}</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle="District" page_title=district.name page_description=district.code %}
+
+    {% if can_manage %}
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{% url 'organization:church_create' %}?district={{ district.id }}" class="btn btn-primary btn-sm">Add Church</a>
+        <a href="{% url 'organization:district_edit' district.id %}" class="btn btn-outline-secondary btn-sm">Edit</a>
+    </div>
+    {% endif %}
+
+    <div class="panel">
+        <div class="panel-header">Churches ({{ churches|length }})</div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead><tr><th>Name</th><th>Code</th><th>Address</th></tr></thead>
+                <tbody>
+                    {% for church in churches %}
+                    <tr>
+                        <td><a href="{% url 'organization:church_detail' church.id %}" class="table-link">{{ church.name }}</a></td>
+                        <td class="text-muted"><span class="chip">{{ church.code }}</span></td>
+                        <td class="text-muted small">{{ church.address|default:"—" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3">{% include "includes/empty_state.html" with message="No churches in this district." %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

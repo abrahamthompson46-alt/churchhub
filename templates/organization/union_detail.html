@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}{{ union.name }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'organization:hierarchy' %}">Organization</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'organization:general_conference_detail' union.general_conference_id %}">{{ union.general_conference.name }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ union.name }}</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle="Union" page_title=union.name page_description=union.code %}
+
+    {% if can_manage %}
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{% url 'organization:conference_create' %}" class="btn btn-primary btn-sm">Add Conference</a>
+        <a href="{% url 'organization:union_edit' union.id %}" class="btn btn-outline-secondary btn-sm">Edit</a>
+    </div>
+    {% endif %}
+
+    <div class="panel">
+        <div class="panel-header">Conferences ({{ conferences|length }})</div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead><tr><th>Name</th><th>Code</th><th>Zones</th><th></th></tr></thead>
+                <tbody>
+                    {% for conference in conferences %}
+                    <tr>
+                        <td><a href="{% url 'organization:conference_detail' conference.id %}" class="table-link">{{ conference.name }}</a></td>
+                        <td class="text-muted"><span class="chip">{{ conference.code }}</span></td>
+                        <td>{{ conference.zone_count }}</td>
+                        <td class="text-end">
+                            {% if can_manage %}
+                            <a href="{% url 'organization:zone_create' %}?conference={{ conference.id }}" class="table-link small">Add Zone</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4">{% include "includes/empty_state.html" with message="No conferences yet." %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

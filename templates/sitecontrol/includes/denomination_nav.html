@@ -1,0 +1,9 @@
+<nav class="platform-subnav mb-3" aria-label="Denomination sections">
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'sitecontrol:denomination_detail' denomination.pk %}" class="btn btn-sm {% if active_tab == 'overview' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Overview</a>
+        <a href="{% url 'sitecontrol:denomination_terminology' denomination.pk %}" class="btn btn-sm {% if active_tab == 'terminology' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Terminology</a>
+        <a href="{% url 'sitecontrol:denomination_seeds' denomination.pk %}" class="btn btn-sm {% if active_tab == 'seeds' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Seed Config</a>
+        <a href="{% url 'sitecontrol:denomination_branding' denomination.pk %}" class="btn btn-sm {% if active_tab == 'branding' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Branding</a>
+        <a href="{% url 'sitecontrol:denomination_billing' denomination.pk %}" class="btn btn-sm {% if active_tab == 'billing' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Billing</a>
+    </div>
+</nav>

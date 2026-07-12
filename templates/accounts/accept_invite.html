@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Accept Invitation — ChurchHub{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<div class="auth-card card border-0">
+    <div class="card-body p-4 p-md-5">
+        <div class="auth-brand">
+            <div class="brand-icon"><i class="bi bi-envelope-check"></i></div>
+            <h1 class="h5 mb-1">Welcome to ChurchHub</h1>
+            <p class="text-muted small mb-0">Complete your account for <strong>{{ invitation.church.name }}</strong></p>
+        </div>
+
+        <dl class="row small mb-4">
+            <dt class="col-5 text-muted">Username</dt><dd class="col-7">{{ invitation.username }}</dd>
+            <dt class="col-5 text-muted">Role</dt><dd class="col-7">{{ invitation.get_role_display }}</dd>
+        </dl>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="alert alert-danger py-2 small">{{ form.non_field_errors }}</div>{% endif %}
+            {% for field in form %}
+                {% include "includes/form_field.html" with field=field %}
+            {% endfor %}
+            <button type="submit" class="btn btn-primary w-100 py-2 mt-2">Create Account</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

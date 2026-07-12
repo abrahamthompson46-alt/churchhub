@@ -1,0 +1,36 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Seed Config — {{ denomination.name }}{% endblock %}
+
+{% block content %}
+{% include "sitecontrol/includes/denomination_nav.html" with active_tab="seeds" %}
+
+<div class="platform-card">
+    <div class="platform-card-header">
+        <span>Onboarding seeds</span>
+    </div>
+    <div class="card-body">
+        <p class="text-muted small mb-4">Defaults applied when a new church is onboarded under this denomination.</p>
+        <form method="post" class="platform-form-grid">
+            {% csrf_token %}
+            {% for field in form %}
+            <div class="{% if field.field.widget.input_type == 'checkbox' %}platform-form-check full-width{% endif %}">
+                {% if field.field.widget.input_type == 'checkbox' %}
+                {{ field }}
+                <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {% else %}
+                <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% endif %}
+                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+            <div class="full-width d-flex gap-2 mt-3">
+                <button type="submit" class="btn btn-primary btn-sm">Save seed config</button>
+                <a href="{% url 'sitecontrol:denomination_detail' denomination.pk %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

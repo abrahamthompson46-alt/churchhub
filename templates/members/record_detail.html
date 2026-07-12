@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}{{ record.title }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'members:list' %}">Members</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'members:record_list' %}">Records</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ record.title }}</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle=record.record_type page_title=record.title %}
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <p class="text-muted mb-0">{{ record.event_date }} — <a href="{% url 'members:detail' record.member_id %}" class="table-link">{{ record.member }}</a></p>
+        <a href="{% url 'members:record_edit' record.pk %}" class="btn btn-outline-secondary btn-sm">Edit</a>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">Record Details</div>
+        <div class="panel-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3 text-muted">Status</dt><dd class="col-sm-9"><span class="chip">{{ record.status }}</span></dd>
+                <dt class="col-sm-3 text-muted">Church</dt><dd class="col-sm-9">{{ record.church.name }}</dd>
+                <dt class="col-sm-3 text-muted">Description</dt><dd class="col-sm-9">{{ record.description|default:"—"|linebreaksbr }}</dd>
+            </dl>
+        </div>
+    </div>
+</div>
+{% endblock %}

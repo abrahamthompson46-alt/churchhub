@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}{{ member.first_name }} {{ member.last_name }} — Timeline{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'members:list' %}">Members</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'members:detail' member.id %}" class="table-link">{{ member.first_name }} {{ member.last_name }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Timeline</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle="Member Timeline" page_title=member page_description=member.church.name %}
+
+    <div class="d-flex gap-2 mb-4">
+        <a href="{% url 'members:detail' member.id %}" class="btn btn-sm btn-outline-secondary">Profile</a>
+        <a href="{% url 'members:edit' member.id %}" class="btn btn-sm btn-outline-primary">Edit Member</a>
+        <a href="{% url 'members:record_add' %}?member={{ member.id }}" class="btn btn-sm btn-outline-primary">Add Record</a>
+    </div>
+
+    {% for item in timeline %}
+    <div class="panel mb-3 timeline-item">
+        <div class="panel-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                <h5 class="mb-0">{{ item.title }}</h5>
+                <small class="text-muted">{% if item.event_date %}{{ item.event_date }}{% else %}{{ item.date }}{% endif %}</small>
+            </div>
+            {% if item.record_type %}<span class="chip mt-2">{{ item.record_type }}</span>{% endif %}
+            {% if item.description %}<p class="mt-2 mb-0 text-muted">{{ item.description }}</p>{% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="empty-state">
+        <div class="empty-state-icon"><i class="bi bi-clock-history"></i></div>
+        <p class="empty-state-text">No timeline entries yet.</p>
+        <a href="{% url 'members:record_add' %}?member={{ member.id }}" class="btn btn-primary btn-sm mt-2">Add a record</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block title %}Control Room — Platform{% endblock %}
+{% block page_title %}Control Room{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Master dashboard for tenants, security, and platform operations.</p>{% endblock %}
+
+{% block content %}
+{% if alerts %}
+<div class="platform-card mb-4">
+    <div class="platform-card-header"><i class="bi bi-exclamation-triangle me-2"></i>Active Alerts</div>
+    <div class="platform-card-body py-2">
+        {% for alert in alerts %}
+        <div class="platform-alert platform-alert--{{ alert.level }}">
+            <i class="bi bi-{% if alert.level == 'danger' %}x-octagon{% elif alert.level == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+            <div>
+                <strong>{{ alert.title }}</strong> — {{ alert.detail }}
+                {% if alert.url_name %}<a href="{% url alert.url_name %}" class="ms-2">Review</a>{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="platform-stat-grid">
+    <div class="platform-stat-card"><div class="label">Churches</div><div class="value">{{ stats.churches }}</div></div>
+    <div class="platform-stat-card"><div class="label">Active Subscriptions</div><div class="value">{{ stats.active_subscriptions }}</div></div>
+    <div class="platform-stat-card"><div class="label">Institution Users</div><div class="value">{{ stats.users }}</div></div>
+    <div class="platform-stat-card"><div class="label">Platform Operators</div><div class="value">{{ stats.operators }}</div></div>
+    <div class="platform-stat-card"><div class="label">Suspended</div><div class="value text-danger">{{ stats.suspended }}</div></div>
+    <div class="platform-stat-card"><div class="label">Active Plans</div><div class="value">{{ stats.plans }}</div></div>
+    <div class="platform-stat-card"><div class="label">Pending Applications</div><div class="value {% if stats.pending_applications %}text-warning{% endif %}">{{ stats.pending_applications }}</div></div>
+    <div class="platform-stat-card"><div class="label">Audit (24h)</div><div class="value">{{ audit_24h }}</div></div>
+    <div class="platform-stat-card"><div class="label">Maintenance</div><div class="value {% if maintenance_mode %}text-warning{% else %}text-success{% endif %}">{% if maintenance_mode %}ON{% else %}Off{% endif %}</div></div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="platform-card">
+            <div class="platform-card-header">Quick Actions</div>
+            <div class="platform-card-body">
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{% url 'sitecontrol:settings' %}" class="btn btn-primary btn-sm"><i class="bi bi-gear me-1"></i>Settings</a>
+                    <a href="{% url 'sitecontrol:tenant_list' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-building me-1"></i>Tenants</a>
+                    <a href="{% url 'sitecontrol:operator_list' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-person-badge me-1"></i>Operators</a>
+                    <a href="{% url 'sitecontrol:registration_settings' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-door-open me-1"></i>Registration</a>
+                    {% if stats.pending_applications %}
+                    <a href="{% url 'sitecontrol:application_list' %}?status=PENDING" class="btn btn-warning btn-sm"><i class="bi bi-inbox me-1"></i>{{ stats.pending_applications }} pending</a>
+                    {% endif %}
+                    <a href="{% url 'sitecontrol:ops_health' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-activity me-1"></i>Ops</a>
+                    <a href="{% url 'sitecontrol:health' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-heart-pulse me-1"></i>Health</a>
+                </div>
+                {% if churches_without_sub %}
+                <p class="text-muted small mt-3 mb-0">{{ churches_without_sub }} church(es) without a subscription. <a href="{% url 'sitecontrol:subscription_seed' %}">Assign default plan</a>.</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="platform-card">
+            <div class="platform-card-header">Recent Audit Events</div>
+            <div class="table-responsive">
+                <table class="platform-table mb-0">
+                    <thead><tr><th>When</th><th>User</th><th>Action</th><th>Summary</th></tr></thead>
+                    <tbody>
+                    {% for entry in recent_audit %}
+                    <tr>
+                        <td class="text-muted small">{{ entry.created_at|date:"M j, H:i" }}</td>
+                        <td>{{ entry.user.username|default:"—" }}</td>
+                        <td><span class="badge bg-secondary">{{ entry.get_action_display }}</span></td>
+                        <td>{{ entry.summary|truncatechars:60 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-muted">No audit events yet.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-3 border-top"><a href="{% url 'sitecontrol:audit_log' %}">View full audit log</a></div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="platform-card">
+            <div class="platform-card-header">Recent Subscription Updates</div>
+            <ul class="list-group list-group-flush">
+                {% for sub in recent_subscriptions %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>{{ sub.church.name }}<br><small class="text-muted">{{ sub.plan.name }}</small></span>
+                    <span class="badge bg-{% if sub.status == 'ACTIVE' %}success{% elif sub.status == 'SUSPENDED' %}danger{% else %}secondary{% endif %}">{{ sub.get_status_display }}</span>
+                </li>
+                {% empty %}
+                <li class="list-group-item text-muted">No subscriptions yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

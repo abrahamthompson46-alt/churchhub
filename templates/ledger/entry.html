@@ -7,7 +7,7 @@
 <div class="page-container">
     {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
 
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Ledger Entry" page_description="Select type and category — debit and credit accounts are applied automatically." %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Ledger Entry" page_description="One amount, one narration. Choose type and category — accounts cascade automatically." %}
 
     {% if path_note %}
     <div class="alert alert-light border small mb-4" role="note">
@@ -16,11 +16,12 @@
     {% endif %}
 
     <div class="row justify-content-center">
-        <div class="col-lg-8">
+        <div class="col-lg-7">
             <form method="post" id="ledger-entry-form" class="data-card p-4" novalidate
                   data-categories-url="{% url 'ledger:api_categories' %}"
                   data-category-detail-url="{% url 'ledger:api_category_detail' pk='00000000-0000-0000-0000-000000000000' %}">
                 {% csrf_token %}
+                {{ form.date }}
 
                 <div class="row g-3">
                     <div class="col-md-6">
@@ -31,34 +32,38 @@
                     </div>
                 </div>
 
-                <div id="account-preview" class="ledger-account-preview mt-3 mb-3" hidden>
+                <div id="account-preview" class="ledger-account-preview mt-2 mb-3" hidden>
                     <div class="row g-2">
                         <div class="col-md-6">
-                            <label class="form-label text-muted small text-uppercase fw-semibold">Debit Account</label>
-                            <div class="ledger-account-box" id="preview-debit">—</div>
+                            <label class="form-label text-muted ledger-account-label">Debit</label>
+                            <div class="ledger-account-box" id="preview-debit" title="">—</div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label text-muted small text-uppercase fw-semibold">Credit Account</label>
-                            <div class="ledger-account-box" id="preview-credit">—</div>
+                            <label class="form-label text-muted ledger-account-label">Credit</label>
+                            <div class="ledger-account-box" id="preview-credit" title="">—</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="row g-3">
-                    <div class="col-md-4">
+                    <div class="col-md-5">
                         {% include "includes/form_field.html" with field=form.amount %}
                     </div>
-                    <div class="col-md-4">
-                        {% include "includes/form_field.html" with field=form.date %}
-                    </div>
-                    <div class="col-md-4" id="member-field-wrap">
+                    <div class="col-md-7" id="member-field-wrap">
                         {% include "includes/form_field.html" with field=form.member %}
                     </div>
                 </div>
 
-                <div class="mb-4">
+                <div class="mb-3 mt-1">
                     {% include "includes/form_field.html" with field=form.narration %}
                 </div>
+
+                {% if business_date %}
+                <p class="text-muted small mb-3">
+                    <i class="bi bi-calendar-check me-1"></i>Posting date: <strong>{{ business_date|date:"j M Y" }}</strong>
+                    <span class="text-muted">(business day)</span>
+                </p>
+                {% endif %}
 
                 {% if form.non_field_errors %}
                 <div class="alert alert-danger small">{{ form.non_field_errors }}</div>

@@ -48,8 +48,10 @@
             return;
         }
         preview.hidden = false;
-        previewDebit.textContent = cat.debit_account_name;
-        previewCredit.textContent = cat.credit_account_name;
+        previewDebit.textContent = cat.debit_account_name || "—";
+        previewCredit.textContent = cat.credit_account_name || "—";
+        previewDebit.title = cat.debit_account_name || "";
+        previewCredit.title = cat.credit_account_name || "";
         if (memberWrap) {
             memberWrap.style.display = cat.requires_member ? "" : "none";
         }

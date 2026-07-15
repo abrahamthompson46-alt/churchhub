@@ -1,17 +1,24 @@
 from decimal import Decimal
 
 from django import forms
-from django.utils import timezone
 
 from church_system.widgets import input_attrs, select_attrs, textarea_attrs
 from ledger.models import LedgerCategory
 from members.models import Member
 from transactions.models import Account
+from transactions.services import resolve_transaction_date
 
 _MONEY = lambda **extra: input_attrs(step="0.01", placeholder="0.00", **extra)
 
 
+def _account_label(obj):
+    """Short account label for selects (name only)."""
+    return obj.name if obj else ""
+
+
 class LedgerEntryForm(forms.Form):
+    """Simplified JV entry: type → category cascade, one amount, one narration."""
+
     transaction_type = forms.ChoiceField(
         label="Transaction Type",
         choices=LedgerCategory.TRANSACTION_TYPES,
@@ -21,6 +28,7 @@ class LedgerEntryForm(forms.Form):
         label="Category",
         queryset=LedgerCategory.objects.none(),
         widget=forms.Select(attrs={**select_attrs(), "id": "id_category"}),
+        help_text="Accounts for debit/credit are filled automatically from the category.",
     )
     amount = forms.DecimalField(
         label="Amount",
@@ -35,8 +43,8 @@ class LedgerEntryForm(forms.Form):
     )
     date = forms.DateField(
         label="Transaction Date",
-        initial=timezone.now().date,
-        widget=forms.DateInput(attrs={**input_attrs(), "type": "date"}),
+        required=False,
+        widget=forms.HiddenInput(),
     )
     member = forms.ModelChoiceField(
         label="Member",
@@ -54,6 +62,8 @@ class LedgerEntryForm(forms.Form):
             or "RECEIPT"
         )
         if church:
+            if "date" not in self.initial and not self.data:
+                self.fields["date"].initial = resolve_transaction_date(church)
             self.fields["category"].queryset = LedgerCategory.objects.filter(
                 church=church,
                 transaction_type=txn_type,
@@ -65,6 +75,8 @@ class LedgerEntryForm(forms.Form):
 
     def clean(self):
         cleaned = super().clean()
+        if self.church and not cleaned.get("date"):
+            cleaned["date"] = resolve_transaction_date(self.church)
         category = cleaned.get("category")
         member = cleaned.get("member")
         if category and category.requires_member and not member:
@@ -114,6 +126,8 @@ class LedgerCategoryEditForm(forms.Form):
             accounts = Account.objects.filter(church=church).order_by("name")
             self.fields["default_debit_account"].queryset = accounts
             self.fields["default_credit_account"].queryset = accounts
+            self.fields["default_debit_account"].label_from_instance = _account_label
+            self.fields["default_credit_account"].label_from_instance = _account_label
         if instance and not self.data:
             self.fields["name"].initial = instance.name
             self.fields["default_narration"].initial = instance.default_narration

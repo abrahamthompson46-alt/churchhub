@@ -48,7 +48,7 @@ class ReceiptForm(forms.Form):
     date = forms.DateField(
         required=False,
         label="Receipt Date",
-        widget=forms.DateInput(attrs={**input_attrs(), "type": "date"}),
+        widget=forms.HiddenInput(),
     )
 
     def __init__(self, *args, church=None, **kwargs):
@@ -120,7 +120,7 @@ class ExpenseForm(forms.Form):
     date = forms.DateField(
         required=False,
         label="Expense Date",
-        widget=forms.DateInput(attrs={**input_attrs(), "type": "date"}),
+        widget=forms.HiddenInput(),
     )
 
     def __init__(self, *args, church=None, **kwargs):
@@ -130,6 +130,7 @@ class ExpenseForm(forms.Form):
                 church=church, account_type="EXPENSE"
             ).order_by("name")
             self.fields["expense_account"].queryset = expense_qs
+            self.fields["expense_account"].label_from_instance = lambda obj: obj.name
             default = expense_qs.filter(name="General Expense").first() or expense_qs.first()
             if default and not self.is_bound:
                 self.fields["expense_account"].initial = default.pk

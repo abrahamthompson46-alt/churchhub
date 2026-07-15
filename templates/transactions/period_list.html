@@ -146,7 +146,13 @@
 
                     <td>{{ day.date|date:"j M Y" }}</td>
 
-                    <td>{% if day.status == "OPEN" %}<span class="badge bg-success">Open</span>{% else %}<span class="badge bg-secondary">Closed</span>{% endif %}</td>
+                    <td>
+                        {% if day.status == "OPEN" %}
+                        <span class="chip chip--success">Open</span>
+                        {% else %}
+                        <span class="chip chip--warning">Closed</span>
+                        {% endif %}
+                    </td>
 
                     <td class="small text-muted">{% if day.opened_by %}{{ day.opened_by }}{% else %}—{% endif %}</td>
 

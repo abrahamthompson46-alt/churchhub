@@ -2612,14 +2612,37 @@ body.app-body {
     }
 }
 
+.ledger-account-preview .ledger-account-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+}
+
 .ledger-account-preview .ledger-account-box {
     background: var(--ch-surface);
     border: 1px solid var(--ch-border);
     border-radius: var(--ch-radius-xs);
-    padding: 0.45rem 0.65rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--ch-navy);
+    padding: 0.3rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--ch-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.ledger-journal-account {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--ch-text-secondary);
+    max-width: 14rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .ledger-confirm-dl dt {

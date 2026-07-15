@@ -63,9 +63,9 @@
                         <td class="text-muted">{{ u.church|default:"—" }}</td>
                         <td>
                             {% if u.is_active %}
-                            <span class="badge bg-success">Active</span>
+                            <span class="chip chip--success">Active</span>
                             {% else %}
-                            <span class="badge bg-secondary">Inactive</span>
+                            <span class="chip chip--danger">Inactive</span>
                             {% endif %}
                         </td>
                         <td class="text-end text-nowrap">

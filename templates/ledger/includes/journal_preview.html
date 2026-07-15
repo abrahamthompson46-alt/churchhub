@@ -13,7 +13,7 @@
                 {% if draft.lines %}
                     {% for line in draft.lines %}
                     <tr>
-                        <td>{{ line.account_name }}</td>
+                        <td><span class="ledger-journal-account" title="{{ line.account_name }}">{{ line.account_name }}</span></td>
                         <td class="text-end {% if line.debit %}text-currency fw-medium{% else %}text-muted{% endif %}">
                             {% if line.debit %}₵ {{ line.debit|floatformat:2|intcomma }}{% else %}—{% endif %}
                         </td>
@@ -24,12 +24,12 @@
                     {% endfor %}
                 {% else %}
                 <tr>
-                    <td>{{ draft.debit_account_name }}</td>
+                    <td><span class="ledger-journal-account" title="{{ draft.debit_account_name }}">{{ draft.debit_account_name }}</span></td>
                     <td class="text-end text-currency fw-medium">₵ {{ draft.amount|floatformat:2|intcomma }}</td>
                     <td class="text-end text-muted">—</td>
                 </tr>
                 <tr>
-                    <td>{{ draft.credit_account_name }}</td>
+                    <td><span class="ledger-journal-account" title="{{ draft.credit_account_name }}">{{ draft.credit_account_name }}</span></td>
                     <td class="text-end text-muted">—</td>
                     <td class="text-end text-currency fw-medium">₵ {{ draft.amount|floatformat:2|intcomma }}</td>
                 </tr>

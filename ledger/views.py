@@ -53,22 +53,26 @@ def ledger_finance_required(view_func):
 
 
 def _entry_initial(church, request):
-    """Pre-fill entry form when linked from a category."""
+    """Pre-fill entry form when linked from a category; always set business date."""
+    from transactions.services import resolve_transaction_date
+
+    initial = {"date": resolve_transaction_date(church)}
     cat_id = request.GET.get("category")
     if not cat_id:
-        return {}
+        return initial
     category = LedgerCategory.objects.filter(
         pk=cat_id,
         church=church,
         is_active=True,
     ).select_related("default_debit_account", "default_credit_account").first()
     if not category:
-        return {}
-    return {
+        return initial
+    initial.update({
         "transaction_type": category.transaction_type,
         "category": category,
         "narration": category.default_narration,
-    }
+    })
+    return initial
 
 
 def _parse_date(value):
@@ -303,8 +307,11 @@ def entry_create(request):
                 flash_exception(request, exc, title="Entry could not be prepared")
     else:
         form = LedgerEntryForm(church=church, initial=_entry_initial(church, request))
+    from transactions.services import resolve_transaction_date
+
     return render(request, "ledger/entry.html", {
         "form": form,
+        "business_date": form.initial.get("date") or resolve_transaction_date(church),
         "path_note": (
             "Use Treasury → Record Receipt for day-to-day tithes and offerings. "
             "Use this General Ledger entry when you need a category-driven journal "

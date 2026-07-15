@@ -41,7 +41,17 @@
                     <tr>
                         <td class="text-muted small text-nowrap">{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
                         <td><a href="{% url 'accounts:user_detail' log.user_id %}" class="table-link">{{ log.user.username }}</a></td>
-                        <td><span class="chip">{{ log.get_action_display }}</span></td>
+                        <td>
+                            {% if log.action == "LOGIN" or log.action == "USER_ACTIVATE" or log.action == "INVITE_ACCEPTED" %}
+                            <span class="chip chip--success">{{ log.get_action_display }}</span>
+                            {% elif log.action == "LOGOUT" or log.action == "PASSWORD_CHANGE" or log.action == "PROFILE_UPDATE" %}
+                            <span class="chip chip--warning">{{ log.get_action_display }}</span>
+                            {% elif log.action == "USER_DEACTIVATE" or log.action == "INVITE_REVOKED" %}
+                            <span class="chip chip--danger">{{ log.get_action_display }}</span>
+                            {% else %}
+                            <span class="chip chip--info">{{ log.get_action_display }}</span>
+                            {% endif %}
+                        </td>
                         <td class="text-muted">{{ log.performed_by.username|default:"—" }}</td>
                         <td class="text-muted small">{{ log.ip_address|default:"—" }}</td>
                         <td class="small text-muted">{{ log.details|default:"—" }}</td>

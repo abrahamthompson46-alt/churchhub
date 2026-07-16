@@ -1,5 +1,3 @@
-from datetime import date
-
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -72,12 +70,16 @@ def _filter_querystring(request, exclude_page=True):
 def _apply_age_group_filter(qs, age_group):
     if not age_group:
         return qs
-    today = date.today()
-    members = []
-    for member in qs.filter(date_of_birth__isnull=False).only("id", "date_of_birth"):
+    # Clear select_related before only() — Django forbids deferring a field that is also select_related.
+    matching_ids = []
+    for member in (
+        qs.filter(date_of_birth__isnull=False)
+        .select_related(None)
+        .only("id", "date_of_birth")
+    ):
         if age_group_for_age(member.age) == age_group:
-            members.append(member.pk)
-    return qs.filter(pk__in=members)
+            matching_ids.append(member.pk)
+    return qs.filter(pk__in=matching_ids)
 
 
 class MemberListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
@@ -205,13 +207,31 @@ def member_detail(request, member_id):
 
 @login_required
 def member_search(request):
-    """JSON member search for treasury / welfare pickers."""
-    from permissions.checks import can_manage_finances
+    """JSON member search for searchable pickers across members/finance forms."""
+    from permissions.checks import (
+        can_manage_families,
+        can_manage_finances,
+        can_manage_leadership,
+        can_manage_ledger_entries,
+        can_manage_member_records,
+        can_manage_receipts,
+        can_manage_spiritual_gifts,
+        can_manage_welfare_cases,
+        can_transfer_members,
+    )
 
     if not (
-        can_manage_finances(request.user)
+        can_view_members(request.user)
         or can_manage_members(request.user)
-        or can_view_members(request.user)
+        or can_manage_finances(request.user)
+        or can_manage_member_records(request.user)
+        or can_manage_leadership(request.user)
+        or can_manage_families(request.user)
+        or can_transfer_members(request.user)
+        or can_manage_spiritual_gifts(request.user)
+        or can_manage_receipts(request.user)
+        or can_manage_ledger_entries(request.user)
+        or can_manage_welfare_cases(request.user)
     ):
         raise PermissionDenied
 
@@ -229,14 +249,15 @@ def member_search(request):
         q = request.GET.get("q", "").strip()
         if not q:
             return JsonResponse({"results": []})
+        # Do not annotate as "full_name" — Member.full_name is a read-only property.
         qs = qs.annotate(
-            full_name=Concat("first_name", Value(" "), "last_name"),
+            search_name=Concat("first_name", Value(" "), "last_name"),
         ).filter(
             Q(first_name__icontains=q)
             | Q(last_name__icontains=q)
             | Q(phone__icontains=q)
             | Q(membership_number__icontains=q)
-            | Q(full_name__icontains=q)
+            | Q(search_name__icontains=q)
             | Q(address__icontains=q)
             | Q(membership_status__icontains=q)
             | Q(gender__icontains=q)
@@ -259,7 +280,7 @@ def member_search(request):
             "name": member.full_name,
             "subtitle": " · ".join(subtitle_parts),
             "photo_url": member.profile_picture.url if member.profile_picture else "",
-            "initials": f"{member.first_name[:1]}{member.last_name[:1]}".upper(),
+            "initials": f"{(member.first_name or '?')[:1]}{(member.last_name or '?')[:1]}".upper(),
         })
     return JsonResponse({"results": results})
 

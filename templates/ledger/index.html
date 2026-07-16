@@ -1,12 +1,16 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load humanize permission_tags %}
 
 {% block title %}Ledger — ChurchHub{% endblock %}
 
 {% block content %}
 <div class="page-container">
+    {% if can_manage_ledger_entries %}
     {% url 'ledger:entry' as new_entry_url %}
     {% include "includes/page_header.html" with page_subtitle="Finance" page_title="General Ledger" page_description="Category-driven double-entry posting with automatic debit and credit accounts." action_url=new_entry_url action_label="New Entry" action_icon="bi-journal-plus" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="General Ledger" page_description="Category-driven double-entry posting with automatic debit and credit accounts." %}
+    {% endif %}
 
     <div class="dash-inline-stats mb-4">
         <div class="dash-inline-stat dash-inline-stat--accent">

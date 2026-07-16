@@ -2,19 +2,51 @@
 
 {% block title %}Control Room — Platform{% endblock %}
 {% block page_title %}Control Room{% endblock %}
-{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Master dashboard for tenants, security, and platform operations.</p>{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Tenants, security, billing, and platform operations.</p>{% endblock %}
 
 {% block content %}
+{% if setup and not setup.is_complete %}
+<div class="platform-card platform-card--compact mb-3">
+    <div class="platform-card-header">
+        <span><i class="bi bi-list-check me-1"></i>Setup readiness</span>
+        <a href="{% url 'sitecontrol:setup' %}" class="small">Open guide →</a>
+    </div>
+    <div class="platform-card-body py-2">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="small text-muted">{{ setup.done_count }} of {{ setup.total_count }} complete</span>
+            <span class="small fw-semibold">{{ setup.percent }}%</span>
+        </div>
+        <div class="platform-progress mb-2">
+            <div class="platform-progress__bar" style="width: {{ setup.percent }}%"></div>
+        </div>
+        <div class="platform-setup-chips">
+            {% for item in setup.items %}
+            {% if not item.done %}
+            <a href="{% url item.url_name %}" class="platform-setup-chip">
+                <i class="bi {{ item.icon }}"></i>{{ item.label }}
+            </a>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% elif setup and setup.is_complete %}
+<div class="platform-alert platform-alert--info mb-3">
+    <i class="bi bi-check-circle"></i>
+    <div><strong>Setup complete.</strong> Platform baseline is ready. <a href="{% url 'sitecontrol:setup' %}">Review checklist</a></div>
+</div>
+{% endif %}
+
 {% if alerts %}
-<div class="platform-card mb-4">
-    <div class="platform-card-header"><i class="bi bi-exclamation-triangle me-2"></i>Active Alerts</div>
+<div class="platform-card platform-card--compact mb-3">
+    <div class="platform-card-header"><i class="bi bi-exclamation-triangle me-1"></i>Active Alerts</div>
     <div class="platform-card-body py-2">
         {% for alert in alerts %}
-        <div class="platform-alert platform-alert--{{ alert.level }}">
+        <div class="platform-alert platform-alert--{{ alert.level }} mb-2">
             <i class="bi bi-{% if alert.level == 'danger' %}x-octagon{% elif alert.level == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
             <div>
                 <strong>{{ alert.title }}</strong> — {{ alert.detail }}
-                {% if alert.url_name %}<a href="{% url alert.url_name %}" class="ms-2">Review</a>{% endif %}
+                {% if alert.url_name %}<a href="{% url alert.url_name %}" class="ms-1">Review</a>{% endif %}
             </div>
         </div>
         {% endfor %}
@@ -24,49 +56,52 @@
 
 <div class="platform-stat-grid">
     <div class="platform-stat-card"><div class="label">Churches</div><div class="value">{{ stats.churches }}</div></div>
-    <div class="platform-stat-card"><div class="label">Active Subscriptions</div><div class="value">{{ stats.active_subscriptions }}</div></div>
-    <div class="platform-stat-card"><div class="label">Institution Users</div><div class="value">{{ stats.users }}</div></div>
-    <div class="platform-stat-card"><div class="label">Platform Operators</div><div class="value">{{ stats.operators }}</div></div>
-    <div class="platform-stat-card"><div class="label">Suspended</div><div class="value text-danger">{{ stats.suspended }}</div></div>
-    <div class="platform-stat-card"><div class="label">Active Plans</div><div class="value">{{ stats.plans }}</div></div>
-    <div class="platform-stat-card"><div class="label">Pending Applications</div><div class="value {% if stats.pending_applications %}text-warning{% endif %}">{{ stats.pending_applications }}</div></div>
-    <div class="platform-stat-card"><div class="label">Audit (24h)</div><div class="value">{{ audit_24h }}</div></div>
+    <div class="platform-stat-card"><div class="label">Active Subs</div><div class="value">{{ stats.active_subscriptions }}</div></div>
+    <div class="platform-stat-card"><div class="label">Users</div><div class="value">{{ stats.users }}</div></div>
+    <div class="platform-stat-card"><div class="label">Operators</div><div class="value">{{ stats.operators }}</div></div>
+    <div class="platform-stat-card"><div class="label">Suspended</div><div class="value {% if stats.suspended %}text-danger{% endif %}">{{ stats.suspended }}</div></div>
+    <div class="platform-stat-card"><div class="label">Plans</div><div class="value">{{ stats.plans }}</div></div>
+    <div class="platform-stat-card"><div class="label">Applications</div><div class="value {% if stats.pending_applications %}text-warning{% endif %}">{{ stats.pending_applications }}</div></div>
+    <div class="platform-stat-card"><div class="label">Audit 24h</div><div class="value">{{ audit_24h }}</div></div>
     <div class="platform-stat-card"><div class="label">Maintenance</div><div class="value {% if maintenance_mode %}text-warning{% else %}text-success{% endif %}">{% if maintenance_mode %}ON{% else %}Off{% endif %}</div></div>
 </div>
 
-<div class="row g-4">
+<div class="row g-3">
     <div class="col-lg-7">
-        <div class="platform-card">
+        <div class="platform-card platform-card--compact">
             <div class="platform-card-header">Quick Actions</div>
             <div class="platform-card-body">
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="{% url 'sitecontrol:settings' %}" class="btn btn-primary btn-sm"><i class="bi bi-gear me-1"></i>Settings</a>
+                    <a href="{% url 'sitecontrol:setup' %}" class="btn btn-primary btn-sm"><i class="bi bi-list-check me-1"></i>Setup</a>
+                    <a href="{% url 'sitecontrol:tenant_provision' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-magic me-1"></i>Provision</a>
                     <a href="{% url 'sitecontrol:tenant_list' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-building me-1"></i>Tenants</a>
-                    <a href="{% url 'sitecontrol:operator_list' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-person-badge me-1"></i>Operators</a>
+                    <a href="{% url 'sitecontrol:plan_list' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-box-seam me-1"></i>Plans</a>
+                    <a href="{% url 'sitecontrol:payment_method_list' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-wallet2 me-1"></i>Payments</a>
                     <a href="{% url 'sitecontrol:registration_settings' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-door-open me-1"></i>Registration</a>
+                    <a href="{% url 'sitecontrol:email_settings' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-envelope-at me-1"></i>Email</a>
+                    <a href="{% url 'sitecontrol:security_settings' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-lock me-1"></i>Security</a>
                     {% if stats.pending_applications %}
                     <a href="{% url 'sitecontrol:application_list' %}?status=PENDING" class="btn btn-warning btn-sm"><i class="bi bi-inbox me-1"></i>{{ stats.pending_applications }} pending</a>
                     {% endif %}
                     <a href="{% url 'sitecontrol:ops_health' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-activity me-1"></i>Ops</a>
-                    <a href="{% url 'sitecontrol:health' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-heart-pulse me-1"></i>Health</a>
                 </div>
                 {% if churches_without_sub %}
-                <p class="text-muted small mt-3 mb-0">{{ churches_without_sub }} church(es) without a subscription. <a href="{% url 'sitecontrol:subscription_seed' %}">Assign default plan</a>.</p>
+                <p class="text-muted small mt-2 mb-0">{{ churches_without_sub }} church(es) without a subscription. <a href="{% url 'sitecontrol:subscription_seed' %}">Assign default plan</a>.</p>
                 {% endif %}
             </div>
         </div>
-        <div class="platform-card">
-            <div class="platform-card-header">Recent Audit Events</div>
+        <div class="platform-card platform-card--compact">
+            <div class="platform-card-header">Recent Audit</div>
             <div class="table-responsive">
                 <table class="platform-table mb-0">
                     <thead><tr><th>When</th><th>User</th><th>Action</th><th>Summary</th></tr></thead>
                     <tbody>
                     {% for entry in recent_audit %}
                     <tr>
-                        <td class="text-muted small">{{ entry.created_at|date:"M j, H:i" }}</td>
+                        <td class="text-muted small text-nowrap">{{ entry.created_at|date:"M j, H:i" }}</td>
                         <td>{{ entry.user.username|default:"—" }}</td>
                         <td><span class="badge bg-secondary">{{ entry.get_action_display }}</span></td>
-                        <td>{{ entry.summary|truncatechars:60 }}</td>
+                        <td>{{ entry.summary|truncatechars:50 }}</td>
                     </tr>
                     {% empty %}
                     <tr><td colspan="4" class="text-muted">No audit events yet.</td></tr>
@@ -74,20 +109,23 @@
                     </tbody>
                 </table>
             </div>
-            <div class="p-3 border-top"><a href="{% url 'sitecontrol:audit_log' %}">View full audit log</a></div>
+            <div class="px-3 py-2 border-top"><a href="{% url 'sitecontrol:audit_log' %}" class="small">Full audit log →</a></div>
         </div>
     </div>
     <div class="col-lg-5">
-        <div class="platform-card">
-            <div class="platform-card-header">Recent Subscription Updates</div>
+        <div class="platform-card platform-card--compact">
+            <div class="platform-card-header">Recent Subscriptions</div>
             <ul class="list-group list-group-flush">
                 {% for sub in recent_subscriptions %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span>{{ sub.church.name }}<br><small class="text-muted">{{ sub.plan.name }}</small></span>
+                <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                    <span class="small">
+                        <strong>{{ sub.church.name }}</strong><br>
+                        <span class="text-muted">{{ sub.plan.name }}</span>
+                    </span>
                     <span class="badge bg-{% if sub.status == 'ACTIVE' %}success{% elif sub.status == 'SUSPENDED' %}danger{% else %}secondary{% endif %}">{{ sub.get_status_display }}</span>
                 </li>
                 {% empty %}
-                <li class="list-group-item text-muted">No subscriptions yet.</li>
+                <li class="list-group-item text-muted small">No subscriptions yet.</li>
                 {% endfor %}
             </ul>
         </div>

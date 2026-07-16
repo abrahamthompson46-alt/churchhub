@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.db.models import Sum
 
-from accounts.permissions import can_manage_finances, can_manage_members
+from permissions.checks import can_manage_finances, can_manage_members, can_view_giving, can_view_own_giving
 from transactions.models import Transaction, TransactionLine
 
 
@@ -12,12 +12,14 @@ GIVING_ACCOUNT_TYPES = ("TITHE", "COMBINED", "INCOME", "WELFARE_FUND")
 
 
 def can_view_member_giving(user, member):
-    if can_manage_finances(user):
+    if can_manage_finances(user) or can_view_giving(user):
         return True
     if can_manage_members(user):
         return True
     linked = getattr(user, "member_id", None)
-    return linked is not None and linked == member.pk
+    if linked is not None and linked == member.pk:
+        return can_view_own_giving(user)
+    return False
 
 
 def member_giving_lines(member, year=None):

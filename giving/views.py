@@ -3,9 +3,13 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 
-from accounts.permissions import can_manage_finances
 from church_system.church_scope import filter_by_church, require_church
 from members.models import Member
+from permissions.checks import (
+    can_export_giving,
+    can_manage_finances,
+    can_view_giving,
+)
 from reports.exporters import export_table_csv, export_table_excel, export_table_pdf
 from sitecontrol.checks import require_feature
 
@@ -15,7 +19,7 @@ from .services import church_giving_leaders, member_giving_lines, member_giving_
 @login_required
 @require_feature("giving_portal")
 def giving_index(request):
-    if not can_manage_finances(request.user):
+    if not (can_view_giving(request.user) or can_manage_finances(request.user)):
         raise PermissionDenied
     church = require_church(request)
     year = int(request.GET.get("year", timezone.now().year))
@@ -43,6 +47,8 @@ def member_statement(request, member_id):
 
     export_fmt = request.GET.get("export")
     if export_fmt in ("csv", "excel", "pdf"):
+        if not (can_export_giving(request.user) or can_manage_finances(request.user)):
+            raise PermissionDenied
         headers = ["Date", "Reference", "Account", "Amount"]
         rows = [
             [l.transaction.date, l.transaction.reference, l.account.name, abs(l.amount)]

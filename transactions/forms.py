@@ -43,7 +43,7 @@ class ReceiptForm(forms.Form):
         queryset=Member.objects.none(),
         required=False,
         label="Member (optional)",
-        widget=forms.Select(attrs=select_attrs()),
+        widget=forms.HiddenInput(attrs={"id": "id_member"}),
     )
     date = forms.DateField(
         required=False,

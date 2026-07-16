@@ -66,6 +66,7 @@ from sitecontrol.rbac import (
 )
 from sitecontrol.services import (
     assign_subscription,
+    build_platform_setup_checklist,
     build_price_snapshot,
     clear_church_plan_cache,
     clear_settings_cache,
@@ -120,6 +121,7 @@ def dashboard(request):
         request.user,
     ).count()
     settings_obj = get_site_settings()
+    setup = build_platform_setup_checklist()
     return render(request, "sitecontrol/dashboard.html", {
         "stats": stats,
         "alerts": alerts,
@@ -129,7 +131,37 @@ def dashboard(request):
         "audit_24h": audit_24h,
         "maintenance_mode": settings_obj.maintenance_mode,
         "can_breakglass_admin": can_access_django_admin(request.user),
+        "setup": setup,
         "breadcrumbs": _breadcrumbs(("Control Room",)),
+    })
+
+
+@platform_required
+@require_platform_capability(CAP_VIEW)
+def setup_checklist(request):
+    if request.method == "POST" and request.POST.get("action") == "run_seed_suite":
+        if not operator_has_capability(request.user, CAP_OPS):
+            raise PermissionDenied
+        from sitecontrol.services import run_platform_seed_suite
+
+        result = run_platform_seed_suite(
+            reset_permissions=bool(request.POST.get("reset_permissions")),
+        )
+        log_platform_action(
+            request,
+            "PLATFORM_SEED_SUITE",
+            result["message"],
+            target_model="SiteSettings",
+            details={"steps": [s["id"] for s in result["steps"]]},
+        )
+        flash_success(request, result["message"] + " No CLI required.")
+        return redirect("sitecontrol:setup")
+
+    setup = build_platform_setup_checklist()
+    return render(request, "sitecontrol/setup.html", {
+        "setup": setup,
+        "can_run_seeds": operator_has_capability(request.user, CAP_OPS),
+        "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Setup Guide",)),
     })
 
 
@@ -209,9 +241,38 @@ def ops_health(request):
             )
             flash_success(request, f"Marked {count} subscription(s) as expired.")
             return redirect("sitecontrol:ops_health")
+        if action == "run_seed_suite":
+            from sitecontrol.services import run_platform_seed_suite
+
+            church = None
+            church_id = (request.POST.get("church_id") or "").strip()
+            if church_id:
+                church = filter_churches_for_operator(
+                    Church.objects.filter(pk=church_id),
+                    request.user,
+                ).first()
+            result = run_platform_seed_suite(
+                church=church,
+                reset_permissions=bool(request.POST.get("reset_permissions")),
+            )
+            log_platform_action(
+                request,
+                "PLATFORM_SEED_SUITE",
+                result["message"],
+                target_model="Church" if church else "SiteSettings",
+                target_id=str(church.pk) if church else "",
+                details={"steps": [s["id"] for s in result["steps"]]},
+            )
+            flash_success(request, result["message"] + " No CLI required.")
+            return redirect("sitecontrol:ops_health")
+    churches = filter_churches_for_operator(
+        Church.objects.select_related("district").order_by("name"),
+        request.user,
+    )[:200]
     return render(request, "sitecontrol/ops.html", {
         "signals": signals,
         "settings_obj": settings_obj,
+        "seed_churches": churches,
         "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Operations",)),
     })
 

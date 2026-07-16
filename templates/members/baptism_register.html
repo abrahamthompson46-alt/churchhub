@@ -5,10 +5,12 @@
 {% block content %}
 <div class="page-container">
     {% include "includes/page_header.html" with page_subtitle="Members" page_title="Baptism Register" page_description="Water baptism records for your church." %}
+    {% if can_export_members %}
     <div class="d-flex gap-2 mb-3">
         <a href="?export=csv" class="btn btn-outline-secondary btn-sm">CSV</a>
         <a href="?export=excel" class="btn btn-outline-secondary btn-sm">Excel</a>
     </div>
+    {% endif %}
     <div class="data-card">
         <div class="table-responsive">
             <table class="table table-hover mb-0">

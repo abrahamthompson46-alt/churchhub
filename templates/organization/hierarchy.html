@@ -4,8 +4,12 @@
 
 {% block content %}
 <div class="page-container">
+    {% if can_onboard_churches %}
     {% url 'organization:church_onboard' as onboard_url %}
     {% include "includes/page_header.html" with page_subtitle="System" page_title="Organization Hierarchy" page_description=hierarchy_chain|default:"Conference → Zone → District → Church" action_url=onboard_url action_label="Onboard Church" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="System" page_title="Organization Hierarchy" page_description=hierarchy_chain|default:"Conference → Zone → District → Church" %}
+    {% endif %}
 
     <div class="metrics-row">
         {% for label, value in stats.items %}
@@ -77,7 +81,12 @@
     </div>
     {% empty %}
     {% if not orphan_conferences %}
+    {% if can_onboard_churches %}
+    {% url 'organization:church_onboard' as onboard_url %}
     {% include "includes/empty_state.html" with icon="bi-diagram-3" message="No organization data yet." action_url=onboard_url action_label="Run onboarding" %}
+    {% else %}
+    {% include "includes/empty_state.html" with icon="bi-diagram-3" message="No organization data yet." %}
+    {% endif %}
     {% endif %}
     {% endfor %}
 

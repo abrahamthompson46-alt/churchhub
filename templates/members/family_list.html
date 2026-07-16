@@ -4,8 +4,12 @@
 
 {% block content %}
 <div class="page-container">
+    {% if can_manage_families %}
     {% url 'members:family_add' as family_url %}
     {% include "includes/page_header.html" with page_subtitle="Members" page_title="Families" action_url=family_url action_label="Add Family" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Families" %}
+    {% endif %}
 
     <div class="data-card">
         <div class="table-responsive">
@@ -20,7 +24,14 @@
                         <td class="text-muted">{{ family.phone|default:"—" }}</td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="4">{% include "includes/empty_state.html" with icon="bi-house-heart" message="No families yet." action_url=family_url action_label="Add family" %}</td></tr>
+                    <tr><td colspan="4">
+                        {% if can_manage_families %}
+                        {% url 'members:family_add' as family_url %}
+                        {% include "includes/empty_state.html" with icon="bi-house-heart" message="No families yet." action_url=family_url action_label="Add family" %}
+                        {% else %}
+                        {% include "includes/empty_state.html" with icon="bi-house-heart" message="No families yet." %}
+                        {% endif %}
+                    </td></tr>
                     {% endfor %}
                 </tbody>
             </table>

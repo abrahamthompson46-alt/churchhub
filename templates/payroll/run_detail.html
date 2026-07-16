@@ -27,40 +27,46 @@
     {% endif %}
 
     <div class="d-flex flex-wrap gap-2 mb-4">
+        {% if can_manage_payroll %}
         {% if run.status == "DRAFT" or run.status == "CALCULATED" %}
         <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="calculate"><button class="btn btn-primary btn-sm">Calculate</button></form>
         {% endif %}
-        {% if run.status == "CALCULATED" and can_approve %}
+        {% endif %}
+        {% if run.status == "CALCULATED" and can_approve_payroll %}
         <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="approve"><button class="btn btn-success btn-sm">Pastor Approve</button></form>
         {% endif %}
-        {% if run.status == "APPROVED" and can_post and not run.treasury_approved_by %}
+        {% if run.status == "APPROVED" and can_post_payroll and not run.treasury_approved_by %}
         <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="treasury_approve"><button class="btn btn-success btn-sm">Treasury Review</button></form>
         {% endif %}
-        {% if run.status == "APPROVED" and can_post and run.treasury_approved_by %}
+        {% if run.status == "APPROVED" and can_post_payroll and run.treasury_approved_by %}
         <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="post"><input type="hidden" name="idempotency_key" value="post-{{ run.pk }}"><button class="btn btn-primary btn-sm">Post to Ledger</button></form>
         {% endif %}
-        {% if run.status == "POSTED" and can_pay %}
+        {% if run.status == "POSTED" and can_pay_payroll %}
         <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="pay"><input type="hidden" name="idempotency_key" value="pay-{{ run.pk }}"><button class="btn btn-success btn-sm">Mark Paid</button></form>
         {% endif %}
+        {% if can_approve_payroll %}
         {% if run.status == "CALCULATED" or run.status == "APPROVED" %}
         <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="collapse" data-bs-target="#rejectForm">Reject</button>
         {% endif %}
-        {% if run.status == "REJECTED" %}
+        {% endif %}
+        {% if run.status == "REJECTED" and can_manage_payroll %}
         <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="reopen"><button class="btn btn-outline-secondary btn-sm">Reopen Draft</button></form>
         {% endif %}
-        {% if run.status != "POSTED" and run.status != "PAID" and run.status != "VOID" %}
+        {% if can_manage_payroll and run.status != "POSTED" and run.status != "PAID" and run.status != "VOID" %}
         <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline" onsubmit="return confirm('Void this payroll run?');">{% csrf_token %}<input type="hidden" name="action" value="void"><button class="btn btn-outline-secondary btn-sm">Void</button></form>
         {% endif %}
         {% if run.status == "POSTED" or run.status == "PAID" %}
-        {% if can_post or can_approve %}
+        {% if can_post_payroll or can_approve_payroll %}
         <form method="post" action="{% url 'payroll:run_action' run.pk %}" class="d-inline" onsubmit="return confirm('Reverse this payroll run in the ledger?');">{% csrf_token %}<input type="hidden" name="action" value="reverse"><input type="hidden" name="reason" value="Manual reversal"><button class="btn btn-outline-danger btn-sm">Reverse</button></form>
         {% endif %}
-        {% if can_pay %}
+        {% if can_pay_payroll %}
         <a href="{% url 'payroll:run_export_csv' run.pk %}" class="btn btn-outline-secondary btn-sm">Bank CSV</a>
         {% endif %}
+        {% if can_export_payroll %}
         <a href="{% url 'payroll:run_export_register' run.pk %}" class="btn btn-outline-secondary btn-sm">Register CSV</a>
         <a href="{% url 'payroll:run_paye_pdf' run.pk %}" class="btn btn-outline-secondary btn-sm" target="_blank">PAYE Schedule</a>
         <a href="{% url 'payroll:run_ssnit_pdf' run.pk %}" class="btn btn-outline-secondary btn-sm" target="_blank">SSNIT Schedule</a>
+        {% endif %}
         {% endif %}
     </div>
 

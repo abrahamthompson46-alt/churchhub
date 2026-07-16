@@ -7,7 +7,11 @@
 <div class="page-container">
     {% url 'ledger:entry' as new_entry_url %}
     {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
+    {% if can_manage_ledger_entries %}
     {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Ledger Entries" page_description="Transactions posted through the category-driven ledger workflow." action_url=new_entry_url action_label="New Entry" action_icon="bi-journal-plus" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Ledger Entries" page_description="Transactions posted through the category-driven ledger workflow." %}
+    {% endif %}
 
     <div class="filter-bar">
         <form method="get" class="filter-form">
@@ -58,8 +62,10 @@
             <div class="filter-actions">
                 <button type="submit" class="btn btn-outline-secondary btn-sm">Filter</button>
                 <a href="{% url 'ledger:entries' %}" class="btn btn-link btn-sm text-muted">Clear</a>
+                {% if can_export_ledger %}
                 <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}export=csv" class="btn btn-outline-secondary btn-sm">CSV</a>
                 <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}export=excel" class="btn btn-outline-secondary btn-sm">Excel</a>
+                {% endif %}
             </div>
         </form>
     </div>
@@ -99,7 +105,13 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="8">{% include "includes/empty_state.html" with icon="bi-journal" message="No ledger entries match your filters." action_url=new_entry_url action_label="New entry" %}</td></tr>
+                <tr><td colspan="8">
+                    {% if can_manage_ledger_entries %}
+                    {% include "includes/empty_state.html" with icon="bi-journal" message="No ledger entries match your filters." action_url=new_entry_url action_label="New entry" %}
+                    {% else %}
+                    {% include "includes/empty_state.html" with icon="bi-journal" message="No ledger entries match your filters." %}
+                    {% endif %}
+                </td></tr>
                 {% endfor %}
             </tbody>
         </table>

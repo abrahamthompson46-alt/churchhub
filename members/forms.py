@@ -127,7 +127,7 @@ class FamilyForm(forms.ModelForm):
         fields = ("name", "head", "address", "phone")
         widgets = {
             "name": forms.TextInput(attrs=_text()),
-            "head": forms.Select(attrs=_select()),
+            "head": forms.HiddenInput(),
             "address": forms.Textarea(attrs={**_text(), "rows": 2}),
             "phone": forms.TextInput(attrs=_text()),
         }
@@ -163,7 +163,7 @@ class RecordForm(forms.ModelForm):
             "status",
         )
         widgets = {
-            "member": forms.Select(attrs=_select()),
+            "member": forms.HiddenInput(),
             "record_type": forms.Select(attrs=_select()),
             "title": forms.TextInput(attrs=_text()),
             "description": forms.Textarea(attrs={**_text(), "rows": 3}),
@@ -190,7 +190,7 @@ class MemberTransferForm(forms.ModelForm):
         model = MemberTransfer
         fields = ("member", "to_church", "transfer_date", "reason")
         widgets = {
-            "member": forms.Select(attrs=_select()),
+            "member": forms.HiddenInput(),
             "to_church": forms.Select(attrs=_select()),
             "transfer_date": forms.DateInput(attrs={**_text(), "type": "date"}),
             "reason": forms.Textarea(attrs={**_text(), "rows": 3}),
@@ -274,7 +274,7 @@ class LeadershipRoleForm(forms.ModelForm):
         model = LeadershipRole
         fields = ["member", "department", "title", "start_date", "end_date", "is_active"]
         widgets = {
-            "member": forms.Select(attrs=_select()),
+            "member": forms.HiddenInput(),
             "department": forms.Select(attrs=_select()),
             "title": forms.TextInput(attrs=_text()),
             "start_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),

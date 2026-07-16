@@ -9,11 +9,12 @@
     <header class="cc-hero dashboard-welcome dashboard-welcome--{{ dashboard_role }}">
         <div class="cc-hero__grid">
             <div class="cc-hero__main">
-                <p class="cc-eyebrow">{% if is_control_center %}Mission Control{% else %}Operations Center{% endif %}</p>
+                <p class="cc-eyebrow">{{ institution_display_name|default:site_name|default:"ChurchHub" }}</p>
                 <h1>Good day{% if user.first_name %}, {{ user.first_name }}{% endif %}</h1>
                 <p class="cc-hero__meta">
-                    {{ current_time|date:"l, F j, Y" }} · {{ role_label }}
-                    {% if active_church %} · {{ active_church.name }}{% elif executive_kpis %} · {{ executive_kpis.church_count }} churches in scope{% endif %}
+                    {% if is_control_center %}Mission Control{% else %}Operations Center{% endif %}
+                    · {{ role_label }}
+                    {% if active_church %} · {{ active_church.name }}{% elif user_church %} · {{ user_church.name }}{% elif executive_kpis %} · {{ executive_kpis.church_count }} churches in scope{% endif %}
                 </p>
                 {% if role_focus.headline %}
                 <p class="dashboard-role-focus mb-0">{{ role_focus.headline }}</p>
@@ -48,6 +49,35 @@
             {% endif %}
         </div>
     </header>
+
+    {% if show_working_day_status or system_date %}
+    <div class="cc-context-bar" aria-label="System and working day">
+        <span class="cc-context-pill">
+            <i class="bi bi-calendar3"></i>
+            System <strong>{{ system_date|date:"D, j M Y" }}</strong>
+        </span>
+        {% if show_working_day_status %}
+        <span class="cc-context-pill {% if working_day_is_open %}cc-context-pill--open{% elif working_date %}cc-context-pill--closed{% else %}cc-context-pill--unset{% endif %}">
+            <i class="bi bi-{% if working_day_is_open %}unlock{% elif working_date %}lock{% else %}exclamation-circle{% endif %}"></i>
+            Working
+            <strong>
+                {% if working_day_is_open %}{{ working_date|date:"j M Y" }} · Open
+                {% elif working_date %}{{ working_date|date:"j M Y" }} · Closed
+                {% else %}No day open{% endif %}
+            </strong>
+            {% if can_manage_working_day %}
+            <a href="{% url 'transactions:period_list' %}" class="ms-1">Manage</a>
+            {% endif %}
+        </span>
+        {% endif %}
+        {% if active_church %}
+        <span class="cc-context-pill">
+            <i class="bi bi-geo-alt"></i>
+            Church <strong>{{ active_church.name }}</strong>
+        </span>
+        {% endif %}
+    </div>
+    {% endif %}
 
     {% if is_control_center and executive_kpis %}
     <section class="cc-kpi-grid mb-4" aria-label="Executive KPIs">
@@ -280,32 +310,28 @@
 
     {% if not is_control_center %}
     {% if show_finance and has_active_church %}
-    <div class="row g-3 dash-finance-cards mb-4">
-        <div class="col-sm-6 col-xl-3">
-            <div class="stat-card bg-gradient-primary">
-                <p class="stat-label">Tithe (MTD)</p>
-                <p class="stat-value">₵{{ tithe_total|floatformat:2|intcomma }}</p>
-            </div>
+    <section class="cc-kpi-grid mb-4" aria-label="Finance KPIs">
+        <div class="cc-kpi-card cc-kpi-card--primary">
+            <span class="cc-kpi-card__label">Tithe (MTD)</span>
+            <span class="cc-kpi-card__value text-currency">₵{{ tithe_total|floatformat:2|intcomma }}</span>
+            <span class="cc-kpi-card__hint">Month to date</span>
         </div>
-        <div class="col-sm-6 col-xl-3">
-            <div class="stat-card bg-gradient-teal">
-                <p class="stat-label">Combined (MTD)</p>
-                <p class="stat-value">₵{{ combined_total|floatformat:2|intcomma }}</p>
-            </div>
+        <div class="cc-kpi-card cc-kpi-card--teal">
+            <span class="cc-kpi-card__label">Combined (MTD)</span>
+            <span class="cc-kpi-card__value text-currency">₵{{ combined_total|floatformat:2|intcomma }}</span>
+            <span class="cc-kpi-card__hint">Month to date</span>
         </div>
-        <div class="col-sm-6 col-xl-3">
-            <div class="stat-card bg-gradient-success">
-                <p class="stat-label">Income (MTD)</p>
-                <p class="stat-value">₵{{ church_income_total|floatformat:2|intcomma }}</p>
-            </div>
+        <div class="cc-kpi-card">
+            <span class="cc-kpi-card__label">Income (MTD)</span>
+            <span class="cc-kpi-card__value text-currency">₵{{ church_income_total|floatformat:2|intcomma }}</span>
+            <span class="cc-kpi-card__hint">All receipts</span>
         </div>
-        <div class="col-sm-6 col-xl-3">
-            <div class="stat-card bg-gradient-danger">
-                <p class="stat-label">Expenses (MTD)</p>
-                <p class="stat-value">₵{{ expense_total|floatformat:2|intcomma }}</p>
-            </div>
+        <div class="cc-kpi-card cc-kpi-card--danger">
+            <span class="cc-kpi-card__label">Expenses (MTD)</span>
+            <span class="cc-kpi-card__value text-currency">₵{{ expense_total|floatformat:2|intcomma }}</span>
+            <span class="cc-kpi-card__hint">Month to date</span>
         </div>
-    </div>
+    </section>
     {% endif %}
 
     {% if show_members %}
@@ -320,6 +346,25 @@
         </div>
     </div>
     {% endif %}
+    {% endif %}
+
+    {% if recent_announcements %}
+    <section class="cc-panel mb-4">
+        <div class="cc-panel__header">
+            <h2 class="cc-panel__title"><i class="bi bi-megaphone"></i> Announcements</h2>
+            <a href="{% url 'announcements:announcement_list' %}" class="dash-section__link">View all →</a>
+        </div>
+        <ul class="list-plain dash-panel dash-panel--flat mb-0 px-3 pb-3">
+            {% for ann in recent_announcements|slice:":4" %}
+            <li class="d-flex justify-content-between align-items-start gap-2 py-2">
+                <div>
+                    <a href="{% url 'announcements:announcement_detail' ann.pk %}" class="table-link">{{ ann.title }}</a>
+                    <div class="text-muted" style="font-size:0.75rem">{{ ann.created_at|date:"M j, Y" }}</div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
     {% endif %}
 
     {% if dashboard_role == 'secretary' and upcoming_meetings is not None %}

@@ -10,7 +10,13 @@ from church_system.church_scope import filter_by_church, get_active_church, requ
 from church_system.flash import flash_exception, flash_success
 from members.models import Member
 from reports.exporters import export_table_csv, export_table_excel, export_table_pdf
-from permissions.checks import can_approve_transactions, can_manage_finances, can_manage_remittance_policy
+from permissions.checks import (
+    can_approve_welfare,
+    can_disburse_welfare,
+    can_manage_finances,
+    can_manage_remittance_policy,
+    can_manage_welfare_cases,
+)
 from sitecontrol.checks import require_feature
 from remittance.forms import (
     RemittancePolicyForm,
@@ -239,7 +245,7 @@ def welfare_index(request):
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "create_case":
-            if not can_manage_finances(request.user):
+            if not can_manage_welfare_cases(request.user):
                 raise PermissionDenied
             case_form = WelfareCaseForm(request.POST, church=church)
             if case_form.is_valid():
@@ -255,7 +261,7 @@ def welfare_index(request):
                 flash_success(request, f"Case {case.case_number} submitted.")
                 return redirect("remittance:welfare")
         elif action == "record_contribution":
-            if not can_manage_finances(request.user):
+            if not can_manage_welfare_cases(request.user):
                 raise PermissionDenied
             contribution_form = WelfareContributionForm(request.POST, church=church)
             if contribution_form.is_valid():
@@ -283,8 +289,8 @@ def welfare_index(request):
         "active_church": church,
         "case_form": case_form,
         "contribution_form": contribution_form,
-        "can_manage": can_manage_finances(request.user),
-        "can_approve": can_approve_transactions(request.user),
+        "can_manage": can_manage_welfare_cases(request.user),
+        "can_approve": can_approve_welfare(request.user),
     })
 
 
@@ -302,7 +308,7 @@ def welfare_case_detail(request, pk):
     ledger_entries = case.ledger_entries.select_related("transaction", "created_by").order_by("-entry_date")
 
     if request.method == "POST" and request.POST.get("action") == "upload_attachment":
-        if not can_manage_finances(request.user):
+        if not can_manage_welfare_cases(request.user):
             raise PermissionDenied
         attachment_form = WelfareCaseAttachmentForm(request.POST, request.FILES)
         if attachment_form.is_valid():
@@ -322,8 +328,8 @@ def welfare_case_detail(request, pk):
         "ledger_entries": ledger_entries,
         "attachments": case.attachments.select_related("uploaded_by"),
         "attachment_form": attachment_form,
-        "can_manage": can_manage_finances(request.user),
-        "can_approve": can_approve_transactions(request.user),
+        "can_manage": can_manage_welfare_cases(request.user),
+        "can_approve": can_approve_welfare(request.user),
         "active_church": church,
     })
 
@@ -336,33 +342,33 @@ def welfare_case_action(request, pk):
 
     try:
         if action == "review":
-            if not can_manage_finances(request.user):
+            if not can_manage_welfare_cases(request.user):
                 raise PermissionDenied
             form = WelfareReviewForm(request.POST)
             if form.is_valid():
                 send_welfare_case_to_review(case, request.user, review_notes=form.cleaned_data.get("review_notes", ""))
                 flash_success(request, "Case sent for review.")
         elif action == "approve":
-            if not can_approve_transactions(request.user):
+            if not can_approve_welfare(request.user):
                 raise PermissionDenied
             form = WelfareApproveForm(request.POST)
             if form.is_valid():
                 approve_welfare_case(case, request.user, amount_approved=form.cleaned_data.get("amount_approved"))
                 flash_success(request, "Welfare case approved.")
         elif action == "reject":
-            if not can_approve_transactions(request.user):
+            if not can_approve_welfare(request.user):
                 raise PermissionDenied
             form = WelfareRejectForm(request.POST)
             if form.is_valid():
                 reject_welfare_case(case, request.user, rejection_reason=form.cleaned_data.get("rejection_reason", ""))
                 flash_success(request, "Welfare case rejected.")
         elif action == "cancel":
-            if not can_manage_finances(request.user):
+            if not can_manage_welfare_cases(request.user):
                 raise PermissionDenied
             cancel_welfare_case(case, request.user)
             flash_success(request, "Welfare case cancelled.")
         elif action == "disburse":
-            if not can_manage_finances(request.user):
+            if not can_disburse_welfare(request.user):
                 raise PermissionDenied
             form = WelfareDisburseForm(request.POST)
             if form.is_valid():

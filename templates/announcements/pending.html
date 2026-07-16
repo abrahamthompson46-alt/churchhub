@@ -33,6 +33,7 @@
                         <td class="text-muted">{{ a.created_by.get_full_name|default:a.created_by.username }}</td>
                         <td>{{ a.created_at|date:"M j, Y" }}</td>
                         <td class="text-end text-nowrap">
+                            {% if can_approve_announcements %}
                             <a href="{% url 'announcements:edit_announcement' a.pk %}" class="btn btn-sm btn-outline-secondary">Review</a>
                             <form method="post" action="{% url 'announcements:approve_announcement' a.pk %}" class="d-inline">{% csrf_token %}
                                 <button type="submit" class="btn btn-sm btn-success">Approve</button>
@@ -58,6 +59,9 @@
                                     </form>
                                 </div>
                             </div>
+                            {% else %}
+                            <a href="{% url 'announcements:announcement_detail' a.pk %}" class="btn btn-sm btn-outline-secondary">View</a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}

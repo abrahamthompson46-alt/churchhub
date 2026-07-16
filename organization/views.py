@@ -26,6 +26,8 @@ from organization.access import (
     scoped_conferences,
     scoped_districts,
     scoped_general_conferences,
+    scoped_unions,
+    scoped_zones,
     user_district,
 )
 from organization.forms import (
@@ -143,6 +145,140 @@ def hierarchy_overview(request):
         "can_manage": can_manage_organization(request.user),
         "search_q": search_q,
         "is_global_admin": is_global_org_admin(request.user),
+    })
+
+
+@login_required
+def unit_directory(request):
+    """Tabbed list of all hierarchy units in scope (GC, unions, conferences, zones, districts, churches)."""
+    require_org_read(request)
+    from sitecontrol.denomination_services import get_level_label, level_enabled
+    from church_system.denomination_scope import get_active_denomination
+
+    denomination = get_active_denomination(request)
+    level = (request.GET.get("level") or "church").strip().lower()
+    q = request.GET.get("q", "").strip()
+
+    tabs = []
+    level_map = [
+        ("general_conference", "general_conference"),
+        ("union", "union"),
+        ("conference", "conference"),
+        ("zone", "zone"),
+        ("district", "district"),
+        ("church", "church"),
+    ]
+    for key, slug in level_map:
+        if level_enabled(denomination, key):
+            tabs.append({
+                "slug": slug,
+                "label": get_level_label(denomination, key, plural=True) or slug.title(),
+            })
+    if not tabs:
+        tabs = [{"slug": "church", "label": "Churches"}]
+    valid_slugs = {t["slug"] for t in tabs}
+    if level not in valid_slugs:
+        level = tabs[0]["slug"]
+
+    rows = []
+    if level == "general_conference":
+        qs = scoped_general_conferences(request).annotate(
+            union_count=Count("unions", distinct=True)
+        ).order_by("name")
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(code__icontains=q))
+        for obj in qs[:500]:
+            rows.append({
+                "name": obj.name,
+                "code": obj.code,
+                "meta": f"{obj.union_count} unions",
+                "url_name": "organization:general_conference_detail",
+                "pk": obj.pk,
+            })
+    elif level == "union":
+        qs = scoped_unions(request).select_related("general_conference").annotate(
+            conference_count=Count("conferences", distinct=True)
+        ).order_by("name")
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(code__icontains=q))
+        for obj in qs[:500]:
+            rows.append({
+                "name": obj.name,
+                "code": obj.code,
+                "meta": obj.general_conference.name if obj.general_conference_id else "—",
+                "extra": f"{obj.conference_count} conferences",
+                "url_name": "organization:union_detail",
+                "pk": obj.pk,
+            })
+    elif level == "conference":
+        qs = scoped_conferences(request).select_related("union").annotate(
+            zone_count=Count("zones", distinct=True)
+        ).order_by("name")
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(code__icontains=q))
+        for obj in qs[:500]:
+            rows.append({
+                "name": obj.name,
+                "code": obj.code,
+                "meta": obj.union.name if obj.union_id else "—",
+                "extra": f"{obj.zone_count} zones",
+                "url_name": "organization:conference_detail",
+                "pk": obj.pk,
+            })
+    elif level == "zone":
+        qs = scoped_zones(request).select_related("conference").annotate(
+            district_count=Count("districts", distinct=True)
+        ).order_by("name")
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(code__icontains=q))
+        for obj in qs[:500]:
+            rows.append({
+                "name": obj.name,
+                "code": obj.code,
+                "meta": obj.conference.name,
+                "extra": f"{obj.district_count} districts",
+                "url_name": "organization:zone_detail",
+                "pk": obj.pk,
+            })
+    elif level == "district":
+        qs = scoped_districts(request).select_related("zone__conference").annotate(
+            church_count=Count("churches", distinct=True)
+        ).order_by("name")
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(code__icontains=q))
+        for obj in qs[:500]:
+            rows.append({
+                "name": obj.name,
+                "code": obj.code,
+                "meta": f"{obj.zone.name} · {obj.zone.conference.name}",
+                "extra": f"{obj.church_count} churches",
+                "url_name": "organization:district_detail",
+                "pk": obj.pk,
+            })
+    else:
+        qs = scoped_churches(request).select_related(
+            "district__zone__conference"
+        ).order_by("name")
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(code__icontains=q))
+        for obj in qs[:500]:
+            rows.append({
+                "name": obj.name,
+                "code": obj.code,
+                "meta": f"{obj.district.name} · {obj.district.zone.conference.name}",
+                "extra": "Active" if obj.is_active else "Inactive",
+                "url_name": "organization:church_detail",
+                "pk": obj.pk,
+                "badge": "success" if obj.is_active else "secondary",
+            })
+
+    return render(request, "organization/directory.html", {
+        "tabs": tabs,
+        "level": level,
+        "rows": rows,
+        "search_q": q,
+        "can_manage": can_manage_organization(request.user),
+        "active_level_label": next((t["label"] for t in tabs if t["slug"] == level), level.title()),
     })
 
 

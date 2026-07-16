@@ -27,11 +27,13 @@
 
     <div class="export-toolbar">
         <span class="chip">Annual statement · {{ year }}</span>
+        {% if can_export_giving %}
         <div class="btn-group btn-group-sm">
             <a href="?year={{ year }}&export=csv" class="btn btn-outline-secondary">CSV</a>
             <a href="?year={{ year }}&export=excel" class="btn btn-outline-secondary">Excel</a>
             <a href="?year={{ year }}&export=pdf" class="btn btn-outline-secondary">PDF</a>
         </div>
+        {% endif %}
     </div>
 
     {% include "includes/table_open.html" with table_title="Contributions" table_icon="bi-list-check" %}

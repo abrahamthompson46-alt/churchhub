@@ -65,7 +65,7 @@
                         <li class="text-muted">No attachments.</li>
                         {% endfor %}
                     </ul>
-                    {% if can_manage and case.status != 'DISBURSED' %}
+                    {% if can_manage_welfare_cases and case.status != 'DISBURSED' %}
                     <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="upload_attachment">
@@ -82,7 +82,7 @@
             <div class="panel">
                 <div class="panel-header">Actions</div>
                 <div class="panel-body d-grid gap-2">
-                    {% if case.status == 'PENDING' and can_manage %}
+                    {% if case.status == 'PENDING' and can_manage_welfare_cases %}
                     <form method="post" action="{% url 'remittance:welfare_case_action' case.pk %}">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="review">
@@ -100,7 +100,7 @@
                     {% endif %}
 
                     {% if case.status == 'PENDING' or case.status == 'UNDER_REVIEW' %}
-                    {% if can_approve %}
+                    {% if can_approve_welfare %}
                     <form method="post" action="{% url 'remittance:welfare_case_action' case.pk %}">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="approve">
@@ -120,7 +120,7 @@
                     {% endif %}
                     {% endif %}
 
-                    {% if case.status == 'APPROVED' and can_manage %}
+                    {% if case.status == 'APPROVED' and can_disburse_welfare %}
                     <form method="post" action="{% url 'remittance:welfare_case_action' case.pk %}">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="disburse">

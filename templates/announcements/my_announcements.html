@@ -5,8 +5,12 @@
 
 {% block content %}
 <div class="page-container">
+    {% if can_create_announcements %}
     {% url 'announcements:create_announcement' as create_url %}
     {% include "includes/page_header.html" with page_subtitle="Communications" page_title="My Submissions" page_description="Track announcements you have submitted." action_url=create_url action_label="New Announcement" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Communications" page_title="My Submissions" page_description="Track announcements you have submitted." %}
+    {% endif %}
 
     <div class="filter-bar filter-bar--tabs">
         <div class="d-flex flex-wrap gap-2">
@@ -51,10 +55,10 @@
                             {% if a.is_approved and not a.is_archived %}
                             <a href="{% url 'announcements:announcement_detail' a.pk %}" class="btn btn-sm btn-outline-secondary">View</a>
                             {% endif %}
-                            {% if not a.is_archived and not a.is_approved %}
+                            {% if not a.is_archived and not a.is_approved and can_create_announcements %}
                             <a href="{% url 'announcements:edit_announcement' a.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
                             {% endif %}
-                            {% if not a.is_archived %}
+                            {% if not a.is_archived and can_archive_announcements %}
                             <form method="post" action="{% url 'announcements:archive_announcement' a.pk %}" class="d-inline">{% csrf_token %}
                                 <input type="hidden" name="next" value="{% url 'announcements:my_announcements' %}">
                                 <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Archive this announcement?')">Archive</button>
@@ -64,7 +68,14 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5">{% include "includes/empty_state.html" with icon="bi-inbox" message="You have not submitted any announcements yet." action_url=create_url action_label="Create announcement" %}</td>
+                        <td colspan="5">
+                            {% if can_create_announcements %}
+                            {% url 'announcements:create_announcement' as create_url %}
+                            {% include "includes/empty_state.html" with icon="bi-inbox" message="You have not submitted any announcements yet." action_url=create_url action_label="Create announcement" %}
+                            {% else %}
+                            {% include "includes/empty_state.html" with icon="bi-inbox" message="You have not submitted any announcements yet." %}
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

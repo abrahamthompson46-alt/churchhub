@@ -38,9 +38,15 @@
 
     {% if member and statement %}
     <div class="d-flex flex-wrap gap-2 mb-3">
+        {% if can_export_reports_pdf %}
         <a href="?member={{ member.id }}{% if form.start_date.value %}&start_date={{ form.start_date.value|date:'Y-m-d' }}{% endif %}{% if form.end_date.value %}&end_date={{ form.end_date.value|date:'Y-m-d' }}{% endif %}&export=pdf" class="btn btn-outline-secondary btn-sm">Export PDF</a>
+        {% endif %}
+        {% if can_export_reports_excel %}
         <a href="?member={{ member.id }}{% if form.start_date.value %}&start_date={{ form.start_date.value|date:'Y-m-d' }}{% endif %}{% if form.end_date.value %}&end_date={{ form.end_date.value|date:'Y-m-d' }}{% endif %}&export=excel" class="btn btn-outline-secondary btn-sm">Export Excel</a>
+        {% endif %}
+        {% if can_export_reports_csv %}
         <a href="?member={{ member.id }}{% if form.start_date.value %}&start_date={{ form.start_date.value|date:'Y-m-d' }}{% endif %}{% if form.end_date.value %}&end_date={{ form.end_date.value|date:'Y-m-d' }}{% endif %}&export=csv" class="btn btn-outline-secondary btn-sm">Export CSV</a>
+        {% endif %}
         <a href="{% url 'remittance:member_welfare' member.id %}{% if form.start_date.value %}?start_date={{ form.start_date.value|date:'Y-m-d' }}&end_date={{ form.end_date.value|date:'Y-m-d' }}{% endif %}" class="btn btn-outline-primary btn-sm">Open Profile View</a>
     </div>
 

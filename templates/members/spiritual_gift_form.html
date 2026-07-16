@@ -14,7 +14,7 @@
                         {% for field in form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
                         <div class="d-flex gap-2 pt-2">
                             <button type="submit" class="btn btn-primary">Save</button>
-                            <a href="{% url 'members:spiritual_gifts' %}" class="btn btn-outline-secondary">Cancel</a>
+                            <a href="{% url 'members:spiritual_gift_list' %}" class="btn btn-outline-secondary">Cancel</a>
                         </div>
                     </form>
                 </div>

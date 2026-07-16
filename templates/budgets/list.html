@@ -5,8 +5,11 @@
 
 {% block content %}
 <div class="page-container">
-    {% url 'budgets:create' as add_base_url %}
+    {% if can_manage_budgets %}
     {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Annual Budget" page_description=scope_label action_url=create_url action_label="Add Line" action_icon="bi-plus-lg" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Annual Budget" page_description=scope_label %}
+    {% endif %}
 
     <ul class="nav nav-pills nav-fill gap-2 mb-3 flex-wrap">
         {% for tab_level, tab_label in level_tabs %}
@@ -56,11 +59,13 @@
             </div>
         </form>
         <span class="toolbar-spacer"></span>
+        {% if can_export_budgets %}
         <div class="btn-group btn-group-sm">
             <a href="?year={{ year }}&level={{ level }}&export=csv" class="btn btn-outline-secondary"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
             <a href="?year={{ year }}&level={{ level }}&export=excel" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
             <a href="?year={{ year }}&level={{ level }}&export=pdf" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
         </div>
+        {% endif %}
         {% if church %}<span class="chip ms-2"><i class="bi bi-building"></i> {{ church.name }}</span>{% endif %}
     </div>
 
@@ -101,7 +106,13 @@
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="7">{% include "includes/empty_state.html" with icon="bi-calculator" message="No budget lines for this year and scope." action_url=create_url action_label="Add budget line" %}</td></tr>
+                    <tr><td colspan="7">
+                        {% if can_manage_budgets %}
+                        {% include "includes/empty_state.html" with icon="bi-calculator" message="No budget lines for this year and scope." action_url=create_url action_label="Add budget line" %}
+                        {% else %}
+                        {% include "includes/empty_state.html" with icon="bi-calculator" message="No budget lines for this year and scope." %}
+                        {% endif %}
+                    </td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -129,10 +140,12 @@
                         <td class="text-end text-currency">₵ {{ b.amount|floatformat:2|intcomma }}</td>
                         <td class="text-muted small">{{ b.notes|default:"—" }}</td>
                         <td class="text-end text-nowrap">
+                            {% if can_manage_budgets %}
                             <a href="{% url 'budgets:edit' b.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
                             <form method="post" action="{% url 'budgets:delete' b.pk %}" class="d-inline">{% csrf_token %}
                                 <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this budget line?')">Delete</button>
                             </form>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}

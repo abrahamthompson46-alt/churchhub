@@ -15,6 +15,28 @@ Optional later: Redis on Render for shared cache and Celery workers.
 
 ---
 
+## Critical: link PostgreSQL
+
+Your web service **must** have `DATABASE_URL` set to the Render Postgres connection string.
+
+Without it, Django used to fall back to SQLite on the ephemeral disk — that causes errors like `no such table: django_session`.
+
+**Fix in Render Dashboard:**
+
+1. Open your **Web Service** (`churchhub-q27c` or similar)
+2. Go to **Environment**
+3. Click **Add Environment Variable** → **Add from Database** (or paste Internal Database URL)
+4. Select your Postgres instance → property **Connection String** → key name `DATABASE_URL`
+5. Also set (match your real hostname):
+   - `DJANGO_ALLOWED_HOSTS=churchhub-q27c.onrender.com`
+   - `DJANGO_CSRF_TRUSTED_ORIGINS=https://churchhub-q27c.onrender.com`
+   - `CHURCHHUB_PUBLIC_URL=https://churchhub-q27c.onrender.com`
+6. **Manual Deploy** → Clear build cache & deploy
+
+After deploy, logs should show: `Database engine: django.db.backends.postgresql`
+
+---
+
 ## Quick deploy (Blueprint)
 
 1. Push this repository to GitHub.
@@ -50,8 +72,8 @@ Sign in at `/accounts/login/` with the platform owner credentials, then open `/p
 | Setting | Value |
 |---------|-------|
 | Runtime | Python 3 |
-| Build Command | `chmod +x scripts/render_build.sh scripts/render_start.sh && ./scripts/render_build.sh` |
-| Start Command | `./scripts/render_start.sh` |
+| Build Command | `sed -i 's/\r$//' scripts/render_build.sh scripts/render_start.sh && chmod +x scripts/render_build.sh scripts/render_start.sh && bash scripts/render_build.sh` |
+| Start Command | `bash scripts/render_start.sh` |
 | Health Check Path | `/health/` |
 
 ### 3. Environment variables

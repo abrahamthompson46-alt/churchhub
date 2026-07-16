@@ -23,10 +23,14 @@
 
     <p class="small text-muted mb-2">Paying unit: <strong>{{ unit_label }}</strong>{% if employee.user %} · Portal user: {{ employee.user.username }}{% endif %}</p>
     <div class="d-flex flex-wrap gap-2 mb-4">
+        {% if can_manage_payroll %}
         <a href="{% url 'payroll:employee_edit' employee.pk %}" class="btn btn-outline-secondary btn-sm">Edit</a>
         <a href="{% url 'payroll:compensation_create' employee.pk %}" class="btn btn-primary btn-sm">Set Compensation</a>
         <a href="{% url 'payroll:loan_create' employee.pk %}" class="btn btn-outline-secondary btn-sm">Add Loan/Advance</a>
+        {% endif %}
+        {% if can_export_payroll %}
         <a href="{% url 'payroll:tax_certificate' employee.pk %}?year={{ ytd.year }}" class="btn btn-outline-secondary btn-sm" target="_blank">Tax Certificate</a>
+        {% endif %}
         <a href="{% url 'payroll:employee_list' %}" class="btn btn-link btn-sm">Back</a>
     </div>
 

@@ -5,8 +5,12 @@
 
 {% block content %}
 <div class="page-container">
+    {% if can_create_announcements %}
     {% url 'announcements:create_announcement' as create_url %}
     {% include "includes/page_header.html" with page_subtitle="Communications" page_title="Announcements" page_description="Approved announcements for your church and hierarchy." action_url=create_url action_label="Create Announcement" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Communications" page_title="Announcements" page_description="Approved announcements for your church and hierarchy." %}
+    {% endif %}
 
     <div class="filter-bar">
         <form method="get" class="filter-form">
@@ -23,7 +27,7 @@
             <div class="filter-actions">
                 <button type="submit" class="btn btn-outline-secondary btn-sm">Filter</button>
                 <a href="{% url 'announcements:announcement_list' %}" class="btn btn-link btn-sm text-muted">Clear</a>
-                {% if can_export %}
+                {% if can_export_announcements %}
                 <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}export=csv" class="btn btn-outline-secondary btn-sm">CSV</a>
                 <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}export=excel" class="btn btn-outline-secondary btn-sm">Excel</a>
                 {% endif %}
@@ -55,7 +59,12 @@
             {% endif %}
         </article>
         {% empty %}
+        {% if can_create_announcements %}
+        {% url 'announcements:create_announcement' as create_url %}
         {% include "includes/empty_state.html" with icon="bi-megaphone" message="No announcements yet." action_url=create_url action_label="Create announcement" %}
+        {% else %}
+        {% include "includes/empty_state.html" with icon="bi-megaphone" message="No announcements yet." %}
+        {% endif %}
         {% endfor %}
     </div>
 

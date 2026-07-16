@@ -4,8 +4,12 @@
 
 {% block content %}
 <div class="page-container">
+    {% if can_manage_leadership %}
     {% url 'members:leadership_add' as leadership_url %}
     {% include "includes/page_header.html" with page_subtitle="Members" page_title="Leadership Roles" action_url=leadership_url action_label="Assign Role" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Leadership Roles" %}
+    {% endif %}
 
     <div class="data-card">
         <div class="table-responsive">
@@ -21,7 +25,14 @@
                         <td>{% if r.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Ended</span>{% endif %}</td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="5">{% include "includes/empty_state.html" with icon="bi-award" message="No leadership roles defined." action_url=leadership_url action_label="Assign role" %}</td></tr>
+                    <tr><td colspan="5">
+                        {% if can_manage_leadership %}
+                        {% url 'members:leadership_add' as leadership_url %}
+                        {% include "includes/empty_state.html" with icon="bi-award" message="No leadership roles defined." action_url=leadership_url action_label="Assign role" %}
+                        {% else %}
+                        {% include "includes/empty_state.html" with icon="bi-award" message="No leadership roles defined." %}
+                        {% endif %}
+                    </td></tr>
                     {% endfor %}
                 </tbody>
             </table>

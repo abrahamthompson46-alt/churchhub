@@ -6,7 +6,7 @@
 
         {% for tab in module_tabs %}
 
-        <a href="{% if tab.report_key %}{% url 'reports:run' tab.report_key %}{% else %}{% url tab.url_name %}{% endif %}"
+        <a href="{% if tab.report_key %}{% url 'reports:run' tab.report_key %}{% else %}{% url tab.url_name %}{% if tab.query %}?{{ tab.query }}{% endif %}{% endif %}"
 
            class="module-tab{% if tab.report_key and report_key == tab.report_key %} is-active{% elif not tab.report_key and current_view == tab.url_name %} is-active{% endif %}">
 

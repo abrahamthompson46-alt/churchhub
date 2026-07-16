@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 
 from church_system.church_scope import require_church
 from church_system.flash import flash_success
-from permissions.checks import permission_required
+from permissions.checks import any_permission_required
 from reports.exporters import export_table_csv, export_table_excel, export_table_pdf
 from sitecontrol.checks import require_feature
 
@@ -29,12 +29,25 @@ from .services import (
 )
 
 
-def budget_finance_required(view_func):
-    """Finance permission + budgets feature gate."""
+def budget_view_required(view_func):
+    """View budgets (+ feature gate). Legacy manage_finances still works via implies."""
 
     @login_required
     @require_feature("budgets")
-    @permission_required("manage_finances")
+    @any_permission_required("view_budgets", "manage_budgets", "manage_finances")
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
+
+def budget_manage_required(view_func):
+    """Create/edit/delete budgets (+ feature gate)."""
+
+    @login_required
+    @require_feature("budgets")
+    @any_permission_required("manage_budgets", "manage_finances")
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
         return view_func(request, *args, **kwargs)
@@ -46,7 +59,7 @@ def _list_redirect(year, level):
     return f"{reverse('budgets:list')}?year={year}&level={level}"
 
 
-@budget_finance_required
+@budget_view_required
 def budget_list(request):
     try:
         level = request.GET.get("level", "CHURCH").upper()
@@ -76,6 +89,10 @@ def budget_list(request):
 
     export_fmt = request.GET.get("export", "")
     if export_fmt in ("csv", "excel", "pdf"):
+        from permissions.checks import can_export_budgets, can_manage_finances
+
+        if not (can_export_budgets(request.user) or can_manage_finances(request.user)):
+            raise PermissionDenied
         payload = export_budget_table(rows, year, scope["scope_label"])
         slug = f"budget-{level.lower()}-{year}"
         if export_fmt == "csv":
@@ -104,7 +121,7 @@ def budget_list(request):
     })
 
 
-@budget_finance_required
+@budget_manage_required
 def budget_create(request):
     try:
         level = request.GET.get("level", "CHURCH").upper()
@@ -148,7 +165,7 @@ def budget_create(request):
     })
 
 
-@budget_finance_required
+@budget_manage_required
 def budget_edit(request, pk):
     try:
         budget, church = get_editable_budget(request, pk)
@@ -193,7 +210,7 @@ def budget_edit(request, pk):
     })
 
 
-@budget_finance_required
+@budget_manage_required
 @require_POST
 def budget_delete(request, pk):
     budget, church = get_editable_budget(request, pk)

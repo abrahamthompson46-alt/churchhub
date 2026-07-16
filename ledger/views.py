@@ -29,7 +29,7 @@ from ledger.services import (
     update_ledger_category,
 )
 from members.models import Member
-from permissions.checks import permission_required
+from permissions.checks import any_permission_required, permission_required
 from reports.exporters import export_table_csv, export_table_excel
 from sitecontrol.checks import require_feature
 from transactions.idempotency import IdempotencyReplay, MissingIdempotencyKey
@@ -40,11 +40,11 @@ SESSION_DRAFT_KEY = "ledger_entry_draft"
 
 
 def ledger_finance_required(view_func):
-    """Finance permission + ledger feature gate."""
+    """Ledger feature + view/post permission."""
 
     @login_required
     @require_feature("ledger")
-    @permission_required("manage_finances")
+    @any_permission_required("view_ledger", "manage_ledger_entries", "manage_finances")
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
         return view_func(request, *args, **kwargs)
@@ -288,6 +288,11 @@ def category_report(request):
 @ledger_finance_required
 @require_http_methods(["GET", "POST"])
 def entry_create(request):
+    from permissions.checks import can_manage_ledger_entries
+
+    if not can_manage_ledger_entries(request.user):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied
     church = require_church(request)
     if request.method == "POST":
         form = LedgerEntryForm(request.POST, church=church)

@@ -124,6 +124,7 @@ TEMPLATES = [
                 "django.template.context_processors.static",
                 "church_system.context_processors.church_context",
                 "church_system.context_processors.navigation_context",
+                "church_system.context_processors.permission_context",
                 "church_system.context_processors.platform_context",
                 "church_system.context_processors.denomination_context",
                 "church_system.context_processors.working_day_context",
@@ -137,19 +138,38 @@ TEMPLATES = [
 # ==============================
 
 def _configure_databases():
+    """
+    Prefer DATABASE_URL (Render/Heroku). Never silently use SQLite in production.
+    """
     database_url = os.environ.get("DATABASE_URL", "").strip()
+    on_render = bool(os.environ.get("RENDER", "").strip())
+    require_postgres = (not DEBUG) or on_render
+
     if database_url:
         try:
             import dj_database_url
+        except ImportError as exc:
+            raise ImproperlyConfigured(
+                "DATABASE_URL is set but dj-database-url is not installed."
+            ) from exc
 
-            return dj_database_url.config(
-                default=database_url,
-                conn_max_age=int(os.environ.get("DB_CONN_MAX_AGE", "600")),
-            )
-        except ImportError:
-            pass
+        # dj_database_url.config() returns a single DB config — wrap as DATABASES['default']
+        db_config = dj_database_url.config(
+            default=database_url,
+            conn_max_age=int(os.environ.get("DB_CONN_MAX_AGE", "600")),
+            conn_health_checks=True,
+        )
+        if not db_config.get("ENGINE"):
+            raise ImproperlyConfigured("DATABASE_URL could not be parsed.")
 
-    if os.environ.get("DB_ENGINE") == "postgresql" or database_url:
+        # Render Postgres expects SSL for most connections
+        if on_render and "postgresql" in db_config["ENGINE"]:
+            options = db_config.setdefault("OPTIONS", {})
+            options.setdefault("sslmode", os.environ.get("DB_SSLMODE", "require"))
+
+        return {"default": db_config}
+
+    if os.environ.get("DB_ENGINE") == "postgresql":
         return {
             "default": {
                 "ENGINE": "django.db.backends.postgresql",
@@ -161,6 +181,14 @@ def _configure_databases():
                 "CONN_MAX_AGE": int(os.environ.get("DB_CONN_MAX_AGE", "600")),
             }
         }
+
+    if require_postgres:
+        raise ImproperlyConfigured(
+            "PostgreSQL is required in production / on Render. "
+            "Set DATABASE_URL on the web service (link your Render Postgres database), "
+            "then redeploy."
+        )
+
     return {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",

@@ -8,6 +8,7 @@ app_name = "sitecontrol"
 
 urlpatterns = [
     path("", views.dashboard, name="dashboard"),
+    path("setup/", views.setup_checklist, name="setup"),
     path("health/", views.health, name="health"),
     path("ops/", views.ops_health, name="ops_health"),
     path("audit/", views.audit_log, name="audit_log"),

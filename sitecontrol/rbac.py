@@ -100,6 +100,7 @@ ROLE_CAPABILITIES = {
 # Navigation item → required capability (view is enough when omitted)
 NAV_ITEM_CAPABILITIES = {
     "sitecontrol:dashboard": CAP_VIEW,
+    "sitecontrol:setup": CAP_VIEW,
     "sitecontrol:health": CAP_VIEW,
     "sitecontrol:audit_log": CAP_VIEW_AUDIT,
     "sitecontrol:ops_health": CAP_OPS,

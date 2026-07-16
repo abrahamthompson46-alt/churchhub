@@ -6,7 +6,9 @@
 <div class="page-container">
     {% include "includes/page_header.html" with page_subtitle="Payroll" page_title="Employees" page_description="Staff and stipend recipients at {{ active_church.name }}." %}
     <div class="d-flex gap-2 mb-3">
+        {% if can_manage_payroll %}
         <a href="{% url 'payroll:employee_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Add Employee</a>
+        {% endif %}
         <a href="{% url 'payroll:index' %}" class="btn btn-outline-secondary btn-sm">Payroll Home</a>
     </div>
     <div class="table-wrap table-wrap--center table-wrap--compact">

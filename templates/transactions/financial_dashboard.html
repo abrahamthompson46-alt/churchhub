@@ -24,11 +24,13 @@
             </div>
         </form>
         <span class="toolbar-spacer"></span>
+        {% if can_export_transactions %}
         <div class="btn-group btn-group-sm">
             <a href="?export=csv{% if start_date %}&amp;start_date={{ start_date }}{% endif %}{% if end_date %}&amp;end_date={{ end_date }}{% endif %}" class="btn btn-outline-secondary">CSV</a>
             <a href="?export=excel{% if start_date %}&amp;start_date={{ start_date }}{% endif %}{% if end_date %}&amp;end_date={{ end_date }}{% endif %}" class="btn btn-outline-secondary">Excel</a>
             <a href="?export=pdf{% if start_date %}&amp;start_date={{ start_date }}{% endif %}{% if end_date %}&amp;end_date={{ end_date }}{% endif %}" class="btn btn-outline-secondary">PDF</a>
         </div>
+        {% endif %}
     </div>
 
     <div class="metrics-row">

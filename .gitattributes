@@ -1,0 +1,4 @@
+# Force LF line endings for shell scripts (Windows CRLF breaks Render builds)
+*.sh text eol=lf
+render.yaml text eol=lf
+docker-entrypoint.sh text eol=lf

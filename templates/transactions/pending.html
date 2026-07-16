@@ -14,7 +14,7 @@
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
-                            {% if can_approve %}<th style="width:40px"><input type="checkbox" id="select-all" class="form-check-input"></th>{% endif %}
+                            {% if can_approve_transactions %}<th style="width:40px"><input type="checkbox" id="select-all" class="form-check-input"></th>{% endif %}
                             <th>Reference</th>
                             <th>Date</th>
                             <th>Type</th>
@@ -26,14 +26,14 @@
                     <tbody>
                         {% for t in transactions %}
                         <tr>
-                            {% if can_approve %}<td><input type="checkbox" name="transaction_ids" value="{{ t.id }}" class="form-check-input" form="bulk-form"></td>{% endif %}
+                            {% if can_approve_transactions %}<td><input type="checkbox" name="transaction_ids" value="{{ t.id }}" class="form-check-input" form="bulk-form"></td>{% endif %}
                             <td><a href="{% url 'transactions:transaction_detail' t.id %}" class="table-link"><code class="small">{{ t.reference }}</code></a></td>
                             <td>{{ t.date }}</td>
                             <td><span class="chip">{{ t.transaction_type }}</span></td>
                             <td class="text-muted">{{ t.description|default:"—"|truncatechars:40 }}</td>
                             <td class="text-end text-currency">₵ {{ t.receipt_total|floatformat:2|intcomma }}</td>
                             <td class="text-end text-nowrap">
-                                {% if can_approve %}
+                                {% if can_approve_transactions %}
                                 <form method="post" action="{% url 'transactions:approve_transaction' t.id %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-success">Approve</button></form>
                                 <form method="post" action="{% url 'transactions:reject_transaction' t.id %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-danger">Reject</button></form>
                                 {% endif %}
@@ -49,7 +49,7 @@
                 </table>
             </div>
         </div>
-        {% if can_approve and transactions %}
+        {% if can_approve_transactions and transactions %}
         <button type="submit" class="btn btn-primary mt-3">Bulk Approve Selected</button>
         {% endif %}
     </form>

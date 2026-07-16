@@ -50,6 +50,105 @@ def clear_settings_cache():
     cache.delete(ANNOUNCEMENT_CACHE_KEY)
 
 
+def build_platform_setup_checklist():
+    """Guided platform setup items with done/pending status for Control Room."""
+    from sitecontrol.models import Denomination
+
+    settings_obj = get_site_settings()
+    has_smtp = bool(settings_obj.smtp_host and (settings_obj.default_from_email or settings_obj.smtp_username))
+    has_logo = bool(settings_obj.logo)
+    has_plan = SubscriptionPlan.objects.filter(is_active=True).exists()
+    has_default_plan = SubscriptionPlan.objects.filter(is_active=True, is_default=True).exists()
+    has_payment = PlatformPaymentMethod.objects.filter(is_active=True).exists()
+    has_denomination = Denomination.objects.filter(is_active=True).exists()
+    has_support = bool(settings_obj.support_email)
+    has_billing_copy = bool(settings_obj.billing_payment_instructions.strip())
+    registration_configured = True  # always present; surface toggles as informational
+
+    items = [
+        {
+            "id": "branding",
+            "label": "Platform branding",
+            "detail": "Upload a logo and set brand colors.",
+            "done": has_logo,
+            "url_name": "sitecontrol:branding",
+            "icon": "bi-palette",
+        },
+        {
+            "id": "email",
+            "label": "Email / SMTP",
+            "detail": "Configure host and from-address for invites and receipts.",
+            "done": has_smtp,
+            "url_name": "sitecontrol:email_settings",
+            "icon": "bi-envelope-at",
+        },
+        {
+            "id": "security",
+            "label": "Security baseline",
+            "detail": "Review password rules and platform IP allowlist.",
+            "done": settings_obj.password_min_length >= 8,
+            "url_name": "sitecontrol:security_settings",
+            "icon": "bi-lock",
+        },
+        {
+            "id": "plans",
+            "label": "Subscription plans",
+            "detail": "Create at least one active plan (mark a default).",
+            "done": has_plan and has_default_plan,
+            "url_name": "sitecontrol:plan_list",
+            "icon": "bi-box-seam",
+        },
+        {
+            "id": "payment_methods",
+            "label": "Payment methods",
+            "detail": "Add bank transfer or mobile money instructions.",
+            "done": has_payment,
+            "url_name": "sitecontrol:payment_method_list",
+            "icon": "bi-wallet2",
+        },
+        {
+            "id": "billing",
+            "label": "Billing instructions",
+            "detail": "Set default currency and payment copy for provisioning.",
+            "done": has_billing_copy,
+            "url_name": "sitecontrol:billing_settings",
+            "icon": "bi-currency-exchange",
+        },
+        {
+            "id": "denomination",
+            "label": "Denomination / tenant",
+            "detail": "Create an institution with terminology and branding.",
+            "done": has_denomination,
+            "url_name": "sitecontrol:denomination_list",
+            "icon": "bi-layers",
+        },
+        {
+            "id": "registration",
+            "label": "Registration controls",
+            "detail": "Decide public apply, invites, and church onboarding gates.",
+            "done": registration_configured and has_support,
+            "url_name": "sitecontrol:registration_settings",
+            "icon": "bi-door-open",
+        },
+        {
+            "id": "provision",
+            "label": "Provision first church",
+            "detail": "Create a live church tenant with admin invite.",
+            "done": Church.objects.exists(),
+            "url_name": "sitecontrol:tenant_provision",
+            "icon": "bi-magic",
+        },
+    ]
+    done_count = sum(1 for item in items if item["done"])
+    return {
+        "items": items,
+        "done_count": done_count,
+        "total_count": len(items),
+        "percent": int(round((done_count / len(items)) * 100)) if items else 100,
+        "is_complete": done_count == len(items),
+    }
+
+
 def log_platform_action(request, action, summary, *, target_model="", target_id="", details=None, denomination=None):
     ip = request.META.get("REMOTE_ADDR")
     if denomination is None:
@@ -101,6 +200,62 @@ def ensure_default_payment_methods():
             sort_order=2,
         ),
     ])
+
+
+def run_platform_seed_suite(*, church=None, reset_permissions=False):
+    """
+    One-click setup suite for platform owners: migrate + seed matrix/plans/payments/denominations.
+    Optionally re-provision financial seeds for a church.
+    """
+    from django.core.management import call_command
+    from io import StringIO
+
+    from sitecontrol.denomination_services import ensure_builtin_denominations
+
+    steps = []
+    buf = StringIO()
+
+    call_command("migrate", "--noinput", stdout=buf, verbosity=0)
+    steps.append({"id": "migrate", "label": "Database migrations", "ok": True})
+
+    seed_args = ["seed_permissions"]
+    if reset_permissions:
+        seed_args.append("--reset")
+    call_command(*seed_args, stdout=buf, verbosity=0)
+    steps.append({
+        "id": "permissions",
+        "label": "Permission matrix seeded" + (" (reset)" if reset_permissions else ""),
+        "ok": True,
+    })
+
+    ensure_default_plans()
+    steps.append({"id": "plans", "label": "Subscription plans ensured", "ok": True})
+
+    ensure_default_payment_methods()
+    steps.append({"id": "payments", "label": "Payment methods ensured", "ok": True})
+
+    created = ensure_builtin_denominations() or []
+    steps.append({
+        "id": "denominations",
+        "label": f"Built-in denominations updated ({len(created)} created)",
+        "ok": True,
+    })
+
+    if church is not None:
+        from sitecontrol.provisioning_services import reprovision_tenant_financials
+
+        reprovision_tenant_financials(church)
+        steps.append({
+            "id": "church_financials",
+            "label": f"Financial seeds re-provisioned for {church.name}",
+            "ok": True,
+        })
+
+    return {
+        "steps": steps,
+        "ok": all(s["ok"] for s in steps),
+        "message": f"Completed {len(steps)} setup step(s).",
+    }
 
 
 def build_price_snapshot(plan, billing_interval="MONTHLY"):

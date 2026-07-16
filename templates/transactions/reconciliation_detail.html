@@ -34,7 +34,9 @@
         <div class="panel mb-4">
             <div class="panel-header d-flex justify-content-between align-items-center">
                 <span>Ledger Lines</span>
+                {% if can_manage_reconciliation %}
                 <button type="submit" name="action" value="match" class="btn btn-sm btn-outline-primary">Save Matches</button>
+                {% endif %}
             </div>
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
@@ -42,7 +44,7 @@
                     <tbody>
                         {% for item in items %}
                         <tr>
-                            <td><input type="checkbox" name="matched_lines" value="{{ item.transaction_line_id }}" class="form-check-input" {% if item.is_matched %}checked{% endif %}></td>
+                            <td><input type="checkbox" name="matched_lines" value="{{ item.transaction_line_id }}" class="form-check-input" {% if item.is_matched %}checked{% endif %} {% if not can_manage_reconciliation %}disabled{% endif %}></td>
                             <td>{{ item.transaction_line.transaction.date }}</td>
                             <td><code class="small">{{ item.transaction_line.transaction.reference }}</code></td>
                             <td class="text-muted small">{{ item.transaction_line.transaction.description|default:"—"|truncatechars:30 }}</td>
@@ -56,9 +58,9 @@
             </div>
         </div>
 
-        {% if can_finalize and difference == 0 %}
+        {% if can_finalize_reconciliation and difference == 0 %}
         <button type="submit" name="action" value="finalize" class="btn btn-success" onclick="return confirm('Finalize this reconciliation?')">Finalize Reconciliation</button>
-        {% elif can_finalize %}
+        {% elif can_finalize_reconciliation %}
         <p class="text-muted small">Matched total must equal statement balance before finalizing.</p>
         {% endif %}
     </form>

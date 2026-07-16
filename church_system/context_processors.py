@@ -157,11 +157,29 @@ def denomination_context(request):
     return ctx
 
 
+def permission_context(request):
+    """Expose can_* flags and has_perm map for template button visibility."""
+    from permissions.checks import permission_flags
+    from permissions.services import get_effective_permissions
+
+    user = getattr(request, "user", None)
+    if not user or not user.is_authenticated or getattr(user, "is_platform_user", False):
+        return {"perms": {}, "permission_flags": {}}
+
+    flags = permission_flags(user)
+    return {
+        "perms": get_effective_permissions(user),
+        "permission_flags": flags,
+        # Flatten common flags into top-level for existing templates that use can_manage etc.
+        **{k: v for k, v in flags.items() if k.startswith("can_")},
+    }
+
+
 def working_day_context(request):
     """System clock and open/closed business day for navbar and dashboards."""
     from django.utils import timezone
 
-    from accounts.permissions import can_approve_transactions, can_manage_finances
+    from accounts.permissions import can_manage_working_day, can_view_dashboard_finance
     from church_system.church_scope import get_active_church, get_user_church
     from transactions.services import get_working_day_status
 
@@ -182,6 +200,6 @@ def working_day_context(request):
         "active_working_day": status["active_working_day"],
         "working_date": status["working_date"],
         "working_day_is_open": status["is_open"],
-        "show_working_day_status": can_manage_finances(request.user),
-        "can_manage_working_day": can_approve_transactions(request.user),
+        "show_working_day_status": can_view_dashboard_finance(request.user),
+        "can_manage_working_day": can_manage_working_day(request.user),
     }

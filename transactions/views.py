@@ -12,7 +12,22 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
-from permissions.checks import can_approve_transactions, can_manage_finances
+from permissions.checks import (
+    can_approve_transactions,
+    can_finalize_reconciliation,
+    can_lock_periods,
+    can_manage_expenses,
+    can_manage_finances,
+    can_manage_receipts,
+    can_manage_reconciliation,
+    can_manage_working_day,
+    can_reject_transactions,
+    can_unlock_periods,
+    can_void_transactions,
+    can_view_audit_log,
+    can_view_pending_approvals,
+    can_view_transactions,
+)
 from church_system.church_scope import filter_by_church, get_active_church, require_church
 from church_system.flash import flash_error, flash_exception, flash_success, flash_warning
 from members.models import Member
@@ -66,7 +81,12 @@ from transactions.services import (
 def _finance_required(view_func):
     @login_required
     def _wrapped(request, *args, **kwargs):
-        if not can_manage_finances(request.user):
+        if not (
+            can_manage_finances(request.user)
+            or can_view_transactions(request.user)
+            or can_manage_receipts(request.user)
+            or can_manage_expenses(request.user)
+        ):
             raise PermissionDenied
         return view_func(request, *args, **kwargs)
     return _wrapped
@@ -204,6 +224,8 @@ def financial_dashboard(request):
 
 @_finance_required
 def record_receipt_view(request):
+    if not can_manage_receipts(request.user):
+        raise PermissionDenied
     church = require_church(request)
     default_date = resolve_transaction_date(church)
     initial = {"idempotency_key": str(uuid.uuid4()), "date": default_date}
@@ -247,6 +269,8 @@ def record_receipt_view(request):
 
 @_finance_required
 def record_expense_view(request):
+    if not can_manage_expenses(request.user):
+        raise PermissionDenied
     church = require_church(request)
     default_date = resolve_transaction_date(church)
     initial = {"idempotency_key": str(uuid.uuid4()), "date": default_date}
@@ -370,7 +394,7 @@ def transaction_list(request):
         "page_obj": page_obj,
         "status_filter": status,
         "type_filter": txn_type,
-        "can_void": can_approve_transactions(request.user),
+        "can_void": can_void_transactions(request.user),
     })
 
 
@@ -385,7 +409,7 @@ def transaction_detail(request, pk):
     )
     void_form = VoidTransactionForm()
     can_void = (
-        can_approve_transactions(request.user)
+        can_void_transactions(request.user)
         and transaction.approval_status == "APPROVED"
         and not transaction.is_voided
         and not transaction.reversal_of_id
@@ -434,13 +458,14 @@ def period_list(request):
         "year": year,
         "church": church,
         "lock_form": lock_form,
-        "can_lock": can_approve_transactions(request.user),
+        "can_lock": can_lock_periods(request.user),
+        "can_unlock": can_unlock_periods(request.user),
         "working_status": working_status,
         "active_working_day": active_day,
         "open_form": open_form,
         "close_form": close_form,
         "recent_working_days": get_recent_working_days(church),
-        "can_manage_working_day": can_approve_transactions(request.user),
+        "can_manage_working_day": can_manage_working_day(request.user),
     })
 
 
@@ -583,7 +608,7 @@ def reconciliation_detail(request, pk):
             except ValueError as exc:
                 flash_exception(request, str(exc))
             return redirect("transactions:reconciliation_detail", pk=pk)
-        if action == "finalize" and can_approve_transactions(request.user):
+        if action == "finalize" and can_finalize_reconciliation(request.user):
             try:
                 finalize_bank_reconciliation(recon, request.user)
                 flash_success(request, "Reconciliation finalized.")
@@ -601,5 +626,5 @@ def reconciliation_detail(request, pk):
         "items": items,
         "matched_total": matched_total,
         "difference": difference,
-        "can_finalize": can_approve_transactions(request.user) and not recon.is_reconciled,
+        "can_finalize": can_finalize_reconciliation(request.user) and not recon.is_reconciled,
     })

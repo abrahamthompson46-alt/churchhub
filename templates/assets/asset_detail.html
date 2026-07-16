@@ -8,15 +8,15 @@
     <div class="d-flex flex-wrap gap-2 mb-3">
         <span class="badge text-bg-secondary">{{ asset.get_status_display }}</span>
         <span class="badge text-bg-light border">{{ asset.get_gra_asset_class_display }}</span>
-        {% if can_manage and asset.is_editable %}
+        {% if can_manage_assets and asset.is_editable %}
         <a href="{% url 'assets:asset_edit' asset.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
         {% endif %}
-        {% if can_manage and asset.is_editable %}
+        {% if can_manage_assets and asset.is_editable %}
         <form method="post" action="{% url 'assets:asset_submit' asset.pk %}" class="d-inline">{% csrf_token %}
             <button type="submit" class="btn btn-sm btn-primary">Submit for Approval</button>
         </form>
         {% endif %}
-        {% if can_approve and asset.pending_approval %}
+        {% if can_approve_assets and asset.pending_approval %}
         <form method="post" action="{% url 'assets:asset_approve' asset.pk %}" class="d-inline">{% csrf_token %}
             <button type="submit" class="btn btn-sm btn-success">Approve</button>
         </form>
@@ -62,7 +62,7 @@
         </div>
     </div>
 
-    {% if can_approve and asset.pending_approval %}
+    {% if can_approve_assets and asset.pending_approval %}
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white fw-semibold">Reject Asset</div>
         <div class="card-body">
@@ -79,7 +79,7 @@
     <div class="alert alert-warning">Rejected: {{ asset.rejection_reason }}</div>
     {% endif %}
 
-    {% if can_manage and asset.status == 'ACTIVE' %}
+    {% if can_dispose_assets and asset.status == 'ACTIVE' %}
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white fw-semibold">Dispose Asset</div>
         <div class="card-body">
@@ -117,7 +117,7 @@
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white fw-semibold">Maintenance Log</div>
-                {% if can_manage %}
+                {% if can_manage_assets %}
                 <div class="card-body border-bottom">
                     <form method="post" action="{% url 'assets:maintenance_add' asset.pk %}">
                         {% csrf_token %}

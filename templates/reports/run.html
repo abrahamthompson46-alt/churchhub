@@ -53,10 +53,18 @@
         <span class="chip text-warning"><i class="bi bi-exclamation-triangle"></i> Results truncated</span>
         {% endif %}
         <div class="btn-group btn-group-sm">
+            {% if can_export_reports_csv %}
             <a href="{{ export_links.csv }}" class="btn btn-outline-secondary">CSV</a>
+            {% endif %}
+            {% if can_export_reports_excel %}
             <a href="{{ export_links.excel }}" class="btn btn-outline-secondary">Excel</a>
+            {% endif %}
+            {% if can_export_reports_pdf %}
             <a href="{{ export_links.pdf }}" class="btn btn-outline-secondary">PDF</a>
+            {% endif %}
+            {% if can_export_reports_csv %}
             <a href="{{ export_links.async_csv }}" class="btn btn-outline-secondary" title="Queue background export">Async CSV</a>
+            {% endif %}
         </div>
     </div>
     {% include "includes/table_open.html" with table_title="Results" table_icon="bi-table" %}

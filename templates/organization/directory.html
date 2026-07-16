@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Organization Directory — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Organization" page_title="Unit Directory" page_description="Browse all hierarchy units in your scope." %}
+
+    <ul class="nav nav-pills flex-wrap gap-2 mb-3">
+        {% for tab in tabs %}
+        <li class="nav-item">
+            <a class="nav-link {% if level == tab.slug %}active{% endif %}"
+               href="{% url 'organization:directory' %}?level={{ tab.slug }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}">
+                {{ tab.label }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <div class="filter-bar mb-3">
+        <form method="get" class="filter-form">
+            <input type="hidden" name="level" value="{{ level }}">
+            <div class="filter-field">
+                <label class="form-label">Search {{ active_level_label }}</label>
+                <input type="search" name="q" value="{{ search_q }}" class="form-control form-control-sm" placeholder="Name or code…">
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Filter</button>
+            </div>
+        </form>
+        <span class="toolbar-spacer"></span>
+        <a href="{% url 'organization:hierarchy' %}" class="btn btn-outline-secondary btn-sm">Tree view</a>
+    </div>
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Code</th>
+                        <th>Context</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td>
+                            <a href="{% url row.url_name row.pk %}" class="table-link fw-semibold">{{ row.name }}</a>
+                            {% if row.badge %}
+                            <span class="chip chip--{{ row.badge }} ms-1">{{ row.extra }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ row.code|default:"—" }}</td>
+                        <td class="text-muted small">
+                            {{ row.meta|default:"—" }}
+                            {% if row.extra and not row.badge %}<br>{{ row.extra }}{% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a href="{% url row.url_name row.pk %}" class="btn btn-sm btn-outline-secondary">Open</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">
+                            {% include "includes/empty_state.html" with icon="bi-diagram-3" message="No units found for this level." %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

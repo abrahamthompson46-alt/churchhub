@@ -234,9 +234,7 @@
 
                                 <td class="text-end">
 
-                                    {% if can_lock %}
-
-                                        {% if m.is_locked %}
+                                        {% if m.is_locked and can_unlock %}
 
                                         <form method="post" action="{% url 'transactions:period_unlock' %}" class="d-inline">
 
@@ -250,7 +248,7 @@
 
                                         </form>
 
-                                        {% else %}
+                                        {% elif not m.is_locked and can_lock %}
 
                                         <form method="post" action="{% url 'transactions:period_lock' %}" class="d-inline">
 
@@ -265,8 +263,6 @@
                                         </form>
 
                                         {% endif %}
-
-                                    {% endif %}
 
                                 </td>
 

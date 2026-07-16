@@ -10,8 +10,9 @@ services:
     plan: free
     region: frankfurt
     branch: main
-    buildCommand: chmod +x scripts/render_build.sh scripts/render_start.sh && ./scripts/render_build.sh
-    startCommand: ./scripts/render_start.sh
+    # Strip CRLF (Windows), then build. Prefer python3 via scripts.
+    buildCommand: sed -i 's/\r$//' scripts/render_build.sh scripts/render_start.sh && chmod +x scripts/render_build.sh scripts/render_start.sh && bash scripts/render_build.sh
+    startCommand: bash scripts/render_start.sh
     healthCheckPath: /health/
     autoDeploy: true
     envVars:
@@ -25,13 +26,14 @@ services:
         generateValue: true
       - key: DJANGO_ALLOWED_HOSTS
         sync: false
-        value: churchhub.onrender.com
+        # Replace with your real hostname, e.g. churchhub-q27c.onrender.com
+        value: churchhub-q27c.onrender.com
       - key: DJANGO_CSRF_TRUSTED_ORIGINS
         sync: false
-        value: https://churchhub.onrender.com
+        value: https://churchhub-q27c.onrender.com
       - key: CHURCHHUB_PUBLIC_URL
         sync: false
-        value: https://churchhub.onrender.com
+        value: https://churchhub-q27c.onrender.com
       - key: CHURCHHUB_BOOTSTRAP
         value: "1"
       - key: DJANGO_SUPERUSER_USERNAME

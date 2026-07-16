@@ -6,7 +6,9 @@
 <div class="page-container">
     {% include "includes/page_header.html" with page_subtitle="Payroll" page_title="Payroll Policies" page_description="PAYE bands and statutory contribution rules — never hardcoded in calculation logic." %}
     <div class="mb-3">
+        {% if can_manage_payroll_policy %}
         <a href="{% url 'payroll:policy_rule_create' %}" class="btn btn-primary btn-sm">Add Statutory Rule</a>
+        {% endif %}
         <a href="{% url 'payroll:index' %}" class="btn btn-outline-secondary btn-sm">Back</a>
     </div>
 
@@ -16,7 +18,9 @@
         <div class="card mb-3">
             <div class="card-body">
                 <h3 class="h6">{{ table.name }} <span class="text-muted">from {{ table.effective_from }}</span>
+                    {% if can_manage_payroll_policy %}
                     <a href="{% url 'payroll:policy_band_add' table.pk %}" class="btn btn-sm btn-outline-secondary ms-2">Add Band</a>
+                    {% endif %}
                 </h3>
                 <table class="table table-sm mb-0">
                     <thead><tr><th>From</th><th>To</th><th class="text-end">Rate</th></tr></thead>

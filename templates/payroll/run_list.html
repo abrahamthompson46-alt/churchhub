@@ -5,7 +5,9 @@
 {% block content %}
 <div class="page-container">
     {% include "includes/page_header.html" with page_subtitle="Payroll" page_title="Payroll Runs" %}
+    {% if can_manage_payroll %}
     <div class="mb-3"><a href="{% url 'payroll:run_create' %}" class="btn btn-primary btn-sm">New Run</a></div>
+    {% endif %}
     <div class="table-responsive table-in-card">
         <table class="table table-hover table-sm mb-0">
             <thead>

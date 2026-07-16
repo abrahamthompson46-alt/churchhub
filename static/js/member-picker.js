@@ -1,5 +1,5 @@
 /**
- * Searchable member picker with photo / initials for treasury and welfare forms.
+ * Searchable member picker with photo / initials.
  */
 (function () {
     var DEBOUNCE_MS = 220;
@@ -15,11 +15,15 @@
         if (item.photo_url) {
             return '<img src="' + esc(item.photo_url) + '" alt="" class="member-picker__photo">';
         }
-        return '<span class="member-picker__initials">' + esc(item.initials) + "</span>";
+        return '<span class="member-picker__initials">' + esc(item.initials || "?") + "</span>";
     }
 
     function initPicker(root) {
-        var hidden = document.getElementById(root.dataset.inputId);
+        if (root.dataset.pickerReady === "1") return;
+        root.dataset.pickerReady = "1";
+
+        var inputId = root.dataset.inputId;
+        var hidden = (inputId && document.getElementById(inputId)) || root.querySelector('input[type="hidden"]');
         if (!hidden) return;
 
         var searchInput = root.querySelector("[data-picker-input]");
@@ -33,6 +37,8 @@
         var searchUrl = root.dataset.searchUrl;
         var timer = null;
 
+        if (!searchInput || !results || !searchUrl) return;
+
         function showSelected(item) {
             hidden.value = item.id;
             nameEl.textContent = item.name;
@@ -42,6 +48,7 @@
             searchWrap.classList.add("d-none");
             results.classList.add("d-none");
             searchInput.value = "";
+            hidden.dispatchEvent(new Event("change", { bubbles: true }));
         }
 
         function clearSelection() {
@@ -49,6 +56,7 @@
             selected.classList.add("d-none");
             searchWrap.classList.remove("d-none");
             searchInput.focus();
+            hidden.dispatchEvent(new Event("change", { bubbles: true }));
         }
 
         function renderResults(items) {
@@ -71,13 +79,21 @@
         }
 
         function fetchResults(query) {
+            results.innerHTML = '<div class="member-picker__empty">Searching…</div>';
+            results.classList.remove("d-none");
             fetch(searchUrl + "?q=" + encodeURIComponent(query), {
-                headers: { "X-Requested-With": "XMLHttpRequest" },
+                headers: { "X-Requested-With": "XMLHttpRequest", "Accept": "application/json" },
+                credentials: "same-origin",
             })
-                .then(function (r) { return r.json(); })
+                .then(function (r) {
+                    if (!r.ok) {
+                        throw new Error("HTTP " + r.status);
+                    }
+                    return r.json();
+                })
                 .then(function (data) { renderResults(data.results || []); })
                 .catch(function () {
-                    results.innerHTML = '<div class="member-picker__empty">Search unavailable</div>';
+                    results.innerHTML = '<div class="member-picker__empty">Search unavailable — try again</div>';
                     results.classList.remove("d-none");
                 });
         }
@@ -88,14 +104,23 @@
                 name: root.dataset.initialName,
                 subtitle: root.dataset.initialSubtitle || "",
                 photo_url: root.dataset.initialPhoto || "",
-                initials: (root.dataset.initialName || "?").split(" ").map(function (p) { return p[0]; }).join("").slice(0, 2).toUpperCase(),
+                initials: (root.dataset.initialName || "?")
+                    .split(/\s+/)
+                    .map(function (p) { return p[0]; })
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase(),
             });
         } else if (hidden.value) {
-            fetch(searchUrl + "?id=" + encodeURIComponent(hidden.value))
-                .then(function (r) { return r.json(); })
+            fetch(searchUrl + "?id=" + encodeURIComponent(hidden.value), {
+                headers: { "X-Requested-With": "XMLHttpRequest", "Accept": "application/json" },
+                credentials: "same-origin",
+            })
+                .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (data) {
-                    if (data.results && data.results[0]) showSelected(data.results[0]);
-                });
+                    if (data && data.results && data.results[0]) showSelected(data.results[0]);
+                })
+                .catch(function () { /* leave search open */ });
         }
 
         searchInput.addEventListener("input", function () {
@@ -125,14 +150,20 @@
             });
         });
 
-        clearBtn.addEventListener("click", clearSelection);
+        if (clearBtn) clearBtn.addEventListener("click", clearSelection);
 
         document.addEventListener("click", function (e) {
             if (!root.contains(e.target)) results.classList.add("d-none");
         });
     }
 
-    document.addEventListener("DOMContentLoaded", function () {
+    function boot() {
         document.querySelectorAll("[data-member-picker]").forEach(initPicker);
-    });
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot);
+    } else {
+        boot();
+    }
 })();

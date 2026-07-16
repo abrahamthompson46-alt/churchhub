@@ -12,6 +12,7 @@
         <div class="metric-card"><span class="metric-label">Guests</span><span class="metric-value">{{ event.headcount }}</span></div>
     </div>
 
+    {% if can_manage_attendance %}
     <form method="post" action="{% url 'meetings:attendance_record' event.pk %}">
         {% csrf_token %}
         <div class="panel">
@@ -36,5 +37,23 @@
             </div>
         </div>
     </form>
+    {% else %}
+    <div class="panel">
+        <div class="panel-header">Member Roll</div>
+        <div class="panel-body">
+            <div class="roll-grid">
+                {% for m in members %}
+                <label class="roll-item" for="m{{ m.pk }}">
+                    <input class="form-check-input" type="checkbox" disabled {% if m.pk in present_ids %}checked{% endif %}>
+                    <span>{{ m.full_name }}</span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="card-footer">
+            <a href="{% url 'meetings:attendance_list' %}" class="btn btn-outline-secondary btn-sm">Back</a>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

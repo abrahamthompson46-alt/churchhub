@@ -16,6 +16,7 @@ from permissions.checks import (
     can_manage_permissions,
     can_manage_users,
     can_view_all_churches,
+    can_view_ledger,
     can_view_members,
     can_view_reports,
     is_superadmin,
@@ -170,9 +171,32 @@ class PermissionCheckTests(ChurchHubTestMixin, TestCase):
 
 
 class MatrixTests(ChurchHubTestMixin, TestCase):
+    def test_registry_has_enterprise_catalog(self):
+        from permissions.registry import PERMISSION_REGISTRY, registry_count
+
+        self.assertGreaterEqual(registry_count(), 90)
+        self.assertIn("view_ledger", PERMISSION_REGISTRY)
+        self.assertIn("manage_receipts", PERMISSION_REGISTRY)
+        self.assertIn("dispose_assets", PERMISSION_REGISTRY)
+        # Legacy broad gates still imply new granular codes
+        implied = PERMISSION_REGISTRY["manage_finances"].get("implies", [])
+        self.assertIn("view_ledger", implied)
+        self.assertIn("manage_receipts", implied)
+
     def test_matrix_seeded(self):
-        self.assertGreater(Permission.objects.count(), 0)
+        self.assertGreaterEqual(Permission.objects.count(), 90)
         self.assertGreater(RolePermission.objects.count(), 0)
+
+    def test_manage_finances_implies_ledger_view(self):
+        user = User.objects.create_user(
+            username="implies_treasury",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        self.assertTrue(user_has_permission(user, "manage_finances"))
+        self.assertTrue(user_has_permission(user, "view_ledger"))
+        self.assertTrue(user_has_permission(user, "manage_receipts"))
 
     def test_deny_override_blocks_permission(self):
         user = User.objects.create_user(

@@ -4,8 +4,12 @@
 
 {% block content %}
 <div class="page-container">
+    {% if can_manage_meetings %}
     {% url 'meetings:create' as schedule_url %}
     {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="People" page_title="Meetings" page_description="Search board and church meetings, minutes, and decisions." action_url=schedule_url action_label="Schedule" action_icon="bi-plus-lg" %}
+    {% else %}
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="People" page_title="Meetings" page_description="Search board and church meetings, minutes, and decisions." %}
+    {% endif %}
 
     <form method="get" class="filter-bar mb-3">
         <div class="row g-2 align-items-end">
@@ -77,7 +81,14 @@
                         <td class="text-end"><a href="{% url 'meetings:detail' m.pk %}" class="btn btn-sm btn-outline-primary">View</a></td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="7">{% include "includes/empty_state.html" with icon="bi-calendar-event" message="No meetings match your search." action_url=schedule_url action_label="Schedule meeting" %}</td></tr>
+                    <tr><td colspan="7">
+                        {% if can_manage_meetings %}
+                        {% url 'meetings:create' as schedule_url %}
+                        {% include "includes/empty_state.html" with icon="bi-calendar-event" message="No meetings match your search." action_url=schedule_url action_label="Schedule meeting" %}
+                        {% else %}
+                        {% include "includes/empty_state.html" with icon="bi-calendar-event" message="No meetings match your search." %}
+                        {% endif %}
+                    </td></tr>
                     {% endfor %}
                 </tbody>
             </table>

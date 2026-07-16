@@ -1,0 +1,70 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block title %}Setup Guide — Platform{% endblock %}
+{% block page_title %}Setup Guide{% endblock %}
+{% block page_subtitle %}
+<p class="platform-topbar-meta mb-0">
+    Complete these steps to go live.
+    <span class="ms-1">{{ setup.done_count }}/{{ setup.total_count }} done · {{ setup.percent }}%</span>
+</p>
+{% endblock %}
+
+{% block content %}
+<div class="platform-card mb-3">
+    <div class="platform-card-body py-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="small text-muted fw-semibold text-uppercase" style="letter-spacing:0.04em">Progress</span>
+            <span class="small fw-semibold">{% if setup.is_complete %}Ready{% else %}In progress{% endif %}</span>
+        </div>
+        <div class="platform-progress">
+            <div class="platform-progress__bar" style="width: {{ setup.percent }}%"></div>
+        </div>
+    </div>
+</div>
+
+<div class="platform-setup-list">
+    {% for item in setup.items %}
+    <a href="{% url item.url_name %}" class="platform-setup-item{% if item.done %} platform-setup-item--done{% endif %}">
+        <span class="platform-setup-item__icon"><i class="bi {{ item.icon }}"></i></span>
+        <span class="platform-setup-item__body">
+            <span class="platform-setup-item__label">{{ item.label }}</span>
+            <span class="platform-setup-item__detail">{{ item.detail }}</span>
+        </span>
+        <span class="platform-setup-item__status">
+            {% if item.done %}
+            <i class="bi bi-check-circle-fill text-success"></i>
+            {% else %}
+            <span class="badge bg-warning-subtle text-warning-emphasis">Configure</span>
+            {% endif %}
+        </span>
+    </a>
+    {% endfor %}
+</div>
+
+{% if can_run_seeds %}
+<div class="platform-card platform-card--compact mt-3">
+    <div class="platform-card-header"><i class="bi bi-magic me-1"></i>Run setup seeds</div>
+    <div class="platform-card-body">
+        <p class="small text-muted mb-3">Apply migrations and seed permissions, plans, payment methods, and denominations without using the terminal.</p>
+        <form method="post" class="d-flex flex-wrap gap-2 align-items-center">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="run_seed_suite">
+            <div class="form-check me-2">
+                <input class="form-check-input" type="checkbox" name="reset_permissions" value="1" id="setupResetPerms">
+                <label class="form-check-label small" for="setupResetPerms">Reset permission matrix</label>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Run migrate + all seed steps now?');">
+                <i class="bi bi-play-fill me-1"></i>Run all seeds
+            </button>
+            <a href="{% url 'sitecontrol:ops_health' %}" class="btn btn-outline-secondary btn-sm">Ops (church re-seed)</a>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<div class="d-flex flex-wrap gap-2 mt-3">
+    <a href="{% url 'sitecontrol:tenant_provision' %}" class="btn btn-primary btn-sm"><i class="bi bi-magic me-1"></i>Provision tenant</a>
+    <a href="{% url 'sitecontrol:ops_health' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-activity me-1"></i>Ops health</a>
+    <a href="{% url 'sitecontrol:dashboard' %}" class="btn btn-outline-secondary btn-sm">Back to Control Room</a>
+</div>
+{% endblock %}

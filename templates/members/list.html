@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load humanize permission_tags %}
 
 {% block title %}Members — ChurchHub{% endblock %}
 
 {% block content %}
 <div class="page-container page-shell">
-    {% if can_manage %}
+    {% if can_add_members %}
     {% url 'members:add' as add_url %}
     {% include "includes/page_header.html" with page_subtitle="People" page_title="Member Directory" page_description=church.name action_url=add_url action_label="Add Member" action_icon="bi-person-plus" %}
     {% else %}
@@ -45,11 +45,13 @@
                 <button type="submit" class="btn btn-outline-primary btn-sm">Filter</button>
             </div>
         </form>
+        {% if can_export_members %}
         <span class="toolbar-spacer"></span>
         <div class="btn-group btn-group-sm">
             <a href="?export=csv{% if filter_qs %}&amp;{{ filter_qs }}{% endif %}" class="btn btn-outline-secondary">CSV</a>
             <a href="?export=excel{% if filter_qs %}&amp;{{ filter_qs }}{% endif %}" class="btn btn-outline-secondary">Excel</a>
         </div>
+        {% endif %}
     </div>
 
     <div class="data-card">
@@ -69,7 +71,14 @@
                     {% for member in members %}
                     <tr>
                         <td>
-                            <a href="{% url 'members:detail' member.id %}" class="table-link">{{ member.first_name }} {{ member.last_name }}</a>
+                            <a href="{% url 'members:detail' member.id %}" class="table-link d-inline-flex align-items-center gap-2">
+                                {% if member.profile_picture %}
+                                <img src="{{ member.profile_picture.url }}" alt="" class="member-list-thumb">
+                                {% else %}
+                                <span class="member-list-thumb member-list-thumb--initials">{{ member.first_name|first|upper }}{{ member.last_name|first|upper }}</span>
+                                {% endif %}
+                                <span>{{ member.first_name }} {{ member.last_name }}</span>
+                            </a>
                             {% if not member.is_active %}<span class="badge bg-secondary ms-1">Inactive</span>{% endif %}
                         </td>
                         <td class="text-muted">{{ member.department|default:"—" }}</td>
@@ -78,7 +87,7 @@
                         <td class="text-muted">{{ member.phone|default:"—" }}</td>
                         <td class="text-end text-nowrap">
                             <a href="{% url 'members:timeline' member.id %}" class="btn btn-sm btn-outline-secondary">Timeline</a>
-                            {% if can_manage %}
+                            {% if can_edit_members %}
                             <a href="{% url 'members:edit' member.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
                             {% endif %}
                         </td>
@@ -86,7 +95,7 @@
                     {% empty %}
                     <tr>
                         <td colspan="6">
-                            {% if can_manage %}
+                            {% if can_add_members %}
                             {% url 'members:add' as add_url %}
                             {% include "includes/empty_state.html" with icon="bi-people" message="No members found." action_url=add_url action_label="Add member" %}
                             {% else %}

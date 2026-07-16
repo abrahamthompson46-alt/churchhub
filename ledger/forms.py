@@ -50,7 +50,7 @@ class LedgerEntryForm(forms.Form):
         label="Member",
         required=False,
         queryset=Member.objects.none(),
-        widget=forms.Select(attrs={**select_attrs(), "id": "id_member"}),
+        widget=forms.HiddenInput(attrs={"id": "id_member"}),
     )
 
     def __init__(self, *args, church=None, **kwargs):

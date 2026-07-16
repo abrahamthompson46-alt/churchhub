@@ -4,8 +4,12 @@
 
 {% block content %}
 <div class="page-container">
+    {% if can_manage_spiritual_gifts %}
     {% url 'members:spiritual_gift_add' as gift_url %}
     {% include "includes/page_header.html" with page_subtitle="Members" page_title="Spiritual Gifts" action_url=gift_url action_label="Add Gift Type" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Spiritual Gifts" %}
+    {% endif %}
 
     <div class="row g-3">
         {% for g in gifts %}
@@ -19,7 +23,12 @@
         </div>
         {% empty %}
         <div class="col-12">
+            {% if can_manage_spiritual_gifts %}
+            {% url 'members:spiritual_gift_add' as gift_url %}
             {% include "includes/empty_state.html" with icon="bi-gift" message="No gift types defined." action_url=gift_url action_label="Add gift type" %}
+            {% else %}
+            {% include "includes/empty_state.html" with icon="bi-gift" message="No gift types defined." %}
+            {% endif %}
         </div>
         {% endfor %}
     </div>

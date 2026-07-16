@@ -1,38 +1,37 @@
 {% comment %}
-
 Reusable compact form field renderer with purpose-based width hints.
-
+Hidden member/head ModelChoiceFields render as searchable photo pickers.
 Usage: {% include "includes/form_field.html" with field=form.field_name %}
-
 {% endcomment %}
-
 {% with wt=field.field.widget.input_type field_name=field.name %}
-
-<div class="form-group{% if wt == 'checkbox' %} form-group--check{% elif wt == 'textarea' %} form-group--wide{% elif wt == 'file' %} form-group--full{% elif 'description' in field_name or 'notes' in field_name or 'message' in field_name or 'reason' in field_name %} form-group--wide{% elif wt == 'number' or wt == 'date' %} form-group--short{% elif wt == 'email' or 'phone' in field_name %} form-group--medium{% endif %}">
-
-    {% if wt == 'checkbox' %}
-
-        <div class="form-check">
-
-            {{ field }}
-
-            <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-
-        </div>
-
-    {% else %}
-
+{% if field.is_hidden %}
+    {% if field_name == "member" or field_name == "head" %}
+    <div class="form-group form-group--wide">
         <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="text-danger ms-1">*</span>{% endif %}</label>
-
-        {{ field }}
-
+        {% if field.value.pk %}
+        {% include "includes/member_picker.html" with input_id=field.id_for_label field_name=field.html_name value=field.value.pk initial_member=field.value required=field.field.required placeholder="Search member by name or phone…" %}
+        {% else %}
+        {% include "includes/member_picker.html" with input_id=field.id_for_label field_name=field.html_name value=field.value required=field.field.required placeholder="Search member by name or phone…" %}
+        {% endif %}
+        {% if field.help_text %}<div class="form-hint">{{ field.help_text }}</div>{% endif %}
+        {% if field.errors %}<div class="form-error">{{ field.errors.0 }}</div>{% endif %}
+    </div>
+    {% else %}
+    {{ field }}
     {% endif %}
-
+{% else %}
+<div class="form-group{% if wt == 'checkbox' %} form-group--check{% elif wt == 'textarea' %} form-group--wide{% elif wt == 'file' %} form-group--full{% elif 'description' in field_name or 'notes' in field_name or 'message' in field_name or 'reason' in field_name %} form-group--wide{% elif wt == 'number' or wt == 'date' %} form-group--short{% elif wt == 'email' or 'phone' in field_name %} form-group--medium{% endif %}">
+    {% if wt == 'checkbox' %}
+        <div class="form-check">
+            {{ field }}
+            <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        </div>
+    {% else %}
+        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="text-danger ms-1">*</span>{% endif %}</label>
+        {{ field }}
+    {% endif %}
     {% if field.help_text %}<div class="form-hint">{{ field.help_text }}</div>{% endif %}
-
     {% if field.errors %}<div class="form-error">{{ field.errors.0 }}</div>{% endif %}
-
 </div>
-
+{% endif %}
 {% endwith %}
-

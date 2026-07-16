@@ -9,6 +9,7 @@ PLATFORM_NAV = [
         "icon": "bi-speedometer2",
         "items": [
             {"label": "Control Room", "url_name": "sitecontrol:dashboard", "icon": "bi-grid-1x2-fill"},
+            {"label": "Setup Guide", "url_name": "sitecontrol:setup", "icon": "bi-list-check"},
             {"label": "Tenant Health", "url_name": "sitecontrol:health", "icon": "bi-heart-pulse"},
             {"label": "Operations", "url_name": "sitecontrol:ops_health", "icon": "bi-activity"},
             {"label": "Audit Log", "url_name": "sitecontrol:audit_log", "icon": "bi-journal-check"},

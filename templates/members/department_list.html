@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="page-container">
-    {% if can_manage %}
+    {% if can_manage_departments %}
     {% url 'members:department_add' as dept_url %}
     {% include "includes/page_header.html" with page_subtitle="Members" page_title="Departments" action_url=dept_url action_label="Add Department" %}
     {% else %}
@@ -24,7 +24,7 @@
                     </tr>
                     {% empty %}
                     <tr><td colspan="3">
-                        {% if can_manage %}
+                        {% if can_manage_departments %}
                         {% url 'members:department_add' as dept_url %}
                         {% include "includes/empty_state.html" with icon="bi-diagram-2" message="No departments yet." action_url=dept_url action_label="Add department" %}
                         {% else %}

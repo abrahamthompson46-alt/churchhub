@@ -6,7 +6,9 @@
 <div class="page-container">
     {% include "includes/page_header.html" with page_subtitle="Fixed Assets" page_title="Activity Log" %}
     <div class="d-flex flex-wrap gap-2 mb-3">
+        {% if can_export_assets %}
         <a href="{% url 'assets:activity_log_export' %}{% if action_filter %}?action={{ action_filter|urlencode }}{% endif %}" class="btn btn-outline-secondary btn-sm">Export CSV</a>
+        {% endif %}
         <a href="{% url 'assets:index' %}" class="btn btn-outline-secondary btn-sm">Dashboard</a>
     </div>
     <form method="get" class="row g-2 mb-3">

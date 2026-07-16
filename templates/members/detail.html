@@ -8,22 +8,39 @@
     {% url 'members:edit' member.id as edit_url %}
     {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="People" page_title=member.full_name page_description=member.church.name %}
 
-    <div class="member-hero">
-        <div class="member-hero-avatar">{{ member.first_name|first|upper }}{{ member.last_name|first|upper }}</div>
+    <div class="member-hero member-hero--profile">
+        <div class="member-hero-photo">
+            {% if member.profile_picture %}
+            <img src="{{ member.profile_picture.url }}" alt="{{ member.full_name }}" class="member-hero-photo__img">
+            {% else %}
+            <div class="member-hero-avatar member-hero-avatar--xl">{{ member.first_name|first|upper }}{{ member.last_name|first|upper }}</div>
+            {% endif %}
+        </div>
         <div class="flex-grow-1">
+            <h2 class="member-hero-name h4 mb-2">{{ member.full_name }}</h2>
             <span class="chip chip--{% if member.is_active %}success{% else %}warning{% endif %}">{{ member.membership_status }}</span>
             {% if member.department %}<span class="chip ms-1">{{ member.department.name }}</span>{% endif %}
-            {% if member.phone %}<p class="text-muted small mb-0 mt-2"><i class="bi bi-telephone me-1"></i>{{ member.phone }}</p>{% endif %}
+            {% if member.membership_number %}<span class="chip chip--muted ms-1">#{{ member.membership_number }}</span>{% endif %}
+            <div class="member-hero-contacts mt-2">
+                {% if member.phone %}<span><i class="bi bi-telephone me-1"></i>{{ member.phone }}</span>{% endif %}
+                <span><i class="bi bi-geo-alt me-1"></i>{{ member.church.name }}</span>
+            </div>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            {% if can_manage %}
+            {% if can_edit_members %}
             <a href="{{ edit_url }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil me-1"></i>Edit</a>
+            {% endif %}
+            {% if can_manage_member_records %}
             <a href="{% url 'members:record_add' %}?member={{ member.id }}" class="btn btn-outline-secondary btn-sm">Record</a>
+            {% endif %}
+            {% if can_manage_spiritual_gifts %}
             <a href="{% url 'members:assign_gift' member.id %}" class="btn btn-outline-secondary btn-sm">Gift</a>
+            {% endif %}
+            {% if can_export_members %}
             <a href="{% url 'members:member_export' member.id %}" class="btn btn-outline-secondary btn-sm">Export</a>
             {% endif %}
             <a href="{% url 'members:timeline' member.id %}" class="btn btn-outline-secondary btn-sm">Timeline</a>
-            {% if show_welfare %}
+            {% if can_view_welfare or show_welfare %}
             <a href="{% url 'remittance:member_welfare' member.id %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-heart-pulse me-1"></i>Welfare</a>
             {% endif %}
         </div>
@@ -54,10 +71,10 @@
                 </div>
             </div>
 
-            <div class="panel">
+            <div class="panel mb-4">
                 <div class="panel-header d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-journal-text me-2 text-muted"></i>Recent Records</span>
-                    {% if can_manage %}
+                    <span><i class="bi bi-journal-text me-2 text-muted"></i>Records</span>
+                    {% if can_manage_member_records %}
                     <a href="{% url 'members:record_add' %}?member={{ member.id }}" class="btn btn-sm btn-link">Add</a>
                     {% endif %}
                 </div>
@@ -75,23 +92,51 @@
                     {% endfor %}
                 </ul>
             </div>
+
+            {% if roles %}
+            <div class="panel mb-4">
+                <div class="panel-header"><i class="bi bi-award me-2 text-muted"></i>Leadership Roles</div>
+                <ul class="list-plain">
+                    {% for role in roles %}
+                    <li class="d-flex justify-content-between gap-2 py-2">
+                        <span class="fw-semibold">{{ role.title }}</span>
+                        <span class="text-muted small">{{ role.department|default:"—" }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if gifts %}
+            <div class="panel mb-4">
+                <div class="panel-header"><i class="bi bi-stars me-2 text-muted"></i>Spiritual Gifts</div>
+                <ul class="list-plain">
+                    {% for assignment in gifts %}
+                    <li class="py-2">
+                        <span class="fw-semibold">{{ assignment.gift.name }}</span>
+                        {% if assignment.notes %}<div class="text-muted small">{{ assignment.notes }}</div>{% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
 
         <div>
             <div class="panel mb-4">
                 <div class="panel-header">Quick Links</div>
                 <div class="panel-body d-grid gap-2">
-                    {% if can_manage %}
+                    {% if can_transfer_members %}
                     <a href="{% url 'members:transfer_create' %}?member={{ member.id }}" class="btn btn-outline-secondary btn-sm text-start"><i class="bi bi-arrow-left-right me-2"></i>Request Transfer</a>
                     {% endif %}
                     <a href="{% url 'giving:member_statement' member.id %}" class="btn btn-outline-secondary btn-sm text-start"><i class="bi bi-wallet2 me-2"></i>Giving Statement</a>
-                    {% if show_welfare %}
+                    {% if can_view_welfare or show_welfare %}
                     <a href="{% url 'remittance:member_welfare' member.id %}" class="btn btn-outline-primary btn-sm text-start"><i class="bi bi-heart-pulse me-2"></i>Welfare Statement</a>
                     {% endif %}
                 </div>
             </div>
 
-            {% if show_welfare and welfare_summary %}
+            {% if welfare_summary and can_view_welfare or welfare_summary and show_welfare %}
             <div class="panel mb-4">
                 <div class="panel-header d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-heart-pulse me-2 text-muted"></i>Welfare</span>

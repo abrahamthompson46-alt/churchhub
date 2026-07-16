@@ -5,10 +5,12 @@
 {% block content %}
 <div class="page-container">
     {% url 'accounts:invite_user' as invite_url %}
-    {% if institution_invites_allowed %}
+    {% if can_invite_users and institution_invites_allowed %}
     {% include "includes/page_header.html" with page_subtitle="Administration" page_title="User Management" page_description="Manage church staff accounts and roles." action_url=invite_url action_label="Invite User" %}
-    {% else %}
+    {% elif not institution_invites_allowed %}
     {% include "includes/page_header.html" with page_subtitle="Administration" page_title="User Management" page_description="User invitations are disabled by the platform owner." %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Administration" page_title="User Management" page_description="Manage church staff accounts and roles." %}
     {% endif %}
 
     <div class="filter-bar">
@@ -72,7 +74,11 @@
                             {% if can_manage_permissions %}
                             <a href="{% url 'permissions:user_effective' u.pk %}" class="btn btn-sm btn-outline-primary">Permissions</a>
                             {% endif %}
+                            {% if can_manage_users %}
                             <a href="{% url 'accounts:user_detail' u.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            {% else %}
+                            <a href="{% url 'accounts:user_detail' u.pk %}" class="btn btn-sm btn-outline-secondary">View</a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
@@ -123,7 +129,7 @@
                         <td class="text-muted small">{{ inv.expires_at|date:"M j, Y" }}</td>
                         <td class="text-end text-nowrap">
                             <a href="{% url 'accounts:invite_detail' inv.pk %}" class="table-link me-2">Details</a>
-                            {% if inv.is_valid %}
+                            {% if inv.is_valid and can_invite_users %}
                             <form method="post" action="{% url 'accounts:invite_resend' inv.pk %}" class="d-inline">{% csrf_token %}
                                 <button type="submit" class="btn btn-sm btn-outline-primary">Resend</button>
                             </form>

@@ -3493,6 +3493,83 @@ main .page-container,
     font-size: 1rem;
 }
 
+/* ── Workspace status bar (below module tabs) ── */
+.workspace-status-bar {
+    border-bottom: 1px solid var(--ch-border);
+    background: #f8fafc;
+}
+.workspace-status-bar__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem 1rem;
+    padding: 0.45rem 0;
+}
+.workspace-status-bar__meta,
+.workspace-status-bar__cash {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.75rem;
+}
+.workspace-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    color: var(--ch-muted);
+}
+.workspace-status-pill__label {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #94a3b8;
+}
+.workspace-status-pill strong {
+    color: var(--ch-navy);
+    font-weight: 600;
+}
+.workspace-status-pill.is-open strong { color: var(--ch-success); }
+.workspace-status-pill.is-closed strong { color: var(--ch-warning); }
+.workspace-status-pill.is-unset strong { color: #64748b; }
+.workspace-status-pill__link {
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 0.15rem;
+}
+.workspace-status-pill--cash strong { font-variant-numeric: tabular-nums; }
+
+.filter-bar--actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    align-items: flex-end;
+}
+.filter-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.table-status {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ch-muted);
+}
+.table-status--approved { color: #047857; }
+.table-status--pending { color: #b45309; }
+.table-status--rejected { color: #b91c1c; }
+.table-status--voided {
+    display: inline-block;
+    margin-left: 0.35rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
 /* ── Member portal ─────────────────────────────────────────── */
 .portal-hero {
     display: flex;
@@ -3546,7 +3623,8 @@ main .page-container,
 }
 
 @media print {
-    .ch-navbar, .app-footer, .flash-stack, .module-tabs { display: none !important; }
+    .ch-navbar, .app-footer, .flash-stack, .module-tabs,
+    .workspace-status-bar, .filter-bar, .no-print, .page-header-actions { display: none !important; }
     .main-content { padding: 0; }
     .card, .data-card { box-shadow: none; border: 1px solid #ddd; }
 }

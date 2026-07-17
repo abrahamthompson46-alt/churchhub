@@ -12,6 +12,7 @@ urlpatterns = [
     path("notifications/read-all/", views.notification_mark_all_read, name="notification_mark_all_read"),
     path("notifications/count/", views.notification_count, name="notification_count"),
     path("notifications/pending/", views.pending_announcements_ajax, name="pending_announcements_count"),
+    path("teller-console/", views.teller_console_api, name="teller_console_api"),
     path("cutoff/", views.cutoff, name="cutoff"),
     path("logout/", views.custom_logout, name="logout"),
 ]

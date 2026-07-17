@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{% static 'vendor/fonts/plus-jakarta-sans/plus-jakarta-sans.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/font/bootstrap-icons.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260717">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260717b">
     <meta name="theme-color" content="{{ institution_primary_color|default:'#0f2942' }}">
     {% if institution_primary_color %}
     <style>
@@ -34,6 +34,7 @@
             {% if module_tabs %}
             {% include "includes/module_tabs.html" %}
             {% endif %}
+            {% include "includes/workspace_status_bar.html" %}
         {% endif %}
     {% endif %}
 

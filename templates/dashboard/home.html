@@ -49,35 +49,6 @@
         </div>
     </header>
 
-    {% if show_working_day_status or system_date %}
-    <div class="cc-context-bar" aria-label="System and working day">
-        <span class="cc-context-pill">
-            <i class="bi bi-calendar3"></i>
-            System <strong>{{ system_date|date:"D, j M Y" }}</strong>
-        </span>
-        {% if show_working_day_status %}
-        <span class="cc-context-pill {% if working_day_is_open %}cc-context-pill--open{% elif working_date %}cc-context-pill--closed{% else %}cc-context-pill--unset{% endif %}">
-            <i class="bi bi-{% if working_day_is_open %}unlock{% elif working_date %}lock{% else %}exclamation-circle{% endif %}"></i>
-            Working
-            <strong>
-                {% if working_day_is_open %}{{ working_date|date:"j M Y" }} · Open
-                {% elif working_date %}{{ working_date|date:"j M Y" }} · Closed
-                {% else %}No day open{% endif %}
-            </strong>
-            {% if can_manage_working_day %}
-            <a href="{% url 'transactions:period_list' %}" class="ms-1">Manage</a>
-            {% endif %}
-        </span>
-        {% endif %}
-        {% if active_church %}
-        <span class="cc-context-pill">
-            <i class="bi bi-geo-alt"></i>
-            Church <strong>{{ active_church.name }}</strong>
-        </span>
-        {% endif %}
-    </div>
-    {% endif %}
-
     {% if is_control_center and executive_kpis %}
     <section class="cc-kpi-grid mb-4" aria-label="Executive KPIs">
         <a href="{% url 'organization:hierarchy' %}" class="cc-kpi-card">
@@ -152,6 +123,65 @@
         {% endif %}
     </section>
     {% endif %}
+    {% endif %}
+
+    {% if show_teller_console and teller_console %}
+    <section class="cc-panel mb-4" id="teller-console" data-refresh-url="{% url 'dashboard:teller_console_api' %}" aria-label="Teller console">
+        <div class="cc-panel__header">
+            <h2 class="cc-panel__title"><i class="bi bi-person-badge"></i> Teller Console</h2>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small" id="teller-console-date">
+                    {% if teller_console.business_date %}{{ teller_console.business_date|date:"j M Y" }}{% endif %}
+                </span>
+                <span class="text-muted small" id="teller-console-updated">Live</span>
+                {% if can_manage_receipts or can_manage_finances %}
+                <a href="{% url 'transactions:record_receipt' %}" class="btn btn-primary btn-sm">New receipt</a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="table-responsive table-in-card">
+            <table class="table table-sm table-hover mb-0 align-middle" id="teller-console-table">
+                <thead>
+                    <tr>
+                        <th>Teller</th>
+                        <th class="text-end">Entries</th>
+                        <th class="text-end">Receipts</th>
+                        <th class="text-end">Expenses</th>
+                        <th class="text-end">Pending</th>
+                        <th class="text-end">Approved</th>
+                    </tr>
+                </thead>
+                <tbody id="teller-console-body">
+                    {% for row in teller_console.tellers %}
+                    <tr>
+                        <td class="fw-medium">{{ row.name }}</td>
+                        <td class="text-end">{{ row.entries }}</td>
+                        <td class="text-end text-currency">₵{{ row.receipts|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency">₵{{ row.expenses|floatformat:2|intcomma }}</td>
+                        <td class="text-end">{{ row.pending }}</td>
+                        <td class="text-end">{{ row.approved }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr id="teller-console-empty">
+                        <td colspan="6" class="text-muted text-center py-3">No entries for this business day yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% if teller_console.tellers %}
+                <tfoot>
+                    <tr class="fw-semibold">
+                        <td>Total</td>
+                        <td class="text-end" id="teller-total-entries">{{ teller_console.totals.entries }}</td>
+                        <td class="text-end text-currency" id="teller-total-receipts">₵{{ teller_console.totals.receipts|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency" id="teller-total-expenses">₵{{ teller_console.totals.expenses|floatformat:2|intcomma }}</td>
+                        <td class="text-end" id="teller-total-pending">{{ teller_console.totals.pending }}</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </section>
     {% endif %}
 
     <div class="row g-4">
@@ -420,6 +450,75 @@ if (ctx) {
         }
     });
 }
+</script>
+{% endif %}
+{% if show_teller_console %}
+<script>
+(function () {
+    const panel = document.getElementById('teller-console');
+    if (!panel) return;
+    const url = panel.dataset.refreshUrl;
+    const body = document.getElementById('teller-console-body');
+    const updatedEl = document.getElementById('teller-console-updated');
+    const dateEl = document.getElementById('teller-console-date');
+
+    function money(v) {
+        const n = Number(v || 0);
+        return '₵' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function render(data) {
+        if (dateEl && data.business_date) {
+            const d = new Date(data.business_date + 'T00:00:00');
+            dateEl.textContent = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+        if (!body) return;
+        if (!data.tellers || !data.tellers.length) {
+            body.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-3">No entries for this business day yet.</td></tr>';
+        } else {
+            body.innerHTML = data.tellers.map(function (row) {
+                return '<tr>' +
+                    '<td class="fw-medium">' + row.name + '</td>' +
+                    '<td class="text-end">' + row.entries + '</td>' +
+                    '<td class="text-end text-currency">' + money(row.receipts) + '</td>' +
+                    '<td class="text-end text-currency">' + money(row.expenses) + '</td>' +
+                    '<td class="text-end">' + row.pending + '</td>' +
+                    '<td class="text-end">' + row.approved + '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+        const te = document.getElementById('teller-total-entries');
+        const tr = document.getElementById('teller-total-receipts');
+        const tx = document.getElementById('teller-total-expenses');
+        const tp = document.getElementById('teller-total-pending');
+        if (te && data.totals) te.textContent = data.totals.entries;
+        if (tr && data.totals) tr.textContent = money(data.totals.receipts);
+        if (tx && data.totals) tx.textContent = money(data.totals.expenses);
+        if (tp && data.totals) tp.textContent = data.totals.pending;
+        if (updatedEl) {
+            const now = new Date();
+            updatedEl.textContent = 'Updated ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+        // Sync cash pills in workspace bar when present
+        if (data.cash_position) {
+            document.querySelectorAll('[data-cash-field]').forEach(function (el) {
+                const key = el.getAttribute('data-cash-field');
+                if (data.cash_position[key] != null) {
+                    el.textContent = money(data.cash_position[key]);
+                }
+            });
+        }
+    }
+
+    function refresh() {
+        fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) { if (data && !data.error) render(data); })
+            .catch(function () {});
+    }
+
+    setInterval(refresh, 20000);
+})();
 </script>
 {% endif %}
 {% endblock %}

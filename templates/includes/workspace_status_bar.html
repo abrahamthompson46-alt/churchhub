@@ -1,0 +1,54 @@
+{% load humanize %}
+{% if user.is_authenticated and not user.is_platform_user and user.role != "MEMBER" %}
+{% if show_working_day_status or system_date or active_church or cash_position %}
+<div class="workspace-status-bar" aria-label="Workspace status">
+    <div class="workspace-status-bar__inner page-container">
+        <div class="workspace-status-bar__meta">
+            {% if system_date %}
+            <span class="workspace-status-pill">
+                <span class="workspace-status-pill__label">System</span>
+                <strong>{{ system_date|date:"D, j M Y" }}</strong>
+            </span>
+            {% endif %}
+            {% if show_working_day_status %}
+            <span class="workspace-status-pill {% if working_day_is_open %}is-open{% elif working_date %}is-closed{% else %}is-unset{% endif %}">
+                <span class="workspace-status-pill__label">Working</span>
+                <strong>
+                    {% if working_day_is_open %}{{ working_date|date:"j M Y" }} · Open
+                    {% elif working_date %}{{ working_date|date:"j M Y" }} · Closed
+                    {% else %}No day open{% endif %}
+                </strong>
+                {% if can_manage_working_day %}
+                <a href="{% url 'transactions:period_list' %}" class="workspace-status-pill__link">Manage</a>
+                {% endif %}
+            </span>
+            {% endif %}
+            {% if active_church %}
+            <span class="workspace-status-pill">
+                <span class="workspace-status-pill__label">Church</span>
+                <strong>{{ active_church.name }}</strong>
+            </span>
+            {% endif %}
+        </div>
+        {% if cash_position and show_cash_position %}
+        <div class="workspace-status-bar__cash" title="Approved book balances">
+            <span class="workspace-status-pill workspace-status-pill--cash">
+                <span class="workspace-status-pill__label">Cash</span>
+                <strong class="text-currency" data-cash-field="cash">₵{{ cash_position.cash|floatformat:2|intcomma }}</strong>
+            </span>
+            <span class="workspace-status-pill workspace-status-pill--cash">
+                <span class="workspace-status-pill__label">Bank</span>
+                <strong class="text-currency" data-cash-field="bank">₵{{ cash_position.bank|floatformat:2|intcomma }}</strong>
+            </span>
+            {% if cash_position.petty_cash %}
+            <span class="workspace-status-pill workspace-status-pill--cash">
+                <span class="workspace-status-pill__label">Petty</span>
+                <strong class="text-currency" data-cash-field="petty_cash">₵{{ cash_position.petty_cash|floatformat:2|intcomma }}</strong>
+            </span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endif %}

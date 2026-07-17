@@ -40,6 +40,52 @@ def _apply_church_switch(request, church_param):
 
 
 @login_required
+def teller_console_api(request):
+    """JSON feed for live teller daily summary (auto-refresh on dashboard)."""
+    from permissions.checks import can_manage_finances, can_view_transactions
+    from transactions.treasury import get_cash_position, get_teller_daily_summary
+
+    if not (can_manage_finances(request.user) or can_view_transactions(request.user)):
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    church = get_active_church(request)
+    if not church:
+        return JsonResponse({"error": "no_church", "tellers": [], "totals": {}})
+
+    summary = get_teller_daily_summary(church)
+    cash = get_cash_position(church)
+
+    def _dec(value):
+        return f"{value:.2f}"
+
+    return JsonResponse({
+        "business_date": summary["business_date"].isoformat() if summary["business_date"] else None,
+        "working_day_open": summary["working_day_open"],
+        "tellers": [
+            {
+                **{k: v for k, v in row.items() if k not in ("receipts", "expenses", "transfers")},
+                "receipts": _dec(row["receipts"]),
+                "expenses": _dec(row["expenses"]),
+                "transfers": _dec(row["transfers"]),
+            }
+            for row in summary["tellers"]
+        ],
+        "totals": {
+            "entries": summary["totals"].get("entries", 0),
+            "receipts": _dec(summary["totals"].get("receipts", 0)),
+            "expenses": _dec(summary["totals"].get("expenses", 0)),
+            "pending": summary["totals"].get("pending", 0),
+        },
+        "cash_position": {
+            "cash": _dec(cash["cash"]),
+            "bank": _dec(cash["bank"]),
+            "petty_cash": _dec(cash["petty_cash"]),
+            "total_liquid": _dec(cash["total_liquid"]),
+        },
+    })
+
+
+@login_required
 def home(request):
     if "church" in request.GET:
         _apply_church_switch(request, request.GET.get("church"))

@@ -370,10 +370,23 @@ def budget_report(request):
 
 @_finance_required
 def transaction_list(request):
+    from transactions.services import resolve_transaction_date
+
+    church = get_active_church(request)
+    business_date = resolve_transaction_date(church) if church else timezone.localdate()
+
+    date_from = parse_date(request.GET.get("date_from") or "") or business_date
+    date_to = parse_date(request.GET.get("date_to") or "") or business_date
+    if date_from > date_to:
+        date_from, date_to = date_to, date_from
+
     transactions = filter_by_church(
         Transaction.objects.select_related("member", "church", "created_by"),
         request,
-    ).prefetch_related("lines__account").order_by("-date", "-created_at")
+    ).prefetch_related("lines__account").filter(
+        date__gte=date_from,
+        date__lte=date_to,
+    ).order_by("-date", "-created_at")
 
     status = request.GET.get("status", "")
     txn_type = request.GET.get("type", "")
@@ -386,14 +399,45 @@ def transaction_list(request):
     if show_voided != "1":
         transactions = transactions.filter(is_voided=False)
 
+    export_fmt = request.GET.get("export", "")
+    if export_fmt in ("csv", "excel"):
+        from reports.exporters import export_table_csv, export_table_excel
+
+        headers = ["Reference", "Date", "Type", "Status", "Description", "Amount", "Created by", "Voided"]
+        rows = []
+        for t in transactions[:5000]:
+            rows.append([
+                t.reference or "",
+                t.date.isoformat() if t.date else "",
+                t.get_transaction_type_display(),
+                t.get_approval_status_display(),
+                t.description or "",
+                f"{abs(t.receipt_total):.2f}",
+                (t.created_by.get_full_name() or t.created_by.username) if t.created_by else "",
+                "Yes" if t.is_voided else "No",
+            ])
+        title = f"Transactions {date_from} to {date_to}"
+        if export_fmt == "csv":
+            return export_table_csv(headers, rows, "transactions.csv")
+        return export_table_excel(headers, rows, "transactions.xlsx", title)
+
     paginator = Paginator(transactions, 50)
     page_obj = paginator.get_page(request.GET.get("page"))
+
+    query = request.GET.copy()
+    query.pop("page", None)
+    query.pop("export", None)
 
     return render(request, "transactions/transaction_list.html", {
         "transactions": page_obj,
         "page_obj": page_obj,
         "status_filter": status,
         "type_filter": txn_type,
+        "date_from": date_from,
+        "date_to": date_to,
+        "business_date": business_date,
+        "show_voided": show_voided == "1",
+        "filter_query": query.urlencode(),
         "can_void": can_void_transactions(request.user),
     })
 

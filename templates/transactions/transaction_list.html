@@ -1,14 +1,22 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Transactions — ChurchHub{% endblock %}
+{% block title %}Transactions — {{ institution_display_name|default:site_name }}{% endblock %}
 
 {% block content %}
 <div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="All Transactions" %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="All Transactions" page_description="Defaults to the current business (working) date." %}
 
-    <div class="filter-bar">
-        <form method="get" class="filter-form">
+    <div class="filter-bar filter-bar--actions">
+        <form method="get" class="filter-form" id="txn-filter-form">
+            <div class="filter-field">
+                <label class="form-label" for="id_date_from">From</label>
+                <input type="date" name="date_from" id="id_date_from" class="form-control form-control-sm" value="{{ date_from|date:'Y-m-d' }}">
+            </div>
+            <div class="filter-field">
+                <label class="form-label" for="id_date_to">To</label>
+                <input type="date" name="date_to" id="id_date_to" class="form-control form-control-sm" value="{{ date_to|date:'Y-m-d' }}">
+            </div>
             <div class="filter-field">
                 <label class="form-label">Status</label>
                 <select name="status" class="form-select form-control-sm">
@@ -30,18 +38,35 @@
                 </select>
             </div>
             <div class="filter-field">
-                <div class="form-check mb-1">
-                    <input class="form-check-input" type="checkbox" name="voided" value="1" id="show-voided">
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" name="voided" value="1" id="show-voided" {% if show_voided %}checked{% endif %}>
                     <label class="form-check-label small" for="show-voided">Include voided</label>
                 </div>
             </div>
             <div class="filter-actions">
                 <button type="submit" class="btn btn-outline-primary btn-sm">Filter</button>
+                <a href="{% url 'transactions:transaction_list' %}" class="btn btn-outline-secondary btn-sm" title="Reset to business date">Today</a>
             </div>
         </form>
+        <div class="filter-toolbar">
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i>Print
+            </button>
+            <a class="btn btn-outline-secondary btn-sm" href="?{{ filter_query }}&amp;export=csv">
+                <i class="bi bi-filetype-csv me-1"></i>CSV
+            </a>
+            <a class="btn btn-outline-secondary btn-sm" href="?{{ filter_query }}&amp;export=excel">
+                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+            </a>
+        </div>
     </div>
 
-    <div class="data-card">
+    <p class="small text-muted mb-2 no-print">
+        Business date: <strong>{{ business_date|date:"j M Y" }}</strong>
+        · Showing {{ date_from|date:"j M Y" }}{% if date_from != date_to %} – {{ date_to|date:"j M Y" }}{% endif %}
+    </p>
+
+    <div class="data-card printable-table">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead>
@@ -50,6 +75,7 @@
                         <th>Date</th>
                         <th>Type</th>
                         <th>Status</th>
+                        <th>Teller</th>
                         <th>Description</th>
                         <th class="text-end">Amount</th>
                     </tr>
@@ -58,34 +84,33 @@
                     {% for t in transactions %}
                     <tr class="{% if t.is_voided %}table-secondary{% endif %}">
                         <td><a href="{% url 'transactions:transaction_detail' t.id %}" class="table-link"><code class="small">{{ t.reference }}</code></a></td>
-                        <td>{{ t.date }}</td>
-                        <td><span class="chip">{{ t.transaction_type }}</span></td>
+                        <td>{{ t.date|date:"j M Y" }}</td>
+                        <td>{{ t.get_transaction_type_display }}</td>
                         <td>
-                            {% if t.approval_status == 'APPROVED' %}<span class="badge bg-success">{{ t.approval_status }}</span>
-                            {% elif t.approval_status == 'PENDING' %}<span class="badge bg-warning text-dark">{{ t.approval_status }}</span>
-                            {% else %}<span class="badge bg-secondary">{{ t.approval_status }}</span>{% endif %}
-                            {% if t.is_voided %}<span class="badge bg-dark">VOID</span>{% endif %}
+                            <span class="table-status table-status--{{ t.approval_status|lower }}">{{ t.get_approval_status_display }}</span>
+                            {% if t.is_voided %}<span class="table-status table-status--voided">Voided</span>{% endif %}
                         </td>
-                        <td class="text-muted small">{{ t.description|default:"—"|truncatechars:35 }}</td>
+                        <td class="small text-muted">{% if t.created_by %}{{ t.created_by.get_full_name|default:t.created_by.username }}{% else %}—{% endif %}</td>
+                        <td class="text-muted small">{{ t.description|default:"—"|truncatechars:40 }}</td>
                         <td class="text-end text-currency">₵ {{ t.receipt_total|floatformat:2|intcomma }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6">{% include "includes/empty_state.html" with icon="bi-receipt" message="No transactions found." %}</td>
+                        <td colspan="7">{% include "includes/empty_state.html" with icon="bi-receipt" message="No transactions for this date range." %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
         {% if page_obj.has_other_pages %}
-        <div class="card-footer d-flex justify-content-between align-items-center">
+        <div class="card-footer d-flex justify-content-between align-items-center no-print">
             <span class="text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
             <ul class="pagination pagination-sm mb-0">
                 {% if page_obj.has_previous %}
-                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&amp;status={{ status_filter }}&amp;type={{ type_filter }}">Previous</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&amp;{{ filter_query }}">Previous</a></li>
                 {% endif %}
                 {% if page_obj.has_next %}
-                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&amp;status={{ status_filter }}&amp;type={{ type_filter }}">Next</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&amp;{{ filter_query }}">Next</a></li>
                 {% endif %}
             </ul>
         </div>

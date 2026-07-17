@@ -28,6 +28,7 @@ from permissions.checks import (
     can_view_all_churches,
     can_view_meetings,
     can_view_members,
+    can_view_transactions,
 )
 from permissions.scoping import get_manageable_churches
 from transactions.models import FinancialPeriod, MonthlyCutoff, Transaction, TransactionLine
@@ -881,6 +882,7 @@ def build_home_context(request):
     user = request.user
     role = get_dashboard_role(user)
     show_finance = can_manage_finances(user)
+    show_treasury_ops = show_finance or can_view_transactions(user)
     show_members = can_view_members(user) or can_manage_members(user)
     show_admin = can_view_all_churches(user) or user.is_superuser
     show_hierarchy = role in ("admin", "overseer", "district_overseer") or show_admin
@@ -916,6 +918,19 @@ def build_home_context(request):
 
     if show_finance:
         context.update(get_financial_summary(request))
+
+    if show_treasury_ops:
+        church = get_active_church(request)
+        if church:
+            from transactions.treasury import get_cash_position, get_teller_daily_summary
+
+            context["cash_position"] = get_cash_position(church)
+            context["teller_console"] = get_teller_daily_summary(church)
+            context["show_teller_console"] = True
+        else:
+            context["show_teller_console"] = False
+    else:
+        context["show_teller_console"] = False
 
     if show_members:
         context.update(get_member_summary(request))

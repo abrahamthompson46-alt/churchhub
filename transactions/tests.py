@@ -273,6 +273,27 @@ class TransactionViewTests(FinancialServicesTests):
     def test_transaction_list_accessible(self):
         response = self.client.get(reverse("transactions:transaction_list"))
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "All Transactions")
+        self.assertContains(response, "Print")
+        self.assertNotContains(response, "badge bg-")
+
+    def test_transaction_list_defaults_to_business_date(self):
+        from transactions.services import resolve_transaction_date
+
+        business = resolve_transaction_date(self.church)
+        response = self.client.get(reverse("transactions:transaction_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["date_from"], business)
+        self.assertEqual(response.context["date_to"], business)
+
+    def test_transaction_list_export_csv(self):
+        response = self.client.get(
+            reverse("transactions:transaction_list"),
+            {"export": "csv"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv")
+        self.assertIn("Reference,Date,Type,Status", response.content.decode("utf-8"))
 
     def test_reconciliation_list_accessible(self):
         response = self.client.get(reverse("transactions:reconciliation_list"))

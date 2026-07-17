@@ -41,7 +41,9 @@
                     <a href="{% url 'ledger:entry' %}?category={{ category.pk }}" class="btn btn-primary btn-sm">
                         <i class="bi bi-journal-plus me-1"></i>Post Entry with This Category
                     </a>
+                    {% if can_manage_gl_categories %}
                     <a href="{% url 'ledger:category_edit' category.pk %}" class="btn btn-outline-secondary btn-sm ms-1">Edit</a>
+                    {% endif %}
                     <a href="{% url 'ledger:categories' %}?type={{ category.transaction_type }}" class="btn btn-outline-secondary btn-sm ms-1">All {{ category.get_transaction_type_display }} Categories</a>
                 </div>
             </div>

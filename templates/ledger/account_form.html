@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — Ledger{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title=title page_description="Accounts appear in posting category debit/credit selectors." %}
+
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <form method="post" class="data-card p-4">
+                {% csrf_token %}
+                {% include "includes/form_field.html" with field=form.name %}
+                {% include "includes/form_field.html" with field=form.code %}
+                {% include "includes/form_field.html" with field=form.account_type %}
+                <div class="form-check mb-3">
+                    {{ form.is_active }}
+                    <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Active</label>
+                </div>
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger small">{{ form.non_field_errors }}</div>
+                {% endif %}
+                <div class="d-flex justify-content-between gap-2 mt-3">
+                    <a href="{% url 'ledger:accounts' %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+                    <button type="submit" class="btn btn-primary btn-sm">Save Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

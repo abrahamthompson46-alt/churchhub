@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Chart of Accounts — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
+    {% if can_manage_accounts %}
+    {% url 'ledger:account_add' as account_add_url %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Chart of Accounts" page_description="GL accounts used by posting categories and journal entries." action_url=account_add_url action_label="Add Account" action_icon="bi-plus-lg" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Chart of Accounts" page_description="GL accounts used by posting categories and journal entries." %}
+    {% endif %}
+
+    <div class="filter-bar filter-bar--tabs mb-4">
+        <div class="btn-group btn-group-sm" role="group">
+            <a href="{% url 'ledger:accounts' %}" class="btn btn-outline-secondary{% if not type_filter %} active{% endif %}">All types</a>
+            {% for value, label in type_choices %}
+            <a href="?type={{ value }}{% if show_inactive %}&inactive=1{% endif %}" class="btn btn-outline-secondary{% if type_filter == value %} active{% endif %}">{{ label }}</a>
+            {% endfor %}
+        </div>
+        <span class="toolbar-spacer"></span>
+        {% if show_inactive %}
+        <a href="{% url 'ledger:accounts' %}{% if type_filter %}?type={{ type_filter }}{% endif %}" class="btn btn-outline-secondary btn-sm">Hide inactive</a>
+        {% else %}
+        <a href="?inactive=1{% if type_filter %}&type={{ type_filter }}{% endif %}" class="btn btn-outline-secondary btn-sm">Show inactive</a>
+        {% endif %}
+        <a href="{% url 'ledger:categories' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-tags me-1"></i>Categories</a>
+        {% if can_manage_accounts %}
+        <a href="{% url 'ledger:account_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Account</a>
+        {% endif %}
+    </div>
+
+    <div class="table-wrap table-wrap--center table-wrap--compact">
+        {% include "includes/table_open.html" with table_title="Accounts" table_icon="bi-journal-bookmark" %}
+        <table class="table table-sm mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    {% if can_manage_accounts %}<th class="text-end">Actions</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for account in accounts %}
+                <tr>
+                    <td><code class="small">{{ account.code|default:"—" }}</code></td>
+                    <td>{{ account.name }}</td>
+                    <td class="small text-muted">{{ account.get_account_type_display }}</td>
+                    <td>
+                        <span class="chip chip--{% if account.is_active %}success{% else %}muted{% endif %}">
+                            {% if account.is_active %}Active{% else %}Inactive{% endif %}
+                        </span>
+                    </td>
+                    {% if can_manage_accounts %}
+                    <td class="text-end">
+                        <a href="{% url 'ledger:account_edit' account.pk %}" class="btn btn-outline-secondary btn-sm">Edit</a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="{% if can_manage_accounts %}5{% else %}4{% endif %}">
+                        {% if can_manage_accounts %}
+                        {% url 'ledger:account_add' as account_add_url %}
+                        {% include "includes/empty_state.html" with icon="bi-journal-bookmark" message="No accounts yet. Seed the ledger or add an account." action_url=account_add_url action_label="Add account" %}
+                        {% else %}
+                        {% include "includes/empty_state.html" with icon="bi-journal-bookmark" message="No accounts configured." %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% include "includes/table_close.html" %}
+    </div>
+</div>
+{% endblock %}

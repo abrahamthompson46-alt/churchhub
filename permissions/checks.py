@@ -78,6 +78,7 @@ def can_export_transactions(user): return _p(user, "export_transactions")
 def can_view_ledger(user): return _p(user, "view_ledger")
 def can_manage_ledger_entries(user): return _p(user, "manage_ledger_entries")
 def can_manage_gl_categories(user): return _p(user, "manage_gl_categories")
+def can_manage_chart_of_accounts(user): return _p(user, "manage_chart_of_accounts")
 def can_export_ledger(user): return _p(user, "export_ledger")
 def can_view_trial_balance(user): return _p(user, "view_trial_balance")
 

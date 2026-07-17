@@ -20,7 +20,7 @@
                     <tr>
                         <td><strong>{{ dept.name }}</strong></td>
                         <td class="text-muted">{{ dept.description|default:"—"|truncatewords:12 }}</td>
-                        <td>{{ dept.member_count }}</td>
+                        <td>{{ dept.members_total }}</td>
                     </tr>
                     {% empty %}
                     <tr><td colspan="3">

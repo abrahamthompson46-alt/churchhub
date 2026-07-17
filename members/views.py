@@ -482,7 +482,8 @@ def record_detail(request, pk):
 def department_list(request):
     _require_view_members(request)
     departments = filter_by_church(
-        Department.objects.annotate(member_count=Count("members")).order_by("name"),
+        # Use members_total — never annotate as member_count if a @property exists
+        Department.objects.annotate(members_total=Count("members")).order_by("name"),
         request,
     )
     return render(request, "members/department_list.html", {
@@ -510,7 +511,7 @@ def family_list(request):
     _require_view_members(request)
     families = filter_by_church(
         Family.objects.select_related("head").annotate(
-            member_count=Count("members")
+            members_total=Count("members")
         ).order_by("name"),
         request,
     )

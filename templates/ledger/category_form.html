@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — Ledger{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title=title page_description="Define the debit and credit accounts used when posting this category." %}
+
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <form method="post" class="data-card p-4">
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-md-5">{% include "includes/form_field.html" with field=form.code %}</div>
+                    <div class="col-md-7">{% include "includes/form_field.html" with field=form.name %}</div>
+                </div>
+                {% include "includes/form_field.html" with field=form.transaction_type %}
+                {% include "includes/form_field.html" with field=form.default_narration %}
+                <div class="row g-3">
+                    <div class="col-md-6">{% include "includes/form_field.html" with field=form.default_debit_account %}</div>
+                    <div class="col-md-6">{% include "includes/form_field.html" with field=form.default_credit_account %}</div>
+                </div>
+                <div class="row g-3 mt-1">
+                    <div class="col-md-4">{% include "includes/form_field.html" with field=form.sort_order %}</div>
+                    <div class="col-md-4 d-flex align-items-end pb-3">
+                        <div class="form-check">
+                            {{ form.requires_member }}
+                            <label class="form-check-label" for="{{ form.requires_member.id_for_label }}">Requires member</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end pb-3">
+                        <div class="form-check">
+                            {{ form.remit_to_district }}
+                            <label class="form-check-label" for="{{ form.remit_to_district.id_for_label }}">Remittance split</label>
+                        </div>
+                    </div>
+                </div>
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger small">{{ form.non_field_errors }}</div>
+                {% endif %}
+                <div class="d-flex justify-content-between gap-2 mt-3">
+                    <a href="{% url 'ledger:categories' %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+                    <button type="submit" class="btn btn-primary btn-sm">Create Category</button>
+                </div>
+            </form>
+            <p class="small text-muted mt-3 mb-0">
+                Need a new debit/credit account first?
+                <a href="{% url 'ledger:account_add' %}">Add account</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -5,7 +5,12 @@
 {% block content %}
 <div class="page-container">
     {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
+    {% if can_manage_categories %}
+    {% url 'ledger:category_add' as category_add_url %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Posting Categories" page_description="Each category defines the default debit and credit accounts for a ledger entry." action_url=category_add_url action_label="Add Category" action_icon="bi-plus-lg" %}
+    {% else %}
     {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Posting Categories" page_description="Each category defines the default debit and credit accounts for a ledger entry." %}
+    {% endif %}
 
     <div class="filter-bar filter-bar--tabs mb-4">
         <div class="btn-group btn-group-sm" role="group">
@@ -15,6 +20,10 @@
             {% endfor %}
         </div>
         <span class="toolbar-spacer"></span>
+        <a href="{% url 'ledger:accounts' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-journal-bookmark me-1"></i>Chart of Accounts</a>
+        {% if can_manage_categories %}
+        <a href="{% url 'ledger:category_add' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Category</a>
+        {% endif %}
         <a href="{% url 'ledger:entry' %}" class="btn btn-primary btn-sm"><i class="bi bi-journal-plus me-1"></i>New Entry</a>
     </div>
 
@@ -40,7 +49,14 @@
         {% empty %}
         <div class="dash-panel text-center text-muted">
             <p class="mb-2">No posting categories are configured for your church.</p>
-            <p class="small mb-0">Run <code>python manage.py seed_ledger</code> or re-run church onboarding.</p>
+            <p class="small mb-3">Seed defaults or create categories manually.</p>
+            <div class="d-flex justify-content-center gap-2 flex-wrap">
+                {% if can_manage_categories %}
+                <a href="{% url 'ledger:category_add' %}" class="btn btn-primary btn-sm">Add Category</a>
+                {% endif %}
+                <a href="{% url 'ledger:accounts' %}" class="btn btn-outline-secondary btn-sm">Chart of Accounts</a>
+            </div>
+            <p class="small mt-3 mb-0">Or run <code>python manage.py seed_ledger</code> / Platform Setup seed suite.</p>
         </div>
         {% endfor %}
     {% endif %}

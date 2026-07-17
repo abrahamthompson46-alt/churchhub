@@ -520,9 +520,16 @@ def post_settlement_batch(batch, user):
             amount=amount,
             fund=f"{batch.offering_type}_TRUST",
         )
+        from ledger.services import seed_ledger_accounts
+        from transactions.account_codes import get_remit_clearing_account
+
+        seed_ledger_accounts(church)
+        credit_account = get_remit_clearing_account(
+            church, batch.offering_type, unit_level="DISTRICT"
+        )
         TransactionLine.objects.create(
             transaction=trx,
-            account=_get_account(church, "DISTRICT_PAYABLE"),
+            account=credit_account,
             amount=-amount,
             fund=f"{batch.offering_type}_TRUST",
         )

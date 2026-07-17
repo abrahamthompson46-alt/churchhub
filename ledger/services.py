@@ -36,6 +36,13 @@ EXTENDED_ACCOUNTS = [
     ("Mission Offering", "INCOME"),
     ("Special Project Income", "INCOME"),
     ("Accrued Expenses", "DISTRICT_PAYABLE"),
+    # Remittance clearing (credit side for remittance transfers — not Main Bank)
+    ("District Tithe Remittance", "DISTRICT_PAYABLE"),
+    ("Conference Tithe Remittance", "DISTRICT_PAYABLE"),
+    ("Union Tithe Remittance", "DISTRICT_PAYABLE"),
+    ("District Combined Remittance", "DISTRICT_PAYABLE"),
+    ("Conference Combined Remittance", "DISTRICT_PAYABLE"),
+    ("Union Combined Remittance", "DISTRICT_PAYABLE"),
 ]
 
 # Category templates: (code, name, type, debit_name, credit_name, narration, requires_member, remit, sort)
@@ -78,8 +85,13 @@ CATEGORY_TEMPLATES = [
     ("TRF_BANK_TO_CASH", "Transfer Bank → Cash", "TRANSFER", "Cash", "Main Bank", "Cash withdrawn from bank", False, False, 20),
     ("TRF_CASH_TO_PETTY", "Fund Petty Cash", "TRANSFER", "Petty Cash", "Cash", "Transfer to petty cash", False, False, 30),
     ("TRF_PETTY_TO_CASH", "Return Petty Cash", "TRANSFER", "Cash", "Petty Cash", "Return from petty cash", False, False, 40),
-    ("TRF_TITHE_REMIT", "Tithe Remittance to District", "TRANSFER", "Tithe Remittance Payable", "Main Bank", "District tithe remittance", False, True, 50),
-    ("TRF_COMBINED_REMIT", "Combined Remittance to District", "TRANSFER", "Combined Remittance Payable", "Main Bank", "District combined remittance", False, True, 60),
+    # Remittance transfers clear remit payables into hierarchy remittance accounts (not Main Bank)
+    ("TRF_TITHE_REMIT", "Tithe Remittance to District", "TRANSFER", "Tithe Remittance Payable", "District Tithe Remittance", "District tithe remittance", False, True, 50),
+    ("TRF_TITHE_REMIT_CONF", "Tithe Remittance to Conference", "TRANSFER", "Tithe Remittance Payable", "Conference Tithe Remittance", "Conference tithe remittance", False, True, 51),
+    ("TRF_TITHE_REMIT_UNION", "Tithe Remittance to Union", "TRANSFER", "Tithe Remittance Payable", "Union Tithe Remittance", "Union tithe remittance", False, True, 52),
+    ("TRF_COMBINED_REMIT", "Combined Remittance to District", "TRANSFER", "Combined Remittance Payable", "District Combined Remittance", "District combined remittance", False, True, 60),
+    ("TRF_COMBINED_REMIT_CONF", "Combined Remittance to Conference", "TRANSFER", "Combined Remittance Payable", "Conference Combined Remittance", "Conference combined remittance", False, True, 61),
+    ("TRF_COMBINED_REMIT_UNION", "Combined Remittance to Union", "TRANSFER", "Combined Remittance Payable", "Union Combined Remittance", "Union combined remittance", False, True, 62),
 ]
 
 FUND_BY_ACCOUNT_TYPE = {
@@ -200,15 +212,34 @@ def _remittance_preview_lines(church, offering_type, debit_account, amount, as_o
 
 def seed_ledger_accounts(church):
     """Ensure core and extended accounts exist for a church."""
+    from transactions.account_codes import ACCOUNT_CODE_BY_NAME
+
     create_default_accounts(church)
     for name, acc_type in EXTENDED_ACCOUNTS:
         if name in CORE_ACCOUNT_NAMES:
             continue
-        Account.objects.update_or_create(
+        code = ACCOUNT_CODE_BY_NAME.get(name, "")
+        account, created = Account.objects.get_or_create(
             church=church,
             name=name,
-            defaults={"account_type": acc_type},
+            defaults={"account_type": acc_type, "code": code, "is_active": True},
         )
+        if created:
+            continue
+        updates = []
+        if account.account_type != acc_type:
+            account.account_type = acc_type
+            updates.append("account_type")
+        if code and not account.code:
+            clash = Account.objects.filter(church=church, code=code).exclude(pk=account.pk).exists()
+            if not clash:
+                account.code = code
+                updates.append("code")
+        if not account.is_active:
+            account.is_active = True
+            updates.append("is_active")
+        if updates:
+            account.save(update_fields=updates)
 
 
 def seed_ledger_categories(church, reset=False):
@@ -294,7 +325,9 @@ def get_ledger_summary(church):
         church=church,
         ledger_category__isnull=False,
     )
+    accounts = Account.objects.filter(church=church, is_active=True)
     return {
+        "account_count": accounts.count(),
         "category_count": categories.count(),
         "receipt_count": categories.filter(transaction_type="RECEIPT").count(),
         "expense_count": categories.filter(transaction_type="EXPENSE").count(),
@@ -659,6 +692,152 @@ def post_ledger_entry(church, user, draft, idempotency_key=None):
     if idem_record:
         complete_financial_idempotency(idem_record, trx)
     return trx
+
+
+@db_transaction.atomic
+def create_ledger_category(
+    church,
+    user,
+    *,
+    code,
+    name,
+    transaction_type,
+    default_debit_account,
+    default_credit_account,
+    default_narration="",
+    requires_member=False,
+    remit_to_district=False,
+    sort_order=100,
+):
+    """Create a church posting category with audit trail."""
+    code = (code or "").strip().upper().replace(" ", "_")
+    if not code:
+        raise ValueError("Category code is required.")
+    if LedgerCategory.objects.filter(church=church, code=code).exists():
+        raise ValueError(f"Category code {code} already exists for this church.")
+    if default_debit_account.church_id != church.pk or default_credit_account.church_id != church.pk:
+        raise ValueError("Accounts must belong to this church.")
+    if default_debit_account.pk == default_credit_account.pk:
+        raise ValueError("Debit and credit accounts must be different.")
+
+    category = LedgerCategory(
+        church=church,
+        code=code,
+        name=(name or "").strip() or code,
+        transaction_type=transaction_type,
+        default_debit_account=default_debit_account,
+        default_credit_account=default_credit_account,
+        default_narration=(default_narration or "").strip(),
+        requires_member=bool(requires_member),
+        remit_to_district=bool(remit_to_district),
+        sort_order=int(sort_order or 100),
+        is_active=True,
+    )
+    _assert_accounts_belong_to_church(category)
+    category.full_clean()
+    category.save()
+    _log_audit(
+        church,
+        "CREATE",
+        user,
+        details={
+            "source": "ledger_category",
+            "category_code": category.code,
+            "name": category.name,
+            "transaction_type": category.transaction_type,
+            "debit": str(category.default_debit_account_id),
+            "credit": str(category.default_credit_account_id),
+        },
+    )
+    return category
+
+
+@db_transaction.atomic
+def create_gl_account(church, user, *, name, code, account_type, is_active=True):
+    """Create a chart-of-accounts entry."""
+    from transactions.account_codes import code_for_name
+
+    name = (name or "").strip()
+    code = (code or "").strip().upper().replace(" ", "_")
+    if not name:
+        raise ValueError("Account name is required.")
+    if not code:
+        code = code_for_name(name) or name.upper().replace(" ", "_")[:40]
+    if Account.objects.filter(church=church, name=name).exists():
+        raise ValueError(f"Account “{name}” already exists.")
+    if code and Account.objects.filter(church=church, code=code).exists():
+        raise ValueError(f"Account code {code} already exists.")
+
+    account = Account.objects.create(
+        church=church,
+        name=name,
+        code=code,
+        account_type=account_type,
+        is_active=bool(is_active),
+    )
+    _log_audit(
+        church,
+        "CREATE",
+        user,
+        details={
+            "source": "chart_of_accounts",
+            "account_id": str(account.pk),
+            "code": account.code,
+            "name": account.name,
+            "account_type": account.account_type,
+        },
+    )
+    return account
+
+
+@db_transaction.atomic
+def update_gl_account(account, user, *, name=None, code=None, account_type=None, is_active=None):
+    """Update a chart-of-accounts entry (code immutable once posted against)."""
+    before = {
+        "name": account.name,
+        "code": account.code,
+        "account_type": account.account_type,
+        "is_active": account.is_active,
+    }
+    if name is not None:
+        name = name.strip()
+        if not name:
+            raise ValueError("Account name is required.")
+        clash = Account.objects.filter(church=account.church, name=name).exclude(pk=account.pk)
+        if clash.exists():
+            raise ValueError(f"Account “{name}” already exists.")
+        account.name = name
+    if code is not None:
+        code = code.strip().upper().replace(" ", "_")
+        if code != account.code:
+            if account.transaction_lines.exists():
+                raise ValueError("Cannot change code on an account that has journal lines.")
+            if code and Account.objects.filter(church=account.church, code=code).exclude(pk=account.pk).exists():
+                raise ValueError(f"Account code {code} already exists.")
+            account.code = code
+    if account_type is not None:
+        account.account_type = account_type
+    if is_active is not None:
+        account.is_active = bool(is_active)
+    account.full_clean()
+    account.save()
+    _log_audit(
+        account.church,
+        "UPDATE",
+        user,
+        details={
+            "source": "chart_of_accounts",
+            "account_id": str(account.pk),
+            "before": before,
+            "after": {
+                "name": account.name,
+                "code": account.code,
+                "account_type": account.account_type,
+                "is_active": account.is_active,
+            },
+        },
+    )
+    return account
 
 
 @db_transaction.atomic

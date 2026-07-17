@@ -179,7 +179,8 @@ PERMISSION_REGISTRY = {
         "default_roles": _ROLE_ALL_STAFF,
         "implies": [
             "view_transactions", "manage_receipts", "manage_expenses",
-            "view_ledger", "manage_ledger_entries", "view_budgets", "manage_budgets",
+            "view_ledger", "manage_ledger_entries", "manage_gl_categories",
+            "manage_chart_of_accounts", "view_budgets", "manage_budgets",
             "view_giving", "manage_giving", "view_remittance", "manage_settlements",
             "view_welfare", "manage_welfare_cases", "view_audit_log",
             "view_pending_approvals", "view_reconciliation", "view_dashboard_finance",
@@ -308,7 +309,14 @@ PERMISSION_REGISTRY = {
     "manage_gl_categories": {
         "name": "Manage GL Categories",
         "category": "Ledger",
-        "description": "Edit ledger posting category templates.",
+        "description": "Create and edit ledger posting category templates.",
+        "default_roles": _ROLE_TREASURY_OPS | {"LOCAL_PASTOR"},
+        "implies": ["view_ledger"],
+    },
+    "manage_chart_of_accounts": {
+        "name": "Manage Chart of Accounts",
+        "category": "Ledger",
+        "description": "Create and edit GL accounts for the church chart of accounts.",
         "default_roles": _ROLE_TREASURY_OPS | {"LOCAL_PASTOR"},
         "implies": ["view_ledger"],
     },

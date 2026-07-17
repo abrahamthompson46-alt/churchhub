@@ -190,8 +190,10 @@ def _finance_sections(user, active_church=None):
                 _item("GL Entries", "ledger:entries", "bi-journal-check"),
             ])
         ledger_items.append(_item("By Category", "ledger:category_report", "bi-bar-chart"))
+        if can_view_ledger(user):
+            ledger_items.append(_item("Chart of Accounts", "ledger:accounts", "bi-journal-bookmark"))
         if can_manage_gl_categories(user):
-            ledger_items.append(_item("Categories", "ledger:categories", "bi-tags"))
+            ledger_items.append(_item("Posting Categories", "ledger:categories", "bi-tags"))
         sections.append(_section("Accounting", ledger_items, "accounting"))
 
     treasury_items = []
@@ -231,6 +233,8 @@ def _finance_sections(user, active_church=None):
             remittance_items.append(_item("Policies", "remittance:index", "bi-percent"))
         if can_manage_settlements(user):
             remittance_items.append(_item("Settlements", "remittance:settlements", "bi-arrow-up-right-circle"))
+        if can_manage_expenses(user) or can_manage_receipts(user) or can_manage_finances(user):
+            remittance_items.append(_item("Bank Remittance Payment", "transactions:record_remittance", "bi-bank"))
         if can_view_welfare(user):
             remittance_items.append(_item("Welfare", "remittance:welfare", "bi-heart-pulse"))
         if remittance_items:
@@ -558,6 +562,8 @@ MODULE_TABS = {
     ],
     "finance": [
         _item("Ledger", "ledger:index", "bi-journal-text"),
+        _item("Accounts", "ledger:accounts", "bi-journal-bookmark"),
+        _item("Categories", "ledger:categories", "bi-tags"),
         _item("Entry", "ledger:entry", "bi-journal-plus"),
         _item("Transactions", "transactions:transaction_list", "bi-list-check"),
         _item("Pending", "transactions:pending_approvals", "bi-hourglass-split"),
@@ -610,7 +616,10 @@ def _tab_allowed(user, url_name, active_church=None):
         "members:transfer_list": lambda: can_transfer_members(user),
         "members:record_list": lambda: can_view_member_records(user),
         "ledger:index": lambda: can_view_ledger(user) and _church_feature(active_church, "ledger", user),
+        "ledger:accounts": lambda: can_view_ledger(user) and _church_feature(active_church, "ledger", user),
+        "ledger:categories": lambda: can_view_ledger(user) and _church_feature(active_church, "ledger", user),
         "ledger:entry": lambda: can_manage_ledger_entries(user) and _church_feature(active_church, "ledger", user),
+        "transactions:record_remittance": lambda: can_manage_expenses(user) or can_manage_receipts(user) or can_manage_finances(user),
         "transactions:transaction_list": lambda: can_view_transactions(user),
         "transactions:pending_approvals": lambda: can_view_pending_approvals(user),
         "budgets:list": lambda: can_view_budgets(user) or can_manage_budgets(user),

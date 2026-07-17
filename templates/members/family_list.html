@@ -20,7 +20,7 @@
                     <tr>
                         <td><a href="{% url 'members:family_detail' family.pk %}" class="table-link">{{ family.name }}</a></td>
                         <td>{{ family.head|default:"—" }}</td>
-                        <td>{{ family.member_count }}</td>
+                        <td>{{ family.members_total }}</td>
                         <td class="text-muted">{{ family.phone|default:"—" }}</td>
                     </tr>
                     {% empty %}

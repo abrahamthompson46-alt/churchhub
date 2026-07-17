@@ -123,7 +123,7 @@ class LedgerCategoryEditForm(forms.Form):
         self.church = church
         self.instance = instance
         if church:
-            accounts = Account.objects.filter(church=church).order_by("name")
+            accounts = Account.objects.filter(church=church, is_active=True).order_by("name")
             self.fields["default_debit_account"].queryset = accounts
             self.fields["default_credit_account"].queryset = accounts
             self.fields["default_debit_account"].label_from_instance = _account_label
@@ -144,3 +144,110 @@ class LedgerCategoryEditForm(forms.Form):
         if debit and credit and debit.pk == credit.pk:
             raise forms.ValidationError("Debit and credit accounts must be different.")
         return cleaned
+
+
+class LedgerCategoryCreateForm(forms.Form):
+    code = forms.CharField(
+        max_length=40,
+        widget=forms.TextInput(attrs=input_attrs(placeholder="e.g. REC_CUSTOM_CASH")),
+        help_text="Unique code for this church (letters, numbers, underscores).",
+    )
+    name = forms.CharField(max_length=120, widget=forms.TextInput(attrs=input_attrs()))
+    transaction_type = forms.ChoiceField(
+        choices=LedgerCategory.TRANSACTION_TYPES,
+        widget=forms.Select(attrs=select_attrs()),
+    )
+    default_debit_account = forms.ModelChoiceField(
+        queryset=Account.objects.none(),
+        widget=forms.Select(attrs=select_attrs()),
+    )
+    default_credit_account = forms.ModelChoiceField(
+        queryset=Account.objects.none(),
+        widget=forms.Select(attrs=select_attrs()),
+    )
+    default_narration = forms.CharField(
+        required=False,
+        max_length=200,
+        widget=forms.TextInput(attrs=input_attrs()),
+    )
+    requires_member = forms.BooleanField(required=False)
+    remit_to_district = forms.BooleanField(
+        required=False,
+        label="Apply remittance split (receipts)",
+        help_text="For receipt categories: split credit into retain + remit payable.",
+    )
+    sort_order = forms.IntegerField(
+        min_value=0,
+        initial=100,
+        widget=forms.NumberInput(attrs=input_attrs()),
+    )
+
+    def __init__(self, *args, church=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.church = church
+        if church:
+            accounts = Account.objects.filter(church=church, is_active=True).order_by("name")
+            self.fields["default_debit_account"].queryset = accounts
+            self.fields["default_credit_account"].queryset = accounts
+            self.fields["default_debit_account"].label_from_instance = _account_label
+            self.fields["default_credit_account"].label_from_instance = _account_label
+
+    def clean_code(self):
+        code = (self.cleaned_data.get("code") or "").strip().upper().replace(" ", "_")
+        if not code:
+            raise forms.ValidationError("Code is required.")
+        if self.church and LedgerCategory.objects.filter(church=self.church, code=code).exists():
+            raise forms.ValidationError("This code already exists for your church.")
+        return code
+
+    def clean(self):
+        cleaned = super().clean()
+        debit = cleaned.get("default_debit_account")
+        credit = cleaned.get("default_credit_account")
+        if debit and credit and debit.pk == credit.pk:
+            raise forms.ValidationError("Debit and credit accounts must be different.")
+        return cleaned
+
+
+class AccountForm(forms.Form):
+    name = forms.CharField(max_length=100, widget=forms.TextInput(attrs=input_attrs()))
+    code = forms.CharField(
+        max_length=40,
+        required=False,
+        widget=forms.TextInput(attrs=input_attrs(placeholder="e.g. UTILITIES")),
+        help_text="Stable code for reports and remittance (auto-filled from name if blank).",
+    )
+    account_type = forms.ChoiceField(
+        choices=Account.ACCOUNT_TYPES,
+        widget=forms.Select(attrs=select_attrs()),
+    )
+    is_active = forms.BooleanField(required=False, initial=True)
+
+    def __init__(self, *args, church=None, instance=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.church = church
+        self.instance = instance
+        if instance and not self.data:
+            self.fields["name"].initial = instance.name
+            self.fields["code"].initial = instance.code
+            self.fields["account_type"].initial = instance.account_type
+            self.fields["is_active"].initial = instance.is_active
+            if instance.transaction_lines.exists():
+                self.fields["code"].disabled = True
+                self.fields["code"].help_text = "Code is locked because this account has journal lines."
+
+    def clean_code(self):
+        if self.instance and self.instance.transaction_lines.exists():
+            return self.instance.code
+        return (self.cleaned_data.get("code") or "").strip().upper().replace(" ", "_")
+
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if not name:
+            raise forms.ValidationError("Name is required.")
+        qs = Account.objects.filter(church=self.church, name=name)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError("An account with this name already exists.")
+        return name

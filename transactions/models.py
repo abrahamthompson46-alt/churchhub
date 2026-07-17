@@ -38,7 +38,14 @@ class Account(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
+    code = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        help_text="Stable account code for lookups (unique per church when set).",
+    )
     account_type = models.CharField(max_length=30, choices=ACCOUNT_TYPES)
+    is_active = models.BooleanField(default=True)
     church = models.ForeignKey(
         "organization.Church",
         on_delete=models.CASCADE,
@@ -48,8 +55,21 @@ class Account(models.Model):
 
     class Meta:
         unique_together = ("church", "name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["church", "code"],
+                condition=~models.Q(code=""),
+                name="account_church_code_uniq",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["church", "code"]),
+            models.Index(fields=["church", "is_active"]),
+        ]
 
     def __str__(self):
+        if self.code:
+            return f"{self.code} — {self.name}"
         return f"{self.name} ({self.account_type})"
 
 

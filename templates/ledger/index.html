@@ -14,6 +14,10 @@
 
     <div class="dash-inline-stats mb-4">
         <div class="dash-inline-stat dash-inline-stat--accent">
+            <span class="dash-inline-stat__label">Chart of Accounts</span>
+            <span class="dash-inline-stat__value"><a href="{% url 'ledger:accounts' %}">{{ summary.account_count }}</a></span>
+        </div>
+        <div class="dash-inline-stat">
             <span class="dash-inline-stat__label">Posting Categories</span>
             <span class="dash-inline-stat__value"><a href="{% url 'ledger:categories' %}">{{ summary.category_count }}</a></span>
         </div>
@@ -92,6 +96,10 @@
                     <a href="{% url 'ledger:entry' %}" class="ledger-quick-link">
                         <i class="bi bi-journal-plus"></i>
                         <span>New Ledger Entry</span>
+                    </a>
+                    <a href="{% url 'ledger:accounts' %}" class="ledger-quick-link">
+                        <i class="bi bi-journal-bookmark"></i>
+                        <span>Chart of Accounts</span>
                     </a>
                     <a href="{% url 'ledger:categories' %}" class="ledger-quick-link">
                         <i class="bi bi-tags"></i>

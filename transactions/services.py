@@ -299,6 +299,8 @@ def _post_line(transaction, account, amount, fund=""):
 # ==========================================
 
 def create_default_accounts(church):
+    from transactions.account_codes import ACCOUNT_CODE_BY_NAME
+
     defaults = [
         ("Tithe", "TITHE"),
         ("Combined Offering", "COMBINED"),
@@ -324,39 +326,51 @@ def create_default_accounts(church):
     ]
 
     for name, acc_type in defaults:
+        code = ACCOUNT_CODE_BY_NAME.get(name, "")
         Account.objects.update_or_create(
             church=church,
             name=name,
-            defaults={"account_type": acc_type},
+            defaults={"account_type": acc_type, "code": code, "is_active": True},
         )
 
 
 def create_default_offering_categories(church):
     """Seed standard offering categories linked to church accounts."""
+    from transactions.account_codes import code_for_name
+
     from .models import OfferingCategory
 
+    # Prefer chart names that match ledger EXTENDED_ACCOUNTS to avoid duplicate codes.
     categories = [
-        ("TITHE", "Tithe", "TITHE", True),
-        ("COMBINED", "Combined Offering", "COMBINED", True),
-        ("THANKSGIVING", "Thanksgiving", "INCOME", False),
-        ("BUILDING", "Building Fund", "INCOME", False),
-        ("MISSION", "Mission Offering", "INCOME", False),
-        ("WELFARE", "Welfare Fund", "INCOME", False),
+        ("TITHE", "Tithe", "Tithe", "TITHE", True),
+        ("COMBINED", "Combined Offering", "Combined Offering", "COMBINED", True),
+        ("THANKSGIVING", "Thanksgiving", "Thanksgiving Offering", "INCOME", False),
+        ("BUILDING", "Building Fund", "Building Fund", "INCOME", False),
+        ("MISSION", "Mission Offering", "Mission Offering", "INCOME", False),
+        ("WELFARE", "Welfare Fund", "Welfare Fund", "WELFARE_FUND", False),
     ]
-    for code, name, acc_type, remit in categories:
+    for code, label, account_name, acc_type, remit in categories:
         if acc_type in ("TITHE", "COMBINED"):
             account = Account.objects.get(church=church, account_type=acc_type)
         else:
-            account, _ = Account.objects.get_or_create(
-                church=church,
-                name=name,
-                defaults={"account_type": acc_type},
-            )
+            gl_code = code_for_name(account_name) or code
+            account = Account.objects.filter(church=church, name=account_name).first()
+            if account is None:
+                account = Account.objects.create(
+                    church=church,
+                    name=account_name,
+                    account_type=acc_type,
+                    code=gl_code,
+                    is_active=True,
+                )
+            elif not account.code:
+                account.code = gl_code
+                account.save(update_fields=["code"])
         OfferingCategory.objects.get_or_create(
             church=church,
             code=code,
             defaults={
-                "name": name,
+                "name": label,
                 "account": account,
                 "remit_to_district": remit,
             },
@@ -568,9 +582,17 @@ def record_district_remittance(
     description="District remittance",
 ):
     """
-    Pay district: clear tithe/combined liability accounts and reduce bank/cash.
-      DR Tithe / Combined (+abs balances)
-      CR Bank/Cash (-amount)
+    Step 3 of remittance: bank/cash payment that clears remit payables.
+
+    Workflow:
+      1. Receipts credit Tithe/Combined Remittance Payable (policy split)
+      2. TRF_*_REMIT / settlement moves liability to hierarchy clearing accounts
+      3. This function pays district from Bank/Cash:
+           DR Tithe / Combined Remittance Payable
+           CR Bank/Cash
+
+    Prefer ledger transfer categories for hierarchy clearing (district/conference/
+    union remittance accounts). Use this when cash actually leaves the church.
     """
     month_date = month_date.replace(day=1) if month_date else None
     cutoff = generate_monthly_cutoff(church, month_date) if month_date else None

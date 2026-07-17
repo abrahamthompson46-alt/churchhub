@@ -13,7 +13,7 @@ from ledger.services import build_entry_draft, post_ledger_entry, seed_ledger
 from members.models import Member
 from organization.models import Church, Conference, District, Zone
 from remittance.services import ensure_default_policies_for_church
-from transactions.models import Transaction, TransactionLine
+from transactions.models import Account, Transaction, TransactionLine
 from transactions.services import WorkingDayClosedError, open_working_day
 
 User = get_user_model()
@@ -74,10 +74,38 @@ class SeedTests(LedgerTestMixin, TestCase):
     def test_remittance_transfer_templates_clear_payables(self):
         tithe = LedgerCategory.objects.get(church=self.church, code="TRF_TITHE_REMIT")
         combined = LedgerCategory.objects.get(church=self.church, code="TRF_COMBINED_REMIT")
+        conf = LedgerCategory.objects.get(church=self.church, code="TRF_TITHE_REMIT_CONF")
+        union = LedgerCategory.objects.get(church=self.church, code="TRF_TITHE_REMIT_UNION")
         self.assertEqual(tithe.default_debit_account.name, "Tithe Remittance Payable")
         self.assertEqual(combined.default_debit_account.name, "Combined Remittance Payable")
-        self.assertEqual(tithe.default_credit_account.name, "Main Bank")
+        self.assertEqual(tithe.default_credit_account.name, "District Tithe Remittance")
+        self.assertEqual(combined.default_credit_account.name, "District Combined Remittance")
+        self.assertEqual(conf.default_credit_account.name, "Conference Tithe Remittance")
+        self.assertEqual(union.default_credit_account.name, "Union Tithe Remittance")
+        self.assertNotEqual(tithe.default_credit_account.name, "Main Bank")
+        # Remittance transfers must never credit Main Bank
+        for code in (
+            "TRF_TITHE_REMIT",
+            "TRF_TITHE_REMIT_CONF",
+            "TRF_TITHE_REMIT_UNION",
+            "TRF_COMBINED_REMIT",
+            "TRF_COMBINED_REMIT_CONF",
+            "TRF_COMBINED_REMIT_UNION",
+        ):
+            cat = LedgerCategory.objects.get(church=self.church, code=code)
+            self.assertNotEqual(cat.default_credit_account.name, "Main Bank")
+            self.assertNotEqual(cat.default_credit_account.account_type, "BANK")
 
+    def test_remittance_accounts_have_stable_codes(self):
+        from transactions.account_codes import ACCOUNT_CODE_BY_NAME, get_account_by_code
+
+        for name, code in ACCOUNT_CODE_BY_NAME.items():
+            if "Remittance" not in name or "Payable" in name:
+                continue
+            acct = Account.objects.filter(church=self.church, name=name).first()
+            self.assertIsNotNone(acct, name)
+            self.assertEqual(acct.code, code)
+            self.assertEqual(get_account_by_code(self.church, code).pk, acct.pk)
 
 class PostingTests(LedgerTestMixin, TestCase):
     def test_post_ledger_entry_balanced(self):
@@ -261,6 +289,15 @@ class PageTests(LedgerTestMixin, TestCase):
         self.assertEqual(response.status_code, 302)
         cat.refresh_from_db()
         self.assertEqual(cat.name, "General Income Updated")
+
+    def test_accounts_and_category_create_pages(self):
+        response = self.client.get(reverse("ledger:accounts"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Chart of Accounts")
+        response = self.client.get(reverse("ledger:category_add"))
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(reverse("ledger:account_add"))
+        self.assertEqual(response.status_code, 200)
 
     def test_entry_prefills_from_category_link(self):
         cat = LedgerCategory.objects.get(church=self.church, code="EXP_UTIL_CASH")

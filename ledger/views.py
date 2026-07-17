@@ -12,11 +12,18 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from church_system.church_scope import require_church
 from church_system.flash import flash_exception, flash_success
-from ledger.forms import LedgerCategoryEditForm, LedgerEntryForm
+from ledger.forms import (
+    AccountForm,
+    LedgerCategoryCreateForm,
+    LedgerCategoryEditForm,
+    LedgerEntryForm,
+)
 from ledger.models import LedgerCategory
 from ledger.services import (
     build_entry_draft,
     category_to_dict,
+    create_gl_account,
+    create_ledger_category,
     export_ledger_entries_table,
     get_all_categories,
     get_categories_for_type,
@@ -26,14 +33,20 @@ from ledger.services import (
     get_ledger_summary,
     paginate_ledger_entries,
     post_ledger_entry,
+    update_gl_account,
     update_ledger_category,
 )
 from members.models import Member
-from permissions.checks import any_permission_required, permission_required
+from permissions.checks import (
+    any_permission_required,
+    can_manage_chart_of_accounts,
+    can_manage_gl_categories,
+    permission_required,
+)
 from reports.exporters import export_table_csv, export_table_excel
 from sitecontrol.checks import require_feature
 from transactions.idempotency import IdempotencyReplay, MissingIdempotencyKey
-from transactions.models import Transaction
+from transactions.models import Account, Transaction
 from transactions.services import PeriodLockedError, WorkingDayClosedError
 
 SESSION_DRAFT_KEY = "ledger_entry_draft"
@@ -112,9 +125,46 @@ def category_list(request):
         "categories": categories,
         "type_filter": txn_type,
         "type_choices": LedgerCategory.TRANSACTION_TYPES,
+        "can_manage_categories": can_manage_gl_categories(request.user),
         "breadcrumbs": [
             {"label": "Ledger", "url": reverse("ledger:index")},
             {"label": "Posting Categories"},
+        ],
+    })
+
+
+@ledger_finance_required
+@permission_required("manage_gl_categories")
+@require_http_methods(["GET", "POST"])
+def category_create(request):
+    church = require_church(request)
+    form = LedgerCategoryCreateForm(request.POST or None, church=church)
+    if request.method == "POST" and form.is_valid():
+        try:
+            category = create_ledger_category(
+                church,
+                request.user,
+                code=form.cleaned_data["code"],
+                name=form.cleaned_data["name"],
+                transaction_type=form.cleaned_data["transaction_type"],
+                default_debit_account=form.cleaned_data["default_debit_account"],
+                default_credit_account=form.cleaned_data["default_credit_account"],
+                default_narration=form.cleaned_data.get("default_narration", ""),
+                requires_member=form.cleaned_data.get("requires_member", False),
+                remit_to_district=form.cleaned_data.get("remit_to_district", False),
+                sort_order=form.cleaned_data.get("sort_order", 100),
+            )
+            flash_success(request, f"Category {category.code} created.", title="Category saved")
+            return redirect("ledger:category_detail", pk=category.pk)
+        except Exception as exc:
+            flash_exception(request, exc, title="Category could not be saved")
+    return render(request, "ledger/category_form.html", {
+        "form": form,
+        "title": "Add Posting Category",
+        "breadcrumbs": [
+            {"label": "Ledger", "url": reverse("ledger:index")},
+            {"label": "Categories", "url": reverse("ledger:categories")},
+            {"label": "Add"},
         ],
     })
 
@@ -155,6 +205,7 @@ def category_detail(request, pk):
 
 
 @ledger_finance_required
+@permission_required("manage_gl_categories")
 @require_http_methods(["GET", "POST"])
 def category_edit(request, pk):
     church = require_church(request)
@@ -404,3 +455,90 @@ def api_category_detail(request, pk):
         is_active=True,
     )
     return JsonResponse(category_to_dict(category))
+
+
+@ledger_finance_required
+def account_list(request):
+    church = require_church(request)
+    show_inactive = request.GET.get("inactive") == "1"
+    accounts = Account.objects.filter(church=church).order_by("account_type", "name")
+    if not show_inactive:
+        accounts = accounts.filter(is_active=True)
+    type_filter = request.GET.get("type", "")
+    if type_filter and type_filter in dict(Account.ACCOUNT_TYPES):
+        accounts = accounts.filter(account_type=type_filter)
+    return render(request, "ledger/accounts.html", {
+        "accounts": accounts,
+        "type_filter": type_filter,
+        "show_inactive": show_inactive,
+        "type_choices": Account.ACCOUNT_TYPES,
+        "can_manage_accounts": can_manage_chart_of_accounts(request.user),
+        "breadcrumbs": [
+            {"label": "Ledger", "url": reverse("ledger:index")},
+            {"label": "Chart of Accounts"},
+        ],
+    })
+
+
+@ledger_finance_required
+@permission_required("manage_chart_of_accounts")
+@require_http_methods(["GET", "POST"])
+def account_create(request):
+    church = require_church(request)
+    form = AccountForm(request.POST or None, church=church)
+    if request.method == "POST" and form.is_valid():
+        try:
+            account = create_gl_account(
+                church,
+                request.user,
+                name=form.cleaned_data["name"],
+                code=form.cleaned_data.get("code", ""),
+                account_type=form.cleaned_data["account_type"],
+                is_active=form.cleaned_data.get("is_active", True),
+            )
+            flash_success(request, f"Account {account.code or account.name} created.", title="Account saved")
+            return redirect("ledger:accounts")
+        except Exception as exc:
+            flash_exception(request, exc, title="Account could not be saved")
+    return render(request, "ledger/account_form.html", {
+        "form": form,
+        "title": "Add Account",
+        "breadcrumbs": [
+            {"label": "Ledger", "url": reverse("ledger:index")},
+            {"label": "Chart of Accounts", "url": reverse("ledger:accounts")},
+            {"label": "Add"},
+        ],
+    })
+
+
+@ledger_finance_required
+@permission_required("manage_chart_of_accounts")
+@require_http_methods(["GET", "POST"])
+def account_edit(request, pk):
+    church = require_church(request)
+    account = get_object_or_404(Account, pk=pk, church=church)
+    form = AccountForm(request.POST or None, church=church, instance=account)
+    if request.method == "POST" and form.is_valid():
+        try:
+            update_gl_account(
+                account,
+                request.user,
+                name=form.cleaned_data["name"],
+                code=form.cleaned_data.get("code", account.code),
+                account_type=form.cleaned_data["account_type"],
+                is_active=form.cleaned_data.get("is_active", True),
+            )
+            flash_success(request, f"Account {account.code or account.name} updated.", title="Account saved")
+            return redirect("ledger:accounts")
+        except Exception as exc:
+            flash_exception(request, exc, title="Account could not be saved")
+    return render(request, "ledger/account_form.html", {
+        "form": form,
+        "account": account,
+        "title": "Edit Account",
+        "breadcrumbs": [
+            {"label": "Ledger", "url": reverse("ledger:index")},
+            {"label": "Chart of Accounts", "url": reverse("ledger:accounts")},
+            {"label": account.name},
+        ],
+    })

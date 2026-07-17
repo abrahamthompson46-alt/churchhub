@@ -413,9 +413,17 @@ class EmailSettingsForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["smtp_host"].help_text = "e.g. smtp.gmail.com or smtp.office365.com"
+        self.fields["smtp_port"].help_text = "587 with TLS (recommended) or 465 with SSL"
+        self.fields["smtp_username"].help_text = "Usually your full email address"
+        self.fields["default_from_email"].help_text = (
+            "Must be allowed by your SMTP provider (often the same as the username)."
+        )
+        self.fields["smtp_use_tls"].help_text = "Use for port 587. Leave unchecked for port 465 (SSL)."
         self.fields["smtp_password"].required = False
         self.fields["smtp_password"].help_text = (
-            "Leave blank to keep the current password. New values are stored encrypted."
+            "Leave blank to keep the current password. New values are stored encrypted. "
+            "For Gmail, use an App Password (not your normal login password)."
         )
 
     def save(self, commit=True):

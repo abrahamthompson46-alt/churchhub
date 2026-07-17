@@ -3,11 +3,33 @@
 {% block page_title %}Email Settings{% endblock %}
 
 {% block content %}
+<div class="platform-card mb-3">
+    <div class="platform-card-body">
+        {% if smtp_status.configured %}
+        <div class="alert alert-success py-2 mb-0 small">
+            <strong>SMTP ready</strong> — {{ smtp_status.message }}
+            From: <code>{{ smtp_status.from_email }}</code>
+            · Auth: {% if smtp_status.username_set %}username set{% else %}no username{% endif %}
+            / {% if smtp_status.password_set %}password set{% else %}<span class="text-danger">password missing</span>{% endif %}
+        </div>
+        {% else %}
+        <div class="alert alert-warning py-2 mb-0 small">
+            <strong>SMTP not configured</strong> — invitations will be created, but emails will not leave the server until you save settings below (or set <code>EMAIL_HOST</code> and <code>DEFAULT_FROM_EMAIL</code> in <code>.env</code>).
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 <div class="platform-card">
     <div class="platform-card-body">
-        <p class="text-muted small">Configure outbound email for invitations, notifications, and system messages.</p>
+        <p class="text-muted small">
+            Configure outbound email for user invitations, password resets, and system messages.
+            Typical providers: Gmail (<code>smtp.gmail.com</code>, port 587, TLS, app password),
+            Microsoft 365 (<code>smtp.office365.com</code>, 587, TLS), or your hosting SMTP.
+        </p>
         <form method="post">
             {% csrf_token %}
+            <input type="hidden" name="action" value="save">
             <div class="platform-form-grid">
                 {% for field in form %}
                 <div class="{% if field.name == 'smtp_use_tls' %}full-width{% endif %}">
@@ -17,11 +39,31 @@
                     <label class="form-label fw-semibold">{{ field.label }}</label>
                     {{ field }}
                     {% endif %}
+                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
                     {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
                 </div>
                 {% endfor %}
             </div>
             <div class="mt-4"><button type="submit" class="btn btn-primary">Save Email Settings</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="platform-card mt-3">
+    <div class="platform-card-header">Send test email</div>
+    <div class="platform-card-body">
+        <p class="text-muted small">Uses the saved SMTP settings (save first if you just changed them).</p>
+        <form method="post" class="row g-3 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="email_test">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold" for="id_test_recipient">Recipient</label>
+                <input type="email" name="recipient" id="id_test_recipient" class="form-control" required
+                       placeholder="you@example.com" value="{{ request.user.email }}">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-outline-primary">Send test</button>
+            </div>
         </form>
     </div>
 </div>

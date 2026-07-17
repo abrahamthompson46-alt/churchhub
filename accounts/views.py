@@ -254,19 +254,39 @@ def invite_user(request):
                 except ValueError as exc:
                     flash_exception(request, exc, title="Invitation could not be created")
                 else:
-                    emailed = send_invitation_email(inv, request=request)
-                    if emailed:
-                        flash_success(
+                    try:
+                        emailed = send_invitation_email(
+                            inv,
+                            request=request,
+                            fail_silently=False,
+                        )
+                    except Exception as exc:
+                        flash_warning(
                             request,
-                            f"Invitation emailed to {inv.email}.",
-                            title="Invitation sent",
+                            (
+                                f"Invitation was created for {inv.email}, but the email could not be sent "
+                                f"({exc}). Share the invite link from the next screen, then fix SMTP under "
+                                "Platform → Email."
+                            ),
+                            title="Invitation created — email failed",
                         )
                     else:
-                        flash_success(
-                            request,
-                            f"Invitation created. Share the invite link with {inv.email} (SMTP not configured).",
-                            title="Invitation created",
-                        )
+                        if emailed:
+                            flash_success(
+                                request,
+                                f"Invitation emailed to {inv.email}.",
+                                title="Invitation sent",
+                            )
+                        else:
+                            flash_warning(
+                                request,
+                                (
+                                    f"Invitation created for {inv.email}, but SMTP is not configured. "
+                                    "Share the invite link from the next screen. Configure SMTP under "
+                                    "Platform → Email (or EMAIL_HOST / DEFAULT_FROM_EMAIL)."
+                                ),
+                                title="Invitation created — email not sent",
+                            )
                     return redirect("accounts:invite_detail", pk=inv.pk)
 
     return render(request, "accounts/invite.html", {"form": form})
@@ -304,13 +324,27 @@ def invite_resend(request, pk):
     church_ids = get_manageable_churches(request.user).values_list("pk", flat=True)
     invitation = get_object_or_404(UserInvitation, pk=pk, church_id__in=church_ids)
     try:
-        resend_invitation(
+        _invitation, emailed = resend_invitation(
             invitation,
             performed_by=request.user,
             ip_address=get_client_ip(request),
             request=request,
         )
-        flash_success(request, f"Invitation resent to {invitation.email}.", title="Invitation resent")
+        if emailed:
+            flash_success(
+                request,
+                f"Invitation resent to {invitation.email}.",
+                title="Invitation resent",
+            )
+        else:
+            flash_warning(
+                request,
+                (
+                    f"Invitation updated for {invitation.email}, but the email was not delivered. "
+                    "Share the invite link below, and configure SMTP under Platform → Email."
+                ),
+                title="Invitation updated — email not sent",
+            )
     except ValueError as exc:
         flash_exception(request, exc, title="Could not resend invitation")
     return redirect("accounts:invite_detail", pk=pk)

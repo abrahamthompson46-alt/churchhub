@@ -5,7 +5,6 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import connection
 from django.db.models import Q
@@ -215,13 +214,9 @@ def ops_health(request):
                 raise PermissionDenied
             recipient = request.POST.get("recipient") or settings_obj.support_email or request.user.email
             try:
-                send_mail(
-                    subject=f"[{settings_obj.site_name}] Ops email test",
-                    message="ChurchHub platform operations email test succeeded.",
-                    from_email=settings_obj.default_from_email or None,
-                    recipient_list=[recipient],
-                    fail_silently=False,
-                )
+                from church_system.email_service import send_test_email
+
+                send_test_email(recipient)
                 log_platform_action(
                     request, "OPS_EMAIL_TEST", f"Test email sent to {recipient}",
                     target_model="SiteSettings",
@@ -358,16 +353,43 @@ def branding_settings(request):
 @platform_required
 @require_platform_capability(CAP_MANAGE_EMAIL)
 def email_settings(request):
+    from church_system.email_service import send_test_email, smtp_status
+
     settings_obj = SiteSettings.load()
     form = EmailSettingsForm(request.POST or None, instance=settings_obj)
-    if request.method == "POST" and form.is_valid():
-        form.save()
-        clear_settings_cache()
-        log_platform_action(request, "SETTINGS_UPDATE", "Email settings updated", target_model="SiteSettings")
-        flash_success(request, "Email settings saved.")
-        return redirect("sitecontrol:email_settings")
+    if request.method == "POST":
+        action = request.POST.get("action") or "save"
+        if action == "email_test":
+            recipient = (
+                request.POST.get("recipient")
+                or settings_obj.support_email
+                or request.user.email
+            )
+            if not recipient:
+                messages.error(request, "Enter a recipient email address for the test.")
+            else:
+                try:
+                    send_test_email(recipient)
+                    log_platform_action(
+                        request,
+                        "OPS_EMAIL_TEST",
+                        f"Test email sent to {recipient}",
+                        target_model="SiteSettings",
+                    )
+                    flash_success(request, f"Test email sent to {recipient}.")
+                except Exception as exc:
+                    messages.error(request, f"Email test failed: {exc}")
+            return redirect("sitecontrol:email_settings")
+
+        if form.is_valid():
+            form.save()
+            clear_settings_cache()
+            log_platform_action(request, "SETTINGS_UPDATE", "Email settings updated", target_model="SiteSettings")
+            flash_success(request, "Email settings saved.")
+            return redirect("sitecontrol:email_settings")
     return render(request, "sitecontrol/email_settings.html", {
         "form": form,
+        "smtp_status": smtp_status(),
         "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Email",)),
     })
 

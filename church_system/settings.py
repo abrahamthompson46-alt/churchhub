@@ -5,7 +5,36 @@ import os
 
 from django.core.exceptions import ImproperlyConfigured
 
+# ============================================
+# PLATFORM DETECTION
+# ============================================
+
+ON_RENDER = bool(os.environ.get("RENDER"))
+ON_PYTHONANYWHERE = bool(os.environ.get("PYTHONANYWHERE_SITE"))
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _load_dotenv(path: Path) -> None:
+    """Load KEY=VALUE pairs from .env without requiring python-dotenv."""
+    if not path.is_file():
+        return
+    try:
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            if not key or key in os.environ:
+                continue
+            value = value.strip().strip("'").strip('"')
+            os.environ[key] = value
+    except OSError:
+        pass
+
+
+_load_dotenv(BASE_DIR / ".env")
 
 # ==============================
 # SECURITY
@@ -140,54 +169,47 @@ TEMPLATES = [
 
 def _configure_databases():
     """
-    Prefer DATABASE_URL (Render/Heroku). Never silently use SQLite in production.
+    Database priority:
+
+    1. DATABASE_URL
+    2. Explicit PostgreSQL settings (DB_ENGINE=postgresql)
+    3. SQLite (Local & PythonAnywhere)
+
+    Render always requires PostgreSQL.
     """
+
     database_url = os.environ.get("DATABASE_URL", "").strip()
-    on_render = bool(os.environ.get("RENDER", "").strip())
-    require_postgres = (not DEBUG) or on_render
 
     if database_url:
-        try:
-            import dj_database_url
-        except ImportError as exc:
-            raise ImproperlyConfigured(
-                "DATABASE_URL is set but dj-database-url is not installed."
-            ) from exc
+        import dj_database_url
 
-        # dj_database_url.config() returns a single DB config — wrap as DATABASES['default']
-        db_config = dj_database_url.config(
-            default=database_url,
+        db = dj_database_url.parse(
+            database_url,
             conn_max_age=int(os.environ.get("DB_CONN_MAX_AGE", "600")),
             conn_health_checks=True,
         )
-        if not db_config.get("ENGINE"):
-            raise ImproperlyConfigured("DATABASE_URL could not be parsed.")
 
-        # Render Postgres expects SSL for most connections
-        if on_render and "postgresql" in db_config["ENGINE"]:
-            options = db_config.setdefault("OPTIONS", {})
-            options.setdefault("sslmode", os.environ.get("DB_SSLMODE", "require"))
+        if ON_RENDER:
+            db.setdefault("OPTIONS", {}).setdefault("sslmode", "require")
 
-        return {"default": db_config}
+        return {"default": db}
 
     if os.environ.get("DB_ENGINE") == "postgresql":
         return {
             "default": {
                 "ENGINE": "django.db.backends.postgresql",
-                "NAME": os.environ.get("DB_NAME", "churchhub"),
-                "USER": os.environ.get("DB_USER", "churchhub"),
-                "PASSWORD": os.environ.get("DB_PASSWORD", ""),
-                "HOST": os.environ.get("DB_HOST", "localhost"),
+                "NAME": os.environ.get("DB_NAME"),
+                "USER": os.environ.get("DB_USER"),
+                "PASSWORD": os.environ.get("DB_PASSWORD"),
+                "HOST": os.environ.get("DB_HOST"),
                 "PORT": os.environ.get("DB_PORT", "5432"),
-                "CONN_MAX_AGE": int(os.environ.get("DB_CONN_MAX_AGE", "600")),
+                "CONN_MAX_AGE": 600,
             }
         }
 
-    if require_postgres:
+    if ON_RENDER:
         raise ImproperlyConfigured(
-            "PostgreSQL is required in production / on Render. "
-            "Set DATABASE_URL on the web service (link your Render Postgres database), "
-            "then redeploy."
+            "DATABASE_URL must be configured on Render."
         )
 
     return {
@@ -315,6 +337,34 @@ LOGGING = build_logging_config(debug=DEBUG)
 CHURCHHUB_PUBLIC_URL = os.environ.get(
     "CHURCHHUB_PUBLIC_URL",
     f"https://{_RENDER_HOST}" if _RENDER_HOST else "http://localhost:8000",
+)
+
+# ==============================
+# EMAIL (Platform SMTP preferred; env is fallback)
+# ==============================
+# Primary config: Platform Control → Email (SiteSettings).
+# Optional env fallback used when SiteSettings SMTP fields are empty.
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "").strip()
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587") or 587)
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "").strip()
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "").strip()
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() in ("true", "1", "yes")
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "false").lower() in ("true", "1", "yes")
+DEFAULT_FROM_EMAIL = os.environ.get(
+    "DEFAULT_FROM_EMAIL",
+    os.environ.get("EMAIL_FROM", ""),
+).strip()
+SERVER_EMAIL = DEFAULT_FROM_EMAIL or "root@localhost"
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND",
+    "church_system.mail.PlatformSMTPEmailBackend",
+)
+# Invitation emails send synchronously by default so the UI reports real delivery.
+# Set CHURCHHUB_ASYNC_EMAIL=1 only when a Celery worker is running.
+CHURCHHUB_ASYNC_EMAIL = os.environ.get("CHURCHHUB_ASYNC_EMAIL", "").lower() in (
+    "true",
+    "1",
+    "yes",
 )
 
 # ==============================

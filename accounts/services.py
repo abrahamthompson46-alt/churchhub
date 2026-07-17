@@ -102,21 +102,37 @@ def create_invitation(email, username, role, church, invited_by, days_valid=7):
     return invitation
 
 
-def send_invitation_email(invitation, request=None):
-    """Send invitation email asynchronously when Celery is available."""
+def send_invitation_email(invitation, request=None, *, fail_silently=True):
+    """
+    Deliver an invitation email.
+
+    Sends synchronously by default so the UI can report real SMTP success/failure.
+    Async (Celery) only when CHURCHHUB_ASYNC_EMAIL is enabled and a broker is usable.
+    Returns True if accepted by SMTP (or queued when async), False if SMTP is not configured.
+    Raises on SMTP delivery errors when fail_silently is False.
+    """
     from django.conf import settings
 
     from church_system.email_service import send_user_invitation_email
 
-    if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
-        return send_user_invitation_email(invitation, request=request, fail_silently=True)
-    try:
-        from church_system.tasks import send_invitation_email_task
+    use_async = getattr(settings, "CHURCHHUB_ASYNC_EMAIL", False) and not getattr(
+        settings, "CELERY_TASK_ALWAYS_EAGER", False
+    )
+    if use_async:
+        try:
+            from church_system.tasks import send_invitation_email_task
 
-        send_invitation_email_task.delay(str(invitation.pk))
-        return True
-    except Exception:
-        return send_user_invitation_email(invitation, request=request, fail_silently=True)
+            send_invitation_email_task.delay(str(invitation.pk))
+            return True
+        except Exception:
+            # Fall through to synchronous send when the broker/worker path fails.
+            pass
+
+    return send_user_invitation_email(
+        invitation,
+        request=request,
+        fail_silently=fail_silently,
+    )
 
 
 @transaction.atomic
@@ -212,8 +228,8 @@ def resend_invitation(invitation, performed_by=None, ip_address=None, days_valid
                 "expires_at": invitation.expires_at.isoformat(),
             },
         )
-    send_invitation_email(invitation, request=request)
-    return invitation
+    emailed = send_invitation_email(invitation, request=request, fail_silently=True)
+    return invitation, emailed
 
 
 def deactivate_user(user, performed_by=None, ip_address=None):

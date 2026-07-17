@@ -11,11 +11,13 @@
         {% elif active_denomination %}
             {{ active_denomination.display_name|default:active_denomination.name }}
         {% else %}
-            {{ site_name|default:"ChurchHub" }}
+            {{ site_name }}
         {% endif %}
     </h2>
     {% if active_denomination and active_denomination.tagline %}
     <p class="text-muted small mt-2 mb-0">{{ active_denomination.tagline }}</p>
+    {% elif site_tagline %}
+    <p class="text-muted small mt-2 mb-0">{{ site_tagline }}</p>
     {% endif %}
 </div>
 
@@ -25,5 +27,5 @@
     {% else %}
     <div class="brand-mark auth-platform-mark-sm mx-auto mb-2"><i class="bi bi-grid-1x2-fill"></i></div>
     {% endif %}
-    <div class="small text-muted">{{ site_name|default:"ChurchHub" }}</div>
+    <div class="small text-muted">{{ site_name }}</div>
 </div>

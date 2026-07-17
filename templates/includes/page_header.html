@@ -1,80 +1,33 @@
-{% comment %}
-
-Unified page header — compact title, breadcrumbs, optional tabs and actions.
-
-{% endcomment %}
-
-
-
+{% comment %}Unified page header — title, breadcrumbs, optional actions. Module tabs render globally in base.html.{% endcomment %}
 <div class="page-header-block">
-
 {% if breadcrumbs %}
-
 <nav aria-label="breadcrumb" class="app-breadcrumb">
-
     <ol class="breadcrumb mb-0">
-
         {% for crumb in breadcrumbs %}
-
         {% if crumb.url %}
-
         <li class="breadcrumb-item"><a href="{{ crumb.url }}">{{ crumb.label }}</a></li>
-
         {% else %}
-
         <li class="breadcrumb-item active" aria-current="page">{{ crumb.label }}</li>
-
         {% endif %}
-
         {% endfor %}
-
     </ol>
-
 </nav>
-
 {% endif %}
-
-
 
 <header class="page-header">
-
     <div class="page-header-main">
-
         {% if page_subtitle %}<p class="page-eyebrow">{{ page_subtitle }}</p>{% endif %}
-
         <h1 class="page-title">{{ page_title }}</h1>
-
         {% if page_description %}<p class="page-lead">{{ page_description }}</p>{% endif %}
-
     </div>
-
     {% if page_actions %}
-
     <div class="page-header-actions">{{ page_actions|safe }}</div>
-
     {% elif action_url and action_label %}
-
     <div class="page-header-actions">
-
         <a href="{{ action_url }}" class="btn btn-primary btn-sm">
-
             {% if action_icon %}<i class="bi {{ action_icon }} me-1"></i>{% endif %}{{ action_label }}
-
         </a>
-
     </div>
-
     {% endif %}
-
 </header>
-
 </div>
-
-
-
-{% if module_tabs %}
-
-{% include "includes/module_tabs.html" %}
-
-{% endif %}
-

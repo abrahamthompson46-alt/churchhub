@@ -38,35 +38,6 @@
                     </form>
                     {% endif %}
 
-                    {% if show_working_day_status %}
-                    {% if can_manage_working_day %}
-                    <a href="{% url 'transactions:period_list' %}"
-                       class="working-day-chip working-day-chip--link{% if working_day_is_open %} working-day-chip--open{% elif working_date %} working-day-chip--closed{% else %} working-day-chip--unset{% endif %}"
-                       title="System date and working day — open period controls"
-                       aria-label="Open period and working day controls">
-                    {% else %}
-                    <div class="working-day-chip{% if working_day_is_open %} working-day-chip--open{% elif working_date %} working-day-chip--closed{% else %} working-day-chip--unset{% endif %}"
-                         title="System date and working day status">
-                    {% endif %}
-                        <span class="working-day-chip__line">
-                            <span class="working-day-chip__label">System</span>
-                            <span class="working-day-chip__value">{{ system_date|date:"D, j M Y" }}</span>
-                        </span>
-                        <span class="working-day-chip__line working-day-chip__status">
-                            <span class="working-day-chip__label">Working</span>
-                            <span class="working-day-chip__value">
-                                {% if working_day_is_open %}
-                                <i class="bi bi-unlock-fill"></i> {{ working_date|date:"j M Y" }} · Open
-                                {% elif working_date %}
-                                <i class="bi bi-lock-fill"></i> {{ working_date|date:"j M Y" }} · Closed
-                                {% else %}
-                                <i class="bi bi-exclamation-circle"></i> No day open
-                                {% endif %}
-                            </span>
-                        </span>
-                    {% if can_manage_working_day %}</a>{% else %}</div>{% endif %}
-                    {% endif %}
-
                     <a href="{% url 'dashboard:notifications' %}" class="tool-btn" title="Notifications">
                         <i class="bi bi-bell"></i>
                         {% if unread_notification_count %}
@@ -104,6 +75,14 @@
                                 {% endif %}
                             </li>
                             {% endfor %}
+                            {% if user.member_id %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'portal:home' %}">
+                                    <i class="bi bi-people"></i>Member portal
+                                </a>
+                            </li>
+                            {% endif %}
                         </ul>
                     </div>
                 </div>

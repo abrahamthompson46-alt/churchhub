@@ -541,6 +541,7 @@ def resolve_module_key(namespace, current_view=""):
         "organization": "organization",
         "accounts": "settings",
         "permissions": "settings",
+        "portal": None,
         "dashboard": None,
     }
     return ns_map.get(namespace)

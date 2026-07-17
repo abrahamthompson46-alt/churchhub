@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Monthly Cut-off — ChurchHub{% endblock %}
+{% block title %}Monthly Cut-off — {{ institution_display_name|default:site_name }}{% endblock %}
 
 {% block content %}
 <div class="page-container">

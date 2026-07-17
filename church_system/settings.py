@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "remittance.apps.RemittanceConfig",
     "payroll.apps.PayrollConfig",
     "assets.apps.AssetsConfig",
+    "portal.apps.PortalConfig",
     "sitecontrol.apps.SitecontrolConfig",
 ]
 

@@ -3,13 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="ChurchHub — Enterprise Church Management System">
-    <title>{% block title %}{{ institution_display_name|default:site_name|default:"ChurchHub" }}{% endblock %}</title>
+    <meta name="description" content="{{ site_tagline|default:site_name }}">
+    <title>{% block title %}{{ institution_display_name|default:site_name }}{% endblock %}</title>
     {% load static %}
+    {% if site_favicon %}
+    <link rel="icon" href="{{ site_favicon.url }}">
+    {% endif %}
     <link rel="stylesheet" href="{% static 'vendor/fonts/plus-jakarta-sans/plus-jakarta-sans.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/font/bootstrap-icons.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260714">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260717">
     <meta name="theme-color" content="{{ institution_primary_color|default:'#0f2942' }}">
     {% if institution_primary_color %}
     <style>
@@ -24,7 +27,14 @@
 </head>
 <body class="app-body {% block body_class %}{% endblock %}">
     {% if user.is_authenticated and not user.is_platform_user %}
-        {% include "includes/navbar.html" %}
+        {% if user.role == "MEMBER" %}
+            {% include "includes/portal_navbar.html" %}
+        {% else %}
+            {% include "includes/navbar.html" %}
+            {% if module_tabs %}
+            {% include "includes/module_tabs.html" %}
+            {% endif %}
+        {% endif %}
     {% endif %}
 
     {% if impersonation_active %}
@@ -60,8 +70,8 @@
     {% if user.is_authenticated %}
     <footer class="app-footer">
         <div class="page-container d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <span class="text-muted small">&copy; {% now "Y" %} {{ institution_display_name|default:site_name|default:"ChurchHub" }}</span>
-            <span class="text-muted small">Enterprise Church Management</span>
+            <span class="text-muted small">&copy; {% now "Y" %} {{ institution_display_name|default:site_name }}</span>
+            <span class="text-muted small">{{ site_footer_text|default:site_tagline }}</span>
         </div>
     </footer>
     {% endif %}

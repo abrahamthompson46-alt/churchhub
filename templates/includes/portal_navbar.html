@@ -1,0 +1,25 @@
+{% load static %}
+<header class="ch-navbar portal-navbar">
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-menubar">
+        <div class="container-fluid navbar-shell">
+            <div class="navbar-top-row">
+                <a class="navbar-brand ch-brand" href="{% url 'portal:home' %}">
+                    {% if denomination_logo or tenant_logo or site_logo %}
+                    <img src="{% if denomination_logo %}{{ denomination_logo.url }}{% elif tenant_logo %}{{ tenant_logo.url }}{% else %}{{ site_logo.url }}{% endif %}" alt="" class="ch-brand-logo">
+                    {% else %}
+                    <span class="ch-brand-mark"><i class="bi bi-people-fill"></i></span>
+                    {% endif %}
+                    <span class="ch-brand-text">
+                        <span class="ch-brand-name">{{ institution_display_name|default:site_name }}</span>
+                        <span class="ch-brand-church">Member Portal</span>
+                    </span>
+                </a>
+                <div class="navbar-utilities">
+                    <a href="{% url 'portal:home' %}" class="tool-btn" title="Portal home"><i class="bi bi-house"></i></a>
+                    <a href="{% url 'portal:profile' %}" class="tool-btn" title="My profile"><i class="bi bi-person"></i></a>
+                    <a href="{% url 'dashboard:logout' %}" class="btn btn-sm btn-outline-light">Sign out</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+</header>

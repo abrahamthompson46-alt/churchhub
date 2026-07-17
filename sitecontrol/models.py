@@ -14,6 +14,15 @@ class SiteSettings(models.Model):
     singleton_id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
     site_name = models.CharField(max_length=120, default="ChurchHub")
     site_tagline = models.CharField(max_length=200, blank=True, default="Enterprise Church Management")
+    login_highlights = models.TextField(
+        blank=True,
+        default=(
+            "Role-based access & audit trails\n"
+            "Conference → church hierarchy\n"
+            "Financial integrity & reporting"
+        ),
+        help_text="Login page highlights — one per line. Leave blank to hide the list.",
+    )
     support_email = models.EmailField(blank=True, default="support@churchhub.local")
     admin_primary_color = models.CharField(max_length=7, default="#1e3a5f")
     accent_color = models.CharField(max_length=7, default="#1d4ed8")
@@ -129,6 +138,12 @@ class SiteSettings(models.Model):
     def save(self, *args, **kwargs):
         self.singleton_id = 1
         super().save(*args, **kwargs)
+        try:
+            from sitecontrol.services import clear_settings_cache
+
+            clear_settings_cache()
+        except Exception:
+            pass
 
     @classmethod
     def load(cls):

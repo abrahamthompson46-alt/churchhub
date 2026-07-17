@@ -37,6 +37,7 @@ urlpatterns = [
     path("remittance/", include(("remittance.urls", "remittance"), namespace="remittance")),
     path("payroll/", include(("payroll.urls", "payroll"), namespace="payroll")),
     path("assets/", include(("assets.urls", "assets"), namespace="assets")),
+    path("portal/", include(("portal.urls", "portal"), namespace="portal")),
     path("platform/", include(("sitecontrol.urls", "sitecontrol"), namespace="sitecontrol")),
 ]
 

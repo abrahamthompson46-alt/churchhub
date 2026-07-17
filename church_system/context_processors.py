@@ -90,7 +90,15 @@ def platform_context(request):
     ctx = {
         "site_settings": settings_obj,
         "site_name": settings_obj.site_name,
+        "site_tagline": settings_obj.site_tagline,
         "site_logo": settings_obj.logo,
+        "site_favicon": settings_obj.favicon,
+        "site_footer_text": settings_obj.footer_text or settings_obj.site_tagline,
+        "login_highlights": [
+            line.strip()
+            for line in (settings_obj.login_highlights or "").splitlines()
+            if line.strip()
+        ],
         "can_manage_platform": request.user.is_authenticated and getattr(
             request.user, "is_platform_user", False
         ),

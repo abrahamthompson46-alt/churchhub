@@ -9,7 +9,6 @@
     <header class="cc-hero dashboard-welcome dashboard-welcome--{{ dashboard_role }}">
         <div class="cc-hero__grid">
             <div class="cc-hero__main">
-                <p class="cc-eyebrow">{{ institution_display_name|default:site_name|default:"ChurchHub" }}</p>
                 <h1>Good day{% if user.first_name %}, {{ user.first_name }}{% endif %}</h1>
                 <p class="cc-hero__meta">
                     {% if is_control_center %}Mission Control{% else %}Operations Center{% endif %}
@@ -112,6 +111,47 @@
             <span class="cc-kpi-card__hint">{{ executive_kpis.pending_transactions }} txn · {{ executive_kpis.overdue_remittances }} overdue</span>
         </a>
     </section>
+    {% endif %}
+
+    {% if not is_control_center %}
+    {% if show_finance and has_active_church or show_members %}
+    <section class="cc-kpi-grid mb-4" aria-label="Church KPIs">
+        {% if show_finance and has_active_church %}
+        <div class="cc-kpi-card cc-kpi-card--primary">
+            <span class="cc-kpi-card__label">Tithe (MTD)</span>
+            <span class="cc-kpi-card__value text-currency">₵{{ tithe_total|floatformat:2|intcomma }}</span>
+            <span class="cc-kpi-card__hint">Month to date</span>
+        </div>
+        <div class="cc-kpi-card cc-kpi-card--teal">
+            <span class="cc-kpi-card__label">Combined (MTD)</span>
+            <span class="cc-kpi-card__value text-currency">₵{{ combined_total|floatformat:2|intcomma }}</span>
+            <span class="cc-kpi-card__hint">Month to date</span>
+        </div>
+        <div class="cc-kpi-card">
+            <span class="cc-kpi-card__label">Income (MTD)</span>
+            <span class="cc-kpi-card__value text-currency">₵{{ church_income_total|floatformat:2|intcomma }}</span>
+            <span class="cc-kpi-card__hint">All receipts</span>
+        </div>
+        <div class="cc-kpi-card cc-kpi-card--danger">
+            <span class="cc-kpi-card__label">Expenses (MTD)</span>
+            <span class="cc-kpi-card__value text-currency">₵{{ expense_total|floatformat:2|intcomma }}</span>
+            <span class="cc-kpi-card__hint">Month to date</span>
+        </div>
+        {% endif %}
+        {% if show_members %}
+        <a href="{% url 'members:list' %}" class="cc-kpi-card">
+            <span class="cc-kpi-card__label">Active Members</span>
+            <span class="cc-kpi-card__value">{{ member_count|intcomma }}</span>
+            <span class="cc-kpi-card__hint">Directory</span>
+        </a>
+        <a href="{% url 'members:transfer_list' %}" class="cc-kpi-card cc-kpi-card--warning">
+            <span class="cc-kpi-card__label">Pending Transfers</span>
+            <span class="cc-kpi-card__value">{{ pending_transfers|default:0 }}</span>
+            <span class="cc-kpi-card__hint">Needs attention</span>
+        </a>
+        {% endif %}
+    </section>
+    {% endif %}
     {% endif %}
 
     <div class="row g-4">
@@ -307,46 +347,6 @@
             {% endif %}
         </div>
     </div>
-
-    {% if not is_control_center %}
-    {% if show_finance and has_active_church %}
-    <section class="cc-kpi-grid mb-4" aria-label="Finance KPIs">
-        <div class="cc-kpi-card cc-kpi-card--primary">
-            <span class="cc-kpi-card__label">Tithe (MTD)</span>
-            <span class="cc-kpi-card__value text-currency">₵{{ tithe_total|floatformat:2|intcomma }}</span>
-            <span class="cc-kpi-card__hint">Month to date</span>
-        </div>
-        <div class="cc-kpi-card cc-kpi-card--teal">
-            <span class="cc-kpi-card__label">Combined (MTD)</span>
-            <span class="cc-kpi-card__value text-currency">₵{{ combined_total|floatformat:2|intcomma }}</span>
-            <span class="cc-kpi-card__hint">Month to date</span>
-        </div>
-        <div class="cc-kpi-card">
-            <span class="cc-kpi-card__label">Income (MTD)</span>
-            <span class="cc-kpi-card__value text-currency">₵{{ church_income_total|floatformat:2|intcomma }}</span>
-            <span class="cc-kpi-card__hint">All receipts</span>
-        </div>
-        <div class="cc-kpi-card cc-kpi-card--danger">
-            <span class="cc-kpi-card__label">Expenses (MTD)</span>
-            <span class="cc-kpi-card__value text-currency">₵{{ expense_total|floatformat:2|intcomma }}</span>
-            <span class="cc-kpi-card__hint">Month to date</span>
-        </div>
-    </section>
-    {% endif %}
-
-    {% if show_members %}
-    <div class="dash-inline-stats mb-4">
-        <div class="dash-inline-stat">
-            <span class="dash-inline-stat__label">Active Members</span>
-            <span class="dash-inline-stat__value"><a href="{% url 'members:list' %}">{{ member_count }}</a></span>
-        </div>
-        <div class="dash-inline-stat dash-inline-stat--warning">
-            <span class="dash-inline-stat__label">Pending Transfers</span>
-            <span class="dash-inline-stat__value"><a href="{% url 'members:transfer_list' %}">{{ pending_transfers|default:0 }}</a></span>
-        </div>
-    </div>
-    {% endif %}
-    {% endif %}
 
     {% if recent_announcements %}
     <section class="cc-panel mb-4">

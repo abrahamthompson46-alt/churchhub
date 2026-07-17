@@ -3,17 +3,29 @@
 {% block page_title %}Branding{% endblock %}
 
 {% block content %}
+<div class="platform-card mb-3">
+    <div class="platform-card-body">
+        <p class="text-muted small mb-0">
+            Set the platform product name, tagline, login highlights, logo, and colors.
+            Institution (denomination) branding is edited under Denominations → Branding.
+        </p>
+    </div>
+</div>
 <div class="platform-card">
     <div class="platform-card-body">
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
             <div class="platform-form-grid">
                 {% for field in form %}
-                <div>
-                    <label class="form-label fw-semibold">{{ field.label }}</label>
+                <div class="{% if field.name == 'login_highlights' %}platform-form-span-2{% endif %}">
+                    <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
+                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
                     {% if field.name == 'logo' and settings_obj.logo %}
                     <div class="mt-2"><img src="{{ settings_obj.logo.url }}" alt="Logo" style="max-height:48px"></div>
+                    {% endif %}
+                    {% if field.name == 'favicon' and settings_obj.favicon %}
+                    <div class="mt-2"><img src="{{ settings_obj.favicon.url }}" alt="Favicon" style="max-height:24px"></div>
                     {% endif %}
                     {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
                 </div>

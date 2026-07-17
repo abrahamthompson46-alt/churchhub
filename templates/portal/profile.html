@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile — {{ institution_display_name|default:site_name }}{% endblock %}
+{% block body_class %}portal-app{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Member Portal" page_title="My Profile" %}
+
+    {% if not member %}
+    <div class="alert alert-warning">No member record is linked to this account.</div>
+    {% else %}
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="cc-panel text-center p-4">
+                {% if member.profile_picture %}
+                <img src="{{ member.profile_picture.url }}" alt="" class="portal-avatar portal-avatar--lg mb-3">
+                {% else %}
+                <div class="portal-avatar portal-avatar--lg portal-avatar--initials mx-auto mb-3">
+                    {{ member.first_name|slice:":1"|upper }}
+                </div>
+                {% endif %}
+                <h2 class="h5 mb-1">{{ member.full_name }}</h2>
+                <p class="text-muted small mb-0">{{ member.church.name }}</p>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="cc-panel">
+                <div class="cc-panel__header"><h2 class="cc-panel__title">Membership details</h2></div>
+                <dl class="row px-3 pb-3 mb-0">
+                    <dt class="col-sm-4 text-muted">Status</dt>
+                    <dd class="col-sm-8">{{ member.get_membership_status_display|default:"—" }}</dd>
+                    <dt class="col-sm-4 text-muted">Phone</dt>
+                    <dd class="col-sm-8">{{ member.phone|default:"—" }}</dd>
+                    <dt class="col-sm-4 text-muted">Email</dt>
+                    <dd class="col-sm-8">{{ member.email|default:user.email|default:"—" }}</dd>
+                    <dt class="col-sm-4 text-muted">Department</dt>
+                    <dd class="col-sm-8">{{ member.department.name|default:"—" }}</dd>
+                    <dt class="col-sm-4 text-muted">Family</dt>
+                    <dd class="col-sm-8">{{ member.family.name|default:"—" }}</dd>
+                </dl>
+            </div>
+            <div class="mt-3">
+                <a href="{% url 'portal:home' %}" class="btn btn-outline-secondary btn-sm">← Back to portal</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -26,8 +26,6 @@ class SiteSettingsForm(forms.ModelForm):
     class Meta:
         model = SiteSettings
         fields = (
-            "site_name",
-            "site_tagline",
             "support_email",
             "footer_text",
             "session_timeout_minutes",
@@ -41,8 +39,6 @@ class SiteSettingsForm(forms.ModelForm):
             "platform_banner_message",
         )
         widgets = {
-            "site_name": forms.TextInput(attrs=input_attrs()),
-            "site_tagline": forms.TextInput(attrs=input_attrs()),
             "support_email": forms.EmailInput(attrs=input_attrs()),
             "footer_text": forms.TextInput(attrs=input_attrs()),
             "session_timeout_minutes": forms.NumberInput(attrs=input_attrs(min="5", max="1440")),
@@ -369,10 +365,29 @@ class PlatformTenantSetupForm(forms.Form):
 class BrandingSettingsForm(forms.ModelForm):
     class Meta:
         model = SiteSettings
-        fields = ("logo", "favicon", "admin_primary_color", "accent_color")
+        fields = (
+            "site_name",
+            "site_tagline",
+            "login_highlights",
+            "footer_text",
+            "logo",
+            "favicon",
+            "admin_primary_color",
+            "accent_color",
+        )
         widgets = {
+            "site_name": forms.TextInput(attrs=input_attrs()),
+            "site_tagline": forms.TextInput(attrs=input_attrs()),
+            "login_highlights": forms.Textarea(attrs=textarea_attrs(rows=4)),
+            "footer_text": forms.TextInput(attrs=input_attrs()),
             "admin_primary_color": forms.TextInput(attrs=input_attrs(type="color")),
             "accent_color": forms.TextInput(attrs=input_attrs(type="color")),
+        }
+        help_texts = {
+            "site_name": "Platform product name shown on login and footers.",
+            "site_tagline": "Short line under the platform name on the login page.",
+            "login_highlights": "One highlight per line on the staff login brand panel.",
+            "footer_text": "Shown in the application footer when signed in.",
         }
 
 

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Sign In — {{ site_name|default:"ChurchHub" }}{% endblock %}
+{% block title %}Sign In — {{ platform_name|default:site_settings.site_name|default:site_name }}{% endblock %}
 {% block body_class %}auth-page{% endblock %}
 
 {% block content %}
@@ -40,6 +40,7 @@
                 </form>
                 <p class="text-center mt-4 mb-0 small">
                     <a href="{% url 'password_reset' %}" class="text-muted text-decoration-none">Forgot password?</a>
+                    · <a href="{% url 'portal:login' %}" class="text-decoration-none">Member portal</a>
                     {% if public_registration_allowed %}
                     · <a href="{% url 'church_apply' %}{% if active_denomination %}?denomination={{ active_denomination.code }}{% endif %}" class="text-decoration-none">Register your church</a>
                     {% endif %}

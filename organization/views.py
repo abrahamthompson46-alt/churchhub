@@ -11,7 +11,11 @@ from church_system.flash import flash_error, flash_exception, flash_success, fla
 from members.models import Member
 from organization.access import (
     assert_can_manage_church,
+    assert_can_manage_district,
     assert_global_structure_manage,
+    assert_subtree_structure_manage,
+    can_manage_subtree_structure,
+    can_transfer_churches,
     get_scoped_church,
     get_scoped_conference,
     get_scoped_district,
@@ -20,6 +24,7 @@ from organization.access import (
     get_scoped_zone,
     is_district_scoped_user,
     is_global_org_admin,
+    org_capability_flags,
     require_org_manage,
     require_org_read,
     scoped_churches,
@@ -142,9 +147,8 @@ def hierarchy_overview(request):
         "active_church": active_church,
         "stats": stats,
         "hierarchy_chain": hierarchy_chain_description(denomination),
-        "can_manage": can_manage_organization(request.user),
         "search_q": search_q,
-        "is_global_admin": is_global_org_admin(request.user),
+        **org_capability_flags(request.user),
     })
 
 
@@ -291,7 +295,11 @@ def conference_detail(request, pk):
     return render(request, "organization/conference_detail.html", {
         "conference": conference,
         "zones": zones,
-        "can_manage": can_manage_organization(request.user) and is_global_org_admin(request.user),
+        **org_capability_flags(request.user),
+        "can_manage": (
+            can_manage_organization(request.user)
+            and can_manage_subtree_structure(request.user)
+        ),
     })
 
 
@@ -341,13 +349,17 @@ def zone_detail(request, pk):
     return render(request, "organization/zone_detail.html", {
         "zone": zone,
         "districts": districts,
-        "can_manage": can_manage_organization(request.user) and is_global_org_admin(request.user),
+        **org_capability_flags(request.user),
+        "can_manage": (
+            can_manage_organization(request.user)
+            and can_manage_subtree_structure(request.user)
+        ),
     })
 
 
 @login_required
 def zone_create(request):
-    assert_global_structure_manage(request)
+    assert_subtree_structure_manage(request)
     conference = None
     conf_pk = request.GET.get("conference")
     if conf_pk:
@@ -367,7 +379,7 @@ def zone_create(request):
 
 @login_required
 def zone_edit(request, pk):
-    assert_global_structure_manage(request)
+    assert_subtree_structure_manage(request)
     zone = get_scoped_zone(request, pk)
     form = ZoneForm(request.POST or None, instance=zone, request=request)
     if request.method == "POST" and form.is_valid():
@@ -392,16 +404,18 @@ def district_detail(request, pk):
     churches_qs = district.churches.order_by("name")
     paginator = Paginator(churches_qs, 25)
     churches_page = paginator.get_page(request.GET.get("page"))
+    flags = org_capability_flags(request.user)
     return render(request, "organization/district_detail.html", {
         "district": district,
         "churches": churches_page,
-        "can_manage": can_manage_organization(request.user),
+        "can_edit_district": flags["can_manage"],
+        **flags,
     })
 
 
 @login_required
 def district_create(request):
-    assert_global_structure_manage(request)
+    assert_subtree_structure_manage(request)
     zone = None
     zone_pk = request.GET.get("zone")
     if zone_pk:
@@ -421,8 +435,8 @@ def district_create(request):
 
 @login_required
 def district_edit(request, pk):
-    assert_global_structure_manage(request)
     district = get_scoped_district(request, pk)
+    assert_can_manage_district(request, district)
     form = DistrictForm(request.POST or None, instance=district, request=request)
     if request.method == "POST" and form.is_valid():
         form.save()
@@ -446,8 +460,7 @@ def church_detail(request, pk):
         "member_count": member_count,
         "account_count": church.accounts.count(),
         "txn_count": church.transactions.count(),
-        "can_manage": can_manage_organization(request.user),
-        "is_global_admin": is_global_org_admin(request.user),
+        **org_capability_flags(request.user),
     })
 
 
@@ -545,7 +558,7 @@ def church_transfer(request, pk):
     require_org_manage(request)
     church = get_scoped_church(request, pk)
     assert_can_manage_church(request, church)
-    if not is_global_org_admin(request.user):
+    if not can_transfer_churches(request.user):
         raise PermissionDenied("Church transfers require conference-level administration.")
     form = ChurchTransferForm(request.POST or None, church=church, request=request)
     if request.method == "POST" and form.is_valid():

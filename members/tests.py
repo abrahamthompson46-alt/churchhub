@@ -288,3 +288,34 @@ class ViewTests(MembersTestMixin, TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Member.objects.filter(first_name="Dup").exists())
+
+    def test_export_denied_when_override_blocks_export(self):
+        from permissions.models import Permission
+        from permissions.services import create_override
+
+        perm = Permission.objects.get(codename="export_members")
+        create_override(self.secretary, perm, granted=False, reason="Test deny export")
+        self.client.login(username="secretary", password="pass12345")
+        response = self.client.get(reverse("members:list"), {"export": "csv"})
+        self.assertEqual(response.status_code, 403)
+
+    def test_baptism_export_requires_export_permission(self):
+        self.client.login(username="member", password="pass12345")
+        response = self.client.get(reverse("members:baptism_register"), {"export": "csv"})
+        self.assertEqual(response.status_code, 403)
+
+    def test_department_edit_and_delete(self):
+        self.client.login(username="secretary", password="pass12345")
+        dept = Department.objects.create(church=self.church, name="Ushering")
+        response = self.client.post(
+            reverse("members:department_edit", kwargs={"pk": dept.pk}),
+            {"name": "Usher Board", "description": "Updated"},
+        )
+        self.assertEqual(response.status_code, 302)
+        dept.refresh_from_db()
+        self.assertEqual(dept.name, "Usher Board")
+        response = self.client.post(
+            reverse("members:department_delete", kwargs={"pk": dept.pk}),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Department.objects.filter(pk=dept.pk).exists())

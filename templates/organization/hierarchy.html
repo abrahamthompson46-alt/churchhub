@@ -56,7 +56,7 @@
                 <a href="{% url 'organization:general_conference_detail' gc.id %}" class="text-white text-decoration-none fw-semibold">{{ gc.name }}</a>
                 <span class="chip" style="background:rgba(255,255,255,0.12);border-color:transparent;color:#fff">{{ gc.code }}</span>
             </div>
-            {% if can_manage and org_levels_enabled.union %}
+            {% if can_manage_union_structure and org_levels_enabled.union %}
             <a href="{% url 'organization:union_create' %}?general_conference={{ gc.id }}" class="btn btn-sm btn-outline-light">Add {{ org_labels.union|default:"Union" }}</a>
             {% endif %}
         </div>
@@ -71,11 +71,11 @@
                 {% for conference in union.conferences.all %}
                 {% include "organization/includes/conference_tree.html" with conference=conference %}
                 {% empty %}
-                <p class="text-muted small ms-3 mb-2">No {{ org_labels_plural.conference|default:"conferences"|lower }}{% if can_manage %} — <a href="{% url 'organization:conference_create' %}">Add {{ org_labels.conference|default:"conference"|lower }}</a>{% endif %}</p>
+                <p class="text-muted small ms-3 mb-2">No {{ org_labels_plural.conference|default:"conferences"|lower }}{% if can_manage_union_structure %} — <a href="{% url 'organization:conference_create' %}">Add {{ org_labels.conference|default:"conference"|lower }}</a>{% endif %}</p>
                 {% endfor %}
             </div>
             {% empty %}
-            <p class="text-muted mb-0">No {{ org_labels_plural.union|default:"unions"|lower }}{% if can_manage and org_levels_enabled.union %} — <a href="{% url 'organization:union_create' %}?general_conference={{ gc.id }}">Add {{ org_labels.union|default:"union"|lower }}</a>{% endif %}</p>
+            <p class="text-muted mb-0">No {{ org_labels_plural.union|default:"unions"|lower }}{% if can_manage_union_structure and org_levels_enabled.union %} — <a href="{% url 'organization:union_create' %}?general_conference={{ gc.id }}">Add {{ org_labels.union|default:"union"|lower }}</a>{% endif %}</p>
             {% endfor %}
         </div>
     </div>

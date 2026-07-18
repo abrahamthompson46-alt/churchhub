@@ -13,6 +13,12 @@
 
     {% include "includes/page_header.html" with page_subtitle="Family" page_title=family.name page_description=family.address %}
 
+    {% if can_manage_families %}
+    <div class="d-flex gap-2 mb-4">
+        <a href="{% url 'members:family_edit' family.pk %}" class="btn btn-outline-secondary btn-sm">Edit family</a>
+    </div>
+    {% endif %}
+
     <div class="detail-grid">
         <div class="panel">
             <div class="panel-header">Household Details</div>

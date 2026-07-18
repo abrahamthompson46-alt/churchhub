@@ -14,10 +14,14 @@
 
     {% include "includes/page_header.html" with page_subtitle="District" page_title=district.name page_description=district.code %}
 
-    {% if can_manage %}
+    {% if can_manage_churches or can_edit_district %}
     <div class="d-flex flex-wrap gap-2 mb-4">
+        {% if can_manage_churches %}
         <a href="{% url 'organization:church_create' %}?district={{ district.id }}" class="btn btn-primary btn-sm">Add Church</a>
+        {% endif %}
+        {% if can_edit_district %}
         <a href="{% url 'organization:district_edit' district.id %}" class="btn btn-outline-secondary btn-sm">Edit</a>
+        {% endif %}
     </div>
     {% endif %}
 

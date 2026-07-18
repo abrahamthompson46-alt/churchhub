@@ -5,7 +5,8 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from permissions.checks import can_view_all_churches
+from permissions.checks import can_process_transfers
+from permissions.org_scope import church_in_user_scope
 from permissions.scoping import get_manageable_churches
 
 from members.models import (
@@ -31,12 +32,14 @@ def log_member_audit(church, action, performed_by=None, member=None, details=Non
 
 
 def can_process_transfer(user, transfer):
-    """User may approve/complete a pending transfer into their manageable churches."""
+    """User may approve/complete a pending transfer into a church in their org scope."""
     if transfer.status != TransferStatus.PENDING:
         return False
-    if can_view_all_churches(user):
-        manageable = get_manageable_churches(user)
-        return manageable.filter(pk=transfer.to_church_id).exists()
+    # can_process_transfers already includes manage_members implies + deny overrides.
+    if not can_process_transfers(user):
+        return False
+    if church_in_user_scope(user, transfer.to_church):
+        return True
     return bool(user.church_id and user.church_id == transfer.to_church_id)
 
 

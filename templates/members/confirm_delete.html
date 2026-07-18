@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container narrow-form">
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title=title %}
+
+    <div class="data-card">
+        <div class="card-body p-4">
+            <p class="mb-4">Confirm action for <strong>{{ object_label }}</strong>.</p>
+            <form method="post" class="d-flex flex-wrap gap-2">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm">{{ confirm_label|default:"Confirm" }}</button>
+                <a href="{{ cancel_href }}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

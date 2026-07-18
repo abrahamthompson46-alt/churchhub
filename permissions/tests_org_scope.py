@@ -1,9 +1,10 @@
 """Subtree organization scope tests."""
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 
-from organization.models import Church, Conference, District, Zone
+from organization.access import scoped_conferences
+from organization.models import Church, Conference, District, GeneralConference, Union, Zone
 from permissions.org_scope import OrgScopeLevel, apply_org_scope, church_in_user_scope
 from permissions.roles import UserRole
 from permissions.scoping import get_manageable_churches
@@ -91,3 +92,42 @@ class OrgScopeTests(TestCase):
             manageable,
             {self.church_a.pk, self.church_b.pk, self.church_other.pk},
         )
+
+    def test_gc_admin_scoped_conferences_exclude_sibling_gc(self):
+        gc_a = GeneralConference.objects.create(name="GC West", code="GCW")
+        gc_b = GeneralConference.objects.create(name="GC East", code="GCE")
+        union_a = Union.objects.create(name="Union West", code="UW", general_conference=gc_a)
+        union_b = Union.objects.create(name="Union East", code="UE", general_conference=gc_b)
+        conf_a = Conference.objects.create(
+            name="Conf West", code="CW", denomination=self.denom, union=union_a
+        )
+        conf_b = Conference.objects.create(
+            name="Conf East", code="CE", denomination=self.denom, union=union_b
+        )
+        zone_a = Zone.objects.create(name="Zone W", code="ZW", conference=conf_a)
+        district_a = District.objects.create(name="Dist W", code="DW", zone=zone_a)
+        church = Church.objects.create(
+            name="GC Church", code="GCC", district=district_a, financials_provisioned=True
+        )
+
+        admin = User.objects.create_user(
+            username="gc_admin",
+            password="pass12345",
+            role=UserRole.GENERAL_OVERSEER,
+            denomination=self.denom,
+        )
+        apply_org_scope(
+            admin,
+            role=UserRole.GENERAL_OVERSEER,
+            scope_level=OrgScopeLevel.GENERAL_CONFERENCE,
+            general_conference=gc_a,
+            denomination=self.denom,
+            church=church,
+        )
+        admin.save()
+
+        request = RequestFactory().get("/")
+        request.user = admin
+        ids = set(scoped_conferences(request).values_list("pk", flat=True))
+        self.assertIn(conf_a.pk, ids)
+        self.assertNotIn(conf_b.pk, ids)

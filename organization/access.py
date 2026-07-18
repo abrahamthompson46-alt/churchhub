@@ -1,12 +1,10 @@
-"""Organization access control — denomination and district scoping."""
+"""Organization access control — denomination and subtree scoping."""
 
 from django.core.exceptions import PermissionDenied
-from django.db import models
 from django.shortcuts import get_object_or_404
 
 from church_system.denomination_scope import (
     assert_church_in_active_denomination,
-    churches_for_denomination,
     conferences_for_denomination,
     get_active_denomination,
     get_user_denomination,
@@ -19,6 +17,7 @@ from organization.models import Church, Conference, District, GeneralConference,
 
 
 def is_global_org_admin(user):
+    """Union+ / denomination admins who may create conferences and transfer across wide trees."""
     from permissions.org_scope import OrgScopeLevel, infer_scope_level
 
     if is_superadmin(user):
@@ -31,6 +30,37 @@ def is_global_org_admin(user):
     } or user_has_role(
         user, {UserRole.GENERAL_OVERSEER, UserRole.SUPER_ADMIN, UserRole.UNION_ADMIN}
     )
+
+
+def can_manage_subtree_structure(user):
+    """Conference/zone+ may create and edit zones/districts inside their scope."""
+    from permissions.org_scope import OrgScopeLevel, infer_scope_level
+
+    if is_superadmin(user):
+        return True
+    level = infer_scope_level(user)
+    return level in {
+        OrgScopeLevel.DENOMINATION,
+        OrgScopeLevel.GENERAL_CONFERENCE,
+        OrgScopeLevel.UNION,
+        OrgScopeLevel.CONFERENCE,
+        OrgScopeLevel.ZONE,
+    }
+
+
+def can_transfer_churches(user):
+    """Church transfers require conference-level (or wider) administration."""
+    from permissions.org_scope import OrgScopeLevel, infer_scope_level
+
+    if is_superadmin(user):
+        return True
+    level = infer_scope_level(user)
+    return level in {
+        OrgScopeLevel.DENOMINATION,
+        OrgScopeLevel.GENERAL_CONFERENCE,
+        OrgScopeLevel.UNION,
+        OrgScopeLevel.CONFERENCE,
+    }
 
 
 def is_district_scoped_user(user):
@@ -64,10 +94,21 @@ def require_org_manage(request):
         raise PermissionDenied
 
 
-def _denomination_filter_path(prefix=""):
-    if prefix:
-        return f"{prefix}__district__zone__conference__denomination"
-    return "district__zone__conference__denomination"
+def org_capability_flags(user):
+    """Template/view flags for consistent organization UI gating."""
+    from permissions.checks import can_manage_organization
+
+    manage = can_manage_organization(user)
+    district = is_district_scoped_user(user)
+    return {
+        "can_manage": manage,
+        "can_manage_churches": manage,
+        "can_manage_structure": manage and can_manage_subtree_structure(user) and not district,
+        "can_manage_union_structure": manage and is_global_org_admin(user),
+        "can_transfer_churches": manage and can_transfer_churches(user),
+        "is_global_admin": is_global_org_admin(user),
+        "is_district_scoped": district,
+    }
 
 
 def scoped_conferences(request):
@@ -90,6 +131,8 @@ def scoped_conferences(request):
         qs = qs.filter(pk__in=ids)
     elif level == OrgScopeLevel.UNION and request.user.scope_union_id:
         qs = qs.filter(union_id=request.user.scope_union_id)
+    elif level == OrgScopeLevel.GENERAL_CONFERENCE and request.user.scope_general_conference_id:
+        qs = qs.filter(union__general_conference_id=request.user.scope_general_conference_id)
     return qs
 
 
@@ -132,22 +175,40 @@ def scoped_churches(request, active_only=False):
 
     qs = get_manageable_churches(request.user)
     if not active_only:
-        # Include inactive churches still in subtree for org admin views
         from permissions.org_scope import church_q_for_scope
-        from organization.models import Church as ChurchModel
 
-        qs = ChurchModel.objects.filter(church_q_for_scope(request.user)).select_related(
+        qs = Church.objects.filter(church_q_for_scope(request.user)).select_related(
             "district__zone__conference__denomination"
         )
     return qs.order_by("name")
 
 
 def scoped_unions(request):
+    from permissions.org_scope import OrgScopeLevel, infer_scope_level
+
+    level = infer_scope_level(request.user)
+    if level == OrgScopeLevel.GENERAL_CONFERENCE and request.user.scope_general_conference_id:
+        return Union.objects.filter(
+            general_conference_id=request.user.scope_general_conference_id
+        )
+    if level == OrgScopeLevel.UNION and request.user.scope_union_id:
+        return Union.objects.filter(pk=request.user.scope_union_id)
     return Union.objects.filter(conferences__in=scoped_conferences(request)).distinct()
 
 
 def scoped_general_conferences(request):
-    return GeneralConference.objects.filter(unions__in=scoped_unions(request)).distinct()
+    from permissions.org_scope import OrgScopeLevel, infer_scope_level
+
+    level = infer_scope_level(request.user)
+    if level == OrgScopeLevel.GENERAL_CONFERENCE and request.user.scope_general_conference_id:
+        return GeneralConference.objects.filter(pk=request.user.scope_general_conference_id)
+    if level == OrgScopeLevel.UNION and request.user.scope_union_id:
+        return GeneralConference.objects.filter(
+            unions__pk=request.user.scope_union_id
+        ).distinct()
+    return GeneralConference.objects.filter(
+        unions__conferences__in=scoped_conferences(request)
+    ).distinct()
 
 
 def get_scoped_conference(request, pk):
@@ -196,7 +257,9 @@ def assert_can_manage_church(request, church):
     if is_district_scoped_user(request.user):
         home_district = user_district(request.user)
         if not home_district or church.district_id != home_district.pk:
-            raise PermissionDenied("District administrators may only manage churches in their district.")
+            raise PermissionDenied(
+                "District administrators may only manage churches in their district."
+            )
 
 
 def assert_can_manage_district(request, district):
@@ -205,14 +268,29 @@ def assert_can_manage_district(request, district):
     if is_district_scoped_user(request.user):
         home_district = user_district(request.user)
         if not home_district or district.pk != home_district.pk:
-            raise PermissionDenied("District administrators may only manage their assigned district.")
+            raise PermissionDenied(
+                "District administrators may only manage their assigned district."
+            )
 
 
 def assert_global_structure_manage(request):
-    """Creating conferences/zones outside district scope requires global admin."""
+    """Union+ structure (GC/union/conference create) — not for district pastors."""
+    require_org_manage(request)
+    if not is_global_org_admin(request.user):
+        raise PermissionDenied(
+            "Creating conferences and unions requires union-level administration."
+        )
+
+
+def assert_subtree_structure_manage(request):
+    """Zone/district create/edit inside conference/zone scope."""
     require_org_manage(request)
     if is_district_scoped_user(request.user):
-        raise PermissionDenied("District pastors cannot modify conference or zone structure.")
+        raise PermissionDenied(
+            "District administrators cannot modify conference or zone structure."
+        )
+    if not can_manage_subtree_structure(request.user):
+        raise PermissionDenied("You cannot modify organization structure at this level.")
 
 
 def church_belongs_to_user_denomination(user, church):

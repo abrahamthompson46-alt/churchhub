@@ -204,13 +204,18 @@ class MemberTransferForm(forms.ModelForm):
             ).exclude(membership_status=MembershipStatus.TRANSFERRED).order_by(
                 "last_name", "first_name"
             )
-            dest = Church.objects.filter(
-                district__zone__conference_id=church.district.zone.conference_id,
-            ).exclude(pk=church.pk)
+            # Same denomination wall; allow cross-conference destinations.
+            dest = Church.objects.filter(is_active=True).exclude(pk=church.pk)
             denom = church.denomination
             if denom:
                 dest = dest.filter(district__zone__conference__denomination=denom)
-            self.fields["to_church"].queryset = dest.order_by("name")
+            elif church.district_id:
+                dest = dest.filter(
+                    district__zone__conference_id=church.district.zone.conference_id,
+                )
+            self.fields["to_church"].queryset = dest.select_related(
+                "district__zone__conference"
+            ).order_by("name")
 
 
 class MemberFilterForm(forms.Form):

@@ -12,6 +12,13 @@
     {% include "includes/page_header.html" with page_subtitle="People" page_title="Member Directory" page_description=church.name %}
     {% endif %}
 
+    {% if show_multi_church_banner %}
+    <div class="alert alert-info mb-3" role="status">
+        Showing members across <strong>{{ manageable_church_count }}</strong> churches in your organization tree.
+        Select an active church in the workspace bar to narrow the directory.
+    </div>
+    {% endif %}
+
     <div class="metrics-row">
         <div class="metric-card"><span class="metric-label">Total</span><span class="metric-value">{{ stats.total }}</span></div>
         <div class="metric-card metric-card--success"><span class="metric-label">Active</span><span class="metric-value">{{ stats.active }}</span></div>

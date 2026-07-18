@@ -21,7 +21,7 @@
     {% if can_manage %}
     <div class="d-flex flex-wrap gap-2 mb-4">
         <a href="{% url 'organization:church_edit' church.id %}" class="btn btn-outline-secondary btn-sm">Edit Church</a>
-        {% if is_global_admin %}
+        {% if can_transfer_churches %}
         <a href="{% url 'organization:church_transfer' church.id %}" class="btn btn-outline-primary btn-sm">Transfer</a>
         {% endif %}
         <form method="post" action="{% url 'organization:church_toggle_active' church.id %}" class="d-inline">

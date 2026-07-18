@@ -1,0 +1,21 @@
+{% if ucc_tabs %}
+<nav class="ucc-nav" aria-label="User control center">
+    <div class="ucc-nav__head">
+        <div>
+            <p class="ucc-nav__eyebrow">Administration</p>
+            <h1 class="ucc-nav__title">User Control Center</h1>
+            <p class="ucc-nav__subtitle">Directory, invitations, roles, and access — scoped to your organization tree.</p>
+        </div>
+    </div>
+    <div class="ucc-nav__tabs" role="tablist">
+        {% for tab in ucc_tabs %}
+        <a href="{% url tab.url_name %}"
+           class="ucc-nav__tab {% if tab.active %}is-active{% endif %}"
+           {% if tab.active %}aria-current="page"{% endif %}>
+            <i class="bi {{ tab.icon }}"></i>
+            <span>{{ tab.label }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</nav>
+{% endif %}

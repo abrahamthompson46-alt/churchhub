@@ -1,41 +1,35 @@
 """Object-scoped permission checks — church and hierarchy aware."""
 
-from django.db.models import Q
-
-from permissions.roles import UserRole
+from permissions.org_scope import church_in_user_scope, church_q_for_scope
 from permissions.services import user_has_permission
 from permissions.superadmin import is_superadmin
+from permissions.org_scope import OrgScopeLevel, infer_scope_level
 
 
 def is_top_level_approver(user):
+    """Denomination / GC / Union level admins may act across their full subtree."""
     if not user.is_authenticated:
         return False
     if is_superadmin(user):
         return True
-    return user.role == UserRole.GENERAL_OVERSEER
+    level = infer_scope_level(user)
+    return level in {
+        OrgScopeLevel.DENOMINATION,
+        OrgScopeLevel.GENERAL_CONFERENCE,
+        OrgScopeLevel.UNION,
+    }
 
 
 def can_act_on_church(user, church, permission_codename):
     """
     User holds the permission and may act on records for this church.
-    Local pastors: same church. District pastors: same district. Overseers: all.
+    Scope is the user's organization subtree (no sideways jumps).
     """
     if not user_has_permission(user, permission_codename):
         return False
-    if is_top_level_approver(user):
-        return True
     if not church:
         return False
-    from church_system.church_scope import get_user_church
-
-    user_church = get_user_church(user)
-    if not user_church:
-        return False
-    if user.role == UserRole.LOCAL_PASTOR:
-        return church.pk == user_church.pk
-    if user.role == UserRole.DISTRICT_PASTOR:
-        return church.district_id == user_church.district_id
-    return False
+    return church_in_user_scope(user, church)
 
 
 def can_approve_for_church(user, church, permission_codename):
@@ -45,20 +39,13 @@ def can_approve_for_church(user, church, permission_codename):
 
 def filter_queryset_for_church_scope(user, queryset, permission_codename, church_lookup="church"):
     """Return queryset rows the user may act on for the given permission."""
+    from organization.models import Church
+
     if not user_has_permission(user, permission_codename):
         return queryset.none()
-    if is_top_level_approver(user):
-        return queryset
-    from church_system.church_scope import get_user_church
 
-    user_church = get_user_church(user)
-    if not user_church:
-        return queryset.none()
-    if user.role == UserRole.LOCAL_PASTOR:
-        return queryset.filter(**{f"{church_lookup}_id": user_church.pk})
-    if user.role == UserRole.DISTRICT_PASTOR:
-        return queryset.filter(**{f"{church_lookup}__district_id": user_church.district_id})
-    return queryset.none()
+    church_ids = Church.objects.filter(church_q_for_scope(user)).values("pk")
+    return queryset.filter(**{f"{church_lookup}_id__in": church_ids})
 
 
 def exclude_self_submitted(user, queryset, submitter_field="minutes_submitted_by"):

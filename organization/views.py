@@ -455,36 +455,45 @@ def church_detail(request, pk):
 def church_create(request):
     require_org_manage(request)
     district = None
-    district_pk = request.GET.get("district")
+    district_pk = request.GET.get("district") or request.POST.get("district")
     if district_pk:
         district = get_scoped_district(request, district_pk)
-        if is_district_scoped_user(request.user) and district.pk != request.user.church.district_id:
+        actor_district = user_district(request.user)
+        if is_district_scoped_user(request.user) and (
+            actor_district is None or district.pk != actor_district.pk
+        ):
             raise PermissionDenied
     form = ChurchForm(request.POST or None, district=district, request=request)
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
-        target_district = data["district"]
-        if is_district_scoped_user(request.user) and target_district.pk != request.user.church.district_id:
-            raise PermissionDenied
-        try:
-            church, created = create_church(
-                district=target_district,
-                name=data["name"],
-                code=data["code"],
-                address=data.get("address", ""),
-                setup_financials=True,
-                performed_by=request.user,
-                ip_address=get_client_ip(request),
-            )
-        except ValueError as exc:
-            flash_error(request, str(exc))
-            return render(request, "organization/church_form.html", {
-                "form": form,
-                "title": "Add Church",
-                "district": district,
-            })
-        flash_success(request, f"Church “{church.name}” created.")
-        return redirect("organization:church_detail", pk=church.pk)
+        target_district = data.get("district") or district
+        if target_district is None:
+            form.add_error("district", "Select a district for this church.")
+        else:
+            actor_district = user_district(request.user)
+            if is_district_scoped_user(request.user) and (
+                actor_district is None or target_district.pk != actor_district.pk
+            ):
+                raise PermissionDenied
+            try:
+                church, created = create_church(
+                    district=target_district,
+                    name=data["name"],
+                    code=data["code"],
+                    address=data.get("address", ""),
+                    setup_financials=True,
+                    performed_by=request.user,
+                    ip_address=get_client_ip(request),
+                )
+            except ValueError as exc:
+                flash_error(request, str(exc))
+                return render(request, "organization/church_form.html", {
+                    "form": form,
+                    "title": "Add Church",
+                    "district": district,
+                })
+            flash_success(request, f"Church “{church.name}” created.")
+            return redirect("organization:church_detail", pk=church.pk)
     return render(request, "organization/church_form.html", {
         "form": form,
         "title": "Add Church",

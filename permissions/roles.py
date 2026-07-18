@@ -8,6 +8,9 @@ class UserRole:
 
     SUPER_ADMIN = "SUPER_ADMIN"
     GENERAL_OVERSEER = "GENERAL_OVERSEER"
+    UNION_ADMIN = "UNION_ADMIN"
+    CONFERENCE_ADMIN = "CONFERENCE_ADMIN"
+    ZONE_DIRECTOR = "ZONE_DIRECTOR"
     DISTRICT_PASTOR = "DISTRICT_PASTOR"
     LOCAL_PASTOR = "LOCAL_PASTOR"
     SECRETARY = "SECRETARY"
@@ -18,7 +21,10 @@ class UserRole:
     CHOICES = [
         (SUPER_ADMIN, "Super Admin"),
         (GENERAL_OVERSEER, "General Overseer"),
-        (DISTRICT_PASTOR, "District Pastor"),
+        (UNION_ADMIN, "Union Administrator"),
+        (CONFERENCE_ADMIN, "Conference Administrator"),
+        (ZONE_DIRECTOR, "Zone Director"),
+        (DISTRICT_PASTOR, "District Administrator"),
         (LOCAL_PASTOR, "Local Pastor"),
         (SECRETARY, "Secretary"),
         (TREASURY, "Treasury"),
@@ -29,6 +35,9 @@ class UserRole:
     HIERARCHY = [
         SUPER_ADMIN,
         GENERAL_OVERSEER,
+        UNION_ADMIN,
+        CONFERENCE_ADMIN,
+        ZONE_DIRECTOR,
         DISTRICT_PASTOR,
         LOCAL_PASTOR,
         SECRETARY,
@@ -37,11 +46,22 @@ class UserRole:
         MEMBER,
     ]
 
-    # Explicit assignable roles — peers cannot mint peers; rank alone is insufficient
-    # (SECRETARY and TREASURY are adjacent in HIERARCHY but must not assign each other).
+    # Org-tree administrators (subtree managers)
+    TREE_ADMIN_ROLES = {
+        SUPER_ADMIN,
+        GENERAL_OVERSEER,
+        UNION_ADMIN,
+        CONFERENCE_ADMIN,
+        ZONE_DIRECTOR,
+        DISTRICT_PASTOR,
+    }
+
     ASSIGNABLE_BY_ROLE = {
         SUPER_ADMIN: (
             GENERAL_OVERSEER,
+            UNION_ADMIN,
+            CONFERENCE_ADMIN,
+            ZONE_DIRECTOR,
             DISTRICT_PASTOR,
             LOCAL_PASTOR,
             SECRETARY,
@@ -50,6 +70,36 @@ class UserRole:
             MEMBER,
         ),
         GENERAL_OVERSEER: (
+            UNION_ADMIN,
+            CONFERENCE_ADMIN,
+            ZONE_DIRECTOR,
+            DISTRICT_PASTOR,
+            LOCAL_PASTOR,
+            SECRETARY,
+            TREASURY,
+            BOARD_MEMBER,
+            MEMBER,
+        ),
+        UNION_ADMIN: (
+            CONFERENCE_ADMIN,
+            ZONE_DIRECTOR,
+            DISTRICT_PASTOR,
+            LOCAL_PASTOR,
+            SECRETARY,
+            TREASURY,
+            BOARD_MEMBER,
+            MEMBER,
+        ),
+        CONFERENCE_ADMIN: (
+            ZONE_DIRECTOR,
+            DISTRICT_PASTOR,
+            LOCAL_PASTOR,
+            SECRETARY,
+            TREASURY,
+            BOARD_MEMBER,
+            MEMBER,
+        ),
+        ZONE_DIRECTOR: (
             DISTRICT_PASTOR,
             LOCAL_PASTOR,
             SECRETARY,
@@ -82,7 +132,12 @@ class UserRole:
 
     @classmethod
     def requires_church(cls, role):
-        return role not in {cls.SUPER_ADMIN, cls.GENERAL_OVERSEER, cls.DISTRICT_PASTOR}
+        """Local operational roles must have a home church."""
+        return role not in cls.TREE_ADMIN_ROLES
+
+    @classmethod
+    def is_tree_admin(cls, role):
+        return role in cls.TREE_ADMIN_ROLES
 
     @classmethod
     def rank(cls, role):
@@ -122,5 +177,4 @@ USER_MANAGEMENT_ROLES = registry_default_roles("manage_users")
 APPROVE_ANNOUNCEMENT_ROLES = registry_default_roles("approve_announcements")
 PERMISSION_ADMIN_ROLES = registry_default_roles("manage_permissions")
 
-# Django auth groups are no longer used for authorization (see sync_role_groups).
 ROLE_GROUP_MAP = {}

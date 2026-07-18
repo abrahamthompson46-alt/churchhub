@@ -69,22 +69,53 @@ def assign_user_to_church(user, church, performed_by=None, ip_address=None):
     return user
 
 
-def create_invitation(email, username, role, church, invited_by, days_valid=7):
+def create_invitation(
+    email,
+    username,
+    role,
+    church,
+    invited_by,
+    days_valid=7,
+    *,
+    scope_level=None,
+    scope_district=None,
+    scope_zone=None,
+    scope_conference=None,
+    scope_union=None,
+    scope_general_conference=None,
+    denomination=None,
+):
+    from permissions.org_scope import OrgScopeLevel
+
     assert_can_assign_role(invited_by, role)
 
     username = username.strip()
     email = email.lower().strip()
+    scope_level = scope_level or OrgScopeLevel.default_for_role(role)
+
+    if UserRole.requires_church(role) and not church:
+        raise ValueError("Local roles require a home church.")
 
     if User.objects.filter(username__iexact=username).exists():
         raise ValueError("Username is already taken.")
     if User.objects.filter(email__iexact=email, is_active=True).exists():
         raise ValueError("An active user with this email already exists.")
 
+    if church and not denomination:
+        denomination = getattr(church, "denomination", None)
+
     invitation = UserInvitation.objects.create(
         email=email,
         username=username,
         role=role,
+        scope_level=scope_level,
         church=church,
+        scope_district=scope_district,
+        scope_zone=scope_zone,
+        scope_conference=scope_conference,
+        scope_union=scope_union,
+        scope_general_conference=scope_general_conference,
+        denomination=denomination,
         invited_by=invited_by,
         expires_at=timezone.now() + timedelta(days=days_valid),
     )
@@ -96,6 +127,7 @@ def create_invitation(email, username, role, church, invited_by, days_valid=7):
             "email": email,
             "username": username,
             "role": role,
+            "scope_level": scope_level,
             "invitation_id": str(invitation.id),
         },
     )
@@ -137,16 +169,18 @@ def send_invitation_email(invitation, request=None, *, fail_silently=True):
 
 @transaction.atomic
 def accept_invitation(invitation, password, first_name="", last_name=""):
+    from permissions.org_scope import apply_org_scope
+    from sitecontrol.services import can_add_user_to_church
+
     invitation = UserInvitation.objects.select_for_update().get(pk=invitation.pk)
 
     if not invitation.is_valid:
         raise ValueError("This invitation is no longer valid.")
 
-    from sitecontrol.services import can_add_user_to_church
-
-    allowed, message = can_add_user_to_church(invitation.church)
-    if not allowed:
-        raise ValueError(message)
+    if invitation.church_id:
+        allowed, message = can_add_user_to_church(invitation.church)
+        if not allowed:
+            raise ValueError(message)
 
     if User.objects.filter(username__iexact=invitation.username).exists():
         raise ValueError("Username is already taken.")
@@ -155,7 +189,7 @@ def accept_invitation(invitation, password, first_name="", last_name=""):
 
     validate_password(password, user=User(username=invitation.username, email=invitation.email))
 
-    denom = getattr(invitation.church, "denomination", None)
+    denom = invitation.denomination or getattr(invitation.church, "denomination", None)
     user = User.objects.create_user(
         username=invitation.username,
         email=invitation.email,
@@ -166,7 +200,21 @@ def accept_invitation(invitation, password, first_name="", last_name=""):
         last_name=last_name,
         is_staff=False,
         denomination=denom,
+        scope_level=invitation.scope_level,
     )
+    apply_org_scope(
+        user,
+        role=invitation.role,
+        scope_level=invitation.scope_level,
+        church=invitation.church,
+        district=invitation.scope_district,
+        zone=invitation.scope_zone,
+        conference=invitation.scope_conference,
+        union=invitation.scope_union,
+        general_conference=invitation.scope_general_conference,
+        denomination=denom,
+    )
+    user.save()
     sync_role_groups(user)
 
     invitation.is_accepted = True
@@ -248,7 +296,9 @@ def activate_user(user, performed_by=None, ip_address=None):
     return user
 
 
-def update_user_role(user, new_role, performed_by=None, ip_address=None):
+def update_user_role(user, new_role, performed_by=None, ip_address=None, *, realign_scope=True):
+    from permissions.org_scope import OrgScopeLevel, apply_org_scope
+
     old_role = user.role
     if old_role == new_role:
         return user
@@ -257,14 +307,30 @@ def update_user_role(user, new_role, performed_by=None, ip_address=None):
         assert_can_assign_role(performed_by, new_role)
 
     user.role = new_role
-    user.save(update_fields=["role"])
+    if realign_scope:
+        # Keep existing unit when possible; otherwise default from role + home church.
+        apply_org_scope(
+            user,
+            role=new_role,
+            scope_level=OrgScopeLevel.default_for_role(new_role),
+            church=user.church,
+            district=user.scope_district,
+            zone=user.scope_zone,
+            conference=user.scope_conference,
+            union=user.scope_union,
+            general_conference=user.scope_general_conference,
+            denomination=user.denomination,
+        )
+        user.save()
+    else:
+        user.save(update_fields=["role"])
     sync_role_groups(user)
     log_activity(
         user,
         "ROLE_CHANGE",
         performed_by=performed_by,
         ip_address=ip_address,
-        details={"old_role": old_role, "new_role": new_role},
+        details={"old_role": old_role, "new_role": new_role, "scope_level": user.scope_level},
     )
     return user
 

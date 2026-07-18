@@ -6,9 +6,11 @@ from django.urls import reverse
 
 from church_system.flash import flash_info, flash_success
 
+from accounts.control_center import ucc_context
 from permissions.checks import can_manage_permissions
 from permissions.forms import PermissionMatrixForm, PermissionOverrideForm
 from permissions.models import PermissionAuditLog, PermissionOverride
+from permissions.scoping import get_manageable_users, user_may_manage_target
 from permissions.services import (
     bulk_update_matrix,
     create_override,
@@ -26,18 +28,24 @@ def _require_permissions_admin(request):
         raise PermissionDenied
 
 
+def _manageable_user_ids(user):
+    return get_manageable_users(user).values_list("pk", flat=True)
+
+
 @login_required
 def index(request):
     _require_permissions_admin(request)
     matrix = get_matrix_data()
-    override_count = PermissionOverride.objects.filter(is_active=True).count()
-    audit_count = PermissionAuditLog.objects.count()
+    user_ids = _manageable_user_ids(request.user)
+    override_count = PermissionOverride.objects.filter(is_active=True, user_id__in=user_ids).count()
+    audit_count = PermissionAuditLog.objects.filter(target_user_id__in=user_ids).count()
     return render(request, "permissions/index.html", {
         "matrix_summary": matrix,
         "override_count": override_count,
         "audit_count": audit_count,
         "role_count": len(UserRole.CHOICES),
         "permission_count": len(matrix["permissions"]),
+        **ucc_context(request.user, active="access"),
     })
 
 
@@ -110,6 +118,7 @@ def role_matrix(request):
         "roles": data["roles"],
         "matrix_rows": matrix_rows,
         "registry_meta": data["registry_meta"],
+        **ucc_context(request.user, active="matrix"),
     })
 
 
@@ -129,7 +138,10 @@ def role_list(request):
             "granted_count": granted,
             "total": len(data["permissions"]),
         })
-    return render(request, "permissions/role_list.html", {"roles": role_summaries})
+    return render(request, "permissions/role_list.html", {
+        "roles": role_summaries,
+        **ucc_context(request.user, active="roles"),
+    })
 
 
 @login_required
@@ -149,16 +161,21 @@ def role_detail(request, role):
         "role": role,
         "role_label": UserRole.label(role),
         "permissions_by_category": permissions_by_category,
+        **ucc_context(request.user, active="roles"),
     })
 
 
 @login_required
 def override_list(request):
     _require_permissions_admin(request)
-    overrides = PermissionOverride.objects.select_related(
+    user_ids = _manageable_user_ids(request.user)
+    overrides = PermissionOverride.objects.filter(user_id__in=user_ids).select_related(
         "user", "permission", "created_by"
     ).order_by("-created_at")[:200]
-    return render(request, "permissions/override_list.html", {"overrides": overrides})
+    return render(request, "permissions/override_list.html", {
+        "overrides": overrides,
+        **ucc_context(request.user, active="overrides"),
+    })
 
 
 @login_required
@@ -188,13 +205,17 @@ def override_create(request):
     return render(request, "permissions/override_form.html", {
         "form": form,
         "title": "Add Permission Override",
+        **ucc_context(request.user, active="overrides"),
     })
 
 
 @login_required
 def override_edit(request, pk):
     _require_permissions_admin(request)
-    override = get_object_or_404(PermissionOverride, pk=pk)
+    override = get_object_or_404(
+        PermissionOverride.objects.filter(user_id__in=_manageable_user_ids(request.user)),
+        pk=pk,
+    )
     if request.method == "POST":
         form = PermissionOverrideForm(request.POST, instance=override, manager=request.user)
         if form.is_valid():
@@ -214,13 +235,17 @@ def override_edit(request, pk):
         "form": form,
         "title": "Edit Permission Override",
         "override": override,
+        **ucc_context(request.user, active="overrides"),
     })
 
 
 @login_required
 def override_delete(request, pk):
     _require_permissions_admin(request)
-    override = get_object_or_404(PermissionOverride, pk=pk)
+    override = get_object_or_404(
+        PermissionOverride.objects.filter(user_id__in=_manageable_user_ids(request.user)),
+        pk=pk,
+    )
     if request.method == "POST":
         log_permission_audit(
             "OVERRIDE_DELETE",
@@ -235,7 +260,10 @@ def override_delete(request, pk):
         override.delete()
         flash_success(request, "Override removed.")
         return redirect("permissions:override_list")
-    return render(request, "permissions/override_confirm_delete.html", {"override": override})
+    return render(request, "permissions/override_confirm_delete.html", {
+        "override": override,
+        **ucc_context(request.user, active="overrides"),
+    })
 
 
 @login_required
@@ -244,6 +272,8 @@ def user_effective(request, user_id):
     from django.contrib.auth import get_user_model
     User = get_user_model()
     target = get_object_or_404(User, pk=user_id)
+    if not user_may_manage_target(request.user, target) and not request.user.is_superuser:
+        raise PermissionDenied("You may only inspect effective permissions within your organization scope.")
     effective = get_effective_permissions(target)
     overrides = PermissionOverride.objects.filter(user=target).select_related("permission")
     grouped = {}
@@ -260,16 +290,23 @@ def user_effective(request, user_id):
         "target_user": target,
         "grouped_permissions": grouped,
         "overrides": overrides,
+        **ucc_context(request.user, active="directory"),
     })
 
 
 @login_required
 def audit_log(request):
     _require_permissions_admin(request)
-    logs = PermissionAuditLog.objects.select_related(
+    user_ids = _manageable_user_ids(request.user)
+    logs = PermissionAuditLog.objects.filter(
+        target_user_id__in=user_ids
+    ).select_related(
         "performed_by", "target_user"
     ).order_by("-created_at")[:300]
-    return render(request, "permissions/audit_log.html", {"logs": logs})
+    return render(request, "permissions/audit_log.html", {
+        "logs": logs,
+        **ucc_context(request.user, active="audit"),
+    })
 
 
 @login_required

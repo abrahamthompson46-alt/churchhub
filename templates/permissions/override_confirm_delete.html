@@ -4,9 +4,17 @@
 
 {% block content %}
 <div class="page-container narrow-form">
-    {% include "includes/page_header.html" with page_subtitle="Permissions" page_title="Remove Override" page_description="This user will revert to role-based permissions for this capability." %}
+    {% include "includes/user_control_center_nav.html" %}
+
+    <div class="ucc-toolbar">
+        <div>
+            <h2 class="ucc-section-title">Remove override</h2>
+            <p class="ucc-section-desc">This user will revert to role-based permissions for this capability.</p>
+        </div>
+    </div>
 
     <div class="data-card">
+
         <div class="card-body">
             <p><strong>{{ override.user.username }}</strong> — {{ override.permission.name }}
                 ({% if override.granted %}grant{% else %}deny{% endif %})</p>

@@ -1,17 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}User Management — ChurchHub{% endblock %}
+{% block title %}User Control Center — ChurchHub{% endblock %}
 
 {% block content %}
 <div class="page-container">
-    {% url 'accounts:invite_user' as invite_url %}
-    {% if can_invite_users and institution_invites_allowed %}
-    {% include "includes/page_header.html" with page_subtitle="Administration" page_title="User Management" page_description="Manage church staff accounts and roles." action_url=invite_url action_label="Invite User" %}
-    {% elif not institution_invites_allowed %}
-    {% include "includes/page_header.html" with page_subtitle="Administration" page_title="User Management" page_description="User invitations are disabled by the platform owner." %}
-    {% else %}
-    {% include "includes/page_header.html" with page_subtitle="Administration" page_title="User Management" page_description="Manage church staff accounts and roles." %}
-    {% endif %}
+    {% include "includes/user_control_center_nav.html" %}
+
+    <div class="ucc-toolbar">
+        <div>
+            <h2 class="ucc-section-title">Directory</h2>
+            <p class="ucc-section-desc">Staff and portal accounts inside your organization tree.</p>
+        </div>
+        {% if can_invite_users and institution_invites_allowed %}
+        <a href="{% url 'accounts:invite_user' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-envelope-plus"></i> Invite user
+        </a>
+        {% elif not institution_invites_allowed %}
+        <span class="text-muted small">Invitations disabled by platform owner.</span>
+        {% endif %}
+    </div>
 
     <div class="filter-bar">
         <form method="get" class="filter-form">
@@ -49,7 +56,7 @@
                     <tr>
                         <th>User</th>
                         <th>Role</th>
-                        <th>Church</th>
+                        <th>Organization scope</th>
                         <th>Status</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -62,23 +69,27 @@
                             <br><span class="text-muted small">@{{ u.username }}</span>
                         </td>
                         <td><span class="chip">{{ u.get_role_display }}</span></td>
-                        <td class="text-muted">{{ u.church|default:"—" }}</td>
+                        <td>
+                            <div class="scope-cell">
+                                <span class="scope-pill scope-pill--{{ u.effective_scope_level|lower }}">{{ u.scope_summary.level_label }}</span>
+                                <span class="scope-cell__name">{{ u.scope_summary.name }}</span>
+                                {% if u.church and u.effective_scope_level != "CHURCH" %}
+                                <span class="scope-cell__home text-muted">Home: {{ u.church.name }}</span>
+                                {% endif %}
+                            </div>
+                        </td>
                         <td>
                             {% if u.is_active %}
-                            <span class="chip chip--success">Active</span>
+                            <span class="table-status table-status--approved">Active</span>
                             {% else %}
-                            <span class="chip chip--danger">Inactive</span>
+                            <span class="table-status table-status--voided">Inactive</span>
                             {% endif %}
                         </td>
                         <td class="text-end text-nowrap">
                             {% if can_manage_permissions %}
-                            <a href="{% url 'permissions:user_effective' u.pk %}" class="btn btn-sm btn-outline-primary">Permissions</a>
+                            <a href="{% url 'permissions:user_effective' u.pk %}" class="btn btn-sm btn-outline-primary">Access</a>
                             {% endif %}
-                            {% if can_manage_users %}
-                            <a href="{% url 'accounts:user_detail' u.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
-                            {% else %}
-                            <a href="{% url 'accounts:user_detail' u.pk %}" class="btn btn-sm btn-outline-secondary">View</a>
-                            {% endif %}
+                            <a href="{% url 'accounts:user_detail' u.pk %}" class="btn btn-sm btn-outline-secondary">{% if can_manage_users %}Edit{% else %}View{% endif %}</a>
                         </td>
                     </tr>
                     {% empty %}
@@ -106,7 +117,7 @@
 
     {% if pending_invites %}
     <div class="panel">
-        <div class="panel-header">Pending Invitations</div>
+        <div class="panel-header">Pending invitations</div>
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead>
@@ -114,7 +125,7 @@
                         <th>Email</th>
                         <th>Username</th>
                         <th>Role</th>
-                        <th>Church</th>
+                        <th>Scope</th>
                         <th>Expires</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -125,7 +136,16 @@
                         <td>{{ inv.email }}</td>
                         <td>{{ inv.username }}</td>
                         <td>{{ inv.get_role_display }}</td>
-                        <td>{{ inv.church.name }}</td>
+                        <td>
+                            <span class="scope-pill scope-pill--{{ inv.scope_level|lower }}">{{ inv.get_scope_level_display }}</span>
+                            <span class="small d-block mt-1">
+                                {% if inv.church %}{{ inv.church.name }}
+                                {% elif inv.scope_district %}{{ inv.scope_district.name }}
+                                {% elif inv.scope_conference %}{{ inv.scope_conference.name }}
+                                {% elif inv.denomination %}{{ inv.denomination.name }}
+                                {% else %}—{% endif %}
+                            </span>
+                        </td>
                         <td class="text-muted small">{{ inv.expires_at|date:"M j, Y" }}</td>
                         <td class="text-end text-nowrap">
                             <a href="{% url 'accounts:invite_detail' inv.pk %}" class="table-link me-2">Details</a>

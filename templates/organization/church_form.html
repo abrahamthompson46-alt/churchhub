@@ -13,7 +13,12 @@
                     <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
                 </ol>
             </nav>
-            {% include "includes/page_header.html" with page_subtitle="Organization" page_title=title %}
+            {% if district %}
+            <p class="small text-muted mb-3">
+                Adding under district <strong>{{ district.name }}</strong>
+                ({{ district.zone.conference.name }} · {{ district.zone.name }}).
+            </p>
+            {% endif %}
             <div class="form-card-inner card">
                 <div class="card-body p-4 p-md-5">
                     <form method="post" novalidate>

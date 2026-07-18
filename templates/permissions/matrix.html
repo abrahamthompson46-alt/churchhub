@@ -1,12 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}Permission Matrix — ChurchHub{% endblock %}
+{% block title %}Role Matrix — User Control Center{% endblock %}
 
 {% block content %}
 <div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Permissions" page_title="Role-Permission Matrix" page_description="Check a cell to grant a permission to a role. User-specific overrides are managed separately." %}
+    {% include "includes/user_control_center_nav.html" %}
+
+    <div class="ucc-toolbar">
+        <div>
+            <h2 class="ucc-section-title">Role matrix</h2>
+            <p class="ucc-section-desc">Grant default permissions per role. User overrides are managed separately.</p>
+        </div>
+    </div>
 
     <form method="post" class="data-card mb-4">
+
         {% csrf_token %}
         <div class="table-responsive">
             <table class="table table-sm align-middle permission-matrix mb-0">

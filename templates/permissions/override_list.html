@@ -1,13 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}Permission Overrides — ChurchHub{% endblock %}
+{% block title %}Overrides — User Control Center{% endblock %}
 
 {% block content %}
 <div class="page-container">
+    {% include "includes/user_control_center_nav.html" %}
     {% url 'permissions:override_create' as create_url %}
-    {% include "includes/page_header.html" with page_subtitle="Permissions" page_title="User Overrides" page_description="Grant or deny specific permissions for individual users. Overrides take precedence over the role matrix." action_url=create_url action_label="Add Override" action_icon="bi-plus-lg" %}
+
+    <div class="ucc-toolbar">
+        <div>
+            <h2 class="ucc-section-title">Overrides</h2>
+            <p class="ucc-section-desc">Grant or deny specific permissions for users in your tree. Overrides beat the role matrix.</p>
+        </div>
+        <a href="{{ create_url }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add override</a>
+    </div>
 
     <div class="data-card">
+
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead>

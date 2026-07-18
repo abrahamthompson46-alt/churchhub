@@ -458,28 +458,21 @@ def get_main_navigation(user, active_church=None):
         nav.append(_dropdown("organization", "Organization", "bi-diagram-3", sections=org_sections))
 
     settings_sections = []
-    user_items = []
+    ucc_items = []
     if can_manage_users(user):
-        user_items.append(_item("Users", "accounts:user_list", "bi-people-fill"))
+        ucc_items.append(_item("User Control Center", "accounts:user_list", "bi-shield-lock"))
+    elif can_manage_permissions(user):
+        ucc_items.append(_item("User Control Center", "permissions:index", "bi-shield-lock"))
     if can_invite_users(user) and institution_invites_allowed():
-        user_items.append(_item("Invite User", "accounts:invite_user", "bi-envelope-plus"))
+        ucc_items.append(_item("Invite User", "accounts:invite_user", "bi-envelope-plus"))
     if can_view_activity_logs(user):
-        user_items.append(_item("Activity Log", "accounts:activity_log", "bi-journal-text"))
-    if user_items:
-        settings_sections.append(_section("Users & Activity", user_items, "users"))
-
-    security_items = []
+        ucc_items.append(_item("Activity Log", "accounts:activity_log", "bi-journal-text"))
     if can_manage_permissions(user):
-        security_items.extend([
-            _item("Permissions", "permissions:index", "bi-shield-lock"),
-            _item("Role Matrix", "permissions:matrix", "bi-grid-3x3-gap"),
-        ])
+        ucc_items.append(_item("Role Matrix", "permissions:matrix", "bi-grid-3x3-gap"))
     if can_manage_overrides(user):
-        security_items.append(_item("Overrides", "permissions:override_list", "bi-sliders"))
-    if can_view_permission_audit(user):
-        security_items.append(_item("Permission Audit", "permissions:audit_log", "bi-journal-check"))
-    if security_items:
-        settings_sections.append(_section("Security", security_items, "security"))
+        ucc_items.append(_item("Overrides", "permissions:override_list", "bi-sliders"))
+    if ucc_items:
+        settings_sections.append(_section("User Control Center", ucc_items, "users"))
 
     if can_manage_working_day(user):
         settings_sections.append(_section("Church Calendar", [
@@ -594,12 +587,11 @@ MODULE_TABS = {
         _item("Onboard", "organization:church_onboard", "bi-building-add"),
     ],
     "settings": [
-        _item("Users", "accounts:user_list", "bi-people-fill"),
+        _item("Control Center", "accounts:user_list", "bi-shield-lock"),
         _item("Invite", "accounts:invite_user", "bi-envelope-plus"),
         _item("Activity", "accounts:activity_log", "bi-journal-text"),
-        _item("Calendar", "transactions:period_list", "bi-calendar-event"),
-        _item("Permissions", "permissions:index", "bi-shield-lock"),
         _item("Matrix", "permissions:matrix", "bi-grid-3x3-gap"),
+        _item("Calendar", "transactions:period_list", "bi-calendar-event"),
     ],
 }
 

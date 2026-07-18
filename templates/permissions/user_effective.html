@@ -1,12 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Effective Permissions — {{ target_user.username }}{% endblock %}
+{% block title %}Effective Access — {{ target_user.username }}{% endblock %}
 
 {% block content %}
 <div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Permissions" page_title=target_user.username page_description=target_user.get_role_display %}
+    {% include "includes/user_control_center_nav.html" %}
+
+    <div class="ucc-toolbar">
+        <div>
+            <h2 class="ucc-section-title">{{ target_user.get_full_name|default:target_user.username }}</h2>
+            <p class="ucc-section-desc">Effective access · {{ target_user.get_role_display }}</p>
+        </div>
+        <a href="{% url 'accounts:user_detail' target_user.pk %}" class="btn btn-outline-secondary btn-sm">Edit user</a>
+    </div>
 
     <div class="row g-4">
+
         <div class="col-lg-8">
             {% for category, items in grouped_permissions.items %}
             <div class="data-card mb-3">

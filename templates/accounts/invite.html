@@ -1,34 +1,108 @@
 {% extends "base.html" %}
 
-{% block title %}Invite User — ChurchHub{% endblock %}
+{% block title %}Invite User — User Control Center{% endblock %}
 
 {% block content %}
 <div class="page-container">
+    {% include "includes/user_control_center_nav.html" %}
+
+    <div class="ucc-toolbar">
+        <div>
+            <h2 class="ucc-section-title">Invite user</h2>
+            <p class="ucc-section-desc">Assign a role inside your organization tree. Users cannot jump sideways outside their unit.</p>
+        </div>
+    </div>
+
     <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <nav aria-label="breadcrumb" class="app-breadcrumb">
-                <ol class="breadcrumb mb-0">
-                    <li class="breadcrumb-item"><a href="{% url 'accounts:user_list' %}">Users</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Invite</li>
-                </ol>
-            </nav>
-            {% include "includes/page_header.html" with page_subtitle="Administration" page_title="Invite User" page_description="Send an invitation link to onboard a new staff member." %}
-            <div class="form-card-inner card">
-                <div class="card-body p-4 p-md-5">
-                    <form method="post" novalidate>
-                        {% csrf_token %}
-                        {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
-                        {% for field in form %}
-                            {% include "includes/form_field.html" with field=field %}
-                        {% endfor %}
-                        <div class="d-flex gap-2 pt-2">
-                            <button type="submit" class="btn btn-primary">Create Invitation</button>
-                            <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary">Cancel</a>
-                        </div>
-                    </form>
+        <div class="col-lg-10">
+            <div class="scope-invite-layout">
+
+                <aside class="scope-invite-aside">
+                    <h2 class="scope-invite-aside__title">How access works</h2>
+                    <ol class="scope-invite-steps">
+                        <li><strong>Role</strong> — what they can do</li>
+                        <li><strong>Scope</strong> — how wide (church → denomination)</li>
+                        <li><strong>Unit</strong> — which node they belong to</li>
+                    </ol>
+                    <p class="scope-invite-aside__note">
+                        Example: a District Administrator for Bantama can manage every church in Bantama —
+                        not Ashanti, and not another conference.
+                    </p>
+                </aside>
+
+                <div class="form-card-inner card scope-invite-card">
+                    <div class="card-body p-4 p-md-5">
+                        <form method="post" novalidate id="invite-scope-form">
+                            {% csrf_token %}
+                            {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+
+                            <div class="scope-form-section">
+                                <h3 class="scope-form-section__title">Account</h3>
+                                {% include "includes/form_field.html" with field=form.email %}
+                                {% include "includes/form_field.html" with field=form.username %}
+                            </div>
+
+                            <div class="scope-form-section">
+                                <h3 class="scope-form-section__title">Organization authority</h3>
+                                {% include "includes/form_field.html" with field=form.role %}
+                                {% include "includes/form_field.html" with field=form.scope_level %}
+                                {% include "includes/form_field.html" with field=form.scope_unit %}
+                                {% include "includes/form_field.html" with field=form.church %}
+                            </div>
+
+                            <div class="d-flex gap-2 pt-2">
+                                <button type="submit" class="btn btn-primary">Create Invitation</button>
+                                <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var form = document.getElementById("invite-scope-form");
+    if (!form) return;
+    var role = form.querySelector(".scope-role-select");
+    var level = form.querySelector(".scope-level-select");
+    function refresh() {
+        // Re-GET with current selections so server rebuilds unit choices
+        var params = new URLSearchParams();
+        if (role && role.value) params.set("role", role.value);
+        if (level && level.value) params.set("scope_level", level.value);
+        // Soft refresh: submit as GET to same URL is awkward; instead reload unit via form get
+        // Keep UX simple: changing role/level triggers form GET-less post of empty — use location
+        var url = window.location.pathname + "?" + params.toString();
+        // Preserve typed email/username in sessionStorage
+        var email = form.querySelector("#id_email");
+        var username = form.querySelector("#id_username");
+        try {
+            sessionStorage.setItem("invite_draft", JSON.stringify({
+                email: email ? email.value : "",
+                username: username ? username.value : "",
+                role: role ? role.value : "",
+                scope_level: level ? level.value : ""
+            }));
+        } catch (e) {}
+        window.location = url;
+    }
+    if (role) role.addEventListener("change", refresh);
+    if (level) level.addEventListener("change", refresh);
+    try {
+        var draft = JSON.parse(sessionStorage.getItem("invite_draft") || "{}");
+        if (draft.email && form.querySelector("#id_email") && !form.querySelector("#id_email").value) {
+            form.querySelector("#id_email").value = draft.email;
+        }
+        if (draft.username && form.querySelector("#id_username") && !form.querySelector("#id_username").value) {
+            form.querySelector("#id_username").value = draft.username;
+        }
+        sessionStorage.removeItem("invite_draft");
+    } catch (e) {}
+})();
+</script>
 {% endblock %}

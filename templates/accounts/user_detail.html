@@ -1,20 +1,40 @@
 {% extends "base.html" %}
 
-{% block title %}{{ user_obj.username }} — User Management{% endblock %}
+{% block title %}{{ user_obj.username }} — User Control Center{% endblock %}
 
 {% block content %}
 <div class="page-container">
+    {% include "includes/user_control_center_nav.html" %}
+
     <nav aria-label="breadcrumb" class="app-breadcrumb">
         <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item"><a href="{% url 'accounts:user_list' %}">Users</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'accounts:user_list' %}">Directory</a></li>
             <li class="breadcrumb-item active" aria-current="page">{{ user_obj.username }}</li>
         </ol>
     </nav>
 
-    {% include "includes/page_header.html" with page_subtitle="Administration" page_title=user_obj.get_full_name|default:user_obj.username page_description=user_obj.get_role_display %}
+    <div class="ucc-toolbar">
+        <div>
+            <h2 class="ucc-section-title">{{ user_obj.get_full_name|default:user_obj.username }}</h2>
+            <p class="ucc-section-desc">{{ user_obj.get_role_display }} · @{{ user_obj.username }}</p>
+        </div>
+        {% if can_view_effective %}
+        <a href="{% url 'permissions:user_effective' user_obj.pk %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-shield-check"></i> Effective access
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="scope-summary-card mb-4">
+
+        <span class="scope-pill scope-pill--{{ user_obj.effective_scope_level|lower }}">{{ user_obj.scope_summary.level_label }}</span>
+        <div>
+            <div class="scope-summary-card__name">{{ user_obj.scope_summary.name }}</div>
+            <div class="scope-summary-card__path text-muted">{{ user_obj.scope_summary.breadcrumb }}</div>
+        </div>
+    </div>
 
     <div class="d-flex gap-2 mb-4 align-items-center">
-        <span class="text-muted small">@{{ user_obj.username }}</span>
         {% if can_deactivate_users %}
             {% if user_obj.is_active %}
                 {% if not is_self %}
@@ -33,6 +53,7 @@
             {% endif %}
         {% endif %}
     </div>
+
 
     <div class="detail-grid">
         <div class="panel">
@@ -58,7 +79,8 @@
                     <dt class="text-muted">Name</dt><dd>{{ user_obj.get_full_name|default:"—" }}</dd>
                     <dt class="text-muted">Email</dt><dd>{{ user_obj.email|default:"—" }}</dd>
                     <dt class="text-muted">Role</dt><dd>{{ user_obj.get_role_display }}</dd>
-                    <dt class="text-muted">Church</dt><dd>{{ user_obj.church|default:"—" }}</dd>
+                    <dt class="text-muted">Scope</dt><dd>{{ user_obj.scope_summary.breadcrumb }}</dd>
+                    <dt class="text-muted">Home church</dt><dd>{{ user_obj.church|default:"—" }}</dd>
                 </dl>
                 {% endif %}
             </div>

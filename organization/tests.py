@@ -244,21 +244,49 @@ class ViewTests(OrganizationTestMixin, TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Conference.objects.filter(code="SC").exists())
 
-    def test_church_onboard_existing_district(self):
+    def test_church_create_with_district_query_param(self):
+        from sitecontrol.services import clear_settings_cache
+        from sitecontrol.models import SiteSettings
+
+        settings_obj = SiteSettings.load()
+        settings_obj.enforce_subscription_limits = False
+        settings_obj.save(update_fields=["enforce_subscription_limits"])
+        clear_settings_cache()
+
         self.client.login(username="admin", password="pass12345")
+        url = reverse("organization:church_create") + f"?district={self.district.pk}"
         response = self.client.post(
-            reverse("organization:church_onboard"),
+            url,
             {
-                "mode": "existing",
                 "district": str(self.district.pk),
-                "name": "Branch Church",
-                "code": "BC01",
-                "address": "123 Main St",
-                "setup_financials": "on",
+                "name": "Query Param Church",
+                "code": "QPC1",
+                "address": "1 Test Rd",
             },
         )
-        self.assertEqual(response.status_code, 302)
-        self.assertTrue(Church.objects.filter(code="BC01").exists())
+        if response.status_code != 302:
+            form = response.context.get("form") if response.context else None
+            self.fail(
+                f"Expected redirect, got {response.status_code}; "
+                f"form errors={getattr(form, 'errors', None)}"
+            )
+        church = Church.objects.get(code="QPC1")
+        self.assertEqual(church.district_id, self.district.pk)
+        self.assertEqual(church.name, "Query Param Church")
+
+    def test_district_pastor_cannot_create_church_in_other_district(self):
+        self.client.login(username="district_pastor", password="pass12345")
+        url = reverse("organization:church_create") + f"?district={self.district2.pk}"
+        response = self.client.post(
+            url,
+            {
+                "district": str(self.district2.pk),
+                "name": "Cross District",
+                "code": "XD1",
+            },
+        )
+        self.assertIn(response.status_code, (403, 404))
+        self.assertFalse(Church.objects.filter(code="XD1").exists())
 
     def test_church_onboard_hides_full_mode_for_district_pastor(self):
         self.client.login(username="district_pastor", password="pass12345")

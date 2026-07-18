@@ -1,12 +1,11 @@
 """Church-scoping utilities for multi-tenant data isolation."""
 
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import get_object_or_404
 
 from permissions.checks import can_view_all_churches
 from permissions.scoping import get_manageable_churches
 from organization.models import Church
-from church_system.denomination_scope import assert_church_in_active_denomination, churches_for_denomination
+from church_system.denomination_scope import assert_church_in_active_denomination
 
 
 def get_user_church(user):
@@ -42,10 +41,9 @@ def get_active_church(request):
         if church:
             assert_church_in_active_denomination(request, church)
             return church
-        if can_view_all_churches(request.user):
-            church = get_object_or_404(Church, pk=church_id)
-            assert_church_in_active_denomination(request, church)
-            return church
+        # Invalid or out-of-scope church ids must not fall through to an unscoped lookup.
+        # (Previously DISTRICT_PASTOR / view_all_churches could open any church via ?church=.)
+        return None
 
     user_church = get_user_church(request.user)
     if user_church:

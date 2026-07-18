@@ -4,9 +4,17 @@
 
 {% block content %}
 <div class="page-container narrow-form">
-    {% include "includes/page_header.html" with page_subtitle="Permissions" page_title=title %}
+    {% include "includes/user_control_center_nav.html" %}
+
+    <div class="ucc-toolbar">
+        <div>
+            <h2 class="ucc-section-title">{{ title }}</h2>
+            <p class="ucc-section-desc">Overrides apply only to users inside your organization scope.</p>
+        </div>
+    </div>
 
     <div class="data-card compact-form">
+
         <form method="post" class="card-body p-3 p-md-4">
             {% csrf_token %}
             {% for field in form %}

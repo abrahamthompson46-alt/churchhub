@@ -1,15 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}Permissions — ChurchHub{% endblock %}
+{% block title %}Access Overview — User Control Center{% endblock %}
 
 {% block content %}
 <div class="page-container">
+    {% include "includes/user_control_center_nav.html" %}
     {% url 'permissions:matrix' as matrix_url %}
     {% url 'permissions:override_list' as overrides_url %}
     {% url 'permissions:audit_log' as audit_url %}
-    {% include "includes/page_header.html" with page_subtitle="System" page_title="Permissions & Roles" page_description="Manage the role-permission matrix, user overrides, and audit trail." action_url=matrix_url action_label="Edit Matrix" action_icon="bi-grid-3x3-gap" %}
+
+    <div class="ucc-toolbar">
+        <div>
+            <h2 class="ucc-section-title">Access overview</h2>
+            <p class="ucc-section-desc">Role matrix, overrides, and audit trail for your manageable users.</p>
+        </div>
+        <a href="{{ matrix_url }}" class="btn btn-primary btn-sm"><i class="bi bi-grid-3x3-gap"></i> Edit matrix</a>
+    </div>
 
     <div class="metrics-row mb-4">
+
         <div class="metric-card metric-card--primary">
             <span class="metric-label">Roles</span>
             <span class="metric-value">{{ role_count }}</span>

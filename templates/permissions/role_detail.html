@@ -1,12 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}{{ role_label }} — Permissions{% endblock %}
+{% block title %}{{ role_label }} — User Control Center{% endblock %}
 
 {% block content %}
 <div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Permissions" page_title=role_label page_description="Default permissions assigned to this role via the matrix." %}
+    {% include "includes/user_control_center_nav.html" %}
+
+    <div class="ucc-toolbar">
+        <div>
+            <h2 class="ucc-section-title">{{ role_label }}</h2>
+            <p class="ucc-section-desc">Default permissions assigned via the role matrix.</p>
+        </div>
+        <a href="{% url 'permissions:role_list' %}" class="btn btn-outline-secondary btn-sm">All roles</a>
+    </div>
 
     {% for category, items in permissions_by_category.items %}
+
     <div class="data-card mb-3">
         <div class="data-card__header">{{ category }}</div>
         <ul class="list-plain mb-0">

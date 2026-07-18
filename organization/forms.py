@@ -134,22 +134,32 @@ class ChurchForm(DenominationScopedFormMixin, forms.ModelForm):
 
     def __init__(self, *args, district=None, request=None, show_status=False, **kwargs):
         super().__init__(*args, **kwargs)
+        self.preselected_district = district
         if not show_status:
             self.fields.pop("is_active", None)
-        if district:
-            self.fields["district"].queryset = District.objects.filter(pk=district.pk).select_related(
-                "zone__conference"
-            )
-            self.fields["district"].initial = district.pk
+
+        if self.instance and self.instance.pk:
+            # District changes go through the transfer flow, not edit.
+            self.fields.pop("district", None)
+            return
+
         if request:
             self.apply_denomination_scope(request)
             from organization.access import scoped_districts
 
-            self.fields["district"].queryset = scoped_districts(request).select_related(
-                "zone__conference"
+            scoped = scoped_districts(request).select_related("zone__conference")
+        else:
+            scoped = District.objects.all().select_related("zone__conference")
+
+        if district:
+            # Lock to the district from ?district= so create-from-district-detail always works.
+            self.fields["district"].queryset = scoped.filter(pk=district.pk)
+            self.fields["district"].initial = district.pk
+            self.fields["district"].widget = forms.HiddenInput()
+        else:
+            self.fields["district"].queryset = scoped.order_by(
+                "zone__conference__name", "zone__name", "name"
             )
-        if self.instance and self.instance.pk:
-            self.fields.pop("district", None)
 
 
 class ChurchOnboardingForm(forms.Form):

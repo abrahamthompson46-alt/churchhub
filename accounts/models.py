@@ -5,9 +5,8 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
 
-from organization.models import Church
-
-
+from organization.models import Church, Conference, District, GeneralConference, Union, Zone
+from permissions.org_scope import OrgScopeLevel, infer_scope_level, scope_display
 from permissions.roles import UserRole
 
 
@@ -20,12 +19,57 @@ class User(AbstractUser):
         default=UserRole.MEMBER,
     )
 
+    scope_level = models.CharField(
+        max_length=30,
+        choices=OrgScopeLevel.CHOICES,
+        default=OrgScopeLevel.CHURCH,
+        db_index=True,
+        help_text="Organization tree level this user may administer (subtree access).",
+    )
+
     church = models.ForeignKey(
         Church,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="users",
+        help_text="Home church. Required for local roles; optional anchor for hierarchy admins.",
+    )
+
+    scope_district = models.ForeignKey(
+        District,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scoped_users",
+    )
+    scope_zone = models.ForeignKey(
+        Zone,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scoped_users",
+    )
+    scope_conference = models.ForeignKey(
+        Conference,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scoped_users",
+    )
+    scope_union = models.ForeignKey(
+        Union,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scoped_users",
+    )
+    scope_general_conference = models.ForeignKey(
+        GeneralConference,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scoped_users",
     )
 
     phone = models.CharField(max_length=20, blank=True)
@@ -85,6 +129,7 @@ class User(AbstractUser):
         indexes = [
             models.Index(fields=["role", "is_active"]),
             models.Index(fields=["church", "is_active"]),
+            models.Index(fields=["scope_level", "is_active"]),
         ]
 
     def __str__(self):
@@ -97,6 +142,14 @@ class User(AbstractUser):
             return False
         return UserRole.requires_church(self.role)
 
+    @property
+    def effective_scope_level(self):
+        return infer_scope_level(self)
+
+    @property
+    def scope_summary(self):
+        return scope_display(self)
+
     def clean(self):
         from django.core.exceptions import ValidationError
 
@@ -106,14 +159,55 @@ class User(AbstractUser):
                 raise ValidationError({"church": "Platform users cannot be assigned to a church."})
             if self.is_staff and not self.is_superuser:
                 raise ValidationError({"is_staff": "Platform operators use /platform/, not Django admin staff."})
+            return
+
+        level = self.scope_level or OrgScopeLevel.default_for_role(self.role)
+        if self.requires_church and not self.church_id:
+            raise ValidationError({"church": "This role requires a home church."})
+        if level == OrgScopeLevel.DISTRICT and not (
+            self.scope_district_id or self.church_id
+        ):
+            raise ValidationError({"scope_district": "District scope requires a district."})
+        if level == OrgScopeLevel.ZONE and not (self.scope_zone_id or self.church_id):
+            raise ValidationError({"scope_zone": "Zone scope requires a zone."})
+        if level == OrgScopeLevel.CONFERENCE and not (
+            self.scope_conference_id or self.church_id
+        ):
+            raise ValidationError({"scope_conference": "Conference scope requires a conference."})
+        if level == OrgScopeLevel.UNION and not self.scope_union_id:
+            raise ValidationError({"scope_union": "Union scope requires a union."})
+        if level == OrgScopeLevel.DENOMINATION and not (
+            self.denomination_id or self.church_id
+        ):
+            raise ValidationError(
+                {"denomination": "Denomination scope requires a denomination assignment."}
+            )
 
     def save(self, *args, **kwargs):
         if self.is_platform_user:
             self.church = None
+            self.scope_level = OrgScopeLevel.DENOMINATION
             if not self.is_superuser:
                 self.is_staff = False
-        elif not self.is_superuser:
-            self.is_staff = False
+        else:
+            role_default = OrgScopeLevel.default_for_role(self.role)
+            if not self.scope_level:
+                self.scope_level = role_default
+            elif (
+                self._state.adding
+                and self.scope_level == OrgScopeLevel.CHURCH
+                and role_default != OrgScopeLevel.CHURCH
+                and not self.scope_district_id
+                and not self.scope_zone_id
+                and not self.scope_conference_id
+                and not self.scope_union_id
+                and not self.scope_general_conference_id
+            ):
+                # Model field default is CHURCH; promote to the role default on create
+                # when no wider scope unit was explicitly chosen.
+                self.scope_level = role_default
+            if not self.is_superuser:
+                self.is_staff = False
         super().save(*args, **kwargs)
 
 
@@ -133,6 +227,7 @@ class UserActivityLog(models.Model):
         ("INVITE_RESENT", "Invitation Resent"),
         ("PROFILE_UPDATE", "Profile Updated"),
         ("EMAIL_CHANGE", "Email Changed"),
+        ("SCOPE_CHANGE", "Organization Scope Changed"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -169,9 +264,43 @@ class UserInvitation(models.Model):
     email = models.EmailField()
     username = models.CharField(max_length=150)
     role = models.CharField(max_length=30, choices=UserRole.CHOICES)
+    scope_level = models.CharField(
+        max_length=30,
+        choices=OrgScopeLevel.CHOICES,
+        default=OrgScopeLevel.CHURCH,
+    )
     church = models.ForeignKey(
         Church,
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="invitations",
+        help_text="Home church (required for local roles).",
+    )
+    scope_district = models.ForeignKey(
+        District, on_delete=models.CASCADE, null=True, blank=True, related_name="invitations"
+    )
+    scope_zone = models.ForeignKey(
+        Zone, on_delete=models.CASCADE, null=True, blank=True, related_name="invitations"
+    )
+    scope_conference = models.ForeignKey(
+        Conference, on_delete=models.CASCADE, null=True, blank=True, related_name="invitations"
+    )
+    scope_union = models.ForeignKey(
+        Union, on_delete=models.CASCADE, null=True, blank=True, related_name="invitations"
+    )
+    scope_general_conference = models.ForeignKey(
+        GeneralConference,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="invitations",
+    )
+    denomination = models.ForeignKey(
+        "sitecontrol.Denomination",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name="invitations",
     )
     token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
@@ -191,7 +320,8 @@ class UserInvitation(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"Invite {self.email} → {self.church.name}"
+        target = self.church.name if self.church_id else self.get_scope_level_display()
+        return f"Invite {self.email} → {target}"
 
     @property
     def is_expired(self):

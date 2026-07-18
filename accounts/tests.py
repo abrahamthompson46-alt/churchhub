@@ -416,6 +416,8 @@ class FormTests(ChurchHubTestMixin, TestCase):
                 "email": "xy@test.com",
                 "phone": "",
                 "role": UserRole.MEMBER,
+                "scope_level": "CHURCH",
+                "scope_unit": str(self.church.pk),
                 "church": str(self.church.pk),
                 "is_active": False,
             },
@@ -423,7 +425,7 @@ class FormTests(ChurchHubTestMixin, TestCase):
             manager=manager,
         )
         self.assertNotIn("is_active", form.fields)
-        self.assertTrue(form.is_valid())
+        self.assertTrue(form.is_valid(), form.errors)
         saved = form.save()
         saved.refresh_from_db()
         self.assertTrue(saved.is_active)
@@ -491,10 +493,12 @@ class ViewTests(ChurchHubTestMixin, TestCase):
                 "email": "invite@test.com",
                 "username": "invited",
                 "role": UserRole.SECRETARY,
+                "scope_level": "CHURCH",
+                "scope_unit": str(self.church.pk),
                 "church": str(self.church.pk),
             },
         )
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 302, getattr(response, "context", None) and response.context.get("form") and response.context["form"].errors)
         self.assertTrue(UserInvitation.objects.filter(username="invited").exists())
 
     def test_local_pastor_cannot_invite_district_pastor_via_view(self):

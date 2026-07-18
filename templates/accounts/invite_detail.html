@@ -4,15 +4,22 @@
 
 {% block content %}
 <div class="page-container">
+    {% include "includes/user_control_center_nav.html" %}
+
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <nav aria-label="breadcrumb" class="app-breadcrumb">
                 <ol class="breadcrumb mb-0">
-                    <li class="breadcrumb-item"><a href="{% url 'accounts:user_list' %}">Users</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'accounts:user_list' %}">Directory</a></li>
                     <li class="breadcrumb-item active" aria-current="page">Invitation</li>
                 </ol>
             </nav>
-            {% include "includes/page_header.html" with page_subtitle="Administration" page_title="Invitation Created" page_description=invitation.email %}
+            <div class="ucc-toolbar">
+                <div>
+                    <h2 class="ucc-section-title">Invitation</h2>
+                    <p class="ucc-section-desc">{{ invitation.email }}</p>
+                </div>
+            </div>
 
             <div class="panel mb-4">
                 <div class="panel-header">Invitation Details</div>
@@ -20,7 +27,9 @@
                     <dl class="row mb-0">
                         <dt class="col-sm-4 text-muted">Username</dt><dd class="col-sm-8">{{ invitation.username }}</dd>
                         <dt class="col-sm-4 text-muted">Role</dt><dd class="col-sm-8">{{ invitation.get_role_display }}</dd>
-                        <dt class="col-sm-4 text-muted">Church</dt><dd class="col-sm-8">{{ invitation.church.name }}</dd>
+                        <dt class="col-sm-4 text-muted">Scope</dt>
+                        <dd class="col-sm-8">{{ invitation.get_scope_level_display }}{% if invitation.scope_district %} · {{ invitation.scope_district.name }}{% elif invitation.scope_zone %} · {{ invitation.scope_zone.name }}{% elif invitation.scope_conference %} · {{ invitation.scope_conference.name }}{% elif invitation.denomination %} · {{ invitation.denomination.name }}{% endif %}</dd>
+                        <dt class="col-sm-4 text-muted">Home church</dt><dd class="col-sm-8">{% if invitation.church %}{{ invitation.church.name }}{% else %}—{% endif %}</dd>
                         <dt class="col-sm-4 text-muted">Expires</dt><dd class="col-sm-8">{{ invitation.expires_at|date:"M j, Y H:i" }}</dd>
                         <dt class="col-sm-4 text-muted">Status</dt>
                         <dd class="col-sm-8">

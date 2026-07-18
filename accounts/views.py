@@ -34,7 +34,7 @@ from accounts.permissions import (
 from accounts.services import (
     accept_invitation,
     activate_user,
-    assign_user_to_church,
+    assert_can_assign_role,
     create_invitation,
     deactivate_user,
     get_client_ip,
@@ -43,7 +43,6 @@ from accounts.services import (
     revoke_invitation,
     send_invitation_email,
     update_user_profile,
-    update_user_role,
 )
 from sitecontrol.services import can_add_user_to_church
 
@@ -111,13 +110,23 @@ def user_list(request):
     paginator = Paginator(users, 25)
     page_obj = paginator.get_page(request.GET.get("page"))
 
-    church_ids = get_manageable_churches(request.user).values_list("pk", flat=True)
+    church_ids = list(get_manageable_churches(request.user).values_list("pk", flat=True))
     pending_invites = UserInvitation.objects.filter(
         is_accepted=False,
         revoked_at__isnull=True,
-        church_id__in=church_ids,
-    ).select_related("church", "invited_by").order_by("-created_at")[:50]
+    ).filter(
+        Q(church_id__in=church_ids)
+        | Q(church__isnull=True, invited_by=request.user)
+        | Q(
+            church__isnull=True,
+            denomination_id__isnull=False,
+            denomination_id=getattr(request.user, "denomination_id", None),
+        )
+    ).select_related(
+        "church", "invited_by", "scope_district", "scope_conference", "denomination"
+    ).distinct().order_by("-created_at")[:50]
 
+    from accounts.control_center import ucc_context
     from permissions.roles import UserRole
 
     return render(request, "accounts/user_list.html", {
@@ -129,6 +138,7 @@ def user_list(request):
         "status_filter": status,
         "role_choices": UserRole.CHOICES,
         "can_manage_permissions": can_manage_permissions(request.user),
+        **ucc_context(request.user, active="directory"),
     })
 
 
@@ -159,57 +169,70 @@ def user_detail(request, pk):
             flash_success(request, f"{user_obj.username} can sign in again.", title="User activated")
             return redirect("accounts:user_detail", pk=pk)
 
-        # Capture before is_valid() — ModelForm._post_clean mutates instance via construct_instance.
         old_role = user_obj.role
-        old_church_id = user_obj.church_id
+        old_scope = (
+            user_obj.scope_level,
+            user_obj.church_id,
+            user_obj.scope_district_id,
+            user_obj.scope_zone_id,
+            user_obj.scope_conference_id,
+            user_obj.scope_union_id,
+        )
 
         form = UserManageForm(request.POST, instance=user_obj, manager=request.user)
         if form.is_valid():
-            new_role = form.cleaned_data["role"]
-            new_church = form.cleaned_data.get("church")
+            try:
+                if form.cleaned_data["role"] != old_role:
+                    assert_can_assign_role(request.user, form.cleaned_data["role"])
+                saved = form.save()
+            except ValueError as exc:
+                flash_exception(request, exc, title="User could not be updated")
+                return redirect("accounts:user_detail", pk=pk)
 
-            # Persist non-role / non-church fields only; role & church go through services.
-            user_obj.first_name = form.cleaned_data["first_name"]
-            user_obj.last_name = form.cleaned_data["last_name"]
-            user_obj.email = form.cleaned_data["email"]
-            user_obj.phone = form.cleaned_data.get("phone") or ""
-            user_obj.member = form.cleaned_data.get("member")
-            # Keep DB role/church stable until services apply changes.
-            user_obj.role = old_role
-            user_obj.church_id = old_church_id
-            user_obj.save(
-                update_fields=["first_name", "last_name", "email", "phone", "member", "role", "church"]
+            new_scope = (
+                saved.scope_level,
+                saved.church_id,
+                saved.scope_district_id,
+                saved.scope_zone_id,
+                saved.scope_conference_id,
+                saved.scope_union_id,
             )
-
-            if new_church and new_church.pk != old_church_id:
-                assign_user_to_church(
-                    user_obj, new_church,
-                    performed_by=request.user, ip_address=ip,
+            if saved.role != old_role:
+                log_activity(
+                    saved,
+                    "ROLE_CHANGE",
+                    performed_by=request.user,
+                    ip_address=ip,
+                    details={"old_role": old_role, "new_role": saved.role},
                 )
-            elif new_church is None and old_church_id is not None:
-                user_obj.church = None
-                user_obj.save(update_fields=["church"])
-
-            if new_role != old_role:
-                try:
-                    update_user_role(
-                        user_obj, new_role,
-                        performed_by=request.user, ip_address=ip,
-                    )
-                except ValueError as exc:
-                    flash_exception(request, exc, title="Role could not be updated")
-                    return redirect("accounts:user_detail", pk=pk)
-
-            flash_success(request, "Role and church assignment saved.", title="User updated")
+            if new_scope != old_scope:
+                log_activity(
+                    saved,
+                    "SCOPE_CHANGE",
+                    performed_by=request.user,
+                    ip_address=ip,
+                    details={
+                        "scope_level": saved.scope_level,
+                        "church_id": str(saved.church_id) if saved.church_id else None,
+                        "scope_district_id": str(saved.scope_district_id) if saved.scope_district_id else None,
+                        "scope_conference_id": str(saved.scope_conference_id) if saved.scope_conference_id else None,
+                    },
+                )
+            flash_success(request, "Profile, role, and organization scope saved.", title="User updated")
             return redirect("accounts:user_detail", pk=pk)
         flash_validation_errors(request, form, title="User could not be updated")
 
     activity = user_obj.activity_logs.order_by("-created_at")[:20]
+    from accounts.control_center import ucc_context
+    from permissions.checks import can_manage_permissions as _can_manage_permissions
+
     return render(request, "accounts/user_detail.html", {
         "user_obj": user_obj,
         "form": form,
         "activity": activity,
         "is_self": user_obj.pk == request.user.pk,
+        "can_view_effective": _can_manage_permissions(request.user),
+        **ucc_context(request.user, active="directory"),
     })
 
 
@@ -226,30 +249,48 @@ def invite_user(request):
             title="Invitations disabled",
         )
         return redirect("accounts:user_list")
-    form = UserInviteForm(request.POST or None, manager=request.user)
+    initial = {}
+    if request.method == "GET":
+        if request.GET.get("role"):
+            initial["role"] = request.GET.get("role")
+        if request.GET.get("scope_level"):
+            initial["scope_level"] = request.GET.get("scope_level")
+    form = UserInviteForm(request.POST or None, manager=request.user, initial=initial)
 
     if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data
         existing = UserInvitation.objects.filter(
-            email=form.cleaned_data["email"],
-            church=form.cleaned_data["church"],
+            email=data["email"],
             is_accepted=False,
             revoked_at__isnull=True,
-        ).first()
+        )
+        if data.get("church"):
+            existing = existing.filter(church=data["church"])
+        existing = existing.first()
         if existing and existing.is_valid:
             flash_warning(request, "Use the existing invite link or wait for it to expire.", title="Invitation pending")
         else:
-            church = form.cleaned_data["church"]
-            allowed, message = can_add_user_to_church(church)
+            church = data.get("church")
+            allowed, message = (True, "")
+            if church:
+                allowed, message = can_add_user_to_church(church)
             if not allowed:
                 flash_error(request, message, title="User limit reached")
             else:
                 try:
                     inv = create_invitation(
-                        email=form.cleaned_data["email"],
-                        username=form.cleaned_data["username"],
-                        role=form.cleaned_data["role"],
+                        email=data["email"],
+                        username=data["username"],
+                        role=data["role"],
                         church=church,
                         invited_by=request.user,
+                        scope_level=data.get("scope_level"),
+                        scope_district=data.get("scope_district"),
+                        scope_zone=data.get("scope_zone"),
+                        scope_conference=data.get("scope_conference"),
+                        scope_union=data.get("scope_union"),
+                        scope_general_conference=data.get("scope_general_conference"),
+                        denomination=data.get("denomination"),
                     )
                 except ValueError as exc:
                     flash_exception(request, exc, title="Invitation could not be created")
@@ -289,16 +330,48 @@ def invite_user(request):
                             )
                     return redirect("accounts:invite_detail", pk=inv.pk)
 
-    return render(request, "accounts/invite.html", {"form": form})
+    from accounts.control_center import ucc_context
+
+    return render(request, "accounts/invite.html", {
+        "form": form,
+        **ucc_context(request.user, active="invite"),
+    })
+
+
+def _get_manageable_invitation(request, pk):
+    """Invitation visible if its home church is in the manager subtree (or denomination invite)."""
+    invitation = get_object_or_404(
+        UserInvitation.objects.select_related(
+            "church", "scope_district", "scope_zone", "scope_conference", "denomination"
+        ),
+        pk=pk,
+    )
+    church_ids = set(get_manageable_churches(request.user).values_list("pk", flat=True))
+    if invitation.church_id and invitation.church_id in church_ids:
+        return invitation
+    if not invitation.church_id and invitation.invited_by_id == request.user.id:
+        return invitation
+    if not invitation.church_id and can_manage_users(request.user):
+        # Denomination-level invite: allow tree admins in same denomination
+        from church_system.denomination_scope import get_user_denomination
+
+        denom = get_user_denomination(request.user)
+        if denom and invitation.denomination_id == denom.pk:
+            return invitation
+    raise PermissionDenied
 
 
 @login_required
 def invite_detail(request, pk):
     if not can_manage_users(request.user):
         raise PermissionDenied
-    church_ids = get_manageable_churches(request.user).values_list("pk", flat=True)
-    invitation = get_object_or_404(UserInvitation, pk=pk, church_id__in=church_ids)
-    return render(request, "accounts/invite_detail.html", {"invitation": invitation})
+    invitation = _get_manageable_invitation(request, pk)
+    from accounts.control_center import ucc_context
+
+    return render(request, "accounts/invite_detail.html", {
+        "invitation": invitation,
+        **ucc_context(request.user, active="invite"),
+    })
 
 
 @login_required
@@ -306,8 +379,7 @@ def invite_detail(request, pk):
 def invite_revoke(request, pk):
     if not can_manage_users(request.user):
         raise PermissionDenied
-    church_ids = get_manageable_churches(request.user).values_list("pk", flat=True)
-    invitation = get_object_or_404(UserInvitation, pk=pk, church_id__in=church_ids)
+    invitation = _get_manageable_invitation(request, pk)
     try:
         revoke_invitation(invitation, performed_by=request.user, ip_address=get_client_ip(request))
         flash_success(request, "Invitation revoked.", title="Invitation revoked")
@@ -321,8 +393,7 @@ def invite_revoke(request, pk):
 def invite_resend(request, pk):
     if not can_manage_users(request.user):
         raise PermissionDenied
-    church_ids = get_manageable_churches(request.user).values_list("pk", flat=True)
-    invitation = get_object_or_404(UserInvitation, pk=pk, church_id__in=church_ids)
+    invitation = _get_manageable_invitation(request, pk)
     try:
         _invitation, emailed = resend_invitation(
             invitation,
@@ -391,9 +462,12 @@ def activity_log(request):
     paginator = Paginator(logs, 50)
     page_obj = paginator.get_page(request.GET.get("page"))
 
+    from accounts.control_center import ucc_context
+
     return render(request, "accounts/activity_log.html", {
         "logs": page_obj,
         "page_obj": page_obj,
         "action_filter": action,
         "action_choices": UserActivityLog.ACTION_CHOICES,
+        **ucc_context(request.user, active="activity"),
     })

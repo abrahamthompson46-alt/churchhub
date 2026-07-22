@@ -109,10 +109,13 @@ def _direct_matrix_grant(user, codename):
     if not _tables_ready():
         return registry_default_roles(codename) and user.role in registry_default_roles(codename)
 
+    timeout = getattr(settings, "PERMISSION_CACHE_TIMEOUT", 300)
+    use_cache = bool(timeout and timeout > 0)
     key = perm_role_key(user.role, codename)
-    cached = cache.get(key)
-    if cached is not None:
-        return bool(cached)
+    if use_cache:
+        cached = cache.get(key)
+        if cached is not None:
+            return bool(cached)
 
     try:
         rp = selectors.role_permission_for(user.role, codename)
@@ -120,8 +123,8 @@ def _direct_matrix_grant(user, codename):
     except RolePermission.DoesNotExist:
         granted = user.role in registry_default_roles(codename)
 
-    timeout = getattr(settings, "PERMISSION_CACHE_TIMEOUT", 300)
-    cache.set(key, granted, timeout)
+    if use_cache:
+        cache.set(key, granted, timeout)
     return granted
 
 

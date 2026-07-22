@@ -252,6 +252,8 @@ class MatrixTests(ChurchHubTestMixin, TestCase):
 
 class ImpliesAndCacheTests(ChurchHubTestMixin, TestCase):
     def test_request_permission_cache(self):
+        from church_system.perf_cache import invalidate_permission_role_cache
+
         user = User.objects.create_user(
             username="cache_user",
             password="pass12345",
@@ -264,6 +266,9 @@ class ImpliesAndCacheTests(ChurchHubTestMixin, TestCase):
         self.assertTrue(can_manage_members(user))
         perm = Permission.objects.get(codename="manage_members")
         RolePermission.objects.filter(role=user.role, permission=perm).update(granted=False)
+        # Raw .update() bypasses update_matrix_cell invalidation; clear Django
+        # role cache so this assertion isolates the *request* permission cache.
+        invalidate_permission_role_cache(role=user.role, codename="manage_members")
         self.assertTrue(can_manage_members(user))
         PermissionCacheMiddleware(lambda r: None)(request)
         self.assertFalse(can_manage_members(user))

@@ -102,5 +102,6 @@ class WorkingDayTests(TestCase):
         session["current_church_id"] = str(self.church.pk)
         session.save()
         response = self.client.get(reverse("dashboard:home"))
-        self.assertContains(response, "working-day-chip")
+        self.assertContains(response, "workspace-status-pill")
+        self.assertContains(response, "is-open")
         self.assertContains(response, "Open")

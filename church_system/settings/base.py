@@ -333,6 +333,8 @@ LOGGING = build_logging_config(
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+TEST_RUNNER = "church_system.test_runner.ChurchHubDiscoverRunner"
+
 # Cache invalidation keys (document convention for services)
 CACHE_VERSION = env_int("CACHE_VERSION", 1)
 PERMISSION_CACHE_TIMEOUT = env_int("PERMISSION_CACHE_TIMEOUT", 300)

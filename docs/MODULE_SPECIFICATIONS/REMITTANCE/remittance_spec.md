@@ -62,14 +62,29 @@ erDiagram
 
 **Managers:** none custom.
 
+**Current layering (Phase 2 / P1-2 Remittance slice):**
+
+```
+Views → Services → Selectors → Repositories → Models
+```
+
+| Layer | File | Role |
+|-------|------|------|
+| Selectors | `remittance/selectors.py` | Scoped reads (policies, settlements, welfare cases/contributions/ledger, unit lookups, fund/payable aggregates) |
+| Repositories | `remittance/repositories.py` | Persistence writes (policy/settlement/welfare/audit/attachment/ledger) |
+| Services | `remittance/services.py`, `welfare_services.py` | Splits, settlement draft/post, unit scope, welfare lifecycle, fund sufficiency |
+
+Views no longer call remittance model managers / `filter_by_church` directly; journal line creates go through `transactions.repositories` where remittance posts GL.
+
 ---
 
 ## 3. Business rules (Current)
 
 1. Retain% + remit% = 100 (model `clean`).  
 2. `post_offering_credit_lines` splits gross per church collection policy into retention + remit payable accounts.  
-3. Settlement draft computes remit payable / received-from-below; `post_settlement_batch` posts church-level balanced TRANSFER journals (typically auto-APPROVED/locked) and marks POSTED. **District+ hierarchy settlement GL posting is not fully implemented** (stub/`pass` path in code).  
-4. Welfare disbursement requires sufficient WELFARE_FUND balance; posts via ledger helpers; links `disbursement_transaction`.  
+3. Settlement draft computes remit payable / received-from-below; `post_settlement_batch` posts church-level balanced TRANSFER journals via PENDING + `approve_module_journal` (maker-checker) and marks POSTED. District+ batches with an amount raise `RemittancePolicyError` and stay **DRAFT** until higher-unit GL posting exists (never POSTED without a journal).  
+3a. **Cross-path hard-gate (P0-4):** church TITHE/COMBINED settlement draft/post is refused when MonthlyCutoff bank remittance already covers an overlapping calendar month; bank remittance is refused when a POSTED church settlement overlaps that month (`remittance.cross_path`).  
+4. Welfare disbursement requires sufficient WELFARE_FUND balance; posts via unlocked journal lines then `approve_module_journal` (case row locked with `select_for_update`); links `disbursement_transaction`; rejects duplicate disbursements with audit.  
 5. Voiding a transaction can call `void_welfare_for_transaction`.  
 6. Feature gate: `remittance` (and welfare UI checks `welfare_module_enabled`).
 
@@ -77,7 +92,7 @@ erDiagram
 
 ## 4. Services (Current)
 
-**`remittance/services.py`:** `calculate_split`, `get_active_policy`, `get_church_collection_policy`, `post_offering_credit_lines`, `ensure_default_policies_for_church`, settlement draft/post, fund balances, policy save/audit.
+**`remittance/services.py`:** `calculate_split`, `get_active_policy`, `get_church_collection_policy`, `post_offering_credit_lines`, `ensure_default_policies_for_church`, settlement draft/post, fund balances, policy save/audit, **scoped** `get_unit_choices` / `unit_in_user_scope`.
 
 **`remittance/welfare_services.py`:** contribution/ledger, case lifecycle (create, review, approve, reject, cancel, disburse), manual contribution, statements, dashboard KPIs, `can_view_member_welfare`.
 
@@ -161,13 +176,14 @@ flowchart LR
 - Creates/updates GL lines on collection (payables/retention/welfare).  
 - Settlement posting creates hierarchy transfer journals.  
 - Disbursement debits welfare fund; must remain balanced via txn services.  
-- **Dual path debt:** `transactions.MonthlyCutoff` remittance UI vs `SettlementBatch` — both exist.
+- **Dual path (mitigated):** MonthlyCutoff bank remit and SettlementBatch UIs both exist; cross-path hard-gate blocks double-clearing the same church/month remit payable.
 
 ---
 
 ## 12. Security considerations
 
 - Church/unit scoping on policies and welfare.  
+- **Unit pickers (P0-12):** `get_unit_choices` always requires an authenticated user and returns only units inside `manageable_scope_units` (institution) or platform managed denominations; never a global unscoped list. Out-of-scope `unit_id` on save/edit/index is rejected and written to `RemittancePolicyAuditLog` (`SCOPE_VIOLATION`).  
 - Welfare attachments under media — permission-gated views.  
 - Maker-checker style: approve vs disburse separate permissions.  
 - Do not expose anonymous contribution member when `is_anonymous`.
@@ -176,8 +192,8 @@ flowchart LR
 
 ## 13. Known architectural gaps
 
-- Dual remittance stories (`transactions:record_remittance` / MonthlyCutoff vs SettlementBatch).  
-- District+ settlement ledger posting incomplete.  
+- Dual remittance UIs remain (MonthlyCutoff bank remit vs SettlementBatch); **cross-path hard-gate** prevents double-clearing remit payable for the same church/month.  
+- District+ settlement ledger posting not implemented (POST refused; batch stays DRAFT).  
 - Thin wrappers in `services.py` over `welfare_services.py`.  
 - Some welfare paths still import legacy `accounts.permissions.can_manage_finances`.  
 - Policy keyed by `unit_type`+`unit_id` without DB FK to org models.  

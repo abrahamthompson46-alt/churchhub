@@ -1,0 +1,22 @@
+[Unit]
+Description=ChurchHub Celery Worker
+After=network.target redis-server.service postgresql.service churchhub-web.service
+Requires=redis-server.service
+
+[Service]
+Type=simple
+User=churchhub
+Group=churchhub
+WorkingDirectory=/opt/churchhub
+EnvironmentFile=/opt/churchhub/.env
+Environment=DJANGO_SETTINGS_MODULE=church_system.settings
+Environment=DJANGO_ENV=production
+ExecStart=/opt/churchhub/.venv/bin/celery -A church_system worker \
+    --loglevel=INFO \
+    --concurrency=2
+Restart=always
+RestartSec=10
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

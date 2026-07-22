@@ -31,6 +31,14 @@ User = get_user_model()
 class OrganizationTestMixin:
     @classmethod
     def setUpTestData(cls):
+        from sitecontrol.models import SiteSettings
+        from sitecontrol.services import clear_settings_cache
+
+        settings_obj = SiteSettings.load()
+        settings_obj.enforce_subscription_limits = False
+        settings_obj.save(update_fields=["enforce_subscription_limits"])
+        clear_settings_cache()
+
         cls.denomination = Denomination.objects.create(
             name="Test Denomination",
             code="TD",
@@ -170,7 +178,35 @@ class ServiceTests(OrganizationTestMixin, TestCase):
 
 
 class ViewTests(OrganizationTestMixin, TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Python 3.14 + Django test client: Context.__copy__ crashes in
+        # store_rendered_templates. Skip the copy; status/content asserts still work.
+        from unittest.mock import patch
+
+        from django.test.client import ContextList
+
+        def _safe_store(store, signal, sender, template, context, **kwargs):
+            store.setdefault("templates", []).append(template)
+            if "context" not in store:
+                store["context"] = ContextList()
+            store["context"].append(context)
+
+        cls._template_store_patcher = patch(
+            "django.test.client.store_rendered_templates",
+            _safe_store,
+        )
+        cls._template_store_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._template_store_patcher.stop()
+        super().tearDownClass()
+
     def setUp(self):
+        from accounts.mfa import SESSION_MFA_VERIFIED, enable_mfa_for_user, generate_totp_secret
+
         self.client = Client()
         self.admin = User.objects.create_superuser(
             username="admin",
@@ -179,6 +215,7 @@ class ViewTests(OrganizationTestMixin, TestCase):
             role=UserRole.SUPER_ADMIN,
             church=self.church,
         )
+        enable_mfa_for_user(self.admin, generate_totp_secret(), [])
         self.secretary = User.objects.create_user(
             username="secretary",
             password="pass12345",
@@ -191,32 +228,39 @@ class ViewTests(OrganizationTestMixin, TestCase):
             role=UserRole.DISTRICT_PASTOR,
             church=self.church,
         )
+        self._mfa_session_key = SESSION_MFA_VERIFIED
+
+    def _login(self, username):
+        self.client.login(username=username, password="pass12345")
+        session = self.client.session
+        session[self._mfa_session_key] = True
+        session.save()
 
     def test_hierarchy_requires_hierarchy_role(self):
-        self.client.login(username="secretary", password="pass12345")
+        self._login("secretary")
         response = self.client.get(reverse("organization:hierarchy"))
         self.assertEqual(response.status_code, 403)
 
     def test_hierarchy_accessible_to_super_admin(self):
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.get(reverse("organization:hierarchy"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.conference.name)
 
     def test_hierarchy_search_filters_results(self):
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.get(reverse("organization:hierarchy"), {"q": "Test Church"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Test Church")
 
     def test_hierarchy_export_csv(self):
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.get(reverse("organization:hierarchy"), {"export": "csv"})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "text/csv")
 
     def test_district_pastor_redirected_to_district_detail(self):
-        self.client.login(username="district_pastor", password="pass12345")
+        self._login("district_pastor")
         response = self.client.get(reverse("organization:hierarchy"))
         self.assertRedirects(
             response,
@@ -224,7 +268,7 @@ class ViewTests(OrganizationTestMixin, TestCase):
         )
 
     def test_district_pastor_cannot_create_conference(self):
-        self.client.login(username="district_pastor", password="pass12345")
+        self._login("district_pastor")
         response = self.client.post(
             reverse("organization:conference_create"),
             {"name": "Blocked Conference", "code": "BC", "denomination": str(self.denomination.pk)},
@@ -232,7 +276,7 @@ class ViewTests(OrganizationTestMixin, TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_conference_create(self):
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.post(
             reverse("organization:conference_create"),
             {
@@ -253,7 +297,7 @@ class ViewTests(OrganizationTestMixin, TestCase):
         settings_obj.save(update_fields=["enforce_subscription_limits"])
         clear_settings_cache()
 
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         url = reverse("organization:church_create") + f"?district={self.district.pk}"
         response = self.client.post(
             url,
@@ -275,7 +319,7 @@ class ViewTests(OrganizationTestMixin, TestCase):
         self.assertEqual(church.name, "Query Param Church")
 
     def test_district_pastor_cannot_create_church_in_other_district(self):
-        self.client.login(username="district_pastor", password="pass12345")
+        self._login("district_pastor")
         url = reverse("organization:church_create") + f"?district={self.district2.pk}"
         response = self.client.post(
             url,
@@ -289,19 +333,19 @@ class ViewTests(OrganizationTestMixin, TestCase):
         self.assertFalse(Church.objects.filter(code="XD1").exists())
 
     def test_church_onboard_hides_full_mode_for_district_pastor(self):
-        self.client.login(username="district_pastor", password="pass12345")
+        self._login("district_pastor")
         response = self.client.get(reverse("organization:church_onboard"))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Full Setup")
 
     def test_church_detail_shows_stats(self):
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.get(reverse("organization:church_detail", kwargs={"pk": self.church.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.church.name)
 
     def test_church_detail_idor_other_denomination_denied(self):
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         session = self.client.session
         session["active_denomination_id"] = str(self.denomination.pk)
         session.save()
@@ -311,13 +355,13 @@ class ViewTests(OrganizationTestMixin, TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_conference_detail(self):
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.get(reverse("organization:conference_detail", kwargs={"pk": self.conference.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.zone.name)
 
     def test_church_toggle_active(self):
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.post(
             reverse("organization:church_toggle_active", kwargs={"pk": self.church.pk})
         )
@@ -331,14 +375,14 @@ class ViewTests(OrganizationTestMixin, TestCase):
         self.assertNotIn(self.church, list(manageable))
 
     def test_church_transfer_requires_global_admin(self):
-        self.client.login(username="district_pastor", password="pass12345")
+        self._login("district_pastor")
         response = self.client.get(
             reverse("organization:church_transfer", kwargs={"pk": self.church.pk})
         )
         self.assertEqual(response.status_code, 403)
 
     def test_church_transfer_by_super_admin(self):
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.post(
             reverse("organization:church_transfer", kwargs={"pk": self.church.pk}),
             {"district": str(self.district2.pk), "reason": "Administrative"},

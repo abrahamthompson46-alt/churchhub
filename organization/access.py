@@ -1,19 +1,16 @@
 """Organization access control — denomination and subtree scoping."""
 
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import get_object_or_404
 
 from church_system.denomination_scope import (
     assert_church_in_active_denomination,
-    conferences_for_denomination,
-    get_active_denomination,
     get_user_denomination,
 )
 from permissions.checks import user_has_role
 from permissions.roles import UserRole
 from permissions.superadmin import is_superadmin
 
-from organization.models import Church, Conference, District, GeneralConference, Union, Zone
+from organization import selectors
 
 
 def is_global_org_admin(user):
@@ -112,143 +109,53 @@ def org_capability_flags(user):
 
 
 def scoped_conferences(request):
-    from permissions.org_scope import OrgScopeLevel, infer_scope_level
-    from permissions.scoping import get_manageable_churches
-
-    denomination = get_active_denomination(request)
-    qs = conferences_for_denomination(denomination) if denomination else Conference.objects.all()
-    level = infer_scope_level(request.user)
-    if level == OrgScopeLevel.CONFERENCE:
-        conf_id = request.user.scope_conference_id or (
-            request.user.church.district.zone.conference_id if request.user.church_id else None
-        )
-        if conf_id:
-            qs = qs.filter(pk=conf_id)
-    elif level in {OrgScopeLevel.ZONE, OrgScopeLevel.DISTRICT, OrgScopeLevel.CHURCH}:
-        ids = get_manageable_churches(request.user).values_list(
-            "district__zone__conference_id", flat=True
-        )
-        qs = qs.filter(pk__in=ids)
-    elif level == OrgScopeLevel.UNION and request.user.scope_union_id:
-        qs = qs.filter(union_id=request.user.scope_union_id)
-    elif level == OrgScopeLevel.GENERAL_CONFERENCE and request.user.scope_general_conference_id:
-        qs = qs.filter(union__general_conference_id=request.user.scope_general_conference_id)
-    return qs
+    return selectors.scoped_conferences(request)
 
 
 def scoped_zones(request):
-    from permissions.org_scope import OrgScopeLevel, infer_scope_level
-    from permissions.scoping import get_manageable_churches
-
-    qs = Zone.objects.filter(conference__in=scoped_conferences(request))
-    level = infer_scope_level(request.user)
-    if level == OrgScopeLevel.ZONE:
-        zone_id = request.user.scope_zone_id or (
-            request.user.church.district.zone_id if request.user.church_id else None
-        )
-        if zone_id:
-            qs = qs.filter(pk=zone_id)
-    elif level in {OrgScopeLevel.DISTRICT, OrgScopeLevel.CHURCH}:
-        ids = get_manageable_churches(request.user).values_list("district__zone_id", flat=True)
-        qs = qs.filter(pk__in=ids)
-    return qs
+    return selectors.scoped_zones(request)
 
 
 def scoped_districts(request):
-    from permissions.org_scope import OrgScopeLevel, infer_scope_level
-    from permissions.scoping import get_manageable_churches
-
-    qs = District.objects.filter(zone__in=scoped_zones(request))
-    level = infer_scope_level(request.user)
-    if level == OrgScopeLevel.DISTRICT:
-        district = user_district(request.user)
-        if district:
-            qs = qs.filter(pk=district.pk)
-    elif level == OrgScopeLevel.CHURCH:
-        ids = get_manageable_churches(request.user).values_list("district_id", flat=True)
-        qs = qs.filter(pk__in=ids)
-    return qs
+    return selectors.scoped_districts(request)
 
 
 def scoped_churches(request, active_only=False):
-    from permissions.scoping import get_manageable_churches
-
-    qs = get_manageable_churches(request.user)
-    if not active_only:
-        from permissions.org_scope import church_q_for_scope
-
-        qs = Church.objects.filter(church_q_for_scope(request.user)).select_related(
-            "district__zone__conference__denomination"
-        )
-    return qs.order_by("name")
+    return selectors.scoped_churches(request, active_only=active_only)
 
 
 def scoped_unions(request):
-    from permissions.org_scope import OrgScopeLevel, infer_scope_level
-
-    level = infer_scope_level(request.user)
-    if level == OrgScopeLevel.GENERAL_CONFERENCE and request.user.scope_general_conference_id:
-        return Union.objects.filter(
-            general_conference_id=request.user.scope_general_conference_id
-        )
-    if level == OrgScopeLevel.UNION and request.user.scope_union_id:
-        return Union.objects.filter(pk=request.user.scope_union_id)
-    return Union.objects.filter(conferences__in=scoped_conferences(request)).distinct()
+    return selectors.scoped_unions(request)
 
 
 def scoped_general_conferences(request):
-    from permissions.org_scope import OrgScopeLevel, infer_scope_level
-
-    level = infer_scope_level(request.user)
-    if level == OrgScopeLevel.GENERAL_CONFERENCE and request.user.scope_general_conference_id:
-        return GeneralConference.objects.filter(pk=request.user.scope_general_conference_id)
-    if level == OrgScopeLevel.UNION and request.user.scope_union_id:
-        return GeneralConference.objects.filter(
-            unions__pk=request.user.scope_union_id
-        ).distinct()
-    return GeneralConference.objects.filter(
-        unions__conferences__in=scoped_conferences(request)
-    ).distinct()
+    return selectors.scoped_general_conferences(request)
 
 
 def get_scoped_conference(request, pk):
-    return get_object_or_404(scoped_conferences(request), pk=pk)
+    return selectors.get_conference_or_404(scoped_conferences(request), pk)
 
 
 def get_scoped_zone(request, pk):
-    return get_object_or_404(
-        scoped_zones(request).select_related("conference"),
-        pk=pk,
-    )
+    return selectors.get_zone_or_404(scoped_zones(request), pk)
 
 
 def get_scoped_district(request, pk):
-    return get_object_or_404(
-        scoped_districts(request).select_related("zone__conference"),
-        pk=pk,
-    )
+    return selectors.get_district_or_404(scoped_districts(request), pk)
 
 
 def get_scoped_church(request, pk):
-    church = get_object_or_404(
-        scoped_churches(request).select_related(
-            "district__zone__conference__union__general_conference"
-        ),
-        pk=pk,
-    )
+    church = selectors.get_church_or_404(scoped_churches(request), pk)
     assert_church_in_active_denomination(request, church)
     return church
 
 
 def get_scoped_union(request, pk):
-    return get_object_or_404(
-        scoped_unions(request).select_related("general_conference"),
-        pk=pk,
-    )
+    return selectors.get_union_or_404(scoped_unions(request), pk)
 
 
 def get_scoped_general_conference(request, pk):
-    return get_object_or_404(scoped_general_conferences(request), pk=pk)
+    return selectors.get_general_conference_or_404(scoped_general_conferences(request), pk)
 
 
 def assert_can_manage_church(request, church):

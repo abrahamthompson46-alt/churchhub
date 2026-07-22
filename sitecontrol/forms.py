@@ -4,8 +4,10 @@ from django import forms
 from django.contrib.auth import get_user_model
 
 from church_system.widgets import checkbox_attrs, input_attrs, select_attrs, textarea_attrs
-from organization.models import Church, District
+from organization.models import Church
 from permissions.roles import UserRole
+from sitecontrol import repositories as repo
+from sitecontrol import selectors
 
 from .models import (
     Denomination,
@@ -75,15 +77,13 @@ class RegistrationSettingsForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["application_default_plan"].queryset = SubscriptionPlan.objects.filter(
-            is_active=True
-        ).order_by("sort_order")
+        self.fields["application_default_plan"].queryset = selectors.active_plans_ordered()
         self.fields["application_default_plan"].required = False
 
 
 class TenantApplicationForm(forms.Form):
     denomination = forms.ModelChoiceField(
-        queryset=Denomination.objects.filter(is_active=True, allow_public_registration=True).order_by("name"),
+        queryset=selectors.public_registration_denominations(),
         widget=forms.Select(attrs=select_attrs()),
     )
     application_type = forms.ChoiceField(
@@ -95,9 +95,7 @@ class TenantApplicationForm(forms.Form):
     church_code = forms.CharField(max_length=20, widget=forms.TextInput(attrs=input_attrs()))
     address = forms.CharField(required=False, widget=forms.Textarea(attrs=textarea_attrs(rows=2)))
     district = forms.ModelChoiceField(
-        queryset=District.objects.select_related("zone__conference").order_by(
-            "zone__conference__name", "zone__name", "name"
-        ),
+        queryset=selectors.districts_for_public_registration(),
         required=False,
         widget=forms.Select(attrs=select_attrs()),
     )
@@ -119,16 +117,12 @@ class TenantApplicationForm(forms.Form):
         if not denom and self.is_bound:
             denom_id = self.data.get("denomination")
             if denom_id:
-                denom = Denomination.objects.filter(pk=denom_id).first()
+                denom = selectors.denomination_by_pk(denom_id)
         if denom:
             self.fields["denomination"].initial = denom.pk
-            self.fields["district"].queryset = District.objects.filter(
-                zone__conference__denomination=denom
-            ).select_related("zone__conference").order_by(
-                "zone__conference__name", "zone__name", "name"
-            )
+            self.fields["district"].queryset = selectors.districts_for_denomination(denom)
         else:
-            self.fields["district"].queryset = District.objects.none()
+            self.fields["district"].queryset = selectors.empty_districts()
 
     def clean(self):
         cleaned = super().clean()
@@ -158,7 +152,7 @@ class ApplicationReviewForm(forms.Form):
         label="Review notes",
     )
     plan = forms.ModelChoiceField(
-        queryset=SubscriptionPlan.objects.none(),
+        queryset=selectors.empty_plans(),
         required=False,
         widget=forms.Select(attrs=select_attrs()),
         label="Subscription plan",
@@ -175,7 +169,7 @@ class ApplicationReviewForm(forms.Form):
         widget=forms.Select(attrs=select_attrs()),
     )
     payment_method = forms.ModelChoiceField(
-        queryset=PlatformPaymentMethod.objects.none(),
+        queryset=selectors.empty_payment_methods(),
         required=False,
         widget=forms.Select(attrs=select_attrs()),
     )
@@ -202,10 +196,8 @@ class ApplicationReviewForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["plan"].queryset = SubscriptionPlan.objects.filter(is_active=True).order_by("sort_order")
-        self.fields["payment_method"].queryset = PlatformPaymentMethod.objects.filter(
-            is_active=True
-        ).order_by("sort_order", "name")
+        self.fields["plan"].queryset = selectors.active_plans_ordered()
+        self.fields["payment_method"].queryset = selectors.active_payment_methods_ordered()
 
 
 class BillingSettingsForm(forms.ModelForm):
@@ -249,7 +241,7 @@ class PlatformTenantSetupForm(forms.Form):
     ]
 
     denomination = forms.ModelChoiceField(
-        queryset=Denomination.objects.filter(is_active=True).order_by("name"),
+        queryset=selectors.active_denominations_ordered(),
         widget=forms.Select(attrs=select_attrs()),
     )
     setup_mode = forms.ChoiceField(
@@ -261,7 +253,7 @@ class PlatformTenantSetupForm(forms.Form):
     church_code = forms.CharField(max_length=20, widget=forms.TextInput(attrs=input_attrs()))
     address = forms.CharField(required=False, widget=forms.Textarea(attrs=textarea_attrs(rows=2)))
     district = forms.ModelChoiceField(
-        queryset=District.objects.none(),
+        queryset=selectors.empty_districts(),
         required=False,
         widget=forms.Select(attrs=select_attrs()),
     )
@@ -280,7 +272,7 @@ class PlatformTenantSetupForm(forms.Form):
         initial=UserRole.LOCAL_PASTOR,
     )
     plan = forms.ModelChoiceField(
-        queryset=SubscriptionPlan.objects.none(),
+        queryset=selectors.empty_plans(),
         widget=forms.Select(attrs=select_attrs()),
     )
     status = forms.ChoiceField(
@@ -294,7 +286,7 @@ class PlatformTenantSetupForm(forms.Form):
         widget=forms.Select(attrs=select_attrs()),
     )
     payment_method = forms.ModelChoiceField(
-        queryset=PlatformPaymentMethod.objects.none(),
+        queryset=selectors.empty_payment_methods(),
         required=False,
         widget=forms.Select(attrs=select_attrs()),
     )
@@ -318,27 +310,19 @@ class PlatformTenantSetupForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["plan"].queryset = SubscriptionPlan.objects.filter(is_active=True).order_by("sort_order")
-        self.fields["payment_method"].queryset = PlatformPaymentMethod.objects.filter(
-            is_active=True
-        ).order_by("sort_order", "name")
+        self.fields["plan"].queryset = selectors.active_plans_ordered()
+        self.fields["payment_method"].queryset = selectors.active_payment_methods_ordered()
         denom = None
         if self.is_bound:
             denom_id = self.data.get("denomination")
             if denom_id:
-                denom = Denomination.objects.filter(pk=denom_id).first()
+                denom = selectors.denomination_by_pk(denom_id)
         elif self.initial.get("denomination"):
             denom = self.initial.get("denomination")
         if denom:
-            self.fields["district"].queryset = District.objects.filter(
-                zone__conference__denomination=denom
-            ).select_related("zone__conference").order_by(
-                "zone__conference__name", "zone__name", "name"
-            )
+            self.fields["district"].queryset = selectors.districts_for_denomination(denom)
         else:
-            self.fields["district"].queryset = District.objects.select_related(
-                "zone__conference"
-            ).order_by("zone__conference__name", "zone__name", "name")[:500]
+            self.fields["district"].queryset = selectors.districts_with_parents_limited()
 
     def clean(self):
         cleaned = super().clean()
@@ -435,7 +419,7 @@ class EmailSettingsForm(forms.ModelForm):
             instance.smtp_password_encrypted = encrypt_secret(raw)
             instance.smtp_password = ""  # clear legacy plaintext
         if commit:
-            instance.save()
+            repo.save_model(instance)
         return instance
 
 
@@ -556,11 +540,9 @@ class TenantSubscriptionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["church"].queryset = Church.objects.select_related("district").order_by("name")
-        self.fields["plan"].queryset = SubscriptionPlan.objects.filter(is_active=True).order_by("sort_order")
-        self.fields["payment_method"].queryset = PlatformPaymentMethod.objects.filter(
-            is_active=True
-        ).order_by("sort_order", "name")
+        self.fields["church"].queryset = selectors.churches_ordered_with_district()
+        self.fields["plan"].queryset = selectors.active_plans_ordered()
+        self.fields["payment_method"].queryset = selectors.active_payment_methods_ordered()
         for feature in FEATURE_FIELDS:
             field_name = f"override_{feature}"
             self.fields[field_name] = forms.BooleanField(
@@ -585,7 +567,7 @@ class TenantSubscriptionForm(forms.ModelForm):
                     del overrides[feature]
         instance.feature_overrides = overrides
         if commit:
-            instance.save()
+            repo.save_subscription(instance)
             self.save_m2m()
         return instance
 
@@ -645,10 +627,9 @@ class PlatformOperatorForm(forms.ModelForm):
         self.is_create = kwargs.pop("is_create", False)
         self.actor = kwargs.pop("actor", None)
         super().__init__(*args, **kwargs)
-        from sitecontrol.models import Denomination
         from sitecontrol.rbac import CAP_GRANT_BREAKGLASS, ROLE_OWNER, operator_has_capability
 
-        self.fields["managed_denominations"].queryset = Denomination.objects.filter(is_active=True).order_by("name")
+        self.fields["managed_denominations"].queryset = selectors.active_denominations_ordered()
         self.fields["managed_denominations"].required = False
         self.fields["managed_denominations"].help_text = (
             "Assign denominations this operator may manage. Required unless role is Owner."
@@ -715,7 +696,7 @@ class PlatformOperatorForm(forms.ModelForm):
         if password:
             user.set_password(password)
         if commit:
-            user.save()
+            repo.save_model(user)
             self.save_m2m()
         return user
 
@@ -792,6 +773,6 @@ class DenominationForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["default_plan"].queryset = SubscriptionPlan.objects.filter(is_active=True).order_by("sort_order")
+        self.fields["default_plan"].queryset = selectors.active_plans_ordered()
         self.fields["default_plan"].required = False
         self.fields["default_role"].choices = UserRole.CHOICES

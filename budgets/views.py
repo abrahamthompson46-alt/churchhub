@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from church_system.church_scope import require_church
-from church_system.flash import flash_success
+from church_system.flash import flash_exception, flash_success
 from permissions.checks import any_permission_required
 from reports.exporters import export_table_csv, export_table_excel, export_table_pdf
 from sitecontrol.checks import require_feature
@@ -95,6 +95,16 @@ def budget_list(request):
             raise PermissionDenied
         payload = export_budget_table(rows, year, scope["scope_label"])
         slug = f"budget-{level.lower()}-{year}"
+        from reports.services import audit_export
+
+        audit_export(
+            user=request.user,
+            report_key="budget_summary",
+            export_format=export_fmt,
+            row_count=len(payload["rows"]),
+            church=church,
+            params={"year": year, "level": level, "scope": scope["scope_label"]},
+        )
         if export_fmt == "csv":
             return export_table_csv(payload["headers"], payload["rows"], f"{slug}.csv")
         if export_fmt == "excel":
@@ -215,6 +225,10 @@ def budget_edit(request, pk):
 def budget_delete(request, pk):
     budget, church = get_editable_budget(request, pk)
     year, level = budget.year, budget.level
-    delete_budget(budget, request.user, church)
+    try:
+        delete_budget(budget, request.user, church)
+    except BudgetServiceError as exc:
+        flash_exception(request, exc)
+        return redirect(_list_redirect(year, level))
     flash_success(request, "Budget line removed.")
     return redirect(_list_redirect(year, level))

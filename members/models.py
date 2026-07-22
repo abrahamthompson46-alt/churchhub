@@ -520,6 +520,8 @@ class MemberAuditLog(models.Model):
         ("EXPORT", "Export"),
         ("DEACTIVATE", "Deactivate"),
         ("ACTIVATE", "Activate"),
+        ("DEPARTMENT_DELETE", "Department Deleted"),
+        ("GIFT_UNASSIGN", "Spiritual Gift Unassigned"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

@@ -53,6 +53,20 @@ erDiagram
 
 **Managers:** none custom. RBAC helpers in `assets/rbac.py`.
 
+**Current layering (Phase 2 / P1-2 Assets slice):**
+
+```
+Views → Services → Selectors → Repositories → Models
+```
+
+| Layer | File | Role |
+|-------|------|------|
+| Selectors | `assets/selectors.py` | Church-scoped reads (assets, categories, depreciation entries, audit/activity, rollups) |
+| Repositories | `assets/repositories.py` | Persistence writes (audit, policy, templates/categories, asset/depreciation/maintenance) |
+| Services | `assets/services.py` | Lifecycle, depreciation calc, capitalization/disposal journals via `transactions.repositories` + `_post_line` |
+
+Views no longer call asset model managers / `get_object_or_404` on domain models directly for list/detail paths.
+
 ---
 
 ## 3. Business rules (Current)
@@ -77,7 +91,7 @@ erDiagram
 
 Registry: `view_assets`, `manage_assets`, `approve_assets`, `dispose_assets`, `manage_asset_policy`, `export_assets`.
 
-**Debt:** `assets.rbac.user_may_view_assets` currently accepts manage/approve/policy paths and does **not** treat `view_assets` as sufficient for read access — registry code is underused in the RBAC helper.
+`assets.rbac.user_may_view_assets` grants read access when the user has `view_assets` (or manage/approve/policy). Index, asset list, and detail use this helper; create/edit/export remain manage-gated.
 
 ---
 
@@ -154,8 +168,7 @@ flowchart LR
 - Units-of-production depreciation not implemented.  
 - Soft-delete absent (status DISPOSED/REJECTED).  
 - No Church `post_save` auto-seed (use `setup_assets` / `ensure_asset_defaults_for_church`).  
-- `view_assets` underused in `user_may_view_assets`.  
-- Minimal Django admin (audit-oriented; FixedAsset not fully admin-managed).  
+- Django admin for church-owned asset models is denomination-scoped via `admin_custom.tenancy` (OWNER global; others `managed_denominations`). Audit logs remain read-only.  
 - No REST API.
 
 ---

@@ -3,15 +3,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
-from django.db.models import Count, Q, Value
-from django.db.models.functions import Concat
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import ListView
 
-from church_system.church_scope import filter_by_church, get_active_church, require_church
+from church_system.church_scope import get_active_church, require_church
 from church_system.flash import flash_exception, flash_success, flash_warning
 from members.access import (
     require_add_members,
@@ -31,6 +29,8 @@ from members.access import (
 from permissions.checks import can_manage_members, can_view_members
 from permissions.scoping import get_manageable_churches
 
+from . import repositories as repo
+from . import selectors
 from .forms import (
     DepartmentForm,
     FamilyForm,
@@ -42,26 +42,19 @@ from .forms import (
     RecordForm,
     SpiritualGiftForm,
 )
-from .models import (
-    Department,
-    Family,
-    LeadershipRole,
-    Member,
-    MemberSpiritualGift,
-    MemberTransfer,
-    Record,
-    RecordType,
-    SpiritualGift,
-)
+from .models import Member, RecordType
 from .services import (
+    MemberServiceError,
     can_process_transfer,
     complete_transfer,
     create_member,
+    delete_department,
     export_directory_rows,
     get_member_directory_stats,
     log_member_audit,
     reject_transfer,
     request_transfer,
+    unassign_spiritual_gift,
     update_member,
     user_can_view_transfer,
 )
@@ -74,43 +67,6 @@ def _filter_querystring(request, exclude_page=True):
     return params.urlencode()
 
 
-def _years_ago(today, years):
-    try:
-        return today.replace(year=today.year - years)
-    except ValueError:
-        return today.replace(year=today.year - years, day=28)
-
-
-def _apply_age_group_filter(qs, age_group):
-    """Filter by age-group using DOB date bounds (SQL), matching age_group_for_age()."""
-    if not age_group:
-        return qs
-    today = timezone.localdate()
-    if age_group == "CHILD":
-        return qs.filter(date_of_birth__isnull=False, date_of_birth__gt=_years_ago(today, 13))
-    if age_group == "TEEN":
-        return qs.filter(
-            date_of_birth__isnull=False,
-            date_of_birth__lte=_years_ago(today, 13),
-            date_of_birth__gt=_years_ago(today, 18),
-        )
-    if age_group == "YOUTH":
-        return qs.filter(
-            date_of_birth__isnull=False,
-            date_of_birth__lte=_years_ago(today, 18),
-            date_of_birth__gt=_years_ago(today, 36),
-        )
-    if age_group == "ADULT":
-        return qs.filter(
-            date_of_birth__isnull=False,
-            date_of_birth__lte=_years_ago(today, 36),
-            date_of_birth__gt=_years_ago(today, 60),
-        )
-    if age_group == "SENIOR":
-        return qs.filter(date_of_birth__isnull=False, date_of_birth__lte=_years_ago(today, 60))
-    return qs
-
-
 class MemberListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Member
     template_name = "members/list.html"
@@ -121,33 +77,14 @@ class MemberListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         return can_view_members(self.request.user) or can_manage_members(self.request.user)
 
     def get_queryset(self):
-        qs = filter_by_church(
-            Member.objects.select_related("church", "occupation", "department", "family"),
+        return selectors.member_directory_qs(
             self.request,
+            q=self.request.GET.get("q", "").strip(),
+            status=self.request.GET.get("status", ""),
+            department=self.request.GET.get("department", ""),
+            gender=self.request.GET.get("gender", ""),
+            age_group=self.request.GET.get("age_group", ""),
         )
-        q = self.request.GET.get("q", "").strip()
-        status = self.request.GET.get("status", "")
-        department = self.request.GET.get("department", "")
-        gender = self.request.GET.get("gender", "")
-        age_group = self.request.GET.get("age_group", "")
-
-        if q:
-            qs = qs.filter(
-                Q(first_name__icontains=q)
-                | Q(last_name__icontains=q)
-                | Q(phone__icontains=q)
-                | Q(membership_number__icontains=q)
-            )
-        if status:
-            qs = qs.filter(membership_status=status)
-        if department:
-            qs = qs.filter(department_id=department)
-        if gender:
-            qs = qs.filter(gender=gender)
-        if age_group:
-            qs = _apply_age_group_filter(qs, age_group)
-
-        return qs.order_by("last_name", "first_name")
 
     def get(self, request, *args, **kwargs):
         export = request.GET.get("export", "")
@@ -164,7 +101,16 @@ class MemberListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                     details={"format": export, "count": len(rows)},
                 )
             from reports.exporters import export_table_csv, export_table_excel
+            from reports.services import audit_export
 
+            audit_export(
+                user=request.user,
+                report_key="member_directory",
+                export_format=export,
+                row_count=len(rows),
+                church=church,
+                params={"count": len(rows)},
+            )
             if export == "csv":
                 return export_table_csv(headers, rows, "member-directory.csv")
             return export_table_excel(headers, rows, "member-directory.xlsx", "Members")
@@ -173,7 +119,7 @@ class MemberListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         church = get_active_church(self.request)
-        base_qs = filter_by_church(Member.objects.all(), self.request)
+        base_qs = selectors.members_base_qs(self.request)
         context["stats"] = get_member_directory_stats(base_qs, church=church)
         context["filter_form"] = MemberFilterForm(self.request.GET, church=church)
         context["church"] = church
@@ -188,26 +134,12 @@ class MemberListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 @login_required
 def member_detail(request, member_id):
     require_view_members(request)
-    member = get_object_or_404(
-        filter_by_church(
-            Member.objects.select_related("church", "occupation", "department", "family"),
-            request,
-        ),
-        id=member_id,
-    )
-    records = member.records.order_by("-event_date")[:10]
-    transfers = member.transfers.select_related("from_church", "to_church").order_by("-created_at")[:5]
-    gifts = member.spiritual_gift_assignments.select_related("gift")
-    roles = member.leadership_roles.filter(is_active=True).select_related("department")
-    attendance_count = 0
-    try:
-        from meetings.models import MeetingAttendance
-
-        attendance_count = MeetingAttendance.objects.filter(
-            member=member, is_present=True
-        ).count()
-    except Exception:
-        pass
+    member = selectors.member_for_request(request, member_id, detail=True)
+    records = selectors.member_recent_records(member)
+    transfers = selectors.member_recent_transfers(member)
+    gifts = selectors.member_gift_assignments(member)
+    roles = selectors.member_active_leadership_roles(member)
+    attendance_count = selectors.member_attendance_present_count(member)
     welfare_summary = None
     show_welfare = False
     try:
@@ -267,39 +199,15 @@ def member_search(request):
     ):
         raise PermissionDenied
 
-    qs = filter_by_church(
-        Member.objects.filter(is_active=True).select_related(
-            "department", "church", "family", "occupation"
-        ),
-        request,
-    )
-
     member_id = request.GET.get("id", "").strip()
-    if member_id:
-        qs = qs.filter(pk=member_id)
-    else:
-        q = request.GET.get("q", "").strip()
-        if not q:
-            return JsonResponse({"results": []})
-        # Do not annotate as "full_name" — Member.full_name is a read-only property.
-        qs = qs.annotate(
-            search_name=Concat("first_name", Value(" "), "last_name"),
-        ).filter(
-            Q(first_name__icontains=q)
-            | Q(last_name__icontains=q)
-            | Q(phone__icontains=q)
-            | Q(membership_number__icontains=q)
-            | Q(search_name__icontains=q)
-            | Q(address__icontains=q)
-            | Q(membership_status__icontains=q)
-            | Q(gender__icontains=q)
-            | Q(department__name__icontains=q)
-            | Q(family__name__icontains=q)
-            | Q(occupation__name__icontains=q)
-        )
+    q = request.GET.get("q", "").strip()
+    if not member_id and not q:
+        return JsonResponse({"results": []})
+
+    qs = selectors.member_search_results_qs(request, member_id=member_id, q=q)
 
     results = []
-    for member in qs.order_by("last_name", "first_name")[:20]:
+    for member in qs:
         subtitle_parts = []
         if member.phone:
             subtitle_parts.append(member.phone)
@@ -330,7 +238,9 @@ def add(request):
                 member = create_member(church, performed_by=request.user, **data)
                 if request.FILES.get("profile_picture"):
                     member.profile_picture = request.FILES["profile_picture"]
-                    member.save(update_fields=["profile_picture", "updated_at"])
+                    repo.save_member(
+                        member, update_fields=["profile_picture", "updated_at"]
+                    )
                 for warning in form.duplicate_warnings:
                     flash_warning(request, warning)
                 flash_success(request, f"{member} added successfully.")
@@ -348,10 +258,7 @@ def add(request):
 @login_required
 def edit(request, member_id):
     require_edit_members(request)
-    member = get_object_or_404(
-        filter_by_church(Member.objects.all(), request),
-        id=member_id,
-    )
+    member = selectors.member_for_request(request, member_id)
     church = member.church
     if request.method == "POST":
         form = MemberForm(request.POST, request.FILES, instance=member, church=church)
@@ -362,7 +269,9 @@ def edit(request, member_id):
                 update_member(member, performed_by=request.user, **data)
                 if picture is not None:
                     member.profile_picture = picture
-                    member.save(update_fields=["profile_picture", "updated_at"])
+                    repo.save_member(
+                        member, update_fields=["profile_picture", "updated_at"]
+                    )
                 for warning in form.duplicate_warnings:
                     flash_warning(request, warning)
                 flash_success(request, f"{member} updated successfully.")
@@ -377,10 +286,7 @@ def edit(request, member_id):
 @login_required
 def member_timeline(request, member_id):
     require_view_members(request)
-    member = get_object_or_404(
-        filter_by_church(Member.objects.all(), request),
-        id=member_id,
-    )
+    member = selectors.member_for_request(request, member_id)
     records = member.records.all()
     history = member.history.all()
     from datetime import date as date_cls
@@ -401,10 +307,7 @@ def member_timeline(request, member_id):
 def member_export(request, member_id):
     """Subject-access JSON export for a single member."""
     require_export_members(request)
-    member = get_object_or_404(
-        filter_by_church(Member.objects.select_related("church"), request),
-        id=member_id,
-    )
+    member = selectors.member_for_request(request, member_id, with_church=True)
     from members.export import export_member_json
 
     payload = export_member_json(member)
@@ -423,13 +326,8 @@ def member_export(request, member_id):
 @login_required
 def record_list(request):
     require_view_records(request)
-    records_qs = filter_by_church(
-        Record.objects.select_related("member", "church").order_by("-event_date"),
-        request,
-    )
     record_type = request.GET.get("type", "")
-    if record_type:
-        records_qs = records_qs.filter(record_type=record_type)
+    records_qs = selectors.records_qs(request, record_type=record_type)
     paginator = Paginator(records_qs, 50)
     records = paginator.get_page(request.GET.get("page"))
     return render(request, "members/record_list.html", {
@@ -448,16 +346,13 @@ def record_add(request):
     member_id = request.GET.get("member")
     member = None
     if member_id:
-        member = get_object_or_404(
-            filter_by_church(Member.objects.all(), request),
-            pk=member_id,
-        )
+        member = selectors.member_pk_for_request(request, member_id)
     form = RecordForm(request.POST or None, church=church, member=member)
     if request.method == "POST" and form.is_valid():
         record = form.save(commit=False)
         record.church = church
         record.created_by = request.user
-        record.save()
+        repo.save_record(record)
         if record.record_type == RecordType.BAPTISM and record.member_id:
             updates = {}
             if record.event_date and not record.member.baptism_date:
@@ -480,10 +375,7 @@ def record_add(request):
 @login_required
 def record_edit(request, pk):
     require_manage_records(request)
-    record = get_object_or_404(
-        filter_by_church(Record.objects.all(), request),
-        pk=pk,
-    )
+    record = selectors.record_for_request(request, pk)
     form = RecordForm(request.POST or None, instance=record, church=record.church)
     if request.method == "POST" and form.is_valid():
         form.save()
@@ -500,10 +392,7 @@ def record_edit(request, pk):
 @login_required
 def record_detail(request, pk):
     require_view_records(request)
-    record = get_object_or_404(
-        filter_by_church(Record.objects.select_related("member"), request),
-        pk=pk,
-    )
+    record = selectors.record_for_request(request, pk, with_member=True)
     return render(request, "members/record_detail.html", {
         "record": record,
         "can_manage": can_manage_members(request.user),
@@ -513,11 +402,7 @@ def record_detail(request, pk):
 @login_required
 def department_list(request):
     require_view_members(request)
-    departments = filter_by_church(
-        # Use members_total — never annotate as member_count if a @property exists
-        Department.objects.annotate(members_total=Count("members")).order_by("name"),
-        request,
-    )
+    departments = selectors.departments_qs(request)
     return render(request, "members/department_list.html", {
         "departments": departments,
         "can_manage": can_manage_members(request.user),
@@ -532,7 +417,7 @@ def department_add(request):
     if request.method == "POST" and form.is_valid():
         dept = form.save(commit=False)
         dept.church = church
-        dept.save()
+        repo.save_department(dept)
         flash_success(request, f"Department “{dept.name}” created.")
         return redirect("members:department_list")
     return render(request, "members/department_form.html", {"form": form, "title": "Add Department"})
@@ -541,7 +426,7 @@ def department_add(request):
 @login_required
 def department_edit(request, pk):
     require_manage_departments(request)
-    dept = get_object_or_404(filter_by_church(Department.objects.all(), request), pk=pk)
+    dept = selectors.department_for_request(request, pk)
     form = DepartmentForm(request.POST or None, instance=dept)
     if request.method == "POST" and form.is_valid():
         form.save()
@@ -557,10 +442,14 @@ def department_edit(request, pk):
 @login_required
 def department_delete(request, pk):
     require_manage_departments(request)
-    dept = get_object_or_404(filter_by_church(Department.objects.all(), request), pk=pk)
+    dept = selectors.department_for_request(request, pk)
     if request.method == "POST":
         name = dept.name
-        dept.delete()
+        try:
+            delete_department(dept, request.user)
+        except MemberServiceError as exc:
+            flash_exception(request, exc)
+            return redirect("members:department_list")
         flash_success(request, f"Department “{name}” removed.")
         return redirect("members:department_list")
     return render(request, "members/confirm_delete.html", {
@@ -574,12 +463,7 @@ def department_delete(request, pk):
 @login_required
 def family_list(request):
     require_view_members(request)
-    families = filter_by_church(
-        Family.objects.select_related("head").annotate(
-            members_total=Count("members")
-        ).order_by("name"),
-        request,
-    )
+    families = selectors.families_qs(request)
     return render(request, "members/family_list.html", {
         "families": families,
         "can_manage": can_manage_members(request.user),
@@ -594,7 +478,7 @@ def family_add(request):
     if request.method == "POST" and form.is_valid():
         family = form.save(commit=False)
         family.church = church
-        family.save()
+        repo.save_family(family)
         flash_success(request, f"Family “{family.name}” created.")
         return redirect("members:family_detail", pk=family.pk)
     return render(request, "members/family_form.html", {"form": form, "title": "Add Family"})
@@ -603,10 +487,7 @@ def family_add(request):
 @login_required
 def family_edit(request, pk):
     require_manage_families(request)
-    family = get_object_or_404(
-        filter_by_church(Family.objects.select_related("head"), request),
-        pk=pk,
-    )
+    family = selectors.family_for_request(request, pk)
     form = FamilyForm(request.POST or None, instance=family, church=family.church)
     if request.method == "POST" and form.is_valid():
         form.save()
@@ -622,11 +503,8 @@ def family_edit(request, pk):
 @login_required
 def family_detail(request, pk):
     require_view_members(request)
-    family = get_object_or_404(
-        filter_by_church(Family.objects.select_related("head"), request),
-        pk=pk,
-    )
-    members = family.members.order_by("last_name", "first_name")
+    family = selectors.family_for_request(request, pk)
+    members = selectors.family_members(family)
     return render(request, "members/family_detail.html", {
         "family": family,
         "members": members,
@@ -638,19 +516,8 @@ def family_detail(request, pk):
 def transfer_list(request):
     require_view_members(request)
     church = get_active_church(request)
-    transfers = MemberTransfer.objects.select_related(
-        "member", "from_church", "to_church", "requested_by"
-    ).order_by("-created_at")
-
-    allowed_churches = get_manageable_churches(request.user)
-    transfers = transfers.filter(
-        Q(from_church__in=allowed_churches) | Q(to_church__in=allowed_churches)
-    )
-
     status = request.GET.get("status", "")
-    if status:
-        transfers = transfers.filter(status=status)
-
+    transfers = selectors.transfers_for_user_qs(request.user, status=status)
     paginator = Paginator(transfers, 50)
     page = paginator.get_page(request.GET.get("page"))
     return render(request, "members/transfer_list.html", {
@@ -693,12 +560,7 @@ def transfer_create(request):
 @login_required
 def transfer_detail(request, pk):
     require_view_members(request)
-    transfer = get_object_or_404(
-        MemberTransfer.objects.select_related(
-            "member", "from_church", "to_church", "requested_by", "processed_by"
-        ),
-        pk=pk,
-    )
+    transfer = selectors.transfer_for_user(request.user, pk)
     if not user_can_view_transfer(request.user, transfer):
         raise PermissionDenied
 
@@ -731,10 +593,7 @@ def transfer_detail(request, pk):
 @login_required
 def baptism_register(request):
     require_baptism_register(request)
-    records_qs = filter_by_church(
-        Record.objects.filter(record_type=RecordType.BAPTISM).select_related("member", "church"),
-        request,
-    ).order_by("-event_date")
+    records_qs = selectors.baptism_records_qs(request)
     export = request.GET.get("export", "")
     if export in ("csv", "excel"):
         require_export_members(request)
@@ -751,7 +610,16 @@ def baptism_register(request):
             for r in records_qs
         ]
         from reports.exporters import export_table_csv, export_table_excel
+        from reports.services import audit_export
 
+        audit_export(
+            user=request.user,
+            report_key="baptism_register",
+            export_format=export,
+            row_count=len(rows),
+            church=get_active_church(request),
+            params={"count": len(rows)},
+        )
         if export == "csv":
             return export_table_csv(headers, rows, "baptism-register.csv")
         return export_table_excel(headers, rows, "baptism-register.xlsx", "Baptisms")
@@ -768,9 +636,7 @@ def baptism_register(request):
 @login_required
 def leadership_list(request):
     require_view_members(request)
-    roles_qs = filter_by_church(
-        LeadershipRole.objects.select_related("member", "department", "church"), request
-    ).order_by("-is_active", "title")
+    roles_qs = selectors.leadership_roles_qs(request)
     paginator = Paginator(roles_qs, 50)
     roles = paginator.get_page(request.GET.get("page"))
     return render(request, "members/leadership_list.html", {
@@ -789,8 +655,7 @@ def leadership_add(request):
         if form.is_valid():
             role = form.save(commit=False)
             role.church = church
-            role.full_clean()
-            role.save()
+            repo.save_leadership_role(role)
             flash_success(request, "Leadership role assigned.")
             return redirect("members:leadership_list")
     else:
@@ -801,14 +666,11 @@ def leadership_add(request):
 @login_required
 def leadership_end(request, pk):
     require_manage_leadership(request)
-    role = get_object_or_404(
-        filter_by_church(LeadershipRole.objects.select_related("member"), request),
-        pk=pk,
-    )
+    role = selectors.leadership_role_for_request(request, pk)
     if request.method == "POST":
         role.is_active = False
         role.end_date = timezone.localdate()
-        role.save(update_fields=["is_active", "end_date"])
+        repo.save_leadership_role(role, update_fields=["is_active", "end_date"])
         flash_success(request, f"Ended role “{role.title}” for {role.member.full_name}.")
         return redirect("members:leadership_list")
     return render(request, "members/confirm_delete.html", {
@@ -823,7 +685,7 @@ def leadership_end(request, pk):
 @login_required
 def spiritual_gift_list(request):
     require_view_members(request)
-    gifts = filter_by_church(SpiritualGift.objects.all(), request)
+    gifts = selectors.spiritual_gifts_qs(request)
     return render(request, "members/spiritual_gifts.html", {
         "gifts": gifts,
         "can_manage": can_manage_members(request.user),
@@ -839,7 +701,7 @@ def spiritual_gift_add(request):
         if form.is_valid():
             gift = form.save(commit=False)
             gift.church = church
-            gift.save()
+            repo.save_spiritual_gift(gift)
             flash_success(request, "Spiritual gift added.")
             return redirect("members:spiritual_gift_list")
     else:
@@ -850,11 +712,11 @@ def spiritual_gift_add(request):
 @login_required
 def member_assign_gift(request, member_id):
     require_manage_gifts(request)
-    member = get_object_or_404(filter_by_church(Member.objects.all(), request), pk=member_id)
+    member = selectors.member_pk_for_request(request, member_id)
     if request.method == "POST":
         form = MemberGiftForm(request.POST, church=member.church)
         if form.is_valid():
-            MemberSpiritualGift.objects.get_or_create(
+            repo.get_or_create_gift_assignment(
                 member=member,
                 gift=form.cleaned_data["gift"],
                 defaults={
@@ -872,15 +734,11 @@ def member_assign_gift(request, member_id):
 @login_required
 def member_unassign_gift(request, member_id, assignment_id):
     require_manage_gifts(request)
-    member = get_object_or_404(filter_by_church(Member.objects.all(), request), pk=member_id)
-    assignment = get_object_or_404(
-        MemberSpiritualGift.objects.select_related("gift"),
-        pk=assignment_id,
-        member=member,
-    )
+    member = selectors.member_pk_for_request(request, member_id)
+    assignment = selectors.gift_assignment_for_member(member, assignment_id)
     if request.method == "POST":
         label = assignment.gift.name
-        assignment.delete()
+        unassign_spiritual_gift(assignment, request.user)
         flash_success(request, f"Removed gift “{label}”.")
         return redirect("members:detail", member_id=member.pk)
     return render(request, "members/confirm_delete.html", {

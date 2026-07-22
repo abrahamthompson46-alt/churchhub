@@ -144,7 +144,7 @@ See `docs/MODULE_SPECIFICATIONS/MEMBERS/members_spec.md`.
 ## 6. Report access logs (Current)
 
 **Model:** `reports.ReportAccessAuditLog`  
-**Writer:** `reports.services.log_report_access`
+**Writer:** `reports.services.log_report_access` / `reports.services.audit_export`
 
 | Action | Meaning |
 |--------|---------|
@@ -153,7 +153,7 @@ See `docs/MODULE_SPECIFICATIONS/MEMBERS/members_spec.md`.
 
 Also: async `ReportExportJob` for large exports.
 
-**Gap:** Not every export path in the product necessarily calls this logger (e.g. some domain exports use `reports.exporters` directly). Prefer writing ReportAccessAuditLog (or domain audit EXPORT action) for sensitive exports.
+**Domain exports (Current):** Module views that call `reports.exporters` (giving, ledger, transactions list/financial statement, member directory/baptism, announcements, organization hierarchy, budgets, remittance welfare statement) invoke `audit_export` so each download creates a `ReportAccessAuditLog` row. Domain-specific EXPORT rows (e.g. `MemberAuditLog`, `AnnouncementAuditLog`) remain where already present.
 
 See `docs/MODULE_SPECIFICATIONS/REPORTS/reports_spec.md`.
 
@@ -282,7 +282,7 @@ AGENTS principles (GDPR, consent tracking, data minimization) are **design goals
 | Soft-delete | Absent | Required for business records | Introduce carefully |
 | MFA | Stub | Required for high privilege | Enforce before claiming compliance |
 | Retention | Ad hoc commands | Configurable policy | Written schedule + no financial purge |
-| Export audit | ReportAccessAuditLog + some domain EXPORT | All exports audited | Close gaps on CSV/PDF paths |
+| Export audit | ReportAccessAuditLog via catalog + `audit_export` on domain exporters | Unified export catalog | Cover remaining ad-hoc paths (assets/payroll/platform) |
 | Remittance narrative | Dual paths | Single remittance SoR | Unify ops + audit story |
 
 ---
@@ -291,12 +291,12 @@ AGENTS principles (GDPR, consent tracking, data minimization) are **design goals
 
 | Gap | Impact |
 |-----|--------|
-| No soft-delete | Hard deletes can erase history where allowed |
+| No soft-delete | Hard deletes can erase history where allowed | **Current guards:** department delete blocked when referenced; budget delete blocked when approved actuals exist; gift unassign + budget/override deletes audited; payroll lines purge only on draft workflow |
 | Audit tables not all immutable | Only PlatformAuditLog blocks update/delete in model |
 | No unified audit schema | Cross-module forensics harder |
 | MFA stub | Privileged actions lack second factor |
 | Dual remittance paths | Audit story split (cutoff vs settlement; district+ settlement incomplete) |
-| Incomplete export auditing | Some exporters bypass ReportAccessAuditLog |
+| Remaining ad-hoc exports | Assets/payroll/platform CSV may still need `audit_export` |
 | Field-level privacy masking | Incomplete vs AGENTS PII rules |
 | No retention/GDPR toolkit | Manual process only |
 | No security monitoring alerts | No automated alerts on denial spikes / large exports |
@@ -315,7 +315,7 @@ AGENTS principles (GDPR, consent tracking, data minimization) are **design goals
 
 4. Soft-delete framework for membership and communications.  
 5. Unify remittance audit narrative (settlement as system of record).  
-6. Ensure every CSV/PDF/Excel export writes ReportAccessAuditLog or domain EXPORT.  
+6. Cover remaining ad-hoc exports (assets/payroll/platform) with `audit_export` where still missing.  
 7. Expand maker-checker to budget lock / sensitive role assignment if product requires AGENTS parity.
 
 ### P2 — Compliance program

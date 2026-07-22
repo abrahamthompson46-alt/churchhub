@@ -65,6 +65,7 @@ class Account(models.Model):
         indexes = [
             models.Index(fields=["church", "code"]),
             models.Index(fields=["church", "is_active"]),
+            models.Index(fields=["church", "account_type"]),
         ]
 
     def __str__(self):
@@ -175,6 +176,9 @@ class Transaction(models.Model):
             models.Index(fields=["church", "approval_status", "date"]),
             models.Index(fields=["church", "transaction_type"]),
             models.Index(fields=["reference"]),
+            models.Index(fields=["church", "approval_status", "is_voided", "date"]),
+            models.Index(fields=["church", "member"]),
+            models.Index(fields=["church", "ledger_category", "-date"]),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -485,7 +489,7 @@ class FinancialAuditLog(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     transaction = models.ForeignKey(
         Transaction,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="audit_logs",
         null=True,
         blank=True,
@@ -514,6 +518,14 @@ class FinancialAuditLog(models.Model):
 
     def __str__(self):
         return f"{self.action} - {self.church} - {self.created_at:%Y-%m-%d %H:%M}"
+
+    def save(self, *args, **kwargs):
+        if self.pk and FinancialAuditLog.objects.filter(pk=self.pk).exists():
+            raise ValueError("FinancialAuditLog entries are immutable and cannot be updated.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("FinancialAuditLog entries cannot be deleted.")
 
 
 # ============================

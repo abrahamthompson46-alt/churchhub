@@ -4,9 +4,11 @@ from django import forms
 
 from church_system.widgets import checkbox_attrs, input_attrs, select_attrs, textarea_attrs
 from permissions.roles import UserRole
+from sitecontrol import repositories as repo
+from sitecontrol import selectors
 from sitecontrol.denomination_defaults import DEFAULT_LEVEL_LABELS
 from sitecontrol.denomination_services import merge_hierarchy_labels
-from sitecontrol.models import Denomination, SubscriptionPlan
+from sitecontrol.models import Denomination
 
 LEVEL_KEYS = (
     "general_conference",
@@ -64,7 +66,7 @@ class DenominationTerminologyForm(forms.Form):
                 "label_plural": self.cleaned_data[f"{key}_label_plural"].strip(),
             }
         denomination.hierarchy_labels = hierarchy_labels
-        denomination.save(update_fields=["hierarchy_labels", "updated_at"])
+        repo.save_model(denomination, update_fields=["hierarchy_labels", "updated_at"])
         return denomination
 
 
@@ -121,7 +123,7 @@ class DenominationSeedForm(forms.Form):
             "payroll_jurisdiction": self.cleaned_data["payroll_jurisdiction"],
             "remittance_preset": self.cleaned_data["remittance_preset"],
         }
-        denomination.save(update_fields=["seed_config", "updated_at"])
+        repo.save_model(denomination, update_fields=["seed_config", "updated_at"])
         return denomination
 
 
@@ -152,6 +154,6 @@ class DenominationBrandingForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["default_plan"].queryset = SubscriptionPlan.objects.filter(is_active=True).order_by("sort_order")
+        self.fields["default_plan"].queryset = selectors.active_plans_ordered()
         self.fields["default_plan"].required = False
         self.fields["default_role"].choices = UserRole.CHOICES

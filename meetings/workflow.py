@@ -2,10 +2,12 @@
 
 from django.utils import timezone
 
-from permissions.checks import can_approve_minutes, can_manage_meetings, can_view_meetings
+from meetings import repositories as repo
+from meetings import selectors
+from permissions.checks import can_manage_meetings, can_view_meetings
 from permissions.scoping_checks import can_approve_for_church, pending_for_church_scope
 
-from .models import Meeting, MinutesStatus, MeetingStatus
+from .models import MeetingStatus, MinutesStatus
 
 
 class MeetingWorkflowError(Exception):
@@ -43,9 +45,7 @@ def can_approve_meeting_minutes(user, meeting):
 
 
 def pending_minutes_for_user(user):
-    qs = Meeting.objects.filter(
-        minutes_status=MinutesStatus.PENDING_APPROVAL,
-    ).select_related("church", "minutes_submitted_by", "department")
+    qs = selectors.pending_minutes_base_qs()
     return pending_for_church_scope(
         user,
         qs,
@@ -83,7 +83,7 @@ def save_minutes_draft(meeting, data, user):
         meeting.minutes_status = MinutesStatus.DRAFT
         meeting.minutes_rejection_reason = ""
         update_fields.extend(["minutes_status", "minutes_rejection_reason"])
-    meeting.save(update_fields=list(dict.fromkeys(update_fields)))
+    repo.save_meeting(meeting, update_fields=list(dict.fromkeys(update_fields)))
     return meeting
 
 
@@ -103,13 +103,16 @@ def submit_minutes_for_approval(meeting, user):
     meeting.minutes_submitted_by = user
     meeting.minutes_submitted_at = timezone.now()
     meeting.minutes_rejection_reason = ""
-    meeting.save(update_fields=[
-        "minutes_status",
-        "minutes_submitted_by",
-        "minutes_submitted_at",
-        "minutes_rejection_reason",
-        "updated_at",
-    ])
+    repo.save_meeting(
+        meeting,
+        update_fields=[
+            "minutes_status",
+            "minutes_submitted_by",
+            "minutes_submitted_at",
+            "minutes_rejection_reason",
+            "updated_at",
+        ],
+    )
     return meeting
 
 
@@ -121,14 +124,17 @@ def approve_minutes(meeting, user):
     meeting.minutes_approved_by = user
     meeting.minutes_approved_at = timezone.now()
     meeting.minutes_rejection_reason = ""
-    meeting.save(update_fields=[
-        "minutes_status",
-        "minutes_locked",
-        "minutes_approved_by",
-        "minutes_approved_at",
-        "minutes_rejection_reason",
-        "updated_at",
-    ])
+    repo.save_meeting(
+        meeting,
+        update_fields=[
+            "minutes_status",
+            "minutes_locked",
+            "minutes_approved_by",
+            "minutes_approved_at",
+            "minutes_rejection_reason",
+            "updated_at",
+        ],
+    )
     return meeting
 
 
@@ -140,12 +146,15 @@ def reject_minutes(meeting, user, reason=""):
     meeting.minutes_rejection_reason = reason.strip()
     meeting.minutes_approved_by = None
     meeting.minutes_approved_at = None
-    meeting.save(update_fields=[
-        "minutes_status",
-        "minutes_locked",
-        "minutes_rejection_reason",
-        "minutes_approved_by",
-        "minutes_approved_at",
-        "updated_at",
-    ])
+    repo.save_meeting(
+        meeting,
+        update_fields=[
+            "minutes_status",
+            "minutes_locked",
+            "minutes_rejection_reason",
+            "minutes_approved_by",
+            "minutes_approved_at",
+            "updated_at",
+        ],
+    )
     return meeting

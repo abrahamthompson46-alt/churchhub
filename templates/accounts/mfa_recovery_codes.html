@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}MFA recovery codes — {{ platform_name|default:site_settings.site_name|default:"ChurchHub" }}{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<div class="auth-split">
+    {% include "includes/auth_platform_panel.html" %}
+    <section class="auth-split-form">
+        <div class="auth-card card">
+            <div class="card-body p-4 p-md-5">
+                <h1 class="h4 fw-bold mb-1 text-center">Save your recovery codes</h1>
+                <p class="text-muted small mb-4 text-center">
+                    Store these codes somewhere safe. Each code can be used once if you lose your authenticator.
+                </p>
+                <ul class="list-unstyled font-monospace small bg-light p-3 rounded mb-4">
+                    {% for code in recovery_codes %}
+                    <li class="mb-1">{{ code }}</li>
+                    {% endfor %}
+                </ul>
+                <a href="{{ continue_url }}" class="btn btn-primary w-100">Continue to dashboard</a>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

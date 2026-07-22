@@ -1,0 +1,25 @@
+[Unit]
+Description=ChurchHub Gunicorn
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=churchhub
+Group=churchhub
+WorkingDirectory=/opt/churchhub
+EnvironmentFile=/opt/churchhub/.env
+Environment=DJANGO_SETTINGS_MODULE=church_system.settings
+Environment=DJANGO_ENV=production
+ExecStart=/opt/churchhub/.venv/bin/gunicorn \
+    --config /opt/churchhub/gunicorn.conf.py \
+    church_system.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=30
+Restart=always
+RestartSec=5
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

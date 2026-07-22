@@ -1,12 +1,8 @@
 """Delete aged dashboard notifications to keep the inbox lean."""
 
-from datetime import timedelta
-
 from django.core.management.base import BaseCommand
-from django.db.models import Q
-from django.utils import timezone
 
-from dashboard.models import Notification
+from dashboard import repositories as repo
 
 
 class Command(BaseCommand):
@@ -35,19 +31,15 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        now = timezone.now()
-        read_cutoff = now - timedelta(days=options["read_days"])
-        unread_cutoff = now - timedelta(days=options["unread_days"])
-        qs = Notification.objects.filter(
-            Q(read=True, created_at__lt=read_cutoff)
-            | Q(read=False, created_at__lt=unread_cutoff)
+        result = repo.purge_aged_notifications(
+            read_days=options["read_days"],
+            unread_days=options["unread_days"],
+            dry_run=options["dry_run"],
         )
-        count = qs.count()
         if options["dry_run"]:
             self.stdout.write(
-                f"Would delete {count} notification(s) "
+                f"Would delete {result} notification(s) "
                 f"(read >{options['read_days']}d, unread >{options['unread_days']}d)."
             )
             return
-        deleted, _ = qs.delete()
-        self.stdout.write(self.style.SUCCESS(f"Deleted {deleted} notification(s)."))
+        self.stdout.write(self.style.SUCCESS(f"Deleted {result} notification(s)."))

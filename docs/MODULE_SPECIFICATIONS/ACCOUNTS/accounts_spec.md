@@ -62,7 +62,25 @@ Email/username/role/scope/church/denomination; unique `token`; accept/revoke/exp
 
 ## 4. Managers
 
-**None custom.** Planned AGENTS managers/repositories: not present.
+**None custom.**
+
+---
+
+## 4b. Layering (Current — Phase 2 / P1-2 Accounts slice)
+
+```
+Views → Services → Selectors → Repositories → Models
+```
+
+| Layer | File | Role |
+|-------|------|------|
+| Selectors | `accounts/selectors.py` | User/invitation/activity reads; form org/member lookups; directory filters |
+| Repositories | `accounts/repositories.py` | User/invitation/activity persistence (no business rules) |
+| Services | `accounts/services.py` | Invite lifecycle, activate/deactivate, profile/role rules, activity orchestration |
+| MFA | `accounts/mfa.py` / `mfa_views.py` | TOTP helpers; MFA field saves via repositories; pending-user lookup via selectors |
+| Views / forms | `accounts/views.py`, `forms.py` | HTTP/forms only; password + manage saves via `commit=False` + repositories |
+
+`tests_layers.py` characterizes selectors, repositories, invitation flow, activity logging, church/denomination/platform isolation.
 
 ---
 

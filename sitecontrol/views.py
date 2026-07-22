@@ -15,7 +15,8 @@ from django.views.decorators.http import require_POST
 
 from accounts.models import User
 from church_system.flash import flash_success
-from organization.models import Church, Conference, District, Zone
+from sitecontrol import repositories as repo
+from sitecontrol import selectors
 from sitecontrol.checks import can_access_django_admin, platform_required, require_platform_capability
 from sitecontrol.forms import (
     BillingSettingsForm,
@@ -32,14 +33,7 @@ from sitecontrol.forms import (
     TenantChurchForm,
     TenantSubscriptionForm,
 )
-from sitecontrol.models import (
-    PlatformAnnouncement,
-    PlatformAuditLog,
-    PlatformPaymentMethod,
-    SiteSettings,
-    SubscriptionPlan,
-    TenantSubscription,
-)
+from sitecontrol.models import SiteSettings
 from sitecontrol.platform_access import (
     filter_audit_for_operator,
     filter_churches_for_operator,
@@ -103,20 +97,20 @@ def dashboard(request):
     stats = platform_stats()
     alerts = tenant_health_alerts()
     recent = filter_subscriptions_for_operator(
-        TenantSubscription.objects.select_related("church", "plan"),
+        selectors.subscription_detail_qs(),
         request.user,
     ).order_by("-updated_at")[:8]
     recent_audit = filter_audit_for_operator(
-        PlatformAuditLog.objects.select_related("user"),
+        selectors.platform_audit_list_base(),
         request.user,
     ).order_by("-created_at")[:6]
     churches_without = filter_churches_for_operator(
-        Church.objects.filter(subscription__isnull=True),
+        selectors.churches_without_subscription(),
         request.user,
     ).count()
     since = timezone.now() - timedelta(hours=24)
     audit_24h = filter_audit_for_operator(
-        PlatformAuditLog.objects.filter(created_at__gte=since),
+        selectors.recent_audit_since(since),
         request.user,
     ).count()
     settings_obj = get_site_settings()
@@ -243,7 +237,7 @@ def ops_health(request):
             church_id = (request.POST.get("church_id") or "").strip()
             if church_id:
                 church = filter_churches_for_operator(
-                    Church.objects.filter(pk=church_id),
+                    selectors.churches_filter_by_pk(church_id),
                     request.user,
                 ).first()
             result = run_platform_seed_suite(
@@ -261,7 +255,7 @@ def ops_health(request):
             flash_success(request, result["message"] + " No CLI required.")
             return redirect("sitecontrol:ops_health")
     churches = filter_churches_for_operator(
-        Church.objects.select_related("district").order_by("name"),
+        selectors.churches_ordered_with_district(),
         request.user,
     )[:200]
     return render(request, "sitecontrol/ops.html", {
@@ -275,7 +269,7 @@ def ops_health(request):
 @platform_required
 @require_platform_capability(CAP_VIEW_AUDIT)
 def audit_log(request):
-    qs = PlatformAuditLog.objects.select_related("user", "denomination").order_by("-created_at")
+    qs = selectors.platform_audit_list_base()
     qs = filter_audit_for_operator(qs, request.user)
     q = request.GET.get("q", "").strip()
     if q:
@@ -293,7 +287,7 @@ def audit_log(request):
 @platform_required
 @require_platform_capability(CAP_EXPORT_AUDIT)
 def audit_export(request):
-    qs = PlatformAuditLog.objects.select_related("user", "denomination").order_by("-created_at")
+    qs = selectors.platform_audit_list_base()
     qs = filter_audit_for_operator(qs, request.user)
     q = request.GET.get("q", "").strip()
     if q:
@@ -321,7 +315,8 @@ def site_settings(request):
     settings_obj = SiteSettings.load()
     form = SiteSettingsForm(request.POST or None, instance=settings_obj)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        obj = form.save(commit=False)
+        repo.save_model(obj)
         clear_settings_cache()
         log_platform_action(request, "SETTINGS_UPDATE", "General site settings updated", target_model="SiteSettings")
         flash_success(request, "Site settings saved.")
@@ -338,7 +333,8 @@ def branding_settings(request):
     settings_obj = SiteSettings.load()
     form = BrandingSettingsForm(request.POST or None, request.FILES or None, instance=settings_obj)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        obj = form.save(commit=False)
+        repo.save_model(obj)
         clear_settings_cache()
         log_platform_action(request, "SETTINGS_UPDATE", "Branding settings updated", target_model="SiteSettings")
         flash_success(request, "Branding saved.")
@@ -382,7 +378,7 @@ def email_settings(request):
             return redirect("sitecontrol:email_settings")
 
         if form.is_valid():
-            form.save()
+            form.save()  # EmailSettingsForm routes persistence through repositories
             clear_settings_cache()
             log_platform_action(request, "SETTINGS_UPDATE", "Email settings updated", target_model="SiteSettings")
             flash_success(request, "Email settings saved.")
@@ -400,7 +396,8 @@ def security_settings(request):
     settings_obj = SiteSettings.load()
     form = SecuritySettingsForm(request.POST or None, instance=settings_obj)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        obj = form.save(commit=False)
+        repo.save_model(obj)
         clear_settings_cache()
         log_platform_action(request, "SETTINGS_UPDATE", "Security settings updated", target_model="SiteSettings")
         flash_success(request, "Security settings saved.")
@@ -417,7 +414,8 @@ def feature_registry(request):
     settings_obj = SiteSettings.load()
     form = FeatureRegistryForm(request.POST or None, instance=settings_obj)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        obj = form.save(commit=False)
+        repo.save_model(obj)
         clear_settings_cache()
         log_platform_action(request, "FEATURE_UPDATE", "Global feature registry updated", target_model="SiteSettings")
         flash_success(request, "Feature registry saved.")
@@ -431,7 +429,7 @@ def feature_registry(request):
 @platform_required
 @require_platform_capability(CAP_MANAGE_PLANS)
 def plan_list(request):
-    plans = SubscriptionPlan.objects.all()
+    plans = selectors.all_plans()
     return render(request, "sitecontrol/plan_list.html", {
         "plans": plans,
         "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Plans",)),
@@ -441,10 +439,12 @@ def plan_list(request):
 @platform_required
 @require_platform_capability(CAP_MANAGE_PLANS)
 def plan_edit(request, pk=None):
-    plan = get_object_or_404(SubscriptionPlan, pk=pk) if pk else None
+    plan = selectors.get_plan_or_404(pk) if pk else None
     form = SubscriptionPlanForm(request.POST or None, instance=plan)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        obj = form.save(commit=False)
+        repo.save_model(obj)
+        form.instance = obj
         log_platform_action(
             request, "PLAN_UPDATE", f"Plan '{form.instance.name}' saved",
             target_model="SubscriptionPlan", target_id=form.instance.pk,
@@ -463,7 +463,7 @@ def plan_edit(request, pk=None):
 @require_platform_capability(CAP_MANAGE_SUBSCRIPTIONS)
 def subscription_list(request):
     subs = filter_subscriptions_for_operator(
-        TenantSubscription.objects.select_related("church", "plan", "church__district"),
+        selectors.subscriptions_list_base(),
         request.user,
     ).order_by("church__name")
     return render(request, "sitecontrol/subscription_list.html", {
@@ -475,7 +475,7 @@ def subscription_list(request):
 @platform_required
 @require_platform_capability(CAP_MANAGE_SUBSCRIPTIONS)
 def subscription_edit(request, pk=None):
-    sub = get_object_or_404(TenantSubscription, pk=pk) if pk else None
+    sub = selectors.get_subscription_or_404(pk) if pk else None
     if sub:
         _require_tenant_access(request, sub.church)
     form = TenantSubscriptionForm(request.POST or None, instance=sub)
@@ -492,7 +492,7 @@ def subscription_edit(request, pk=None):
                 instance.plan,
                 instance.billing_interval,
             )
-        instance.save()
+        repo.save_subscription(instance)
         clear_church_plan_cache(instance.church)
         log_platform_action(
             request, "SUBSCRIPTION_UPDATE", f"Subscription for {instance.church.name} updated",
@@ -526,7 +526,7 @@ def subscription_bulk_seed(request):
 
     count = 0
     churches = filter_churches_for_operator(
-        Church.objects.filter(subscription__isnull=True),
+        selectors.churches_without_subscription(),
         request.user,
     )
     for church in churches:
@@ -540,7 +540,7 @@ def subscription_bulk_seed(request):
 @platform_required
 @require_platform_capability(CAP_VIEW)
 def tenant_list(request):
-    qs = Church.objects.select_related("district__zone__conference", "subscription__plan").order_by("name")
+    qs = selectors.churches_tenant_list_base()
     qs = filter_churches_for_operator(qs, request.user)
     q = request.GET.get("q", "").strip()
     status = request.GET.get("status", "")
@@ -562,13 +562,10 @@ def tenant_list(request):
 @platform_required
 @require_platform_capability(CAP_VIEW)
 def tenant_detail(request, pk):
-    church = get_object_or_404(
-        Church.objects.select_related("district__zone__conference__denomination", "subscription__plan"),
-        pk=pk,
-    )
+    church = selectors.get_church_or_404(selectors.church_detail_qs(), pk)
     _require_tenant_access(request, church)
     stats = tenant_detail_stats(church)
-    users = User.objects.filter(church=church, is_platform_user=False).order_by("username")[:20]
+    users = selectors.institution_users_for_church(church, limit=20)
     return render(request, "sitecontrol/tenant_detail.html", {
         "church": church,
         "stats": stats,
@@ -582,14 +579,12 @@ def tenant_detail(request, pk):
 @platform_required
 @require_platform_capability(CAP_MANAGE_TENANTS)
 def tenant_edit(request, pk):
-    church = get_object_or_404(
-        Church.objects.select_related("district__zone__conference__denomination"),
-        pk=pk,
-    )
+    church = selectors.get_church_or_404(selectors.church_tenant_access_qs(), pk)
     _require_tenant_access(request, church)
     form = TenantChurchForm(request.POST or None, instance=church)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        obj = form.save(commit=False)
+        repo.save_church(obj)
         log_platform_action(
             request, "TENANT_UPDATE", f"Tenant '{church.name}' updated",
             target_model="Church", target_id=church.pk,
@@ -607,10 +602,7 @@ def tenant_edit(request, pk):
 @require_platform_capability(CAP_MANAGE_TENANTS)
 @require_POST
 def tenant_suspend(request, pk):
-    church = get_object_or_404(
-        Church.objects.select_related("district__zone__conference__denomination"),
-        pk=pk,
-    )
+    church = selectors.get_church_or_404(selectors.church_tenant_access_qs(), pk)
     _require_tenant_access(request, church)
     reason = request.POST.get("reason", "").strip()
     suspend_tenant(church, request.user, reason=reason)
@@ -626,10 +618,7 @@ def tenant_suspend(request, pk):
 @require_platform_capability(CAP_MANAGE_TENANTS)
 @require_POST
 def tenant_reactivate(request, pk):
-    church = get_object_or_404(
-        Church.objects.select_related("district__zone__conference__denomination"),
-        pk=pk,
-    )
+    church = selectors.get_church_or_404(selectors.church_tenant_access_qs(), pk)
     _require_tenant_access(request, church)
     reactivate_tenant(church, request.user)
     log_platform_action(
@@ -644,10 +633,7 @@ def tenant_reactivate(request, pk):
 @require_platform_capability(CAP_MANAGE_TENANTS)
 @require_POST
 def tenant_offboard(request, pk):
-    church = get_object_or_404(
-        Church.objects.select_related("district__zone__conference__denomination"),
-        pk=pk,
-    )
+    church = selectors.get_church_or_404(selectors.church_tenant_access_qs(), pk)
     _require_tenant_access(request, church)
     reason = request.POST.get("reason", "").strip()
     confirm = request.POST.get("confirm", "").strip().upper()
@@ -669,10 +655,7 @@ def tenant_offboard(request, pk):
 def tenant_reprovision_financials(request, pk):
     from sitecontrol.provisioning_services import reprovision_tenant_financials
 
-    church = get_object_or_404(
-        Church.objects.select_related("district__zone__conference__denomination"),
-        pk=pk,
-    )
+    church = selectors.get_church_or_404(selectors.church_tenant_access_qs(), pk)
     _require_tenant_access(request, church)
     reprovision_tenant_financials(church, reviewer=request.user)
     log_platform_action(
@@ -758,7 +741,8 @@ def billing_settings(request):
     settings_obj = SiteSettings.load()
     form = BillingSettingsForm(request.POST or None, instance=settings_obj)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        obj = form.save(commit=False)
+        repo.save_model(obj)
         clear_settings_cache()
         log_platform_action(request, "SETTINGS_UPDATE", "Billing settings updated", target_model="SiteSettings")
         flash_success(request, "Billing settings saved.")
@@ -773,7 +757,7 @@ def billing_settings(request):
 @require_platform_capability(CAP_MANAGE_PLANS)
 def payment_method_list(request):
     ensure_default_payment_methods()
-    methods = PlatformPaymentMethod.objects.all()
+    methods = selectors.all_payment_methods()
     return render(request, "sitecontrol/payment_method_list.html", {
         "methods": methods,
         "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Payment Methods",)),
@@ -783,10 +767,12 @@ def payment_method_list(request):
 @platform_required
 @require_platform_capability(CAP_MANAGE_PLANS)
 def payment_method_edit(request, pk=None):
-    method = get_object_or_404(PlatformPaymentMethod, pk=pk) if pk else None
+    method = selectors.get_payment_method_or_404(pk) if pk else None
     form = PlatformPaymentMethodForm(request.POST or None, instance=method)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        obj = form.save(commit=False)
+        repo.save_model(obj)
+        form.instance = obj
         log_platform_action(
             request,
             "PAYMENT_METHOD_UPDATE",
@@ -815,7 +801,7 @@ def impersonate_start(request, user_id):
     """Support operators may temporarily act as an institution user (audited)."""
     from django.contrib.auth import login
 
-    target = get_object_or_404(User, pk=user_id, is_platform_user=False, is_active=True)
+    target = selectors.get_institution_user_or_404(user_id)
     if not target.church_id:
         messages.error(request, "Target user has no church assignment.")
         return redirect("sitecontrol:tenant_list")
@@ -824,7 +810,7 @@ def impersonate_start(request, user_id):
         messages.error(request, "End the current impersonation session first.")
         return redirect("sitecontrol:tenant_detail", pk=target.church_id)
 
-    request.session[IMPERSONATE_SESSION_KEY] = str(request.user.pk)
+    operator_pk = str(request.user.pk)
     log_platform_action(
         request,
         "IMPERSONATE_START",
@@ -834,7 +820,10 @@ def impersonate_start(request, user_id):
         details={"church_id": str(target.church_id)},
         denomination=getattr(target.church, "denomination", None),
     )
+    # login() flushes the session — restore the operator id AFTER switching users.
     login(request, target, backend="django.contrib.auth.backends.ModelBackend")
+    request.session[IMPERSONATE_SESSION_KEY] = operator_pk
+    request.session["impersonation_active"] = True
     messages.warning(
         request,
         f"You are impersonating {target.username}. All actions are audited. Use End Impersonation when finished.",
@@ -855,13 +844,14 @@ def impersonate_end(request):
         return redirect("login")
 
     operator_id = request.session.pop(IMPERSONATE_SESSION_KEY, None)
+    request.session.pop("impersonation_active", None)
     if not operator_id:
         messages.info(request, "No active impersonation session.")
         if getattr(request.user, "is_platform_user", False):
             return redirect("sitecontrol:dashboard")
         return redirect("dashboard:home")
 
-    operator = User.objects.filter(pk=operator_id, is_platform_user=True, is_active=True).first()
+    operator = selectors.active_platform_operator_by_pk(operator_id)
     if not operator:
         messages.error(request, "Original platform operator could not be restored.")
         return redirect("login")
@@ -882,30 +872,21 @@ def impersonate_end(request):
 @platform_required
 @require_platform_capability(CAP_VIEW)
 def hierarchy(request):
-    from django.db.models import Count
     from sitecontrol.platform_access import operator_has_global_access
 
     if operator_has_global_access(request.user):
         tree = organization_tree_summary()
-        zones = Zone.objects.select_related("conference").order_by("conference__name", "name")[:100]
-        districts = District.objects.select_related("zone__conference").order_by("zone__name", "name")[:100]
+        zones = selectors.zones_hierarchy_global(limit=100)
+        districts = selectors.districts_hierarchy_global(limit=100)
     else:
         denoms = request.user.managed_denominations.all()
-        conferences = Conference.objects.filter(denomination__in=denoms).annotate(
-            zone_count=Count("zones", distinct=True),
-        ).order_by("name")[:50]
+        conferences = selectors.conferences_for_denominations_annotated(denoms, limit=50)
         tree = {
             "conferences": conferences,
-            "church_count": Church.objects.filter(
-                district__zone__conference__denomination__in=denoms
-            ).count(),
+            "church_count": selectors.church_count_for_denominations(denoms),
         }
-        zones = Zone.objects.filter(conference__denomination__in=denoms).select_related("conference").order_by(
-            "conference__name", "name"
-        )[:100]
-        districts = District.objects.filter(zone__conference__denomination__in=denoms).select_related(
-            "zone__conference"
-        ).order_by("zone__name", "name")[:100]
+        zones = selectors.zones_for_denominations(denoms, limit=100)
+        districts = selectors.districts_for_denominations(denoms, limit=100)
     return render(request, "sitecontrol/hierarchy.html", {
         "tree": tree,
         "zones": zones,
@@ -917,7 +898,7 @@ def hierarchy(request):
 @platform_required
 @require_platform_capability(CAP_MANAGE_OPERATORS)
 def operator_list(request):
-    operators = User.objects.filter(is_platform_user=True).prefetch_related("managed_denominations").order_by("username")
+    operators = selectors.platform_operators_ordered()
     return render(request, "sitecontrol/operator_list.html", {
         "operators": operators,
         "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Platform Operators",)),
@@ -952,7 +933,7 @@ def operator_create(request):
 @platform_required
 @require_platform_capability(CAP_MANAGE_OPERATORS)
 def operator_edit(request, pk):
-    operator = get_object_or_404(User, pk=pk, is_platform_user=True)
+    operator = selectors.get_platform_operator_or_404(pk)
     form = PlatformOperatorForm(request.POST or None, instance=operator, actor=request.user)
     if request.method == "POST" and form.is_valid():
         was_super = operator.is_superuser
@@ -980,12 +961,12 @@ def operator_edit(request, pk):
 @require_platform_capability(CAP_MANAGE_OPERATORS)
 @require_POST
 def operator_deactivate(request, pk):
-    operator = get_object_or_404(User, pk=pk, is_platform_user=True)
+    operator = selectors.get_platform_operator_or_404(pk)
     if operator.pk == request.user.pk:
         messages.error(request, "You cannot deactivate your own account.")
         return redirect("sitecontrol:operator_list")
     operator.is_active = False
-    operator.save(update_fields=["is_active"])
+    repo.save_model(operator, update_fields=["is_active"])
     log_platform_action(
         request, "OPERATOR_DEACTIVATE", f"Platform operator '{operator.username}' deactivated",
         target_model="User", target_id=operator.pk,
@@ -997,7 +978,7 @@ def operator_deactivate(request, pk):
 @platform_required
 @require_platform_capability(CAP_MANAGE_ANNOUNCEMENTS)
 def announcement_list(request):
-    items = PlatformAnnouncement.objects.select_related("created_by").order_by("-created_at")
+    items = selectors.announcements_list_base()
     return render(request, "sitecontrol/announcement_list.html", {
         "announcements": items,
         "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Announcements",)),
@@ -1007,13 +988,13 @@ def announcement_list(request):
 @platform_required
 @require_platform_capability(CAP_MANAGE_ANNOUNCEMENTS)
 def announcement_edit(request, pk=None):
-    item = get_object_or_404(PlatformAnnouncement, pk=pk) if pk else None
+    item = selectors.get_announcement_or_404(pk) if pk else None
     form = PlatformAnnouncementForm(request.POST or None, instance=item)
     if request.method == "POST" and form.is_valid():
         instance = form.save(commit=False)
         if not instance.created_by_id:
             instance.created_by = request.user
-        instance.save()
+        repo.save_model(instance)
         clear_settings_cache()
         log_platform_action(
             request, "ANNOUNCEMENT_UPDATE", f"Announcement '{instance.title}' saved",

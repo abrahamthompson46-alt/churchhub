@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import User, UserActivityLog, UserInvitation
+from .models import TrustedDevice, User, UserActivityLog, UserInvitation
 
 
 @admin.register(User)
@@ -31,7 +31,7 @@ class CustomUserAdmin(UserAdmin):
             },
         ),
     )
-    readonly_fields = ("member", "mfa_enabled")
+    readonly_fields = ("member", "mfa_enabled", "mfa_secret", "mfa_recovery_hashes")
     filter_horizontal = ("managed_denominations", "groups", "user_permissions")
     list_display = (
         "username",
@@ -89,3 +89,26 @@ class UserInvitationAdmin(admin.ModelAdmin):
     list_filter = ("is_accepted", "role", "church")
     search_fields = ("email", "username")
     readonly_fields = ("token", "accepted_at", "revoked_at", "created_at")
+
+
+@admin.register(TrustedDevice)
+class TrustedDeviceAdmin(admin.ModelAdmin):
+    list_display = ("user", "label", "ip_address", "last_used_at", "expires_at")
+    list_filter = ("expires_at",)
+    search_fields = ("user__username", "label")
+    readonly_fields = (
+        "user",
+        "token_hash",
+        "label",
+        "user_agent",
+        "ip_address",
+        "created_at",
+        "last_used_at",
+        "expires_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

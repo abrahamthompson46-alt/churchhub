@@ -1,10 +1,10 @@
 from django import forms
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from django.db.models import Q
 
 from church_system.widgets import input_attrs, select_attrs
-from organization.models import Church, Conference, District, GeneralConference, Union, Zone
+from accounts import repositories as repo
+from accounts import selectors
 from permissions.org_scope import (
     OrgScopeLevel,
     apply_org_scope,
@@ -12,7 +12,6 @@ from permissions.org_scope import (
 )
 from permissions.roles import UserRole
 from permissions.scoping import get_manageable_churches
-from sitecontrol.models import Denomination
 
 from .models import User
 
@@ -56,7 +55,7 @@ class UserInviteForm(forms.Form):
         help_text="The node they belong to. They can only manage inside this subtree.",
     )
     church = forms.ModelChoiceField(
-        queryset=Church.objects.none(),
+        queryset=selectors.empty_churches(),
         required=False,
         widget=forms.Select(attrs=select_attrs()),
         label="Home church",
@@ -151,43 +150,43 @@ class UserInviteForm(forms.Form):
             if church:
                 cleaned["scope_unit_obj"] = church
             elif unit_id:
-                cleaned["scope_unit_obj"] = Church.objects.filter(pk=unit_id).first()
+                cleaned["scope_unit_obj"] = selectors.church_by_pk(unit_id)
                 cleaned["church"] = cleaned["scope_unit_obj"]
             else:
                 self.add_error("scope_unit", "Select the local church.")
         elif level == OrgScopeLevel.DISTRICT:
-            district = District.objects.filter(pk=unit_id).first() if unit_id else None
+            district = selectors.district_by_pk(unit_id) if unit_id else None
             if not district and church:
                 district = church.district
             if not district:
                 self.add_error("scope_unit", "Select the district.")
             cleaned["scope_district"] = district
         elif level == OrgScopeLevel.ZONE:
-            zone = Zone.objects.filter(pk=unit_id).first() if unit_id else None
+            zone = selectors.zone_by_pk(unit_id) if unit_id else None
             if not zone and church:
                 zone = church.district.zone
             if not zone:
                 self.add_error("scope_unit", "Select the zone.")
             cleaned["scope_zone"] = zone
         elif level == OrgScopeLevel.CONFERENCE:
-            conference = Conference.objects.filter(pk=unit_id).first() if unit_id else None
+            conference = selectors.conference_by_pk(unit_id) if unit_id else None
             if not conference and church:
                 conference = church.district.zone.conference
             if not conference:
                 self.add_error("scope_unit", "Select the conference.")
             cleaned["scope_conference"] = conference
         elif level == OrgScopeLevel.UNION:
-            union = Union.objects.filter(pk=unit_id).first() if unit_id else None
+            union = selectors.union_by_pk(unit_id) if unit_id else None
             if not union:
                 self.add_error("scope_unit", "Select the union.")
             cleaned["scope_union"] = union
         elif level == OrgScopeLevel.GENERAL_CONFERENCE:
-            gc = GeneralConference.objects.filter(pk=unit_id).first() if unit_id else None
+            gc = selectors.general_conference_by_pk(unit_id) if unit_id else None
             if not gc:
                 self.add_error("scope_unit", "Select the general conference.")
             cleaned["scope_general_conference"] = gc
         elif level == OrgScopeLevel.DENOMINATION:
-            denom = Denomination.objects.filter(pk=unit_id).first() if unit_id else None
+            denom = selectors.denomination_by_pk(unit_id) if unit_id else None
             if not denom and self.manager:
                 from church_system.denomination_scope import get_user_denomination
 
@@ -281,9 +280,7 @@ class UserManageForm(forms.ModelForm):
 
     def __init__(self, *args, manager=None, **kwargs):
         self.manager = manager
-        from members.models import Member
-
-        self.base_fields["member"].queryset = Member.objects.none()
+        self.base_fields["member"].queryset = selectors.empty_members()
         super().__init__(*args, **kwargs)
         if manager:
             self.fields["church"].queryset = get_manageable_churches(manager)
@@ -336,16 +333,14 @@ class UserManageForm(forms.ModelForm):
         if self.is_bound:
             church_id = self.data.get("church") or getattr(self.instance, "church_id", None)
             if church_id:
-                church = Church.objects.filter(pk=church_id).first()
+                church = selectors.church_by_pk(church_id)
         else:
             church = getattr(self.instance, "church", None)
 
-        member_qs = Member.objects.none()
-        if church:
-            member_qs = Member.objects.filter(church=church).filter(
-                Q(user_account__isnull=True) | Q(pk=getattr(self.instance, "member_id", None))
-            ).order_by("last_name", "first_name")
-        self.fields["member"].queryset = member_qs
+        self.fields["member"].queryset = selectors.linkable_members_for_church(
+            church,
+            current_member_id=getattr(self.instance, "member_id", None),
+        )
 
         if UserRole.requires_church(role or UserRole.MEMBER):
             self.fields["church"].required = True
@@ -389,17 +384,17 @@ class UserManageForm(forms.ModelForm):
             "denomination": cleaned.get("denomination"),
         }
         if level == OrgScopeLevel.DISTRICT and unit_id:
-            kwargs["district"] = District.objects.filter(pk=unit_id).first()
+            kwargs["district"] = selectors.district_by_pk(unit_id)
         elif level == OrgScopeLevel.ZONE and unit_id:
-            kwargs["zone"] = Zone.objects.filter(pk=unit_id).first()
+            kwargs["zone"] = selectors.zone_by_pk(unit_id)
         elif level == OrgScopeLevel.CONFERENCE and unit_id:
-            kwargs["conference"] = Conference.objects.filter(pk=unit_id).first()
+            kwargs["conference"] = selectors.conference_by_pk(unit_id)
         elif level == OrgScopeLevel.UNION and unit_id:
-            kwargs["union"] = Union.objects.filter(pk=unit_id).first()
+            kwargs["union"] = selectors.union_by_pk(unit_id)
         elif level == OrgScopeLevel.GENERAL_CONFERENCE and unit_id:
-            kwargs["general_conference"] = GeneralConference.objects.filter(pk=unit_id).first()
+            kwargs["general_conference"] = selectors.general_conference_by_pk(unit_id)
         elif level == OrgScopeLevel.DENOMINATION and unit_id:
-            kwargs["denomination"] = Denomination.objects.filter(pk=unit_id).first()
+            kwargs["denomination"] = selectors.denomination_by_pk(unit_id)
         elif level == OrgScopeLevel.CHURCH and church:
             pass
 
@@ -413,6 +408,6 @@ class UserManageForm(forms.ModelForm):
         if kwargs:
             apply_org_scope(user, **kwargs)
         if commit:
-            user.save()
+            repo.save_user(user)
             self.save_m2m()
         return user

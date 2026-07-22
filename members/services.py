@@ -9,25 +9,29 @@ from permissions.checks import can_process_transfers
 from permissions.org_scope import church_in_user_scope
 from permissions.scoping import get_manageable_churches
 
+from members import repositories as repo
+from members import selectors
 from members.models import (
-    LeadershipRole,
-    Member,
-    MemberAuditLog,
+    Department,
     MembershipStatus,
+    MemberSpiritualGift,
     MemberTransfer,
-    Record,
     RecordType,
     TransferStatus,
 )
 
 
+class MemberServiceError(Exception):
+    """Business rule violation in member domain services."""
+
+
 def log_member_audit(church, action, performed_by=None, member=None, details=None):
-    return MemberAuditLog.objects.create(
+    return repo.create_audit_log(
         church=church,
-        member=member,
         action=action,
         performed_by=performed_by,
-        details=details or {},
+        member=member,
+        details=details,
     )
 
 
@@ -52,21 +56,17 @@ def user_can_view_transfer(user, transfer):
 
 def find_duplicate_members(church, first_name, last_name, date_of_birth=None, phone="", exclude_pk=None):
     """Return potential duplicates for soft-match warnings."""
-    qs = Member.objects.filter(
-        church=church,
-        first_name__iexact=(first_name or "").strip(),
-        last_name__iexact=(last_name or "").strip(),
+    qs = selectors.members_name_match(
+        church, first_name, last_name, exclude_pk=exclude_pk
     )
-    if exclude_pk:
-        qs = qs.exclude(pk=exclude_pk)
     matches = []
     if date_of_birth:
         matches.extend(list(qs.filter(date_of_birth=date_of_birth)[:5]))
     phone = (phone or "").strip()
     if phone:
-        phone_matches = Member.objects.filter(church=church, phone=phone)
-        if exclude_pk:
-            phone_matches = phone_matches.exclude(pk=exclude_pk)
+        phone_matches = selectors.members_with_phone(
+            church, phone, exclude_pk=exclude_pk
+        )
         matches.extend(list(phone_matches[:5]))
     # Deduplicate while preserving order
     seen = set()
@@ -83,18 +83,16 @@ def create_member(church, performed_by=None, **fields):
     """Create a member with validation, duplicate checks, and audit."""
     phone = (fields.get("phone") or "").strip()
     membership_number = (fields.get("membership_number") or "").strip()
-    if phone and Member.objects.filter(church=church, phone=phone).exists():
+    if phone and selectors.members_with_phone(church, phone).exists():
         raise ValidationError({"phone": "A member with this phone number already exists in this church."})
-    if membership_number and Member.objects.filter(
-        church=church, membership_number=membership_number
+    if membership_number and selectors.members_with_membership_number(
+        church, membership_number
     ).exists():
         raise ValidationError({
             "membership_number": "This membership number is already assigned in this church.",
         })
 
-    member = Member(church=church, created_by=performed_by, **fields)
-    member.full_clean()
-    member.save()
+    member = repo.create_member(church=church, created_by=performed_by, **fields)
     log_member_audit(
         church,
         "CREATE",
@@ -114,11 +112,13 @@ def update_member(member, performed_by=None, **fields):
     ) or ""
     membership_number = membership_number.strip()
 
-    if phone and Member.objects.filter(church=member.church, phone=phone).exclude(pk=member.pk).exists():
+    if phone and selectors.members_with_phone(
+        member.church, phone, exclude_pk=member.pk
+    ).exists():
         raise ValidationError({"phone": "A member with this phone number already exists in this church."})
-    if membership_number and Member.objects.filter(
-        church=member.church, membership_number=membership_number
-    ).exclude(pk=member.pk).exists():
+    if membership_number and selectors.members_with_membership_number(
+        member.church, membership_number, exclude_pk=member.pk
+    ).exists():
         raise ValidationError({
             "membership_number": "This membership number is already assigned in this church.",
         })
@@ -129,8 +129,7 @@ def update_member(member, performed_by=None, **fields):
         if old != value:
             changed[key] = {"from": str(old) if old is not None else None, "to": str(value) if value is not None else None}
             setattr(member, key, value)
-    member.full_clean()
-    member.save()
+    repo.save_member(member)
     if changed:
         action = "STATUS" if "membership_status" in changed else "UPDATE"
         log_member_audit(
@@ -149,11 +148,7 @@ def request_transfer(member, to_church, transfer_date, requested_by, reason=""):
         raise ValueError("Member is already in the destination church.")
     if member.membership_status == MembershipStatus.TRANSFERRED:
         raise ValueError("This member is already marked as transferred.")
-    pending = MemberTransfer.objects.filter(
-        member=member,
-        status=TransferStatus.PENDING,
-    ).exists()
-    if pending:
+    if selectors.pending_transfer_exists(member):
         raise ValueError("This member already has a pending transfer.")
 
     # Same denomination only when both conferences have denominations set
@@ -162,7 +157,7 @@ def request_transfer(member, to_church, transfer_date, requested_by, reason=""):
     if from_denom and to_denom and from_denom.pk != to_denom.pk:
         raise ValueError("Cannot transfer a member across denominations.")
 
-    transfer = MemberTransfer.objects.create(
+    transfer = repo.create_transfer(
         member=member,
         from_church=member.church,
         to_church=to_church,
@@ -196,14 +191,14 @@ def complete_transfer(transfer, processed_by, notes=""):
     from_church = transfer.from_church
 
     # End active leadership at the outgoing church
-    LeadershipRole.objects.filter(
+    repo.end_active_leadership_roles(
         member=member,
         church=from_church,
-        is_active=True,
-    ).update(is_active=False, end_date=transfer.transfer_date)
+        end_date=transfer.transfer_date,
+    )
 
     # Outgoing church record: member left
-    Record.objects.create(
+    repo.create_record(
         church=from_church,
         member=member,
         record_type=RecordType.TRANSFER,
@@ -218,11 +213,19 @@ def complete_transfer(transfer, processed_by, notes=""):
     member.family = None
     member.membership_status = MembershipStatus.ACTIVE
     member.is_active = True
-    member.save(update_fields=[
-        "church", "department", "family", "membership_status", "is_active", "updated_at",
-    ])
+    repo.save_member(
+        member,
+        update_fields=[
+            "church",
+            "department",
+            "family",
+            "membership_status",
+            "is_active",
+            "updated_at",
+        ],
+    )
 
-    Record.objects.create(
+    repo.create_record(
         church=transfer.to_church,
         member=member,
         record_type=RecordType.TRANSFER,
@@ -237,7 +240,10 @@ def complete_transfer(transfer, processed_by, notes=""):
     transfer.processed_at = timezone.now()
     if notes:
         transfer.notes = notes
-    transfer.save(update_fields=["status", "processed_by", "processed_at", "notes", "updated_at"])
+    repo.save_transfer(
+        transfer,
+        update_fields=["status", "processed_by", "processed_at", "notes", "updated_at"],
+    )
 
     log_member_audit(
         transfer.to_church,
@@ -265,7 +271,10 @@ def reject_transfer(transfer, processed_by, notes=""):
     transfer.processed_by = processed_by
     transfer.processed_at = timezone.now()
     transfer.notes = notes
-    transfer.save(update_fields=["status", "processed_by", "processed_at", "notes", "updated_at"])
+    repo.save_transfer(
+        transfer,
+        update_fields=["status", "processed_by", "processed_at", "notes", "updated_at"],
+    )
     log_member_audit(
         transfer.from_church,
         "TRANSFER_REJECT",
@@ -277,22 +286,57 @@ def reject_transfer(transfer, processed_by, notes=""):
 
 
 def get_member_directory_stats(queryset, church=None):
-    """Summary counts for member list filters."""
-    transferred = 0
+    """Summary counts for member list filters (single aggregate query)."""
+    from django.db.models import Count, Q
+
+    from members.models import MembershipStatus
+
     if church is not None:
-        transferred = MemberTransfer.objects.filter(
-            from_church=church,
-            status=TransferStatus.COMPLETED,
-        ).count()
-    else:
-        transferred = queryset.filter(membership_status=MembershipStatus.TRANSFERRED).count()
+        transferred = selectors.completed_transfers_from_church_count(church)
+        agg = queryset.aggregate(
+            total=Count("pk"),
+            active=Count(
+                "pk",
+                filter=Q(is_active=True, membership_status=MembershipStatus.ACTIVE),
+            ),
+            inactive=Count(
+                "pk",
+                filter=(
+                    Q(is_active=False) | Q(membership_status=MembershipStatus.INACTIVE)
+                )
+                & ~Q(membership_status=MembershipStatus.TRANSFERRED),
+            ),
+        )
+        return {
+            "total": agg["total"] or 0,
+            "active": agg["active"] or 0,
+            "inactive": agg["inactive"] or 0,
+            "transferred": transferred,
+        }
+
+    agg = queryset.aggregate(
+        total=Count("pk"),
+        active=Count(
+            "pk",
+            filter=Q(is_active=True, membership_status=MembershipStatus.ACTIVE),
+        ),
+        inactive=Count(
+            "pk",
+            filter=(
+                Q(is_active=False) | Q(membership_status=MembershipStatus.INACTIVE)
+            )
+            & ~Q(membership_status=MembershipStatus.TRANSFERRED),
+        ),
+        transferred=Count(
+            "pk",
+            filter=Q(membership_status=MembershipStatus.TRANSFERRED),
+        ),
+    )
     return {
-        "total": queryset.count(),
-        "active": queryset.filter(is_active=True, membership_status=MembershipStatus.ACTIVE).count(),
-        "inactive": queryset.filter(
-            Q(is_active=False) | Q(membership_status=MembershipStatus.INACTIVE)
-        ).exclude(membership_status=MembershipStatus.TRANSFERRED).count(),
-        "transferred": transferred,
+        "total": agg["total"] or 0,
+        "active": agg["active"] or 0,
+        "inactive": agg["inactive"] or 0,
+        "transferred": agg["transferred"] or 0,
     }
 
 
@@ -339,3 +383,54 @@ def export_directory_rows(queryset):
             m.address,
         ])
     return headers, rows
+
+
+def department_delete_blockers(department: Department) -> list[str]:
+    """Human-readable reasons a department cannot be hard-deleted."""
+    blockers = []
+    if selectors.members_assigned_to_department(department).exists():
+        blockers.append("members are assigned")
+    if selectors.active_leadership_roles_for_department(department).exists():
+        blockers.append("active leadership roles exist")
+    if repo.budgets_reference_department(department):
+        blockers.append("budget lines reference this department")
+    return blockers
+
+
+def delete_department(department: Department, user) -> None:
+    """
+    Remove an unused department after dependency checks and audit.
+
+    Hard delete is allowed only when no members, leadership, or budgets reference
+    the row. Soft-delete is not implemented for departments (Planned).
+    """
+    blockers = department_delete_blockers(department)
+    if blockers:
+        raise MemberServiceError(
+            "Cannot delete department: " + "; ".join(blockers) + "."
+        )
+    log_member_audit(
+        department.church,
+        "DEPARTMENT_DELETE",
+        performed_by=user,
+        details={
+            "department_id": str(department.pk),
+            "department_name": department.name,
+        },
+    )
+    repo.delete_department(department)
+
+
+def unassign_spiritual_gift(assignment: MemberSpiritualGift, user) -> None:
+    """Remove a spiritual-gift assignment with member audit trail."""
+    log_member_audit(
+        assignment.member.church,
+        "GIFT_UNASSIGN",
+        performed_by=user,
+        member=assignment.member,
+        details={
+            "gift": assignment.gift.name,
+            "assignment_id": str(assignment.pk),
+        },
+    )
+    repo.delete_gift_assignment(assignment)

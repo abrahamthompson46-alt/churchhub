@@ -3,6 +3,7 @@ from decimal import Decimal
 from django import forms
 
 from church_system.widgets import input_attrs, select_attrs, textarea_attrs
+from ledger import selectors
 from ledger.models import LedgerCategory
 from members.models import Member
 from transactions.models import Account
@@ -64,14 +65,10 @@ class LedgerEntryForm(forms.Form):
         if church:
             if "date" not in self.initial and not self.data:
                 self.fields["date"].initial = resolve_transaction_date(church)
-            self.fields["category"].queryset = LedgerCategory.objects.filter(
-                church=church,
-                transaction_type=txn_type,
-                is_active=True,
-            ).select_related("default_debit_account", "default_credit_account")
-            self.fields["member"].queryset = Member.objects.filter(
-                church=church, is_active=True
-            ).order_by("last_name", "first_name")
+            self.fields["category"].queryset = selectors.categories_for_type_qs(
+                church, txn_type
+            )
+            self.fields["member"].queryset = selectors.active_members_for_church_qs(church)
 
     def clean(self):
         cleaned = super().clean()
@@ -123,7 +120,7 @@ class LedgerCategoryEditForm(forms.Form):
         self.church = church
         self.instance = instance
         if church:
-            accounts = Account.objects.filter(church=church, is_active=True).order_by("name")
+            accounts = selectors.active_accounts_for_church_qs(church)
             self.fields["default_debit_account"].queryset = accounts
             self.fields["default_credit_account"].queryset = accounts
             self.fields["default_debit_account"].label_from_instance = _account_label
@@ -186,7 +183,7 @@ class LedgerCategoryCreateForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.church = church
         if church:
-            accounts = Account.objects.filter(church=church, is_active=True).order_by("name")
+            accounts = selectors.active_accounts_for_church_qs(church)
             self.fields["default_debit_account"].queryset = accounts
             self.fields["default_credit_account"].queryset = accounts
             self.fields["default_debit_account"].label_from_instance = _account_label
@@ -196,7 +193,7 @@ class LedgerCategoryCreateForm(forms.Form):
         code = (self.cleaned_data.get("code") or "").strip().upper().replace(" ", "_")
         if not code:
             raise forms.ValidationError("Code is required.")
-        if self.church and LedgerCategory.objects.filter(church=self.church, code=code).exists():
+        if self.church and selectors.category_code_exists(self.church, code):
             raise forms.ValidationError("This code already exists for your church.")
         return code
 
@@ -232,12 +229,12 @@ class AccountForm(forms.Form):
             self.fields["code"].initial = instance.code
             self.fields["account_type"].initial = instance.account_type
             self.fields["is_active"].initial = instance.is_active
-            if instance.transaction_lines.exists():
+            if selectors.account_has_journal_lines(instance):
                 self.fields["code"].disabled = True
                 self.fields["code"].help_text = "Code is locked because this account has journal lines."
 
     def clean_code(self):
-        if self.instance and self.instance.transaction_lines.exists():
+        if self.instance and selectors.account_has_journal_lines(self.instance):
             return self.instance.code
         return (self.cleaned_data.get("code") or "").strip().upper().replace(" ", "_")
 
@@ -245,9 +242,9 @@ class AccountForm(forms.Form):
         name = (self.cleaned_data.get("name") or "").strip()
         if not name:
             raise forms.ValidationError("Name is required.")
-        qs = Account.objects.filter(church=self.church, name=name)
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
+        exclude_pk = self.instance.pk if self.instance else None
+        if self.church and selectors.account_name_exists(
+            self.church, name, exclude_pk=exclude_pk
+        ):
             raise forms.ValidationError("An account with this name already exists.")
         return name

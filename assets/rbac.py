@@ -8,14 +8,16 @@ from permissions.checks import (
     can_manage_asset_policy,
     can_manage_assets,
     can_view_all_churches,
+    can_view_assets,
 )
 from permissions.scoping import get_manageable_churches
 
 
 def user_may_view_assets(user):
-    """Read access to the asset register (dashboard, detail, export)."""
+    """Read access to the asset register (dashboard, list, detail)."""
     return (
-        can_manage_assets(user)
+        can_view_assets(user)
+        or can_manage_assets(user)
         or can_approve_assets(user)
         or can_manage_asset_policy(user)
     )

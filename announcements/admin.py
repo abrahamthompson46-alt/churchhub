@@ -1,5 +1,7 @@
 from django.contrib import admin
 
+from admin_custom.audit_admin import ReadOnlyAuditModelAdmin
+from admin_custom.tenancy import filter_admin_qs_by_church
 from announcements.models import Announcement, AnnouncementAuditLog, AnnouncementImage, AnnouncementView
 from announcements.services import approve_announcement, archive_announcement, reject_announcement
 
@@ -44,29 +46,49 @@ class AnnouncementAdmin(admin.ModelAdmin):
     actions = ["action_approve", "action_reject", "action_archive"]
 
     fieldsets = (
-        (None, {
-            "fields": (
-                "title", "content", "visibility", "church",
-                "event_date", "publish_at", "auto_expire", "is_pinned",
-            ),
-        }),
-        ("Status", {
-            "fields": (
-                "status", "is_approved", "approved_by", "approved_at",
-                "is_rejected", "rejected_by", "rejected_at", "rejection_reason",
-                "is_archived", "archived_by", "archived_at",
-            ),
-        }),
+        (
+            None,
+            {
+                "fields": (
+                    "title",
+                    "content",
+                    "visibility",
+                    "church",
+                    "event_date",
+                    "publish_at",
+                    "auto_expire",
+                    "is_pinned",
+                ),
+            },
+        ),
+        (
+            "Status",
+            {
+                "fields": (
+                    "status",
+                    "is_approved",
+                    "approved_by",
+                    "approved_at",
+                    "is_rejected",
+                    "rejected_by",
+                    "rejected_at",
+                    "rejection_reason",
+                    "is_archived",
+                    "archived_by",
+                    "archived_at",
+                ),
+            },
+        ),
         ("Audit", {"fields": ("created_by", "created_at", "updated_at")}),
     )
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request).select_related("church", "created_by", "approved_by")
-        if request.user.is_superuser:
-            return qs
-        if hasattr(request.user, "church") and request.user.church:
-            return qs.filter(church=request.user.church)
-        return qs.none()
+        qs = (
+            super()
+            .get_queryset(request)
+            .select_related("church", "created_by", "approved_by")
+        )
+        return filter_admin_qs_by_church(qs, request.user)
 
     def has_add_permission(self, request):
         return False
@@ -111,36 +133,31 @@ class AnnouncementAdmin(admin.ModelAdmin):
 
 
 @admin.register(AnnouncementView)
-class AnnouncementViewAdmin(admin.ModelAdmin):
+class AnnouncementViewAdmin(ReadOnlyAuditModelAdmin):
     list_display = ("announcement", "user", "viewed_at")
     list_filter = ("viewed_at",)
     search_fields = ("announcement__title", "user__username")
     readonly_fields = ("announcement", "user", "viewed_at")
 
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return filter_admin_qs_by_church(qs, request.user, "announcement__church")
 
 
 @admin.register(AnnouncementAuditLog)
-class AnnouncementAuditLogAdmin(admin.ModelAdmin):
+class AnnouncementAuditLogAdmin(ReadOnlyAuditModelAdmin):
     list_display = ("action", "announcement", "church", "performed_by", "created_at")
     list_filter = ("action", "created_at")
     search_fields = ("announcement__title", "performed_by__username")
-    readonly_fields = ("announcement", "church", "action", "performed_by", "details", "created_at")
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
+    readonly_fields = (
+        "announcement",
+        "church",
+        "action",
+        "performed_by",
+        "details",
+        "created_at",
+    )
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        if request.user.is_superuser:
-            return qs
-        if hasattr(request.user, "church") and request.user.church:
-            return qs.filter(church=request.user.church)
-        return qs.none()
+        return filter_admin_qs_by_church(qs, request.user)

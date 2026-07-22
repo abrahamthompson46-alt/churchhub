@@ -1,7 +1,7 @@
 from django import forms
 
 from church_system.widgets import input_attrs, select_attrs, textarea_attrs
-from members.models import Department, Member
+from meetings import selectors
 
 from .models import (
     AttendanceEvent,
@@ -44,7 +44,7 @@ class MeetingForm(forms.ModelForm):
     def __init__(self, *args, church=None, **kwargs):
         super().__init__(*args, **kwargs)
         if church:
-            self.fields["department"].queryset = Department.objects.filter(church=church)
+            self.fields["department"].queryset = selectors.departments_for_church(church)
 
 
 class MeetingFilterForm(forms.Form):
@@ -134,7 +134,7 @@ class ActionItemForm(forms.ModelForm):
     def __init__(self, *args, church=None, **kwargs):
         super().__init__(*args, **kwargs)
         if church:
-            self.fields["assigned_to"].queryset = Member.objects.filter(church=church, is_active=True)
+            self.fields["assigned_to"].queryset = selectors.active_members_for_church(church)
 
 
 class DecisionForm(forms.ModelForm):
@@ -165,6 +165,6 @@ class AttendanceEventForm(forms.ModelForm):
     def __init__(self, *args, church=None, **kwargs):
         super().__init__(*args, **kwargs)
         if church:
-            self.fields["department"].queryset = Department.objects.filter(church=church)
-            self.fields["meeting"].queryset = Meeting.objects.filter(church=church)
+            self.fields["department"].queryset = selectors.departments_for_church(church)
+            self.fields["meeting"].queryset = selectors.meetings_for_church(church)
         self.fields["meeting"].required = False

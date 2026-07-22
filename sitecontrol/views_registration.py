@@ -3,11 +3,13 @@
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import HttpResponseForbidden
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 
 from church_system.flash import flash_error, flash_success
 from sitecontrol.checks import platform_required, require_platform_capability
 from sitecontrol.forms import ApplicationReviewForm, RegistrationSettingsForm, TenantApplicationForm
+from sitecontrol import repositories as repo
+from sitecontrol import selectors
 from sitecontrol.models import TenantApplication
 from sitecontrol.rbac import CAP_MANAGE_APPLICATIONS, CAP_MANAGE_REGISTRATION
 from sitecontrol.registration_services import (
@@ -33,11 +35,12 @@ def church_apply(request):
         )
 
     settings_obj = get_site_settings()
-    from sitecontrol.models import Denomination
 
     denom_code = request.GET.get("denomination")
     initial_denom = (
-        Denomination.objects.filter(code=denom_code, is_active=True, allow_public_registration=True).first()
+        selectors.denomination_by_code(
+            code=denom_code, active_only=True, allow_public_registration=True
+        )
         if denom_code
         else None
     )
@@ -87,7 +90,8 @@ def registration_settings(request):
     settings_obj = get_site_settings()
     form = RegistrationSettingsForm(request.POST or None, instance=settings_obj)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        settings_obj = form.save(commit=False)
+        repo.save_model(settings_obj)
         clear_settings_cache()
         log_platform_action(request, "REGISTRATION_UPDATE", "Registration access controls updated")
         flash_success(request, "Registration settings saved.")
@@ -103,7 +107,7 @@ def registration_settings(request):
 def application_list(request):
     from sitecontrol.platform_access import filter_platform_denomination
 
-    qs = TenantApplication.objects.select_related("district", "reviewed_by", "created_church", "denomination").order_by("-created_at")
+    qs = selectors.applications_list_base()
     qs = filter_platform_denomination(qs, request.user)
     status = request.GET.get("status", "")
     if status:
@@ -124,12 +128,7 @@ def application_detail(request, pk):
     from django.core.exceptions import PermissionDenied
     from sitecontrol.platform_access import operator_can_access_denomination
 
-    application = get_object_or_404(
-        TenantApplication.objects.select_related(
-            "district__zone__conference", "reviewed_by", "created_church", "invitation", "denomination"
-        ),
-        pk=pk,
-    )
+    application = selectors.get_application_or_404(pk)
     if application.denomination_id and not operator_can_access_denomination(request.user, application.denomination):
         raise PermissionDenied("You do not have access to this application.")
     form = ApplicationReviewForm()
@@ -150,7 +149,7 @@ def application_detail(request, pk):
 @platform_required
 @require_platform_capability(CAP_MANAGE_APPLICATIONS)
 def application_approve(request, pk):
-    application = get_object_or_404(TenantApplication, pk=pk, status="PENDING")
+    application = selectors.get_pending_application_or_404(pk)
     form = ApplicationReviewForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         try:
@@ -193,7 +192,7 @@ def application_approve(request, pk):
 @platform_required
 @require_platform_capability(CAP_MANAGE_APPLICATIONS)
 def application_reject(request, pk):
-    application = get_object_or_404(TenantApplication, pk=pk, status="PENDING")
+    application = selectors.get_pending_application_or_404(pk)
     form = ApplicationReviewForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         reject_tenant_application(

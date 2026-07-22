@@ -1,19 +1,10 @@
 """Organization hierarchy services."""
 
-import uuid
-
 from django.core.exceptions import ValidationError
 from django.db import transaction as db_transaction
 
-from organization.models import (
-    Church,
-    Conference,
-    District,
-    GeneralConference,
-    OrganizationAuditLog,
-    Union,
-    Zone,
-)
+from organization import repositories as repo
+from organization import selectors
 from transactions.services import create_default_accounts, create_default_offering_categories
 
 
@@ -27,7 +18,7 @@ def get_client_ip(request):
 
 
 def log_org_audit(action, entity, performed_by=None, ip_address=None, details=None):
-    return OrganizationAuditLog.objects.create(
+    return repo.create_org_audit(
         action=action,
         entity_type=entity.__class__.__name__,
         entity_id=entity.pk,
@@ -84,7 +75,7 @@ def provision_church(church, force=False):
         return church
     setup_church_financials(church)
     church.financials_provisioned = True
-    church.save(update_fields=["financials_provisioned", "updated_at"])
+    repo.save_church(church, update_fields=["financials_provisioned", "updated_at"])
     return church
 
 
@@ -105,7 +96,7 @@ def create_church(
     if not allowed:
         raise ValueError(message)
 
-    church, created = Church.objects.get_or_create(
+    church, created = repo.get_or_create_church(
         district=district,
         code=code,
         defaults={"name": name, "address": address, "is_active": True},
@@ -114,7 +105,9 @@ def create_church(
         church.name = name
         church.address = address
         church.is_active = True
-        church.save(update_fields=["name", "address", "is_active", "updated_at"])
+        repo.save_church(
+            church, update_fields=["name", "address", "is_active", "updated_at"]
+        )
 
     if setup_financials:
         provision_church(church, force=True)
@@ -141,7 +134,7 @@ def _resolve_or_create_conference(
 
         denomination = Denomination.get_default()
 
-    existing = Conference.objects.filter(code=conference_code).first()
+    existing = selectors.conference_by_code(conference_code)
     if existing:
         if denomination and existing.denomination_id and existing.denomination_id != denomination.pk:
             raise ValueError(
@@ -161,10 +154,10 @@ def _resolve_or_create_conference(
             updates.append("denomination")
         if updates:
             updates.append("updated_at")
-            conference.save(update_fields=updates)
+            repo.save_conference(conference, update_fields=updates)
         return conference, created
 
-    conference = Conference.objects.create(
+    conference = repo.create_conference(
         code=conference_code,
         name=conference_name,
         union=union,
@@ -197,23 +190,23 @@ def onboard_full_hierarchy(
         union=union,
         denomination=denomination,
     )
-    zone, _ = Zone.objects.get_or_create(
+    zone, _ = repo.get_or_create_zone(
         conference=conference,
         code=zone_code,
         defaults={"name": zone_name},
     )
     if zone.name != zone_name:
         zone.name = zone_name
-        zone.save(update_fields=["name", "updated_at"])
+        repo.save_zone(zone, update_fields=["name", "updated_at"])
 
-    district, _ = District.objects.get_or_create(
+    district, _ = repo.get_or_create_district(
         zone=zone,
         code=district_code,
         defaults={"name": district_name},
     )
     if district.name != district_name:
         district.name = district_name
-        district.save(update_fields=["name", "updated_at"])
+        repo.save_district(district, update_fields=["name", "updated_at"])
 
     church, created = create_church(
         district=district,
@@ -247,7 +240,7 @@ def update_church(church, performed_by=None, ip_address=None, **fields):
         else:
             serializable[key] = str(value)
     church.full_clean()
-    church.save()
+    repo.save_church(church)
     log_org_audit(
         "UPDATE", church, performed_by=performed_by, ip_address=ip_address, details=serializable
     )
@@ -263,12 +256,14 @@ def transfer_church(church, new_district, performed_by=None, ip_address=None, re
     if old_denom and new_denom and old_denom != new_denom:
         raise ValidationError("Cannot transfer a church across denominations.")
 
-    if Church.objects.filter(district=new_district, code=church.code).exclude(pk=church.pk).exists():
+    if selectors.church_code_exists_in_district(
+        new_district, church.code, exclude_pk=church.pk
+    ):
         raise ValidationError("A church with this code already exists in the target district.")
 
     church.district = new_district
     church.full_clean()
-    church.save(update_fields=["district", "updated_at"])
+    repo.save_church(church, update_fields=["district", "updated_at"])
     log_org_audit(
         "TRANSFER",
         church,
@@ -286,7 +281,7 @@ def transfer_church(church, new_district, performed_by=None, ip_address=None, re
 @db_transaction.atomic
 def set_church_active(church, active, performed_by=None, ip_address=None):
     church.is_active = active
-    church.save(update_fields=["is_active", "updated_at"])
+    repo.save_church(church, update_fields=["is_active", "updated_at"])
     log_org_audit(
         "ACTIVATE" if active else "DEACTIVATE",
         church,
@@ -298,17 +293,8 @@ def set_church_active(church, active, performed_by=None, ip_address=None):
 
 def export_hierarchy_rows(request):
     """Flat rows for CSV/Excel export of churches in scope."""
-    from organization.access import scoped_churches
-
     rows = []
-    churches = scoped_churches(request).select_related(
-        "district__zone__conference__denomination"
-    ).order_by(
-        "district__zone__conference__name",
-        "district__zone__name",
-        "district__name",
-        "name",
-    )
+    churches = selectors.churches_for_export(request)
     for church in churches:
         conf = church.conference
         rows.append([
@@ -336,12 +322,8 @@ def export_hierarchy_rows(request):
 
 def reconcile_organization(denomination=None):
     """Return issues: churches without subscription, unprovisioned financials, orphan conferences."""
-    from sitecontrol.models import TenantSubscription
-
     issues = []
-    churches = Church.objects.select_related("district__zone__conference")
-    if denomination:
-        churches = churches.filter(district__zone__conference__denomination=denomination)
+    churches = selectors.churches_for_reconcile(denomination)
 
     for church in churches.filter(is_active=True):
         if not church.financials_provisioned:
@@ -350,15 +332,14 @@ def reconcile_organization(denomination=None):
                 "church": church.name,
                 "church_id": str(church.pk),
             })
-        if not TenantSubscription.objects.filter(church=church).exists():
+        if not selectors.church_has_subscription(church):
             issues.append({
                 "kind": "missing_subscription",
                 "church": church.name,
                 "church_id": str(church.pk),
             })
 
-    orphan_qs = Conference.objects.filter(denomination__isnull=True)
-    for conf in orphan_qs[:50]:
+    for conf in selectors.orphan_conferences_qs()[:50]:
         issues.append({
             "kind": "orphan_conference",
             "conference": conf.name,

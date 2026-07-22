@@ -1,0 +1,9 @@
+Hello {{ user.get_username }},
+
+Your {{ site_name }} sign-in code is:
+
+{{ code }}
+
+This code expires in {{ ttl_minutes }} minutes. If you did not try to sign in, ignore this email and contact your administrator.
+
+— {{ site_name }}

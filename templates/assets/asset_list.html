@@ -6,8 +6,10 @@
 <div class="page-container">
     {% include "includes/page_header.html" with page_subtitle="Fixed Assets" page_title="Asset Register" %}
     <div class="d-flex gap-2 mb-3">
+        {% if can_manage %}
         <a href="{% url 'assets:asset_create' %}" class="btn btn-primary btn-sm">New Asset</a>
         <a href="{% url 'assets:asset_export_csv' %}" class="btn btn-outline-secondary btn-sm">Export CSV</a>
+        {% endif %}
         <a href="{% url 'assets:index' %}" class="btn btn-outline-secondary btn-sm">Dashboard</a>
     </div>
     <form method="get" class="row g-2 mb-3">

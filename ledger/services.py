@@ -4,11 +4,11 @@ from decimal import Decimal
 
 from django.core.paginator import Paginator
 from django.db import transaction as db_transaction
-from django.db.models import Sum
 from django.utils import timezone
 
+from ledger import repositories as repo
+from ledger import selectors
 from ledger.models import LedgerCategory
-from transactions.models import Account, Transaction, TransactionLine
 from transactions.services import (
     WorkingDayClosedError,
     _log_audit,
@@ -127,7 +127,7 @@ CORE_ACCOUNT_NAMES = frozenset({
 
 
 def _account_map(church):
-    return {a.name: a for a in Account.objects.filter(church=church)}
+    return selectors.accounts_by_name_for_church(church)
 
 
 def _assert_accounts_belong_to_church(category):
@@ -194,14 +194,14 @@ def _remittance_preview_lines(church, offering_type, debit_account, amount, as_o
         }
     ]
     if retain > 0:
-        retain_acct = Account.objects.get(church=church, account_type=mapping["retain"])
+        retain_acct = selectors.account_by_type(church, mapping["retain"])
         lines.append({
             "account_name": retain_acct.name,
             "debit": None,
             "credit": str(retain),
         })
     if remit > 0:
-        remit_acct = Account.objects.get(church=church, account_type=mapping["remit"])
+        remit_acct = selectors.account_by_type(church, mapping["remit"])
         lines.append({
             "account_name": remit_acct.name,
             "debit": None,
@@ -219,7 +219,7 @@ def seed_ledger_accounts(church):
         if name in CORE_ACCOUNT_NAMES:
             continue
         code = ACCOUNT_CODE_BY_NAME.get(name, "")
-        account, created = Account.objects.get_or_create(
+        account, created = repo.get_or_create_account(
             church=church,
             name=name,
             defaults={"account_type": acc_type, "code": code, "is_active": True},
@@ -231,15 +231,14 @@ def seed_ledger_accounts(church):
             account.account_type = acc_type
             updates.append("account_type")
         if code and not account.code:
-            clash = Account.objects.filter(church=church, code=code).exclude(pk=account.pk).exists()
-            if not clash:
+            if not selectors.account_code_exists(church, code, exclude_pk=account.pk):
                 account.code = code
                 updates.append("code")
         if not account.is_active:
             account.is_active = True
             updates.append("is_active")
         if updates:
-            account.save(update_fields=updates)
+            repo.save_account(account, update_fields=updates)
 
 
 def seed_ledger_categories(church, reset=False):
@@ -252,7 +251,7 @@ def seed_ledger_categories(church, reset=False):
 
     if reset:
         # Soft-deactivate so historical Transaction.ledger_category FKs stay valid.
-        LedgerCategory.objects.filter(church=church).update(is_active=False)
+        repo.deactivate_categories_for_church(church)
 
     for row in CATEGORY_TEMPLATES:
         code, name, txn_type, debit_name, credit_name, narration, req_member, remit, sort = row
@@ -262,7 +261,7 @@ def seed_ledger_categories(church, reset=False):
             continue
         if debit.church_id != church.pk or credit.church_id != church.pk:
             continue
-        LedgerCategory.objects.update_or_create(
+        repo.update_or_create_category(
             church=church,
             code=code,
             defaults={
@@ -284,24 +283,15 @@ def seed_ledger(church, reset=False):
 
 
 def get_categories_for_type(church, transaction_type):
-    return LedgerCategory.objects.filter(
-        church=church,
-        transaction_type=transaction_type,
-        is_active=True,
-    ).select_related("default_debit_account", "default_credit_account")
+    return selectors.categories_for_type_qs(church, transaction_type)
 
 
 def get_all_categories(church, transaction_type=None, include_inactive=False):
     """Posting categories, optionally filtered by type."""
-    qs = LedgerCategory.objects.filter(church=church).select_related(
-        "default_debit_account",
-        "default_credit_account",
-    )
-    if not include_inactive:
-        qs = qs.filter(is_active=True)
+    qs = selectors.categories_for_church_qs(church, include_inactive=include_inactive)
     if transaction_type:
         qs = qs.filter(transaction_type=transaction_type)
-    return qs.order_by("transaction_type", "sort_order", "name")
+    return selectors.categories_ordered(qs)
 
 
 def get_categories_grouped(church):
@@ -320,22 +310,7 @@ def get_categories_grouped(church):
 
 def get_ledger_summary(church):
     """Counts and recent ledger-sourced transactions for the hub page."""
-    categories = LedgerCategory.objects.filter(church=church, is_active=True)
-    entries = Transaction.objects.filter(
-        church=church,
-        ledger_category__isnull=False,
-    )
-    accounts = Account.objects.filter(church=church, is_active=True)
-    return {
-        "account_count": accounts.count(),
-        "category_count": categories.count(),
-        "receipt_count": categories.filter(transaction_type="RECEIPT").count(),
-        "expense_count": categories.filter(transaction_type="EXPENSE").count(),
-        "transfer_count": categories.filter(transaction_type="TRANSFER").count(),
-        "entry_count": entries.count(),
-        "pending_count": entries.filter(approval_status="PENDING").count(),
-        "approved_count": entries.filter(approval_status="APPROVED", is_voided=False).count(),
-    }
+    return selectors.ledger_summary_counts(church)
 
 
 def get_ledger_entries(
@@ -348,28 +323,15 @@ def get_ledger_entries(
     category=None,
 ):
     """Ledger-sourced transactions for the entries list (unpaginated queryset)."""
-    qs = Transaction.objects.filter(
-        church=church,
-        ledger_category__isnull=False,
-    ).select_related(
-        "ledger_category",
-        "member",
-        "created_by",
-    ).prefetch_related("lines__account").order_by("-date", "-created_at")
-
-    if status:
-        qs = qs.filter(approval_status=status)
-    if transaction_type:
-        qs = qs.filter(transaction_type=transaction_type)
-    if date_from:
-        qs = qs.filter(date__gte=date_from)
-    if date_to:
-        qs = qs.filter(date__lte=date_to)
-    if member:
-        qs = qs.filter(member=member)
-    if category:
-        qs = qs.filter(ledger_category=category)
-    return qs
+    return selectors.ledger_entries_qs(
+        church,
+        status=status,
+        transaction_type=transaction_type,
+        date_from=date_from,
+        date_to=date_to,
+        member=member,
+        category=category,
+    )
 
 
 def paginate_ledger_entries(queryset, page=1, per_page=25):
@@ -379,33 +341,18 @@ def paginate_ledger_entries(queryset, page=1, per_page=25):
 
 def get_category_gl_totals(church, date_from=None, date_to=None):
     """Approved ledger entry totals grouped by category (absolute receipt/expense amount)."""
-    qs = Transaction.objects.filter(
-        church=church,
-        ledger_category__isnull=False,
-        approval_status="APPROVED",
-        is_voided=False,
+    qs = selectors.approved_ledger_txns_qs(
+        church, date_from=date_from, date_to=date_to
     )
-    if date_from:
-        qs = qs.filter(date__gte=date_from)
-    if date_to:
-        qs = qs.filter(date__lte=date_to)
 
     rows = []
-    for cat in LedgerCategory.objects.filter(church=church, is_active=True).order_by(
-        "transaction_type", "sort_order", "name"
-    ):
+    for cat in selectors.categories_ordered(selectors.categories_for_church_qs(church)):
         cat_txns = qs.filter(ledger_category=cat)
         count = cat_txns.count()
         if not count:
             continue
         # Sum absolute debit side (positive lines) as volume
-        volume = (
-            TransactionLine.objects.filter(
-                transaction__in=cat_txns,
-                amount__gt=0,
-            ).aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
+        volume = selectors.category_volume_for_transactions(cat_txns)
         rows.append({
             "category": cat,
             "count": count,
@@ -459,17 +406,13 @@ def _budget_warning_for_expense(church, category, amount, entry_date):
         return ""
     try:
         from budgets.services import budget_line_variance
-        from transactions.models import Budget
     except Exception:
         return ""
 
     year = entry_date.year
-    budget = Budget.objects.filter(
-        church=church,
-        year=year,
-        account=category.default_debit_account,
-        level="CHURCH",
-    ).first()
+    budget = selectors.church_budget_for_account_year(
+        church, category.default_debit_account, year
+    )
     if not budget:
         return ""
     meta = budget_line_variance(budget)
@@ -595,10 +538,7 @@ def post_ledger_entry(church, user, draft, idempotency_key=None):
             "Missing idempotency key. Refresh the page and try again."
         )
 
-    category = LedgerCategory.objects.select_related(
-        "default_debit_account",
-        "default_credit_account",
-    ).get(pk=draft["category_id"], church=church, is_active=True)
+    category = selectors.get_active_category_for_church(church, draft["category_id"])
 
     if category.transaction_type != draft["transaction_type"]:
         raise ValueError("Category does not match the selected transaction type.")
@@ -617,9 +557,7 @@ def post_ledger_entry(church, user, draft, idempotency_key=None):
 
     member = None
     if draft.get("member_id"):
-        from members.models import Member
-
-        member = Member.objects.filter(pk=draft["member_id"], church=church).first()
+        member = selectors.member_for_church(church, draft["member_id"])
         if category.requires_member and not member:
             raise ValueError("A valid member is required for this category.")
 
@@ -631,7 +569,7 @@ def post_ledger_entry(church, user, draft, idempotency_key=None):
     else:
         django_type = "RECEIPT"
 
-    trx = Transaction.objects.create(
+    trx = repo.create_ledger_transaction(
         transaction_type=django_type,
         church=church,
         created_by=user,
@@ -713,7 +651,7 @@ def create_ledger_category(
     code = (code or "").strip().upper().replace(" ", "_")
     if not code:
         raise ValueError("Category code is required.")
-    if LedgerCategory.objects.filter(church=church, code=code).exists():
+    if selectors.category_code_exists(church, code):
         raise ValueError(f"Category code {code} already exists for this church.")
     if default_debit_account.church_id != church.pk or default_credit_account.church_id != church.pk:
         raise ValueError("Accounts must belong to this church.")
@@ -735,7 +673,7 @@ def create_ledger_category(
     )
     _assert_accounts_belong_to_church(category)
     category.full_clean()
-    category.save()
+    repo.save_category(category)
     _log_audit(
         church,
         "CREATE",
@@ -763,12 +701,12 @@ def create_gl_account(church, user, *, name, code, account_type, is_active=True)
         raise ValueError("Account name is required.")
     if not code:
         code = code_for_name(name) or name.upper().replace(" ", "_")[:40]
-    if Account.objects.filter(church=church, name=name).exists():
+    if selectors.account_name_exists(church, name):
         raise ValueError(f"Account “{name}” already exists.")
-    if code and Account.objects.filter(church=church, code=code).exists():
+    if code and selectors.account_code_exists(church, code):
         raise ValueError(f"Account code {code} already exists.")
 
-    account = Account.objects.create(
+    account = repo.create_account(
         church=church,
         name=name,
         code=code,
@@ -803,24 +741,24 @@ def update_gl_account(account, user, *, name=None, code=None, account_type=None,
         name = name.strip()
         if not name:
             raise ValueError("Account name is required.")
-        clash = Account.objects.filter(church=account.church, name=name).exclude(pk=account.pk)
-        if clash.exists():
+        if selectors.account_name_exists(account.church, name, exclude_pk=account.pk):
             raise ValueError(f"Account “{name}” already exists.")
         account.name = name
     if code is not None:
         code = code.strip().upper().replace(" ", "_")
         if code != account.code:
-            if account.transaction_lines.exists():
+            if selectors.account_has_journal_lines(account):
                 raise ValueError("Cannot change code on an account that has journal lines.")
-            if code and Account.objects.filter(church=account.church, code=code).exclude(pk=account.pk).exists():
+            if code and selectors.account_code_exists(
+                account.church, code, exclude_pk=account.pk
+            ):
                 raise ValueError(f"Account code {code} already exists.")
             account.code = code
     if account_type is not None:
         account.account_type = account_type
     if is_active is not None:
         account.is_active = bool(is_active)
-    account.full_clean()
-    account.save()
+    repo.save_account(account)
     _log_audit(
         account.church,
         "UPDATE",
@@ -875,7 +813,7 @@ def update_ledger_category(category, user, *, name=None, default_narration=None,
 
     _assert_accounts_belong_to_church(category)
     category.full_clean()
-    category.save()
+    repo.save_category(category)
 
     _log_audit(
         category.church,

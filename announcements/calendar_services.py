@@ -5,8 +5,8 @@ from datetime import date, datetime, timedelta
 
 from django.utils import timezone
 
-from church_system.church_scope import filter_by_church, get_active_church
-from members.models import Member
+from announcements import selectors
+from church_system.church_scope import get_active_church
 
 from .services import visible_announcements
 
@@ -64,12 +64,7 @@ def _calendar_item(
 def get_upcoming_birthdays(request, days=60, limit=100):
     today = timezone.now().date()
     end = today + timedelta(days=days)
-    members = filter_by_church(
-        Member.objects.filter(is_active=True, date_of_birth__isnull=False).select_related(
-            "department", "church"
-        ),
-        request,
-    )
+    members = selectors.active_members_with_dob_for_request(request)
     items = []
     for member in members.iterator():
         occ = _birthday_in_window(member.date_of_birth, today, end)
@@ -98,21 +93,16 @@ def get_upcoming_birthdays(request, days=60, limit=100):
 
 
 def get_upcoming_meetings(request, days=60, limit=50):
-    from meetings.models import Meeting, MeetingStatus
-
     church = get_active_church(request)
     if not church:
         return []
     now = timezone.now()
     end = now + timedelta(days=days)
-    qs = Meeting.objects.filter(
-        church=church,
-        scheduled_at__gte=now,
-        scheduled_at__lte=end,
-        status=MeetingStatus.SCHEDULED,
-    ).select_related("department").order_by("scheduled_at")
+    qs = selectors.scheduled_meetings_for_church_in_window(
+        church, start=now, end=end, limit=limit
+    )
     items = []
-    for meeting in qs[:limit]:
+    for meeting in qs:
         subtitle = meeting.location or ""
         if meeting.department:
             subtitle = f"{meeting.department.name}" + (f" · {subtitle}" if subtitle else "")
@@ -133,14 +123,14 @@ def get_upcoming_meetings(request, days=60, limit=50):
 def get_upcoming_announcement_events(request, days=60, limit=50):
     now = timezone.now()
     end = now + timedelta(days=days)
-    qs = (
-        visible_announcements(request.user)
-        .filter(event_date__isnull=False, event_date__gte=now, event_date__lte=end)
-        .select_related("church")
-        .order_by("event_date")
+    qs = selectors.announcement_events_in_window(
+        visible_announcements(request.user),
+        start=now,
+        end=end,
+        limit=limit,
     )
     items = []
-    for announcement in qs[:limit]:
+    for announcement in qs:
         subtitle = announcement.church.name if announcement.church else "General"
         items.append(
             _calendar_item(
@@ -195,11 +185,23 @@ def calendar_summary_counts(request, days=60):
     birthdays = get_upcoming_birthdays(request, days=days, limit=500)
     meetings = get_upcoming_meetings(request, days=days, limit=500)
     events = get_upcoming_announcement_events(request, days=days, limit=500)
+    return calendar_summary_counts_from_items(
+        [{"kind": "birthday", "date": r["date"]} for r in birthdays]
+        + [{"kind": "meeting", "date": r["date"]} for r in meetings]
+        + [{"kind": "event", "date": r["date"]} for r in events]
+    )
+
+
+def calendar_summary_counts_from_items(items):
+    """Derive summary counts from already-fetched calendar items (no extra queries)."""
     today = timezone.now().date()
+    birthdays = [row for row in items if row.get("kind") == "birthday"]
+    meetings = [row for row in items if row.get("kind") == "meeting"]
+    events = [row for row in items if row.get("kind") in ("event", "announcement")]
     return {
         "birthdays": len(birthdays),
         "meetings": len(meetings),
         "events": len(events),
-        "today_birthdays": sum(1 for row in birthdays if row["date"] == today),
+        "today_birthdays": sum(1 for row in birthdays if row.get("date") == today),
         "total": len(birthdays) + len(meetings) + len(events),
     }

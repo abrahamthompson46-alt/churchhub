@@ -35,11 +35,13 @@ Surface **approved, non-voided** tithe/combined/income/welfare giving history pe
 ```mermaid
 flowchart LR
   UI[giving views] --> Svc[giving.services]
-  Svc -->|read| TXN[Approved Transaction + Lines]
+  Svc --> Sel[giving.selectors]
+  Sel -->|read| TXN[Approved Transaction + Lines]
   Svc -->|welfare totals| WEL[remittance.welfare_services]
   TXN --> ACC[Account types TITHE COMBINED INCOME WELFARE_FUND]
 ```
 
+Repositories are empty — Giving does not write journals.
 ### Module interactions
 
 ```mermaid
@@ -103,9 +105,19 @@ Giving filters: `approval_status=APPROVED`, `is_voided=False`, member set, accou
 
 ---
 
-## 7. Managers
+## 7. Managers / selectors / repositories (Current)
 
-**None.**
+**Managers:** none.
+
+| Module | Role |
+|--------|------|
+| `selectors.py` | Approved journal/line reads, church-scoped member lookup, leaderboard line qs, type aggregates |
+| `repositories.py` | **Empty by design** — Giving persists nothing; books of record stay in `transactions` |
+
+**Layering (P1-2):** Views → services → selectors → (read-only) models in `transactions` / `members`.  
+**Giving = reporting/statement layer.** **Transactions = accounting system of record.** Church scope, permissions, and export behavior are unchanged.
+
+`tests_layers.py` characterizes selector reads, church isolation, statement aggregation, export row prep, and repository read-only posture.
 
 ---
 
@@ -114,9 +126,10 @@ Giving filters: `approval_status=APPROVED`, `is_voided=False`, member set, accou
 | Function | Behavior |
 |----------|----------|
 | `can_view_member_giving(user, member)` | Finance / view_giving / manage_members, or linked member + `view_own_giving` |
-| `member_giving_lines(member, year=None)` | Approved non-voided lines for giving account types |
+| `member_giving_lines(member, year=None)` | Approved non-voided lines for giving account types (via selectors) |
 | `member_giving_summary(member, year=None)` | Abs totals by type + total; adds `welfare_contributed` / `welfare_received` |
 | `church_giving_leaders(church, year=None, limit=20)` | Top members by abs TITHE+COMBINED |
+| `export_giving_statement_table(lines)` | Headers/rows for CSV/Excel/PDF (abs amounts) |
 
 **Does not create, approve, or void transactions.**
 
@@ -210,7 +223,7 @@ Agents must not add “quick tithe create” inside this app without going throu
 
 ## 19. Audit logging (Current)
 
-No dedicated giving audit table. Underlying CREATE/APPROVE/VOID remain on `FinancialAuditLog` in transactions. Exports are not separately audited in this app (as of current code).
+No dedicated giving audit table. Underlying CREATE/APPROVE/VOID remain on `FinancialAuditLog` in transactions. Statement exports call `reports.services.audit_export` (`report_key=giving_statement`).
 
 ---
 
@@ -303,7 +316,7 @@ Auth/CSRF + church scope + `require_feature("giving_portal")` + permissions chec
 - Empty models; AGENTS donation types absent.  
 - `manage_giving` underused vs registry.  
 - Python aggregation for leaders may not scale.  
-- No dedicated giving audit on export.
+- Export audited via `ReportAccessAuditLog` (`audit_export`); no domain-specific giving audit table.
 
 ---
 

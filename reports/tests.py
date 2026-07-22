@@ -1,13 +1,17 @@
 """Tests for reports app — security, scoping, and builders."""
 
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import Client, RequestFactory, TestCase
+from django.test.client import ContextList
 from django.urls import reverse
 
+from accounts.mfa import SESSION_MFA_VERIFIED, enable_mfa_for_user, generate_totp_secret
 from accounts.models import UserRole
 from organization.models import Church, Conference, District, Zone
+from permissions.services import ensure_permission_matrix
 from reports.models import ReportAccessAuditLog
 from reports.services import (
     _churches_in_scope,
@@ -15,13 +19,40 @@ from reports.services import (
     resolve_date_range,
     user_may_access_report,
 )
+from sitecontrol.models import SiteSettings
 
 User = get_user_model()
 
 
 class ReportsTests(TestCase):
     @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
+        def _safe_store(store, signal, sender, template, context, **kwargs):
+            store.setdefault("templates", []).append(template)
+            if "context" not in store:
+                store["context"] = ContextList()
+            store["context"].append(context)
+
+        cls._template_store_patcher = patch(
+            "django.test.client.store_rendered_templates",
+            _safe_store,
+        )
+        cls._template_store_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._template_store_patcher.stop()
+        super().tearDownClass()
+
+    @classmethod
     def setUpTestData(cls):
+        ensure_permission_matrix()
+        SiteSettings.objects.update_or_create(
+            singleton_id=1,
+            defaults={"mfa_required_for_privileged": False},
+        )
         conf = Conference.objects.create(code="R1", name="R Conf")
         zone = Zone.objects.create(conference=conf, code="R1", name="R Zone")
         dist = District.objects.create(zone=zone, code="R1", name="R Dist")
@@ -37,6 +68,13 @@ class ReportsTests(TestCase):
         self.treasury = User.objects.create_user(
             username="treasury_r", password="pass12345", role=UserRole.TREASURY, church=self.church
         )
+        enable_mfa_for_user(self.treasury, generate_totp_secret(), [])
+
+    def _login(self, username):
+        self.client.login(username=username, password="pass12345")
+        session = self.client.session
+        session[SESSION_MFA_VERIFIED] = True
+        session.save()
 
     def _request(self, user=None):
         request = self.factory.get("/")
@@ -58,7 +96,7 @@ class ReportsTests(TestCase):
         self.assertEqual(self.client.get(reverse("reports:index")).status_code, 302)
 
     def test_report_index_for_treasury(self):
-        self.client.login(username="treasury_r", password="pass12345")
+        self._login("treasury_r")
         response = self.client.get(reverse("reports:index"))
         self.assertEqual(response.status_code, 200)
 
@@ -73,7 +111,7 @@ class ReportsTests(TestCase):
         self.assertEqual(data["headers"][0], "District")
 
     def test_hierarchy_rollup_denied_for_treasury(self):
-        self.client.login(username="treasury_r", password="pass12345")
+        self._login("treasury_r")
         response = self.client.get(reverse("reports:run", args=["hierarchy_rollup"]))
         self.assertEqual(response.status_code, 403)
 
@@ -133,7 +171,7 @@ class ReportsTests(TestCase):
         self.assertNotIn("requires_feature", meta)
 
     def test_run_report_writes_audit_log(self):
-        self.client.login(username="treasury_r", password="pass12345")
+        self._login("treasury_r")
         before = ReportAccessAuditLog.objects.count()
         response = self.client.get(reverse("reports:run", args=["financial_summary"]), {"period": "monthly"})
         self.assertEqual(response.status_code, 200)
@@ -143,15 +181,11 @@ class ReportsTests(TestCase):
         self.assertEqual(log.action, ReportAccessAuditLog.ACTION_RUN)
 
     def test_member_without_view_reports_denied_index(self):
-        from permissions.models import Permission, RolePermission
-
+        # MEMBER is outside report catalog defaults; finance implies do not grant it.
         user = User.objects.create_user(
             username="no_reports",
             password="pass12345",
-            role=UserRole.TREASURY,
+            role=UserRole.MEMBER,
             church=self.church,
         )
-        perm = Permission.objects.filter(codename="view_reports").first()
-        if perm:
-            RolePermission.objects.filter(role=UserRole.TREASURY, permission=perm).update(granted=False)
         self.assertFalse(user_may_access_report(user, "financial_summary", active_church=self.church))

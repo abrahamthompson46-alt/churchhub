@@ -224,7 +224,7 @@ Standard Django reset views; templates under `templates/registration/password_re
 
 Email delivery depends on platform SMTP / env (`EMAIL_*`, `EMAIL_BACKEND`, `CHURCHHUB_PUBLIC_URL`, SiteSettings SMTP including optional encrypted password).
 
-**Rate limiting:** login POST only — password reset endpoints are **not** covered by `LoginRateLimitMiddleware` today.
+**Rate limiting:** `LoginRateLimitMiddleware` covers staff login, portal login, and password-reset POSTs (request + confirm).
 
 ---
 
@@ -263,30 +263,39 @@ Public tenant onboarding: `/apply/` → platform approve → church provision + 
 
 | State | Detail |
 |-------|--------|
-| **Current** | `User.mfa_enabled` boolean stub; help text states enforcement is not implemented; admin/profile treat as non-operational |
-| **Planned (AGENTS.md)** | Authenticator apps (TOTP), email OTP, optional SMS OTP, recovery codes; high-privilege accounts should require MFA |
-| **Recommended** | Implement TOTP + recovery codes for platform OWNER/SECURITY, institution SUPER_ADMIN, and treasury-capable roles **before** claiming MFA readiness |
+| **Current** | MFA enforced for privileged roles when `SiteSettings.mfa_required_for_privileged` is True (default). Platform OWNER/SECURITY, institution SUPER_ADMIN, TREASURY, and Django superusers must enroll and verify. Methods: **TOTP** (QR enroll), **email OTP** (alternate), **recovery codes**. **Trusted device** cookie skips MFA for 30 days when checked. Secrets stored encrypted. |
+| **Planned (AGENTS.md)** | Optional SMS OTP, richer device management UI |
+| **Recommended** | Dedicated `MFA_ENCRYPTION_KEY`; rate-limit TOTP verify attempts |
 
-Do **not** document MFA as live until challenge/enforcement exists in the login path.
+Login flow: password success → trusted device (if cookie valid) → home; else if privileged and enrolled → `/accounts/mfa/verify/` (TOTP, email code, or recovery) → if privileged and not enrolled → login then `/accounts/mfa/enroll/` (scannable QR). `MfaEnforcementMiddleware` blocks the rest of the app until verified (or trusted device).
 
 ---
 
 ## 11. Login rate limiting (Current)
 
 **Middleware:** `sitecontrol.middleware.LoginRateLimitMiddleware`  
-**Scope:** `POST` to `/accounts/login` only (not portal login path unless same URL).
+**Scope:** `POST` to:
+
+| Path | Behavior |
+|------|----------|
+| `/accounts/login` | Fail counters by IP + username; clear on successful auth (incl. MFA pending) |
+| `/portal/login/` | Same as staff login; lock redirects to portal login |
+| `/accounts/password_reset/` | Attempt counters by IP + email (`reset_*` keys) |
+| `/accounts/reset/<uidb64>/<token>/` | Same reset counters (confirm POSTs) |
 
 | Cache key | Purpose |
 |-----------|---------|
-| `login_fail:{ip}` / `login_fail_user:{username}` | Fail counters |
-| `login_lock:{ip}` / `login_lock_user:{username}` | Lock flags |
+| `login_fail:{ip}` / `login_fail_user:{username}` | Login fail counters |
+| `login_lock:{ip}` / `login_lock_user:{username}` | Login lock flags |
+| `reset_fail:{ip}` / `reset_fail_email:{email}` | Password-reset attempt counters |
+| `reset_lock:{ip}` / `reset_lock_email:{email}` | Password-reset lock flags |
 
 | SiteSettings | Default | Range |
 |--------------|---------|-------|
 | `login_max_attempts` | 5 | 3–20 |
 | `login_lockout_minutes` | 15 | 1–120 |
 
-On success: fail keys cleared. Cache: Redis if `REDIS_URL`, else LocMem (locks not shared across processes on LocMem).
+On login success: fail keys cleared. Cache: Redis if `REDIS_URL`, else LocMem (locks not shared across processes on LocMem).
 
 **No** automatic `is_active=False` lockout model — only cache lockout + manual deactivate / tenant offboard.
 
@@ -297,7 +306,8 @@ On success: fail keys cleared. Cache: Redis if `REDIS_URL`, else LocMem (locks n
 | Variable / setting | Effect |
 |--------------------|--------|
 | `DJANGO_SECRET_KEY` | Required when `DEBUG=False` |
-| `DJANGO_DEBUG` | Must be False in production |
+| `DJANGO_DEBUG` | Must be False in production; unset defaults False when `DATABASE_URL`/Render markers present |
+| `DJANGO_ALLOW_DEBUG_IN_PROD` | Temporary override only |
 | `DJANGO_ALLOWED_HOSTS` | Host allowlist |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | CSRF trusted origins |
 | `SECURE_SSL_REDIRECT` | When not DEBUG |
@@ -318,16 +328,16 @@ SiteSettings also: session timeout, login attempts/lockout, password min length 
 | Password | Min length + optional uppercase + Django defaults | History, expiry, full complexity | Expand SiteSettings validators |
 | Lockout | Cache rate-limit | Account lock + admin unlock | Persist lock events; unlock UI |
 | Sessions | Idle via SiteSettings | Absolute + logout-all + devices | Absolute timeout + logout-all |
-| MFA | Stub field | TOTP / OTP / recovery | Enforce for privileged roles |
+| MFA | TOTP + email OTP + recovery; trusted device 30d | SMS OTP | Expand optional roles |
 | Portal | Separate login view | Richer member auth | Keep lane separation |
 
 ---
 
 ## 14. Security recommendations
 
-1. Implement MFA (TOTP) for privileged roles — do not claim readiness until enforced.  
+1. Dedicated MFA encryption key separate from `SECRET_KEY`; rate-limit TOTP verify attempts.
 2. Require Redis in production for shared login lockout.  
-3. Fail deploy if `DJANGO_DEBUG=True` in production.  
+3. Keep `DJANGO_DEBUG=False` in production (startup + `/health/` already reject unsafe DEBUG).  
 4. Rate-limit password reset / invite accept endpoints.  
 5. Password history + optional expiry for finance/platform roles.  
 6. Session absolute timeout + logout-all.  

@@ -7,11 +7,12 @@ from django.urls import reverse
 from organization.models import Church, Conference, District, Zone
 from sitecontrol.denomination_services import ensure_builtin_denominations
 from sitecontrol.models import Denomination, PlatformAuditLog
+from sitecontrol.test_support import SiteControlClientHarness
 
 User = get_user_model()
 
 
-class DenominationPlatformPhasesTests(TestCase):
+class DenominationPlatformPhasesTests(SiteControlClientHarness, TestCase):
     @classmethod
     def setUpTestData(cls):
         ensure_builtin_denominations()
@@ -36,6 +37,9 @@ class DenominationPlatformPhasesTests(TestCase):
         zone = Zone.objects.create(conference=conf, name="COP Z", code="COPZ")
         district = District.objects.create(zone=zone, name="COP D", code="COPD")
         cls.cop_church = Church.objects.create(district=district, name="COP Church", code="COPCH")
+
+    def setUp(self):
+        self.disable_privileged_mfa()
 
     def test_scoped_operator_sees_only_assigned_denominations(self):
         from sitecontrol.platform_access import get_operator_denominations

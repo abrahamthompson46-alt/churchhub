@@ -39,12 +39,12 @@ def can_approve_for_church(user, church, permission_codename):
 
 def filter_queryset_for_church_scope(user, queryset, permission_codename, church_lookup="church"):
     """Return queryset rows the user may act on for the given permission."""
-    from organization.models import Church
+    from permissions import selectors
 
     if not user_has_permission(user, permission_codename):
         return queryset.none()
 
-    church_ids = Church.objects.filter(church_q_for_scope(user)).values("pk")
+    church_ids = selectors.church_ids_matching_q(church_q_for_scope(user))
     return queryset.filter(**{f"{church_lookup}_id__in": church_ids})
 
 

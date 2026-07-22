@@ -6,9 +6,11 @@ from django.db import transaction as db_transaction
 from django.utils import timezone
 
 from organization.services import get_church_financial_chain
+from remittance import repositories as repo
+from remittance import selectors
 from remittance.constants import CHURCH_DEFAULT_POLICIES, SETTLEMENT_DEFAULT_POLICIES
-from remittance.models import RemittancePolicy, RemittancePolicyAuditLog
-from transactions.models import Account, TransactionLine
+from remittance.models import RemittancePolicy
+from transactions import repositories as txn_repo
 
 
 class RemittancePolicyError(ValueError):
@@ -47,19 +49,9 @@ def calculate_split(gross_amount, retain_percent, remit_percent):
 def get_active_policy(unit_type, unit_id, offering_type, application_scope, as_of_date=None):
     """Return the active policy for a unit on a given date."""
     as_of_date = as_of_date or timezone.now().date()
-    from django.db.models import Q
-
-    qs = RemittancePolicy.objects.filter(
-        unit_type=unit_type,
-        unit_id=unit_id,
-        offering_type=offering_type,
-        application_scope=application_scope,
-        is_active=True,
-        effective_from__lte=as_of_date,
-    ).filter(
-        Q(effective_to__isnull=True) | Q(effective_to__gte=as_of_date)
-    ).order_by("-effective_from")
-    return qs.first()
+    return selectors.active_policy(
+        unit_type, unit_id, offering_type, application_scope, as_of_date
+    )
 
 
 def get_church_collection_policy(church, offering_type, as_of_date=None):
@@ -85,7 +77,7 @@ def get_settlement_policy(unit_type, unit_id, offering_type, as_of_date=None):
 
 
 def _get_account_by_type(church, account_type):
-    account = Account.objects.filter(church=church, account_type=account_type).first()
+    account = selectors.account_by_type(church, account_type)
     if not account:
         raise RemittancePolicyError(
             f"Missing {account_type} account for {church.name}. Run account setup."
@@ -114,14 +106,14 @@ def post_offering_credit_lines(transaction, church, offering_type, gross_amount,
     funds = FUND_BY_OFFERING[offering_type]
 
     if retain > 0:
-        TransactionLine.objects.create(
+        txn_repo.create_transaction_line(
             transaction=transaction,
             account=_get_account_by_type(church, mapping["retain"]),
             amount=-retain,
             fund=funds["retain"],
         )
     if remit > 0:
-        TransactionLine.objects.create(
+        txn_repo.create_transaction_line(
             transaction=transaction,
             account=_get_account_by_type(church, mapping["remit"]),
             amount=-remit,
@@ -149,16 +141,15 @@ def ensure_default_policies_for_church(church, user=None):
     """Seed church-level gross collection policies if none exist."""
     created = []
     for row in CHURCH_DEFAULT_POLICIES:
-        exists = RemittancePolicy.objects.filter(
-            unit_type="CHURCH",
-            unit_id=church.pk,
-            offering_type=row["offering_type"],
-            application_scope=row["application_scope"],
-            is_active=True,
-        ).exists()
+        exists = selectors.active_policy_exists(
+            "CHURCH",
+            church.pk,
+            row["offering_type"],
+            row["application_scope"],
+        )
         if exists:
             continue
-        policy = RemittancePolicy.objects.create(
+        policy = repo.create_policy(
             unit_type="CHURCH",
             unit_id=church.pk,
             offering_type=row["offering_type"],
@@ -176,16 +167,15 @@ def ensure_default_settlement_policies(unit_type, unit_id, user=None):
     """Seed settlement policies for district/conference/union/GC units."""
     created = []
     for row in SETTLEMENT_DEFAULT_POLICIES:
-        exists = RemittancePolicy.objects.filter(
-            unit_type=unit_type,
-            unit_id=unit_id,
-            offering_type=row["offering_type"],
-            application_scope=row["application_scope"],
-            is_active=True,
-        ).exists()
+        exists = selectors.active_policy_exists(
+            unit_type,
+            unit_id,
+            row["offering_type"],
+            row["application_scope"],
+        )
         if exists:
             continue
-        policy = RemittancePolicy.objects.create(
+        policy = repo.create_policy(
             unit_type=unit_type,
             unit_id=unit_id,
             offering_type=row["offering_type"],
@@ -218,7 +208,7 @@ def ensure_hierarchy_settlement_policies(church, user=None):
 
 
 def log_policy_change(policy, action, user, snapshot=None):
-    RemittancePolicyAuditLog.objects.create(
+    repo.create_policy_audit(
         policy=policy,
         action=action,
         changed_by=user,
@@ -236,9 +226,29 @@ def log_policy_change(policy, action, user, snapshot=None):
     )
 
 
-@db_transaction.atomic
 def save_remittance_policy(form_data, user, policy=None, church=None):
     """Create or update a remittance policy with audit trail."""
+    unit_type = form_data.get("unit_type")
+    unit_id = form_data.get("unit_id")
+    if unit_type and unit_id and not unit_in_user_scope(
+        user, unit_type, unit_id, church=church
+    ):
+        log_remittance_scope_violation(
+            user,
+            unit_type,
+            unit_id,
+            reason="save_remittance_policy rejected out-of-scope unit",
+            church=church,
+        )
+        raise RemittancePolicyError(
+            "Selected organization unit is outside your remittance scope."
+        )
+    return _save_remittance_policy(form_data, user, policy=policy, church=church)
+
+
+@db_transaction.atomic
+def _save_remittance_policy(form_data, user, policy=None, church=None):
+    """Create or update a remittance policy with audit trail (after scope checks)."""
     from remittance.forms import RemittancePolicyForm
 
     if policy:
@@ -248,33 +258,22 @@ def save_remittance_policy(form_data, user, policy=None, church=None):
         instance = RemittancePolicy()
         action = "CREATE"
 
-    form = RemittancePolicyForm(form_data, instance=instance, church=church)
+    form = RemittancePolicyForm(form_data, instance=instance, church=church, user=user)
     if not form.is_valid():
         raise RemittancePolicyError(form.errors.as_text())
 
     instance = form.save(commit=False)
     instance.created_by = instance.created_by or user
-    instance.full_clean()
-    instance.save()
+    repo.save_policy(instance)
     log_policy_change(instance, action, user)
     return instance
 
 
 def get_fund_balances(church):
     """Summarize ledger lines by fund dimension for treasury display."""
-    from django.db.models import Sum
+    from transactions.models import TransactionLine
 
-    rows = (
-        TransactionLine.objects.filter(
-            transaction__church=church,
-            transaction__approval_status="APPROVED",
-            transaction__is_voided=False,
-        )
-        .exclude(fund="")
-        .values("fund")
-        .annotate(balance=Sum("amount"))
-        .order_by("fund")
-    )
+    rows = selectors.fund_balance_rows(church)
     labels = dict(TransactionLine.FUND_CHOICES)
     return [
         {"fund": row["fund"], "label": labels.get(row["fund"], row["fund"]), "balance": abs(row["balance"] or 0)}
@@ -284,47 +283,156 @@ def get_fund_balances(church):
 
 def resolve_unit_label(unit_type, unit_id):
     """Human-readable label for a financial unit."""
-    from organization.models import Church, Conference, District, GeneralConference, Union
-
-    model_map = {
-        "CHURCH": Church,
-        "DISTRICT": District,
-        "CONFERENCE": Conference,
-        "UNION": Union,
-        "GENERAL_CONFERENCE": GeneralConference,
-    }
-    model = model_map.get(unit_type)
-    if not model:
+    obj = selectors.org_unit_by_type(unit_type, unit_id)
+    if obj is None and unit_type not in (
+        "CHURCH",
+        "DISTRICT",
+        "CONFERENCE",
+        "UNION",
+        "GENERAL_CONFERENCE",
+    ):
         return unit_type
-    obj = model.objects.filter(pk=unit_id).first()
     return str(obj) if obj else f"{unit_type} ({unit_id})"
 
 
-def get_unit_choices(unit_type, church=None):
-    """Return (uuid, label) tuples for policy admin unit picker."""
-    from organization.models import Church, Conference, District, GeneralConference, Union
+_UNIT_TYPE_TO_SCOPE = {
+    "CHURCH": "CHURCH",
+    "DISTRICT": "DISTRICT",
+    "ZONE": "ZONE",
+    "CONFERENCE": "CONFERENCE",
+    "UNION": "UNION",
+    "GENERAL_CONFERENCE": "GENERAL_CONFERENCE",
+}
+
+
+def _filter_units_by_denomination(queryset, unit_type, denomination):
+    """Intersect org units with a denomination wall."""
+    if not denomination:
+        return queryset
+    if unit_type == "CHURCH":
+        return queryset.filter(district__zone__conference__denomination=denomination)
+    if unit_type == "DISTRICT":
+        return queryset.filter(zone__conference__denomination=denomination)
+    if unit_type == "ZONE":
+        return queryset.filter(conference__denomination=denomination)
+    if unit_type == "CONFERENCE":
+        return queryset.filter(denomination=denomination)
+    if unit_type == "UNION":
+        return queryset.filter(conferences__denomination=denomination).distinct()
+    if unit_type == "GENERAL_CONFERENCE":
+        return queryset.filter(
+            unions__conferences__denomination=denomination
+        ).distinct()
+    return queryset.none()
+
+
+def _platform_unit_queryset(unit_type, user, denomination=None):
+    """Platform operators: managed denominations (or all for OWNER/superuser)."""
+    from sitecontrol.platform_access import (
+        filter_churches_for_operator,
+        get_operator_denominations,
+        operator_can_access_denomination,
+        operator_has_global_access,
+    )
+
+    if denomination is not None and not operator_can_access_denomination(user, denomination):
+        return selectors.empty_church_qs()
+
+    if denomination is not None:
+        denoms = selectors.platform_denomination_qs(denomination)
+    else:
+        denoms = get_operator_denominations(user)
+    if not denoms.exists() and not operator_has_global_access(user):
+        return selectors.empty_church_qs()
 
     if unit_type == "CHURCH":
-        if church:
-            return [(str(church.pk), str(church))]
-        return [(str(c.pk), str(c)) for c in Church.objects.select_related("district").order_by("name")[:200]]
+        qs = filter_churches_for_operator(
+            selectors.platform_churches_base_qs(),
+            user,
+        )
+        if denomination is not None:
+            qs = qs.filter(district__zone__conference__denomination=denomination)
+        return qs.order_by("name")
     if unit_type == "DISTRICT":
-        if church:
-            return [(str(church.district.pk), str(church.district))]
-        return [(str(d.pk), str(d)) for d in District.objects.select_related("zone").order_by("name")[:200]]
+        return selectors.districts_for_denominations(denoms)
     if unit_type == "CONFERENCE":
-        if church:
-            return [(str(church.conference.pk), str(church.conference))]
-        return [(str(c.pk), str(c)) for c in Conference.objects.order_by("name")]
+        return selectors.conferences_for_denominations(denoms)
     if unit_type == "UNION":
-        if church and church.union:
-            return [(str(church.union.pk), str(church.union))]
-        return [(str(u.pk), str(u)) for u in Union.objects.select_related("general_conference").order_by("name")]
+        return selectors.unions_for_denominations(denoms)
     if unit_type == "GENERAL_CONFERENCE":
-        if church and church.general_conference:
-            return [(str(church.general_conference.pk), str(church.general_conference))]
-        return [(str(gc.pk), str(gc)) for gc in GeneralConference.objects.order_by("name")]
-    return []
+        return selectors.general_conferences_for_denominations(denoms)
+    return selectors.empty_church_qs()
+
+
+def log_remittance_scope_violation(user, unit_type, unit_id, *, reason="", church=None):
+    """Record attempted remittance access outside the caller's org scope."""
+    repo.create_policy_audit(
+        policy=None,
+        action="SCOPE_VIOLATION",
+        changed_by=user,
+        snapshot={
+            "unit_type": unit_type,
+            "unit_id": str(unit_id) if unit_id else "",
+            "reason": reason or "Unit outside caller scope",
+            "church_id": str(church.pk) if church else "",
+        },
+    )
+
+
+def unit_in_user_scope(user, unit_type, unit_id, *, church=None, denomination=None) -> bool:
+    """True when unit_id appears in the caller's scoped remittance unit picker."""
+    if not user or not unit_id:
+        return False
+    allowed = {
+        choice_id
+        for choice_id, _label in get_unit_choices(
+            unit_type,
+            user=user,
+            church=church,
+            denomination=denomination,
+        )
+    }
+    return str(unit_id) in allowed
+
+
+def get_unit_choices(unit_type, church=None, *, user=None, denomination=None):
+    """
+    Return (uuid, label) tuples for remittance policy unit pickers.
+
+    Always filtered by the caller's manageable org subtree and denomination wall.
+    Never falls back to a global unscoped queryset.
+    """
+    from church_system.denomination_scope import (
+        get_church_denomination,
+        get_user_denomination,
+    )
+    from permissions.org_scope import manageable_scope_units
+
+    if not user or not getattr(user, "is_authenticated", False):
+        return []
+
+    if unit_type not in _UNIT_TYPE_TO_SCOPE:
+        return []
+
+    if getattr(user, "is_platform_user", False):
+        denom = denomination
+        if denom is None and church is not None:
+            denom = get_church_denomination(church)
+        qs = _platform_unit_queryset(unit_type, user, denomination=denom)
+        return [(str(obj.pk), str(obj)) for obj in qs[:200]]
+
+    level = _UNIT_TYPE_TO_SCOPE[unit_type]
+    qs = manageable_scope_units(user, level)
+
+    denom = denomination
+    if denom is None and church is not None:
+        denom = get_church_denomination(church)
+    if denom is None:
+        denom = get_user_denomination(user)
+    if denom is not None:
+        qs = _filter_units_by_denomination(qs, unit_type, denom)
+
+    return [(str(obj.pk), str(obj)) for obj in qs.order_by("name")[:200]]
 
 
 REMIT_PAYABLE_ACCOUNT = {
@@ -342,58 +450,38 @@ HIERARCHY_PARENT = {
 
 def _parent_unit(unit_type, unit_id):
     """Return (parent_type, parent_id) for the next level up."""
-    from organization.models import Church, Conference, District, Union
-
     if unit_type == "CHURCH":
-        church = Church.objects.select_related("district__zone__conference__union").get(pk=unit_id)
+        church = selectors.church_with_hierarchy(unit_id)
         return "DISTRICT", church.district.pk
     if unit_type == "DISTRICT":
-        district = District.objects.select_related("zone__conference__union").get(pk=unit_id)
+        district = selectors.district_with_hierarchy(unit_id)
         return "CONFERENCE", district.zone.conference.pk
     if unit_type == "CONFERENCE":
-        conference = Conference.objects.select_related("union").get(pk=unit_id)
+        conference = selectors.conference_with_union(unit_id)
         if conference.union_id:
             return "UNION", conference.union.pk
         return None, None
     if unit_type == "UNION":
-        union = Union.objects.select_related("general_conference").get(pk=unit_id)
+        union = selectors.union_with_gc(unit_id)
         return "GENERAL_CONFERENCE", union.general_conference.pk
     return None, None
 
 
 def compute_period_remit_payable(church, offering_type, period_start, period_end):
     """Sum remittance payable credits posted in the period for an offering."""
-    from django.db.models import Sum
-
     account_type = REMIT_PAYABLE_ACCOUNT.get(offering_type)
     if not account_type:
         return Decimal("0.00")
-    total = TransactionLine.objects.filter(
-        transaction__church=church,
-        transaction__approval_status="APPROVED",
-        transaction__is_voided=False,
-        transaction__date__gte=period_start,
-        transaction__date__lte=period_end,
-        account__account_type=account_type,
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-    return abs(total)
+    return selectors.remit_payable_total(
+        church, account_type, period_start, period_end
+    )
 
 
 def compute_received_from_below(unit_type, unit_id, offering_type, period_start, period_end):
     """Gross received by a unit from posted child settlements in the period."""
-    from django.db.models import Sum
-
-    from remittance.models import SettlementBatch
-
-    total = SettlementBatch.objects.filter(
-        to_unit_type=unit_type,
-        to_unit_id=unit_id,
-        offering_type=offering_type,
-        status="POSTED",
-        period_start__lte=period_end,
-        period_end__gte=period_start,
-    ).aggregate(total=Sum("gross_received"))["total"] or Decimal("0.00")
-    return total
+    return selectors.posted_settlements_received_total(
+        unit_type, unit_id, offering_type, period_start, period_end
+    )
 
 
 @db_transaction.atomic
@@ -404,14 +492,17 @@ def create_settlement_draft(from_unit_type, from_unit_id, offering_type, period_
     Church settlements use remittance payable balances; higher levels apply
     SETTLEMENT_FROM_BELOW policy on amounts received from below.
     """
-    from remittance.models import SettlementBatch
-
     to_unit_type, to_unit_id = _parent_unit(from_unit_type, from_unit_id)
     if not to_unit_type:
         raise RemittancePolicyError("No parent unit exists for this settlement.")
 
     if from_unit_type == "CHURCH":
-        church = church or __import__("organization.models", fromlist=["Church"]).Church.objects.get(pk=from_unit_id)
+        church = church or selectors.church_by_pk(from_unit_id)
+        from remittance.cross_path import assert_settlement_not_blocked_by_bank_remit
+
+        assert_settlement_not_blocked_by_bank_remit(
+            church, period_start, period_end, offering_type=offering_type
+        )
         gross = compute_period_remit_payable(church, offering_type, period_start, period_end)
         retain = Decimal("0.00")
         remit = gross
@@ -427,18 +518,16 @@ def create_settlement_draft(from_unit_type, from_unit_id, offering_type, period_
     if gross <= 0:
         raise RemittancePolicyError("No settlement amount for the selected period.")
 
-    existing = SettlementBatch.objects.filter(
+    if selectors.settlement_batch_exists_for_period(
         from_unit_type=from_unit_type,
         from_unit_id=from_unit_id,
         offering_type=offering_type,
         period_start=period_start,
         period_end=period_end,
-        status__in=("DRAFT", "POSTED"),
-    ).exists()
-    if existing:
+    ):
         raise RemittancePolicyError("A settlement batch already exists for this period.")
 
-    return SettlementBatch.objects.create(
+    return repo.create_settlement_batch(
         offering_type=offering_type,
         from_unit_type=from_unit_type,
         from_unit_id=from_unit_id,
@@ -456,34 +545,34 @@ def create_settlement_draft(from_unit_type, from_unit_id, offering_type, period_
 
 def user_can_edit_remittance_policy(user, policy, active_church=None):
     """Ensure remittance policy edits stay within the user's hierarchy scope."""
-    from permissions.checks import can_manage_remittance_policy, can_view_all_churches
+    from permissions.checks import can_manage_remittance_policy
 
     if not can_manage_remittance_policy(user):
         return False
-    if user.is_superuser or can_view_all_churches(user):
+    if unit_in_user_scope(
+        user,
+        policy.unit_type,
+        policy.unit_id,
+        church=active_church,
+    ):
         return True
-    church = active_church or getattr(user, "church", None)
-    if not church:
-        return False
-    if policy.unit_type == "CHURCH":
-        return str(policy.unit_id) == str(church.pk)
-    if policy.unit_type == "DISTRICT":
-        return str(policy.unit_id) == str(church.district_id)
-    if policy.unit_type == "ZONE":
-        return str(policy.unit_id) == str(church.district.zone_id)
-    if policy.unit_type == "CONFERENCE":
-        return str(policy.unit_id) == str(church.district.zone.conference_id)
+    log_remittance_scope_violation(
+        user,
+        policy.unit_type,
+        policy.unit_id,
+        reason="user_can_edit_remittance_policy denied",
+        church=active_church,
+    )
     return False
 
 
 @db_transaction.atomic
 def post_settlement_batch(batch, user):
     """Post settlement to the ledger and mark the batch as posted."""
-    from organization.models import Church
-    from transactions.models import Transaction, TransactionLine
     from transactions.services import (
         _get_account,
         _log_audit,
+        approve_module_journal,
         assert_period_open,
         validate_transaction_balance,
     )
@@ -492,29 +581,33 @@ def post_settlement_batch(batch, user):
         raise RemittancePolicyError("Only draft batches can be posted.")
 
     if batch.from_unit_type == "CHURCH":
-        church = Church.objects.get(pk=batch.from_unit_id)
+        church = selectors.church_by_pk(batch.from_unit_id)
+        from remittance.cross_path import assert_settlement_not_blocked_by_bank_remit
+
+        assert_settlement_not_blocked_by_bank_remit(
+            church,
+            batch.period_start,
+            batch.period_end,
+            offering_type=batch.offering_type,
+        )
         assert_period_open(church, batch.period_end)
         payable_type = (
             "TITHE_REMIT_PAYABLE"
             if batch.offering_type == "TITHE"
             else "COMBINED_REMIT_PAYABLE"
         )
-        trx = Transaction.objects.create(
+        trx = txn_repo.create_transaction(
             transaction_type="TRANSFER",
             church=church,
-            created_by=user,
+            created_by=batch.created_by or user,
             description=(
                 f"Settlement {batch.get_offering_type_display()} "
                 f"{batch.period_start} to {batch.period_end}"
             ),
             date=batch.period_end,
-            approval_status="APPROVED",
-            approved_by=user,
-            approved_at=timezone.now(),
-            locked=True,
         )
         amount = batch.gross_received
-        TransactionLine.objects.create(
+        txn_repo.create_transaction_line(
             transaction=trx,
             account=_get_account(church, payable_type),
             amount=amount,
@@ -527,13 +620,19 @@ def post_settlement_batch(batch, user):
         credit_account = get_remit_clearing_account(
             church, batch.offering_type, unit_level="DISTRICT"
         )
-        TransactionLine.objects.create(
+        txn_repo.create_transaction_line(
             transaction=trx,
             account=credit_account,
             amount=-amount,
             fund=f"{batch.offering_type}_TRUST",
         )
         validate_transaction_balance(trx)
+        approve_module_journal(trx, user)
+        if trx.approval_status != "APPROVED":
+            raise RemittancePolicyError(
+                "Settlement journal requires approval by an officer other than "
+                "the batch creator before posting."
+            )
         _log_audit(
             church,
             "CREATE",
@@ -546,9 +645,7 @@ def post_settlement_batch(batch, user):
                 "amount": str(amount),
             },
         )
-        from remittance.models import SettlementLine
-
-        SettlementLine.objects.create(
+        repo.create_settlement_line(
             batch=batch,
             source_transaction=trx,
             amount=amount,
@@ -557,12 +654,16 @@ def post_settlement_batch(batch, user):
     elif batch.gross_received <= 0:
         raise RemittancePolicyError("No settlement amount to post.")
     else:
-        # District+ settlements: ledger integration for higher units is tracked separately.
-        pass
+        # Higher-unit (district+) GL posting is not implemented. Never mark POSTED
+        # without a balanced journal — refuse until CoA/clearing for those units exists.
+        raise RemittancePolicyError(
+            "Ledger posting for district and higher settlement batches is not yet "
+            "implemented. The batch remains DRAFT until higher-unit GL posting is available."
+        )
 
     batch.status = "POSTED"
     batch.posted_at = timezone.now()
-    batch.save(update_fields=["status", "posted_at"])
+    repo.save_settlement_batch(batch, update_fields=["status", "posted_at"])
     return batch
 
 
@@ -587,8 +688,12 @@ def reject_welfare_case(case, user, rejection_reason=""):
     return _reject(case, user, rejection_reason=rejection_reason)
 
 
-@db_transaction.atomic
-def disburse_welfare_case(case, user, payment_account_type="CASH"):
+def disburse_welfare_case(case, user, payment_account_type="CASH", idempotency_key=None):
     from remittance.welfare_services import disburse_welfare_case as _disburse
 
-    return _disburse(case, user, payment_account_type=payment_account_type)
+    return _disburse(
+        case,
+        user,
+        payment_account_type=payment_account_type,
+        idempotency_key=idempotency_key,
+    )

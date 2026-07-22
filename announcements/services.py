@@ -2,9 +2,10 @@
 
 from django.core.paginator import Paginator
 from django.db import transaction as db_transaction
-from django.db.models import Count, Q
 from django.utils import timezone
 
+from announcements import repositories as repo
+from announcements import selectors
 from permissions.checks import can_approve_announcements, can_create_announcements, can_view_all_churches
 from permissions.scoping import get_manageable_churches
 from permissions.scoping_checks import (
@@ -14,12 +15,7 @@ from permissions.scoping_checks import (
 )
 from permissions.superadmin import is_superadmin
 
-from .models import (
-    MAX_PINNED_PER_CHURCH,
-    Announcement,
-    AnnouncementAuditLog,
-    AnnouncementView,
-)
+from .models import MAX_PINNED_PER_CHURCH, Announcement
 
 
 class AnnouncementServiceError(ValueError):
@@ -27,7 +23,7 @@ class AnnouncementServiceError(ValueError):
 
 
 def _log_audit(announcement, action, user, details=None):
-    AnnouncementAuditLog.objects.create(
+    repo.create_audit_log(
         announcement=announcement,
         church=announcement.church if announcement else None,
         action=action,
@@ -69,12 +65,7 @@ def can_archive_announcement(user, announcement):
 
 def pending_for_user(user):
     """Pending announcements this user is allowed to review."""
-    qs = Announcement.objects.filter(
-        is_approved=False,
-        is_archived=False,
-        is_rejected=False,
-        status=Announcement.STATUS_PENDING,
-    ).select_related("church", "created_by")
+    qs = selectors.pending_announcements_base_qs()
     if is_top_level_approver(user):
         return qs
     scoped = pending_for_church_scope(
@@ -84,23 +75,13 @@ def pending_for_user(user):
         church_lookup="church",
         submitter_field="created_by",
     )
-    return scoped.exclude(visibility="general")
+    return selectors.exclude_general_visibility(scoped)
 
 
 def visible_announcements(user, *, include_scheduled=False):
     """Approved, non-archived, non-expired announcements for the user."""
-    now = timezone.now()
-    qs = Announcement.objects.filter(
-        is_approved=True,
-        is_archived=False,
-        is_rejected=False,
-    ).filter(
-        Q(auto_expire=False)
-        | Q(event_date__isnull=True)
-        | Q(event_date__gte=now)
-    )
-    if not include_scheduled:
-        qs = qs.filter(Q(publish_at__isnull=True) | Q(publish_at__lte=now))
+    qs = selectors.approved_announcements_base_qs()
+    qs = selectors.apply_publish_at_filter(qs, include_scheduled=include_scheduled)
 
     if can_view_all_churches(user) or is_superadmin(user):
         return qs
@@ -108,34 +89,21 @@ def visible_announcements(user, *, include_scheduled=False):
     churches = get_manageable_churches(user)
     church_ids = list(churches.values_list("pk", flat=True))
     if church_ids:
-        return qs.filter(Q(visibility="general") | Q(church_id__in=church_ids))
+        return selectors.announcements_for_church_ids(qs, church_ids)
 
     from church_system.church_scope import get_user_church
 
     church = get_user_church(user)
     if church:
-        return qs.filter(Q(visibility="general") | Q(church=church))
-    return qs.filter(visibility="general")
+        return selectors.announcements_for_church(qs, church)
+    return selectors.general_visibility_only(qs)
 
 
 def _assert_pin_limit(church, excluding_pk=None):
     if not church:
-        # General (conference-wide) pins: limit globally among general visibility
-        qs = Announcement.objects.filter(
-            visibility="general",
-            is_pinned=True,
-            is_archived=False,
-            is_approved=True,
-        )
+        qs = selectors.pinned_general_approved_qs(excluding_pk=excluding_pk)
     else:
-        qs = Announcement.objects.filter(
-            church=church,
-            is_pinned=True,
-            is_archived=False,
-            is_approved=True,
-        )
-    if excluding_pk:
-        qs = qs.exclude(pk=excluding_pk)
+        qs = selectors.pinned_church_approved_qs(church, excluding_pk=excluding_pk)
     if qs.count() >= MAX_PINNED_PER_CHURCH:
         raise AnnouncementServiceError(
             f"At most {MAX_PINNED_PER_CHURCH} pinned announcements are allowed. "
@@ -181,7 +149,7 @@ def create_announcement(
         if not church:
             raise AnnouncementServiceError("Church is required for church-scoped announcements.")
         manageable = get_manageable_churches(user)
-        if not manageable.filter(pk=church.pk).exists():
+        if not selectors.manageable_church_exists(manageable, church.pk):
             raise AnnouncementServiceError("You cannot post announcements for that church.")
 
     if auto_approve is None:
@@ -195,7 +163,7 @@ def create_announcement(
         _assert_pin_limit(church)
 
     with db_transaction.atomic():
-        ann = Announcement(
+        fields = dict(
             title=title,
             content=content,
             visibility=visibility,
@@ -211,12 +179,13 @@ def create_announcement(
             status=Announcement.STATUS_PENDING,
         )
         if auto_approve:
-            ann.is_approved = True
-            ann.approved_by = user
-            ann.approved_at = timezone.now()
-            ann.status = Announcement.STATUS_APPROVED
-        ann.full_clean()
-        ann.save()
+            fields.update(
+                is_approved=True,
+                approved_by=user,
+                approved_at=timezone.now(),
+                status=Announcement.STATUS_APPROVED,
+            )
+        ann = repo.create_announcement_instance(**fields)
         _log_audit(
             ann,
             "CREATE",
@@ -270,7 +239,7 @@ def update_announcement(
             announcement.church = None
         elif church is not None:
             manageable = get_manageable_churches(user)
-            if not manageable.filter(pk=church.pk).exists():
+            if not selectors.manageable_church_exists(manageable, church.pk):
                 raise AnnouncementServiceError("Invalid church for this announcement.")
             announcement.church = church
     if event_date is not None:
@@ -285,11 +254,6 @@ def update_announcement(
             _assert_pin_limit(announcement.church, excluding_pk=announcement.pk)
         announcement.is_pinned = bool(is_pinned)
 
-    # Material edits to published posts by non-approvers shouldn't happen (can_edit blocks).
-    # Approver edits keep published; creator edits only pending.
-    # If an approver edits content of a published post and require_reapproval is True
-    # for non-approver path — creators can't edit approved. For approvers, keep approved
-    # but log the change. Optional: demote to pending when content changes by non-owner approver.
     if was_approved and require_reapproval and not editor_is_approver:
         announcement.is_approved = False
         announcement.approved_by = None
@@ -301,7 +265,7 @@ def update_announcement(
 
     with db_transaction.atomic():
         announcement.full_clean()
-        announcement.save()
+        repo.save_announcement(announcement)
         _log_audit(
             announcement,
             "UPDATE",
@@ -339,7 +303,7 @@ def approve_announcement(announcement, user):
         announcement.approved_by = user
         announcement.approved_at = timezone.now()
         announcement.status = Announcement.STATUS_APPROVED
-        announcement.save()
+        repo.save_announcement(announcement)
         _log_audit(announcement, "APPROVE", user, details={"title": announcement.title})
     return announcement
 
@@ -367,7 +331,7 @@ def reject_announcement(announcement, user, reason=""):
         announcement.rejected_at = timezone.now()
         announcement.rejection_reason = reason
         announcement.status = Announcement.STATUS_REJECTED
-        announcement.save()
+        repo.save_announcement(announcement)
         _log_audit(
             announcement,
             "REJECT",
@@ -386,37 +350,20 @@ def archive_announcement(announcement, user):
         announcement.archived_by = user
         announcement.archived_at = timezone.now()
         announcement.status = Announcement.STATUS_ARCHIVED
-        announcement.save()
+        repo.save_announcement(announcement)
         _log_audit(announcement, "ARCHIVE", user, details={"title": announcement.title})
     return announcement
 
 
 def get_announcement_list_queryset(user, *, q="", church=None, pinned_only=False):
-    qs = visible_announcements(user).select_related(
-        "church", "created_by", "approved_by"
-    ).prefetch_related("images").annotate(
-        view_count=Count("views", distinct=True),
-    ).order_by("-is_pinned", "-created_at")
-    if q:
-        qs = qs.filter(Q(title__icontains=q) | Q(content__icontains=q))
-    if church:
-        qs = qs.filter(church=church)
-    if pinned_only:
-        qs = qs.filter(is_pinned=True)
-    return qs
+    qs = selectors.announcement_list_annotated(visible_announcements(user))
+    return selectors.filter_announcement_list(
+        qs, q=q, church=church, pinned_only=pinned_only
+    )
 
 
 def get_my_announcements_queryset(user, status=""):
-    qs = Announcement.objects.filter(created_by=user).select_related("church")
-    if status == "pending":
-        qs = qs.filter(is_approved=False, is_archived=False, is_rejected=False)
-    elif status == "approved":
-        qs = qs.filter(is_approved=True, is_archived=False, is_rejected=False)
-    elif status == "rejected":
-        qs = qs.filter(is_rejected=True, is_archived=False)
-    elif status == "archived":
-        qs = qs.filter(is_archived=True)
-    return qs.order_by("-created_at")
+    return selectors.my_announcements_qs(user, status=status)
 
 
 def paginate_queryset(queryset, page=1, per_page=20):
@@ -429,10 +376,10 @@ def export_announcements_table(queryset):
         "Approved At", "Views", "Event Date",
     ]
     rows = []
-    for a in queryset.select_related("church")[:5000]:
+    for a in selectors.announcement_with_church_for_export(queryset):
         view_count = getattr(a, "view_count", None)
         if view_count is None:
-            view_count = a.views.count()
+            view_count = selectors.announcement_view_count(a)
         rows.append([
             a.title,
             a.get_status_display() if hasattr(a, "get_status_display") else a.status,
@@ -453,16 +400,8 @@ def export_announcements_table(queryset):
 
 
 def mark_viewed(user, announcement):
-    obj, created = AnnouncementView.objects.get_or_create(
-        user=user, announcement=announcement
-    )
-    return obj, created
+    return repo.get_or_create_announcement_view(user=user, announcement=announcement)
 
 
 def view_counts_for(announcement_ids):
-    return dict(
-        AnnouncementView.objects.filter(announcement_id__in=announcement_ids)
-        .values("announcement_id")
-        .annotate(c=Count("id"))
-        .values_list("announcement_id", "c")
-    )
+    return selectors.view_counts_by_announcement_ids(announcement_ids)

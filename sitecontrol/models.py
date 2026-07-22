@@ -42,6 +42,13 @@ class SiteSettings(models.Model):
         default=15,
         validators=[MinValueValidator(1), MaxValueValidator(120)],
     )
+    mfa_required_for_privileged = models.BooleanField(
+        default=True,
+        help_text=(
+            "Require TOTP MFA for platform OWNER/SECURITY, institution SUPER_ADMIN, "
+            "TREASURY, and Django superusers."
+        ),
+    )
     maintenance_mode = models.BooleanField(
         default=False,
         help_text="When enabled, only platform operators may sign in.",

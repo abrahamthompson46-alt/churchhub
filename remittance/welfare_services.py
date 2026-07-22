@@ -3,15 +3,13 @@
 from decimal import Decimal
 
 from django.db import transaction as db_transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Sum
 from django.utils import timezone
 
-from remittance.models import (
-    WelfareAssistanceCase,
-    WelfareContribution,
-    WelfareMemberLedger,
-)
+from remittance import repositories as repo
+from remittance import selectors
 from remittance.services import RemittancePolicyError
+from transactions import repositories as txn_repo
 
 
 def _quantize(amount):
@@ -21,12 +19,7 @@ def _quantize(amount):
 def generate_case_number(church):
     year = timezone.now().year
     prefix = f"WEL-{year}-"
-    last = (
-        WelfareAssistanceCase.objects.filter(church=church, case_number__startswith=prefix)
-        .order_by("-case_number")
-        .values_list("case_number", flat=True)
-        .first()
-    )
+    last = selectors.last_case_number_for_prefix(church, prefix)
     if last:
         try:
             seq = int(last.rsplit("-", 1)[-1]) + 1
@@ -39,18 +32,10 @@ def generate_case_number(church):
 
 def get_welfare_fund_balance(church):
     """Available welfare fund balance from approved GL lines."""
-    from transactions.models import Account, TransactionLine
-
-    account = Account.objects.filter(church=church, account_type="WELFARE_FUND").first()
+    account = selectors.account_by_type(church, "WELFARE_FUND")
     if not account:
         return Decimal("0.00")
-    total = TransactionLine.objects.filter(
-        transaction__church=church,
-        transaction__approval_status="APPROVED",
-        transaction__is_voided=False,
-        account=account,
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-    return abs(total)
+    return selectors.welfare_fund_line_total(church, account)
 
 
 def assert_welfare_fund_sufficient(church, amount):
@@ -77,7 +62,7 @@ def post_ledger_entry(
     transaction=None,
     user=None,
 ):
-    return WelfareMemberLedger.objects.create(
+    return repo.create_member_ledger_entry(
         church=church,
         member=member,
         entry_type=entry_type,
@@ -97,7 +82,7 @@ def post_ledger_entry(
 def record_welfare_contribution(church, member, transaction, amount, contribution_date=None, notes="", user=None):
     """Track a member welfare contribution and ledger entry linked to a receipt."""
     contribution_date = contribution_date or timezone.now().date()
-    contribution = WelfareContribution.objects.create(
+    contribution = repo.create_welfare_contribution(
         church=church,
         member=member,
         transaction=transaction,
@@ -126,9 +111,7 @@ def record_welfare_contribution(church, member, transaction, amount, contributio
 @db_transaction.atomic
 def void_welfare_for_transaction(transaction, user):
     """Reverse welfare contributions and member ledger entries when a receipt is voided."""
-    contributions = WelfareContribution.objects.filter(transaction=transaction).select_related(
-        "member", "church"
-    )
+    contributions = selectors.contributions_for_transaction(transaction)
     for contribution in contributions:
         if contribution.member_id:
             post_ledger_entry(
@@ -144,7 +127,7 @@ def void_welfare_for_transaction(transaction, user):
                 transaction=transaction,
                 user=user,
             )
-        contribution.delete()
+        repo.delete_welfare_contribution(contribution)
 
 
 def welfare_module_enabled(church, user=None):
@@ -162,22 +145,16 @@ def welfare_module_enabled(church, user=None):
 
 
 def member_welfare_ledger(member, year=None, start_date=None, end_date=None, limit=500):
-    qs = WelfareMemberLedger.objects.filter(member=member).select_related(
-        "contribution", "case", "transaction", "created_by"
+    qs = selectors.member_ledger_qs(
+        member, year=year, start_date=start_date, end_date=end_date
     )
-    if year:
-        qs = qs.filter(entry_date__year=year)
-    if start_date:
-        qs = qs.filter(entry_date__gte=start_date)
-    if end_date:
-        qs = qs.filter(entry_date__lte=end_date)
     return qs.order_by("entry_date", "created_at")[:limit]
 
 
 def member_welfare_opening_balance(member, before_date):
     if not before_date:
         return Decimal("0.00")
-    qs = WelfareMemberLedger.objects.filter(member=member, entry_date__lt=before_date)
+    qs = selectors.member_ledger_before_date(member, before_date)
     ins = qs.filter(direction="IN").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
     outs = qs.filter(direction="OUT").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
     return _quantize(ins - outs)
@@ -226,26 +203,19 @@ def build_member_welfare_statement(member, start_date=None, end_date=None):
 
 
 def member_welfare_cases(member, limit=50):
-    return (
-        WelfareAssistanceCase.objects.filter(member=member)
-        .select_related("created_by", "approved_by", "disbursed_by", "disbursement_transaction")
-        .order_by("-created_at")[:limit]
-    )
+    return selectors.member_cases_qs(member).order_by("-created_at")[:limit]
 
 
 def member_welfare_contributions(member, year=None, limit=100):
-    qs = WelfareContribution.objects.filter(
-        member=member,
-        transaction__is_voided=False,
+    return (
+        selectors.member_contributions_qs(member, year=year)
+        .order_by("-contribution_date")[:limit]
     )
-    if year:
-        qs = qs.filter(contribution_date__year=year)
-    return qs.select_related("transaction").order_by("-contribution_date")[:limit]
 
 
 def member_welfare_summary(member, year=None, start_date=None, end_date=None):
-    ledger_qs = WelfareMemberLedger.objects.filter(member=member)
-    case_qs = WelfareAssistanceCase.objects.filter(member=member)
+    ledger_qs = selectors.member_ledger_qs(member)
+    case_qs = selectors.member_cases_qs(member)
     if year:
         ledger_qs = ledger_qs.filter(entry_date__year=year)
         case_qs = case_qs.filter(created_at__year=year)
@@ -293,8 +263,8 @@ def welfare_year_choices(years_back=5):
 
 def church_welfare_dashboard(church, year=None):
     year = year or timezone.now().year
-    contributions = WelfareContribution.objects.filter(church=church, contribution_date__year=year)
-    cases = WelfareAssistanceCase.objects.filter(church=church, created_at__year=year)
+    contributions = selectors.church_contributions_year_qs(church, year)
+    cases = selectors.church_cases_year_qs(church, year)
     return {
         "fund_balance": get_welfare_fund_balance(church),
         "contributions_ytd": contributions.aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
@@ -303,9 +273,7 @@ def church_welfare_dashboard(church, year=None):
         )["total"] or Decimal("0.00"),
         "pending_cases": cases.filter(status__in=("PENDING", "UNDER_REVIEW")).count(),
         "approved_awaiting": cases.filter(status="APPROVED").count(),
-        "cases_by_status": dict(
-            cases.values("status").annotate(c=Count("id")).values_list("status", "c")
-        ),
+        "cases_by_status": selectors.cases_by_status_counts(cases),
     }
 
 
@@ -320,7 +288,7 @@ def create_welfare_case(
     priority="NORMAL",
 ):
     case_number = generate_case_number(church)
-    case = WelfareAssistanceCase.objects.create(
+    case = repo.create_welfare_case(
         church=church,
         case_number=case_number,
         member=member,
@@ -353,7 +321,7 @@ def send_welfare_case_to_review(case, user, review_notes=""):
     case.reviewed_by = user
     case.reviewed_at = timezone.now()
     case.review_notes = review_notes
-    case.save()
+    repo.save_welfare_case(case)
     return case
 
 
@@ -368,7 +336,7 @@ def approve_welfare_case(case, user, amount_approved=None):
     case.amount_approved = approved
     case.approved_by = user
     case.approved_at = timezone.now()
-    case.save()
+    repo.save_welfare_case(case)
     return case
 
 
@@ -380,7 +348,7 @@ def reject_welfare_case(case, user, rejection_reason=""):
     case.rejection_reason = rejection_reason
     case.approved_by = user
     case.approved_at = timezone.now()
-    case.save()
+    repo.save_welfare_case(case)
     return case
 
 
@@ -391,53 +359,126 @@ def cancel_welfare_case(case, user):
     case.status = "CANCELLED"
     case.reviewed_by = user
     case.reviewed_at = timezone.now()
-    case.save()
+    repo.save_welfare_case(case)
     return case
 
 
+def _log_welfare_disburse_rejected(case, user, reason):
+    """Audit rejected duplicate/invalid disbursement attempts (outside atomic rollback)."""
+    from transactions.services import _log_audit
+
+    _log_audit(
+        case.church,
+        "CREATE",
+        user,
+        transaction=None,
+        details={
+            "type": "WELFARE_DISBURSE_REJECTED",
+            "case_id": str(case.pk),
+            "case_number": case.case_number,
+            "reason": reason,
+            "status": case.status,
+        },
+    )
+
+
+def disburse_welfare_case(case, user, payment_account_type="CASH", idempotency_key=None):
+    """
+    Disburse an approved welfare case to the GL.
+
+    Locks the case row first (select_for_update), posts lines on an unlocked
+    journal, then approves/locks via maker-checker. Duplicate attempts are
+    rejected and audited outside the atomic block so the audit survives rollback.
+    """
+    case_id = case.pk if hasattr(case, "pk") else case
+    try:
+        return _disburse_welfare_case_atomic(
+            case_id, user, payment_account_type, idempotency_key
+        )
+    except RemittancePolicyError as exc:
+        if getattr(exc, "log_duplicate_audit", False):
+            locked_case = selectors.welfare_case_for_audit(case_id)
+            if locked_case:
+                _log_welfare_disburse_rejected(locked_case, user, str(exc))
+        raise
+
+
 @db_transaction.atomic
-def disburse_welfare_case(case, user, payment_account_type="CASH"):
-    from transactions.models import Transaction, TransactionLine
+def _disburse_welfare_case_atomic(case_id, user, payment_account_type, idempotency_key):
+    from transactions.idempotency import (
+        IdempotencyReplay,
+        claim_financial_idempotency,
+        complete_financial_idempotency,
+        normalize_idempotency_key,
+    )
     from transactions.services import (
         _get_account,
         _log_audit,
+        approve_module_journal,
         assert_period_open,
+        assert_working_day_allows_posting,
+        resolve_transaction_date,
         validate_transaction_balance,
     )
 
+    case = selectors.welfare_case_lock_for_disburse(case_id)
+
+    if case.status == "DISBURSED" or case.disbursement_transaction_id:
+        err = RemittancePolicyError(
+            "This welfare case has already been disbursed."
+        )
+        err.log_duplicate_audit = True
+        raise err
+
     if case.status != "APPROVED":
         raise RemittancePolicyError("Only approved cases can be disbursed.")
+
     amount = case.amount_approved
     if not amount or amount <= 0:
         raise RemittancePolicyError("Approved amount must be greater than zero.")
 
+    key = normalize_idempotency_key(idempotency_key) or f"welfare-disburse-{case.pk}"
+    try:
+        idem_record = claim_financial_idempotency(
+            case.church, user, "EXPENSE", key
+        )
+    except IdempotencyReplay as replay:
+        case.refresh_from_db()
+        if case.disbursement_transaction_id:
+            err = RemittancePolicyError(
+                "This welfare case has already been disbursed."
+            )
+            err.log_duplicate_audit = True
+            raise err from replay
+        raise RemittancePolicyError(
+            "Duplicate welfare disbursement submission detected."
+        ) from replay
+
     assert_welfare_fund_sufficient(case.church, amount)
 
-    txn_date = timezone.now().date()
+    txn_date = resolve_transaction_date(case.church)
     assert_period_open(case.church, txn_date)
+    assert_working_day_allows_posting(case.church, txn_date)
 
-    trx = Transaction.objects.create(
+    maker = case.approved_by or case.created_by or user
+    trx = txn_repo.create_transaction(
         transaction_type="EXPENSE",
         church=case.church,
-        created_by=user,
+        created_by=maker,
         description=f"Welfare assistance — {case.case_number} — {case.member.full_name}",
         member=case.member,
         date=txn_date,
-        approval_status="APPROVED",
-        approved_by=user,
-        approved_at=timezone.now(),
-        locked=True,
     )
     payment = _get_account(case.church, payment_account_type)
     welfare_fund = _get_account(case.church, "WELFARE_FUND")
 
-    TransactionLine.objects.create(
+    txn_repo.create_transaction_line(
         transaction=trx,
         account=welfare_fund,
         amount=amount,
         fund="WELFARE",
     )
-    TransactionLine.objects.create(
+    txn_repo.create_transaction_line(
         transaction=trx,
         account=payment,
         amount=-amount,
@@ -445,6 +486,13 @@ def disburse_welfare_case(case, user, payment_account_type="CASH"):
     )
 
     validate_transaction_balance(trx)
+    trx = approve_module_journal(trx, user)
+    if trx.approval_status != "APPROVED":
+        raise RemittancePolicyError(
+            "Welfare disbursement journal requires approval by an officer "
+            "other than the case approver."
+        )
+
     _log_audit(
         case.church,
         "CREATE",
@@ -462,7 +510,16 @@ def disburse_welfare_case(case, user, payment_account_type="CASH"):
     case.disbursement_transaction = trx
     case.disbursed_by = user
     case.disbursed_at = timezone.now()
-    case.save()
+    repo.save_welfare_case(
+        case,
+        update_fields=[
+            "status",
+            "disbursement_transaction",
+            "disbursed_by",
+            "disbursed_at",
+            "updated_at",
+        ],
+    )
 
     post_ledger_entry(
         church=case.church,
@@ -477,6 +534,7 @@ def disburse_welfare_case(case, user, payment_account_type="CASH"):
         transaction=trx,
         user=user,
     )
+    complete_financial_idempotency(idem_record, trx)
     return case, trx
 
 
@@ -496,9 +554,8 @@ def record_manual_welfare_contribution(church, member, amount, user, contributio
         payment_account_type=payment_account_type,
         date=contribution_date,
         description=notes or f"Welfare contribution — {member.full_name}",
-        post_approved=True,
     )
-    contribution = WelfareContribution.objects.filter(transaction=trx, member=member).first()
+    contribution = selectors.contribution_for_transaction_member(trx, member)
     if contribution:
         update_fields = []
         if notes:
@@ -508,9 +565,10 @@ def record_manual_welfare_contribution(church, member, amount, user, contributio
             contribution.contribution_date = contribution_date
             update_fields.append("contribution_date")
         if update_fields:
-            contribution.save(update_fields=update_fields)
-        WelfareMemberLedger.objects.filter(contribution=contribution).update(
-            description=(notes or contribution.notes or "Welfare contribution")[:255],
+            repo.save_welfare_contribution(contribution, update_fields=update_fields)
+        repo.update_ledger_for_contribution(
+            contribution,
+            description=(notes or contribution.notes or "Welfare contribution"),
             entry_date=contribution_date,
         )
     return trx, contribution
@@ -530,7 +588,7 @@ def can_view_member_welfare(user, member):
 def backfill_welfare_ledger():
     """Create ledger rows for historical contributions and disbursed cases."""
     created = 0
-    for contribution in WelfareContribution.objects.filter(member__isnull=False).iterator():
+    for contribution in selectors.contributions_with_member_iterator():
         if contribution.ledger_entries.exists():
             continue
         post_ledger_entry(
@@ -548,7 +606,7 @@ def backfill_welfare_ledger():
         )
         created += 1
 
-    for case in WelfareAssistanceCase.objects.iterator():
+    for case in selectors.all_welfare_cases_iterator():
         if not case.ledger_entries.filter(entry_type="REQUEST").exists():
             post_ledger_entry(
                 church=case.church,

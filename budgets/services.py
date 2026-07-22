@@ -3,10 +3,10 @@
 from decimal import Decimal
 
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db.models import Sum
 
+from budgets import repositories as repo
+from budgets import selectors
 from permissions.checks import can_view_all_churches
-from transactions.models import Budget, FinancialAuditLog, TransactionLine
 
 INCOME_ACCOUNT_TYPES = {"TITHE", "COMBINED", "INCOME", "COMBINED_RETENTION", "WELFARE_FUND"}
 EXPENSE_ACCOUNT_TYPES = {"EXPENSE", "SALARY_EXPENSE", "EMPLOYER_SSNIT_EXPENSE", "DEPRECIATION_EXPENSE"}
@@ -22,14 +22,7 @@ def _quantize(amount):
 
 def _account_actual(churches_qs, account, year):
     """Sum approved transaction lines for an account across churches in a year."""
-    actual = TransactionLine.objects.filter(
-        account=account,
-        transaction__church__in=churches_qs,
-        transaction__approval_status="APPROVED",
-        transaction__is_voided=False,
-        transaction__date__year=year,
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-    return abs(actual)
+    return selectors.account_actual_for_year(churches_qs, account, year)
 
 
 def _variance_meta(account_type, budgeted, actual):
@@ -66,29 +59,22 @@ def log_budget_audit(church, action, user, budget, details=None):
     }
     if details:
         payload.update(details)
-    FinancialAuditLog.objects.create(
+    repo.create_budget_audit(
         church=church,
         action=action,
-        performed_by=user,
+        user=user,
         details=payload,
     )
 
 
 def budgets_for_scope(church=None, year=None, level="CHURCH", district=None, conference=None):
-    qs = Budget.objects.select_related(
-        "account", "church", "district", "conference", "department"
+    return selectors.budgets_for_scope_qs(
+        church=church,
+        year=year,
+        level=level,
+        district=district,
+        conference=conference,
     )
-    if year:
-        qs = qs.filter(year=year)
-    if level:
-        qs = qs.filter(level=level)
-    if level in {"CHURCH", "DEPARTMENT"} and church:
-        qs = qs.filter(church=church)
-    elif level == "DISTRICT" and district:
-        qs = qs.filter(district=district)
-    elif level == "CONFERENCE" and conference:
-        qs = qs.filter(conference=conference)
-    return qs.order_by("account__name", "department__name")
 
 
 def budgets_for_church(church, year=None, level="CHURCH"):
@@ -96,17 +82,7 @@ def budgets_for_church(church, year=None, level="CHURCH"):
 
 
 def _churches_for_budget(budget):
-    from organization.models import Church
-
-    if budget.level == "CHURCH":
-        return Church.objects.filter(pk=budget.church_id)
-    if budget.level == "DEPARTMENT":
-        return Church.objects.filter(pk=budget.church_id)
-    if budget.level == "DISTRICT" and budget.district_id:
-        return Church.objects.filter(district_id=budget.district_id)
-    if budget.level == "CONFERENCE" and budget.conference_id:
-        return Church.objects.filter(district__zone__conference_id=budget.conference_id)
-    return Church.objects.none()
+    return selectors.churches_for_budget_qs(budget)
 
 
 def budget_line_variance(budget):
@@ -291,7 +267,7 @@ def save_budget(budget, user, church, is_new=False, old_amount=None):
     audit_church = church or budget.church
     if not audit_church:
         raise BudgetServiceError("Church context is required to save a budget.")
-    budget.save()
+    repo.save_budget(budget)
     if is_new:
         log_budget_audit(audit_church, "BUDGET_CREATE", user, budget)
     else:
@@ -305,9 +281,24 @@ def save_budget(budget, user, church, is_new=False, old_amount=None):
     return budget
 
 
+def budget_has_approved_actuals(budget) -> bool:
+    """True when approved transactions exist for this budget line's scope."""
+    if budget.level == "DEPARTMENT":
+        return False
+    churches = _churches_for_budget(budget)
+    if not churches.exists():
+        return False
+    actual = _account_actual(churches, budget.account, budget.year)
+    return actual > Decimal("0")
+
+
 def delete_budget(budget, user, church):
+    if budget_has_approved_actuals(budget):
+        raise BudgetServiceError(
+            "Cannot delete a budget line with approved transactions in this year."
+        )
     log_budget_audit(church, "BUDGET_DELETE", user, budget)
-    budget.delete()
+    repo.delete_budget(budget)
 
 
 def available_budget_levels(user, church):
@@ -320,18 +311,7 @@ def available_budget_levels(user, church):
 
 
 def duplicate_budget_exists(budget):
-    qs = Budget.objects.filter(year=budget.year, account=budget.account, level=budget.level)
-    if budget.pk:
-        qs = qs.exclude(pk=budget.pk)
-    if budget.level == "CHURCH":
-        return qs.filter(church=budget.church, department__isnull=True).exists()
-    if budget.level == "DEPARTMENT":
-        return qs.filter(church=budget.church, department=budget.department).exists()
-    if budget.level == "DISTRICT":
-        return qs.filter(district=budget.district).exists()
-    if budget.level == "CONFERENCE":
-        return qs.filter(conference=budget.conference).exists()
-    return False
+    return selectors.duplicate_budget_exists(budget)
 
 
 def validate_budget_instance(budget):
@@ -349,9 +329,7 @@ def get_editable_budget(request, pk):
     if not church:
         raise BudgetServiceError("Select a church context to manage budgets.")
 
-    budget = Budget.objects.select_related(
-        "account", "church", "district", "conference", "department"
-    ).filter(pk=pk).first()
+    budget = selectors.budget_by_pk(pk)
     if not budget:
         raise Http404
 
@@ -367,4 +345,3 @@ def get_editable_budget(request, pk):
         if budget.conference_id != church.district.zone.conference_id:
             raise Http404
     return budget, church
-

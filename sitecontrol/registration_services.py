@@ -4,13 +4,12 @@ from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
-from accounts.models import User
 from accounts.services import create_invitation
-from organization.models import Church, District
 from organization.services import create_church, onboard_full_hierarchy
 from permissions.roles import UserRole
 
-from .models import TenantApplication
+from sitecontrol import repositories as repo
+from sitecontrol import selectors
 from .services import (
     assign_subscription,
     get_default_plan,
@@ -22,9 +21,7 @@ from .services import (
 def public_registration_allowed():
     if not get_site_settings().allow_church_self_registration:
         return False
-    from sitecontrol.models import Denomination
-
-    return Denomination.objects.filter(is_active=True, allow_public_registration=True).exists()
+    return selectors.public_registration_denomination_exists()
 
 
 def institution_invites_allowed():
@@ -36,7 +33,7 @@ def institution_onboarding_allowed():
 
 
 def pending_application_count():
-    return TenantApplication.objects.filter(status="PENDING").count()
+    return selectors.pending_application_count()
 
 
 def _validate_role(role):
@@ -54,13 +51,13 @@ def submit_tenant_application(data, ip_address=None):
     email = data["contact_email"].lower().strip()
     username = data["applicant_username"].strip()
 
-    if TenantApplication.objects.filter(status="PENDING", contact_email=email).exists():
+    if selectors.pending_application_for_email(email):
         raise ValueError("An application with this email is already pending review.")
 
-    if User.objects.filter(username__iexact=username).exists():
+    if selectors.username_exists_iexact(username):
         raise ValueError("This username is already taken.")
 
-    if User.objects.filter(email__iexact=email).exists():
+    if selectors.email_exists_iexact(email):
         raise ValueError("An account with this email already exists.")
 
     app_type = data.get("application_type", "EXISTING_DISTRICT")
@@ -76,13 +73,13 @@ def submit_tenant_application(data, ip_address=None):
             raise ValueError("Please select a district.")
         if district.zone.conference.denomination_id != denomination.pk:
             raise ValueError("The selected district does not belong to your denomination.")
-        if Church.objects.filter(district=district, code=data["church_code"]).exists():
+        if selectors.church_code_exists_in_district(district, data["church_code"]):
             raise ValueError("A church with this code already exists in the selected district.")
     else:
-        if Church.objects.filter(code=data["church_code"]).exists():
+        if selectors.church_code_exists(data["church_code"]):
             raise ValueError("A church with this code already exists.")
 
-    application = TenantApplication.objects.create(
+    application = repo.create_tenant_application(
         application_type=app_type,
         denomination=denomination,
         church_name=data["church_name"].strip(),
@@ -205,7 +202,7 @@ def approve_tenant_application(
     application.reviewed_at = timezone.now()
     application.created_church = church
     application.invitation = invitation
-    application.save()
+    repo.save_application(application)
 
     return application, church, invitation
 
@@ -219,5 +216,5 @@ def reject_tenant_application(application, reviewer, review_notes=""):
     application.review_notes = review_notes
     application.reviewed_by = reviewer
     application.reviewed_at = timezone.now()
-    application.save()
+    repo.save_application(application)
     return application

@@ -2,6 +2,7 @@
 
 from django.db import transaction
 
+from sitecontrol import repositories as repo
 from sitecontrol.denomination_defaults import BUILTIN_DENOMINATIONS, DEFAULT_LEVEL_LABELS
 
 
@@ -68,8 +69,10 @@ def apply_seed_config_to_church(church, denomination):
     create_default_offering_categories(church)
 
     for item in config.get("offering_categories", []):
-        OfferingCategory.objects.filter(church=church, code=item["code"]).update(
-            name=item.get("name", item["code"])
+        repo.update_offering_category_names(
+            church=church,
+            code=item["code"],
+            name=item.get("name", item["code"]),
         )
 
     if config.get("enable_remittance", True) and denomination.feature_remittance:
@@ -95,11 +98,9 @@ def apply_seed_config_to_church(church, denomination):
 
 @transaction.atomic
 def ensure_builtin_denominations():
-    from sitecontrol.models import Denomination
-
     created = []
     for spec in BUILTIN_DENOMINATIONS:
-        obj, was_created = Denomination.objects.update_or_create(
+        obj, was_created = repo.update_or_create_denomination(
             code=spec["code"],
             defaults={
                 "name": spec["name"],
@@ -131,10 +132,9 @@ def hierarchy_chain_description(denomination):
 
 
 def assign_orphan_conferences_to_default():
-    from organization.models import Conference
     from sitecontrol.models import Denomination
 
     default = Denomination.get_default()
     if not default:
         return 0
-    return Conference.objects.filter(denomination__isnull=True).update(denomination=default)
+    return repo.assign_orphan_conferences_to_denomination(default)

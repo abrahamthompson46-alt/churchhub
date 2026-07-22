@@ -7,11 +7,14 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from church_system.auth import ChurchHubLoginView
-from church_system.views import health_check
+from church_system.views import health_check, live_check, metrics_check, ready_check
 from sitecontrol.views_registration import church_apply, church_apply_success
 
 urlpatterns = [
     path("health/", health_check, name="health_check"),
+    path("health/live/", live_check, name="health_live"),
+    path("health/ready/", ready_check, name="health_ready"),
+    path("metrics/", metrics_check, name="metrics"),
     path("apply/", church_apply, name="church_apply"),
     path("apply/success/", church_apply_success, name="church_apply_success"),
     path("", RedirectView.as_view(pattern_name="login", permanent=False)),

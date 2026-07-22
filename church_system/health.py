@@ -1,5 +1,11 @@
-"""Operational health checks for load balancers and monitoring."""
+"""Operational health / readiness / liveness checks."""
 
+from __future__ import annotations
+
+import time
+from collections.abc import Callable
+
+from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
@@ -29,35 +35,140 @@ def check_migrations():
     return "ok"
 
 
-def run_health_checks():
-    """
-    Run all health probes.
-    Returns (payload dict, http_status).
-    """
-    payload = {
-        "status": "ok",
-        "service": "churchhub",
-        "checks": {
-            "database": "unknown",
-            "cache": "unknown",
-            "migrations": "unknown",
-        },
-    }
-    failures = []
+def check_debug_safe():
+    """Fail health when DEBUG is on in a production-like deployment."""
+    from church_system.debug_config import is_production_like_env
 
-    for name, checker in (
-        ("database", check_database),
-        ("cache", check_cache),
-        ("migrations", check_migrations),
-    ):
+    if settings.DEBUG and is_production_like_env():
+        raise RuntimeError(
+            "DEBUG=True on a production-like host (DATABASE_URL / RENDER / "
+            "PYTHONANYWHERE_SITE / DYNO). Set DJANGO_DEBUG=False."
+        )
+    return "ok"
+
+
+def check_redis_configured():
+    """Warn-level for liveness; readiness may require Redis in production."""
+    redis_url = getattr(settings, "REDIS_URL", "") or ""
+    env = getattr(settings, "DJANGO_ENV", "development")
+    if env == "production" and not redis_url:
+        raise RuntimeError("REDIS_URL is required in production")
+    if redis_url:
+        # Touch cache which is backed by Redis when configured
+        check_cache()
+        return "ok"
+    return "skipped"
+
+
+def check_celery_broker():
+    """Optional probe — skip when eager or broker unreachable in non-prod."""
+    if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+        return "eager"
+    broker = getattr(settings, "CELERY_BROKER_URL", "") or ""
+    if not broker:
+        return "skipped"
+    try:
+        from kombu import Connection
+
+        with Connection(broker) as conn:
+            conn.ensure_connection(max_retries=1, timeout=2)
+        return "ok"
+    except Exception as exc:
+        env = getattr(settings, "DJANGO_ENV", "development")
+        if env == "production":
+            raise RuntimeError(f"celery broker unreachable: {exc}") from exc
+        return f"degraded:{exc}"
+
+
+def _run_named_checks(checks: tuple[tuple[str, Callable], ...]):
+    payload = {"status": "ok", "service": "churchhub", "checks": {}}
+    failures = []
+    for name, checker in checks:
+        payload["checks"][name] = "unknown"
         try:
             payload["checks"][name] = checker()
         except Exception as exc:
             payload["checks"][name] = "error"
             payload["checks"][f"{name}_detail"] = str(exc)
             failures.append(name)
-
     if failures:
         payload["status"] = "degraded"
         return payload, 503
     return payload, 200
+
+
+def run_liveness_checks():
+    """Process is up — minimal probes (DB ping only)."""
+    started = time.time()
+    payload, status = _run_named_checks((("database", check_database),))
+    payload["check_type"] = "liveness"
+    payload["duration_ms"] = int((time.time() - started) * 1000)
+    return payload, status
+
+
+def run_readiness_checks():
+    """Ready to serve traffic — DB, migrations, cache/redis, debug safety."""
+    started = time.time()
+    checks = [
+        ("database", check_database),
+        ("migrations", check_migrations),
+        ("cache", check_cache),
+        ("debug", check_debug_safe),
+        ("redis", check_redis_configured),
+    ]
+    payload, status = _run_named_checks(tuple(checks))
+    payload["check_type"] = "readiness"
+    payload["duration_ms"] = int((time.time() - started) * 1000)
+    payload["django_env"] = getattr(settings, "DJANGO_ENV", "unknown")
+    return payload, status
+
+
+def run_health_checks():
+    """
+    Full health probes (backward compatible with /health/).
+    Returns (payload dict, http_status).
+    """
+    started = time.time()
+    checks = [
+        ("database", check_database),
+        ("cache", check_cache),
+        ("migrations", check_migrations),
+        ("debug", check_debug_safe),
+    ]
+    # Include celery broker status as informational in full health
+    payload, status = _run_named_checks(tuple(checks))
+    try:
+        payload["checks"]["celery_broker"] = check_celery_broker()
+    except Exception as exc:
+        payload["checks"]["celery_broker"] = "error"
+        payload["checks"]["celery_broker_detail"] = str(exc)
+        payload["status"] = "degraded"
+        status = 503
+    payload["check_type"] = "health"
+    payload["duration_ms"] = int((time.time() - started) * 1000)
+    payload["django_env"] = getattr(settings, "DJANGO_ENV", "unknown")
+    return payload, status
+
+
+def basic_metrics():
+    """Lightweight process metrics for /metrics/ JSON (not Prometheus)."""
+    import os
+
+    try:
+        import django
+
+        django_version = django.get_version()
+    except Exception:
+        django_version = "unknown"
+
+    db_engine = settings.DATABASES["default"]["ENGINE"].split(".")[-1]
+    return {
+        "service": "churchhub",
+        "django_env": getattr(settings, "DJANGO_ENV", "unknown"),
+        "django_version": django_version,
+        "debug": bool(settings.DEBUG),
+        "database_engine": db_engine,
+        "redis_configured": bool(getattr(settings, "REDIS_URL", "")),
+        "celery_eager": bool(getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False)),
+        "pid": os.getpid(),
+    }

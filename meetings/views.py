@@ -1,14 +1,13 @@
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.db.models import Q
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 
-from church_system.church_scope import filter_by_church, require_church
+from church_system.church_scope import require_church
 from church_system.flash import flash_exception, flash_info, flash_success
-from members.models import Member
+from meetings import repositories as repo
+from meetings import selectors
 from permissions.checks import (
     any_permission_required,
-    can_approve_minutes,
     can_manage_meetings,
     permission_required,
 )
@@ -24,7 +23,6 @@ from .forms import (
     MeetingMinutesForm,
     MinutesRejectForm,
 )
-from .models import AttendanceEvent, Meeting, MeetingAttachment
 from .services import record_event_attendance, record_meeting_attendance
 from .workflow import (
     MeetingWorkflowError,
@@ -41,44 +39,10 @@ from .workflow import (
 )
 
 
-def _meeting_queryset(request):
-    return filter_by_church(
-        Meeting.objects.select_related(
-            "department",
-            "church",
-            "created_by",
-            "minutes_submitted_by",
-            "minutes_approved_by",
-        ),
-        request,
-    )
-
-
 def _filter_meetings(request, qs):
     form = MeetingFilterForm(request.GET or None)
     if form.is_valid():
-        cleaned = form.cleaned_data
-        q = cleaned.get("q", "").strip()
-        if q:
-            qs = qs.filter(
-                Q(title__icontains=q)
-                | Q(agenda__icontains=q)
-                | Q(location__icontains=q)
-                | Q(chair_person__icontains=q)
-                | Q(minutes__icontains=q)
-                | Q(minutes_deliberations__icontains=q)
-                | Q(minutes_motions__icontains=q)
-            )
-        if cleaned.get("meeting_type"):
-            qs = qs.filter(meeting_type=cleaned["meeting_type"])
-        if cleaned.get("status"):
-            qs = qs.filter(status=cleaned["status"])
-        if cleaned.get("minutes_status"):
-            qs = qs.filter(minutes_status=cleaned["minutes_status"])
-        if cleaned.get("date_from"):
-            qs = qs.filter(scheduled_at__date__gte=cleaned["date_from"])
-        if cleaned.get("date_to"):
-            qs = qs.filter(scheduled_at__date__lte=cleaned["date_to"])
+        qs = selectors.filter_meetings_queryset(qs, form.cleaned_data)
     return qs, form
 
 
@@ -86,8 +50,8 @@ def _filter_meetings(request, qs):
 @require_feature("meetings")
 @any_permission_required("view_meetings", "manage_meetings")
 def meeting_list(request):
-    meetings, filter_form = _filter_meetings(request, _meeting_queryset(request))
-    meetings = meetings.order_by("-scheduled_at")[:200]
+    meetings, filter_form = _filter_meetings(request, selectors.meetings_for_request(request))
+    meetings = selectors.meetings_list_limited(meetings, limit=200)
     return render(request, "meetings/list.html", {
         "meetings": meetings,
         "filter_form": filter_form,
@@ -122,7 +86,7 @@ def meeting_create(request):
             meeting = form.save(commit=False)
             meeting.church = church
             meeting.created_by = request.user
-            meeting.save()
+            repo.save_meeting(meeting)
             flash_success(request, "Meeting scheduled.")
             return redirect("meetings:detail", pk=meeting.pk)
     else:
@@ -135,11 +99,9 @@ def meeting_create(request):
 
 
 def _meeting_context(request, meeting):
-    members = Member.objects.filter(church=meeting.church, is_active=True).order_by("last_name")
-    attendee_ids = set(meeting.attendees.values_list("member_id", flat=True))
-    present_ids = set(
-        meeting.attendees.filter(is_present=True).values_list("member_id", flat=True)
-    )
+    members = selectors.active_members_for_church(meeting.church)
+    attendee_ids = selectors.meeting_attendee_member_ids(meeting)
+    present_ids = selectors.meeting_present_member_ids(meeting)
     return {
         "meeting": meeting,
         "members": members,
@@ -164,12 +126,7 @@ def _meeting_context(request, meeting):
 def meeting_detail(request, pk):
     if not can_view_meetings_user(request.user):
         raise PermissionDenied
-    meeting = get_object_or_404(
-        _meeting_queryset(request).prefetch_related(
-            "attendees__member", "action_items", "decisions", "attachments__uploaded_by"
-        ),
-        pk=pk,
-    )
+    meeting = selectors.get_meeting_or_404(request, pk, detail=True)
     return render(request, "meetings/detail.html", {
         **_meeting_context(request, meeting),
         "breadcrumbs": [
@@ -183,13 +140,14 @@ def meeting_detail(request, pk):
 @require_feature("meetings")
 @any_permission_required("view_meetings", "manage_meetings")
 def meeting_edit(request, pk):
-    meeting = get_object_or_404(_meeting_queryset(request), pk=pk)
+    meeting = selectors.get_meeting_or_404(request, pk)
     if not can_edit_meeting_metadata(request.user, meeting):
         raise PermissionDenied
     if request.method == "POST":
         form = MeetingForm(request.POST, instance=meeting, church=meeting.church)
         if form.is_valid():
-            form.save()
+            meeting = form.save(commit=False)
+            repo.save_meeting(meeting)
             flash_success(request, "Meeting updated.")
             return redirect("meetings:detail", pk=meeting.pk)
     else:
@@ -210,7 +168,7 @@ def meeting_edit(request, pk):
 @require_feature("meetings")
 @any_permission_required("view_meetings", "manage_meetings")
 def meeting_action(request, pk):
-    meeting = get_object_or_404(_meeting_queryset(request), pk=pk)
+    meeting = selectors.get_meeting_or_404(request, pk)
     if request.method != "POST":
         return redirect("meetings:detail", pk=pk)
 
@@ -276,7 +234,7 @@ def meeting_action(request, pk):
             attachment = form.save(commit=False)
             attachment.meeting = meeting
             attachment.uploaded_by = request.user
-            attachment.save()
+            repo.save_meeting_attachment(attachment)
             flash_success(request, "File uploaded.")
         else:
             flash_exception(request, "Upload failed. Select a valid file.")
@@ -285,9 +243,10 @@ def meeting_action(request, pk):
     if action == "delete_attachment":
         if not can_manage_meetings(request.user):
             raise PermissionDenied
-        attachment = get_object_or_404(MeetingAttachment, pk=request.POST.get("attachment_id"), meeting=meeting)
-        attachment.file.delete(save=False)
-        attachment.delete()
+        attachment = selectors.get_meeting_attachment_or_404(
+            meeting=meeting, pk=request.POST.get("attachment_id")
+        )
+        repo.delete_meeting_attachment(attachment)
         flash_success(request, "Attachment removed.")
         return redirect("meetings:detail", pk=pk)
 
@@ -295,10 +254,9 @@ def meeting_action(request, pk):
 
 
 def _notify_minutes_submitted(meeting):
-    from accounts.models import User
     from dashboard.services import notify_user
 
-    for user in User.objects.filter(is_active=True, church_id=meeting.church_id):
+    for user in selectors.active_users_for_church(meeting.church_id):
         if can_approve_meeting_minutes(user, meeting):
             notify_user(
                 user,
@@ -337,7 +295,7 @@ def _notify_minutes_decision(meeting, approved=True, reason=""):
 @require_feature("meetings")
 @permission_required("manage_meetings")
 def meeting_attendance(request, pk):
-    meeting = get_object_or_404(_meeting_queryset(request), pk=pk)
+    meeting = selectors.get_meeting_or_404(request, pk)
     if request.method == "POST":
         member_ids = request.POST.getlist("members")
         present_ids = request.POST.getlist("present")
@@ -350,7 +308,7 @@ def meeting_attendance(request, pk):
 @require_feature("meetings")
 @permission_required("manage_meetings")
 def action_item_add(request, pk):
-    meeting = get_object_or_404(_meeting_queryset(request), pk=pk)
+    meeting = selectors.get_meeting_or_404(request, pk)
     if not can_edit_minutes(request.user, meeting):
         raise PermissionDenied
     if request.method == "POST":
@@ -358,7 +316,7 @@ def action_item_add(request, pk):
         if form.is_valid():
             item = form.save(commit=False)
             item.meeting = meeting
-            item.save()
+            repo.save_action_item(item)
             flash_success(request, "Action item added.")
     return redirect("meetings:detail", pk=pk)
 
@@ -367,7 +325,7 @@ def action_item_add(request, pk):
 @require_feature("meetings")
 @permission_required("manage_meetings")
 def decision_add(request, pk):
-    meeting = get_object_or_404(_meeting_queryset(request), pk=pk)
+    meeting = selectors.get_meeting_or_404(request, pk)
     if not can_edit_minutes(request.user, meeting):
         raise PermissionDenied
     if request.method == "POST":
@@ -375,7 +333,7 @@ def decision_add(request, pk):
         if form.is_valid():
             decision = form.save(commit=False)
             decision.meeting = meeting
-            decision.save()
+            repo.save_decision(decision)
             flash_success(request, "Decision recorded.")
     return redirect("meetings:detail", pk=pk)
 
@@ -384,9 +342,7 @@ def decision_add(request, pk):
 @require_feature("meetings")
 @permission_required("manage_meetings")
 def attendance_list(request):
-    events = filter_by_church(
-        AttendanceEvent.objects.select_related("church", "department"), request
-    ).order_by("-event_date")
+    events = selectors.attendance_events_for_request(request)
     return render(request, "meetings/attendance_list.html", {"events": events})
 
 
@@ -401,7 +357,7 @@ def attendance_create(request):
             event = form.save(commit=False)
             event.church = church
             event.created_by = request.user
-            event.save()
+            repo.save_attendance_event(event)
             flash_success(request, "Attendance event created.")
             return redirect("meetings:attendance_detail", pk=event.pk)
     else:
@@ -413,12 +369,9 @@ def attendance_create(request):
 @require_feature("meetings")
 @permission_required("manage_meetings")
 def attendance_detail(request, pk):
-    event = get_object_or_404(
-        filter_by_church(AttendanceEvent.objects.all(), request).prefetch_related("records__member"),
-        pk=pk,
-    )
-    members = Member.objects.filter(church=event.church, is_active=True).order_by("last_name")
-    present_ids = set(event.records.filter(is_present=True).values_list("member_id", flat=True))
+    event = selectors.get_attendance_event_or_404(request, pk, with_records=True)
+    members = selectors.active_members_for_church(event.church)
+    present_ids = selectors.event_present_member_ids(event)
     return render(request, "meetings/attendance_detail.html", {
         "event": event,
         "members": members,
@@ -430,7 +383,7 @@ def attendance_detail(request, pk):
 @require_feature("meetings")
 @permission_required("manage_meetings")
 def attendance_record(request, pk):
-    event = get_object_or_404(filter_by_church(AttendanceEvent.objects.all(), request), pk=pk)
+    event = selectors.get_attendance_event_or_404(request, pk)
     if request.method == "POST":
         member_ids = request.POST.getlist("members")
         present_ids = request.POST.getlist("present")

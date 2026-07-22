@@ -111,7 +111,7 @@ class Command(BaseCommand):
                 user=treasurer,
                 church=church,
             )
-            post_settlement_batch(batch, treasurer)
+            post_settlement_batch(batch, pastor)
         except Exception as exc:
             self.issues.append(f"Settlement seed skipped: {exc}")
 

@@ -156,7 +156,38 @@ class HierarchyScopeTests(TestCase):
 
 
 class ViewTests(DashboardTestMixin, TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from unittest.mock import patch
+
+        from django.test.client import ContextList
+
+        def _safe_store(store, signal, sender, template, context, **kwargs):
+            store.setdefault("templates", []).append(template)
+            if "context" not in store:
+                store["context"] = ContextList()
+            store["context"].append(context)
+
+        cls._template_store_patcher = patch(
+            "django.test.client.store_rendered_templates",
+            _safe_store,
+        )
+        cls._template_store_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._template_store_patcher.stop()
+        super().tearDownClass()
+
     def setUp(self):
+        from accounts.mfa import SESSION_MFA_VERIFIED, enable_mfa_for_user, generate_totp_secret
+        from sitecontrol.models import SiteSettings
+
+        SiteSettings.objects.update_or_create(
+            singleton_id=1,
+            defaults={"mfa_required_for_privileged": False},
+        )
         self.client = Client()
         self.treasury = User.objects.create_user(
             username="treasury",
@@ -164,20 +195,36 @@ class ViewTests(DashboardTestMixin, TestCase):
             role=UserRole.TREASURY,
             church=self.church,
         )
+        enable_mfa_for_user(self.treasury, generate_totp_secret(), [])
+        self._mfa_key = SESSION_MFA_VERIFIED
+
+    def _login(self, username):
+        from accounts.mfa import enable_mfa_for_user, generate_totp_secret
+
+        user = User.objects.get(username=username)
+        if not getattr(user, "mfa_enabled", False):
+            try:
+                enable_mfa_for_user(user, generate_totp_secret(), [])
+            except Exception:
+                pass
+        self.client.login(username=username, password="pass12345")
+        session = self.client.session
+        session[self._mfa_key] = True
+        session.save()
 
     def test_home_requires_login(self):
         response = self.client.get(reverse("dashboard:home"))
         self.assertEqual(response.status_code, 302)
 
     def test_home_renders_for_treasury(self):
-        self.client.login(username="treasury", password="pass12345")
+        self._login("treasury")
         response = self.client.get(reverse("dashboard:home"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Good day")
 
     def test_notification_inbox(self):
         notify_user(self.treasury, "Alert", "Test message")
-        self.client.login(username="treasury", password="pass12345")
+        self._login("treasury")
         response = self.client.get(reverse("dashboard:notifications"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Test message")
@@ -185,7 +232,7 @@ class ViewTests(DashboardTestMixin, TestCase):
     def test_mark_all_read(self):
         notify_user(self.treasury, "A", "One")
         notify_user(self.treasury, "B", "Two")
-        self.client.login(username="treasury", password="pass12345")
+        self._login("treasury")
         response = self.client.post(reverse("dashboard:notification_mark_all_read"))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
@@ -194,13 +241,13 @@ class ViewTests(DashboardTestMixin, TestCase):
 
     def test_notification_count_api(self):
         notify_user(self.treasury, "A", "One")
-        self.client.login(username="treasury", password="pass12345")
+        self._login("treasury")
         response = self.client.get(reverse("dashboard:notification_count"))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["count"], 1)
 
     def test_cutoff_page(self):
-        self.client.login(username="treasury", password="pass12345")
+        self._login("treasury")
         session = self.client.session
         session["current_church_id"] = str(self.church.id)
         session.save()
@@ -208,7 +255,7 @@ class ViewTests(DashboardTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_cutoff_get_does_not_create_monthly_cutoff(self):
-        self.client.login(username="treasury", password="pass12345")
+        self._login("treasury")
         session = self.client.session
         session["current_church_id"] = str(self.church.id)
         session.save()
@@ -225,12 +272,12 @@ class ViewTests(DashboardTestMixin, TestCase):
             role=UserRole.MEMBER,
             church=self.church,
         )
-        self.client.login(username="member_no_fin", password="pass12345")
+        self._login("member_no_fin")
         response = self.client.get(reverse("dashboard:cutoff"))
         self.assertEqual(response.status_code, 403)
 
     def test_switcher_clears_session_with_empty_church(self):
-        self.client.login(username="treasury", password="pass12345")
+        self._login("treasury")
         session = self.client.session
         session["current_church_id"] = str(self.church.id)
         session.save()
@@ -239,7 +286,7 @@ class ViewTests(DashboardTestMixin, TestCase):
         self.assertNotIn("current_church_id", self.client.session)
 
     def test_home_clears_church_with_all(self):
-        self.client.login(username="treasury", password="pass12345")
+        self._login("treasury")
         session = self.client.session
         session["current_church_id"] = str(self.church.id)
         session.save()
@@ -254,7 +301,7 @@ class ViewTests(DashboardTestMixin, TestCase):
             "Click me",
             action_url="https://evil.example/steal",
         )
-        self.client.login(username="treasury", password="pass12345")
+        self._login("treasury")
         response = self.client.post(
             reverse("dashboard:notification_mark_read", kwargs={"pk": n.pk}),
             {"follow": "1"},
@@ -273,7 +320,7 @@ class ViewTests(DashboardTestMixin, TestCase):
             "Internal",
             action_url="/dashboard/notifications/",
         )
-        self.client.login(username="treasury", password="pass12345")
+        self._login("treasury")
         response = self.client.post(
             reverse("dashboard:notification_mark_read", kwargs={"pk": n.pk}),
             {"follow": "1"},
@@ -287,7 +334,7 @@ class ViewTests(DashboardTestMixin, TestCase):
             password="pass12345",
             role=UserRole.GENERAL_OVERSEER,
         )
-        self.client.login(username="overseer", password="pass12345")
+        self._login("overseer")
         response = self.client.get(reverse("dashboard:home"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "District Roll-up")
@@ -295,10 +342,18 @@ class ViewTests(DashboardTestMixin, TestCase):
         self.assertContains(response, "Action Queue")
 
     def test_executive_kpis_for_overseer(self):
+        from sitecontrol.denomination_services import ensure_builtin_denominations
+        from sitecontrol.models import Denomination
+
+        ensure_builtin_denominations()
+        sda = Denomination.objects.get(code="sda")
+        self.conference.denomination = sda
+        self.conference.save(update_fields=["denomination"])
         overseer = User.objects.create_user(
             username="go_kpi",
             password="pass12345",
             role=UserRole.GENERAL_OVERSEER,
+            denomination=sda,
         )
         factory = RequestFactory()
         request = factory.get("/")
@@ -329,7 +384,7 @@ class ViewTests(DashboardTestMixin, TestCase):
             role=UserRole.SECRETARY,
             church=self.church,
         )
-        self.client.login(username="secretary", password="pass12345")
+        self._login("secretary")
         response = self.client.get(reverse("dashboard:home"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Upcoming Meetings")
@@ -342,7 +397,7 @@ class ViewTests(DashboardTestMixin, TestCase):
             username="sec2", password="pass12345", role=UserRole.SECRETARY, church=self.church
         )
         for username in ("treasury", "ov2", "sec2"):
-            self.client.login(username=username, password="pass12345")
+            self._login(username)
             response = self.client.get(reverse("dashboard:home"))
             self.assertEqual(response.status_code, 200, username)
 

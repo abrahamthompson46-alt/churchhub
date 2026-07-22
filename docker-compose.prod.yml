@@ -1,0 +1,55 @@
+# Production-oriented Compose override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Override secrets via environment or an env file before going live.
+
+services:
+  web:
+    environment:
+      DJANGO_DEBUG: "False"
+      DJANGO_ENV: production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?set hosts}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:?set csrf origins}
+      CHURCHHUB_PUBLIC_URL: ${CHURCHHUB_PUBLIC_URL:?set public url}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CHURCHHUB_ASYNC_EMAIL: ${CHURCHHUB_ASYNC_EMAIL:-0}
+      CHURCHHUB_FILE_LOGS: "true"
+      CHURCHHUB_LOG_DIR: /app/logs
+      MEDIA_ROOT: /app/media
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: production
+    restart: unless-stopped
+
+  celery:
+    environment:
+      DJANGO_DEBUG: "False"
+      DJANGO_ENV: production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CELERY_TASK_ALWAYS_EAGER: "false"
+      CHURCHHUB_FILE_LOGS: "true"
+    restart: unless-stopped
+
+  celerybeat:
+    environment:
+      DJANGO_DEBUG: "False"
+      DJANGO_ENV: production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CELERY_TASK_ALWAYS_EAGER: "false"
+      CHURCHHUB_CELERY_BEAT: "true"
+      CHURCHHUB_FILE_LOGS: "true"
+    restart: unless-stopped
+
+  db:
+    restart: unless-stopped
+
+  redis:
+    restart: unless-stopped

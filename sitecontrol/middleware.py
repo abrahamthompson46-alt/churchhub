@@ -41,6 +41,7 @@ INSTITUTION_PREFIXES = (
 INSTITUTION_ACCOUNT_PATHS = (
     "/accounts/profile",
     "/accounts/invite/accept",
+    "/accounts/mfa/",
 )
 
 
@@ -118,6 +119,7 @@ class MaintenanceModeMiddleware:
             request.path.startswith("/platform/"),
             request.path.startswith("/static/"),
             request.path.startswith("/health/"),
+            request.path.startswith("/metrics/"),
             (
                 request.path.startswith("/apply/")
                 and not getattr(settings_obj, "maintenance_block_apply", True)
@@ -140,18 +142,62 @@ class MaintenanceModeMiddleware:
 
 
 class LoginRateLimitMiddleware:
-    """Throttle repeated failed login attempts by IP and username."""
+    """Throttle failed auth POSTs: staff login, portal login, and password reset."""
+
+    LOGIN_PATHS = frozenset({"/accounts/login", "/portal/login"})
+    RESET_REQUEST_PATH = "/accounts/password_reset"
 
     def __init__(self, get_response):
         self.get_response = get_response
 
+    @staticmethod
+    def _norm_path(path: str) -> str:
+        return path.rstrip("/") or "/"
+
+    @classmethod
+    def _is_login_path(cls, path: str) -> bool:
+        return path in cls.LOGIN_PATHS
+
+    @classmethod
+    def _is_reset_path(cls, path: str) -> bool:
+        if path == cls.RESET_REQUEST_PATH:
+            return True
+        # Django confirm: /accounts/reset/<uidb64>/<token>
+        parts = path.strip("/").split("/")
+        return (
+            len(parts) == 4
+            and parts[0] == "accounts"
+            and parts[1] == "reset"
+            and parts[3] != "done"
+        )
+
+    @staticmethod
+    def _login_succeeded(request) -> bool:
+        if request.user.is_authenticated:
+            return True
+        # Privileged MFA: password OK, challenge pending (not yet authenticated).
+        return bool(request.session.get("mfa_pending_user_id"))
+
     def __call__(self, request):
-        if request.method == "POST" and request.path.rstrip("/") == "/accounts/login":
-            settings_obj = get_site_settings()
-            ip = request.META.get("REMOTE_ADDR", "unknown")
+        if request.method != "POST":
+            return self.get_response(request)
+
+        path = self._norm_path(request.path)
+        is_login = self._is_login_path(path)
+        is_reset = self._is_reset_path(path)
+        if not is_login and not is_reset:
+            return self.get_response(request)
+
+        settings_obj = get_site_settings()
+        ip = request.META.get("REMOTE_ADDR", "unknown")
+        ttl = settings_obj.login_lockout_minutes * 60
+        max_attempts = settings_obj.login_max_attempts
+
+        if is_login:
             username = (request.POST.get("username") or "").strip().lower()
             lock_key = f"login_lock:{ip}"
             user_lock_key = f"login_lock_user:{username}" if username else None
+            redirect_name = "portal:login" if path == "/portal/login" else "login"
 
             if cache.get(lock_key) or (user_lock_key and cache.get(user_lock_key)):
                 messages.error(
@@ -159,21 +205,20 @@ class LoginRateLimitMiddleware:
                     f"Too many failed login attempts. Try again in "
                     f"{settings_obj.login_lockout_minutes} minutes.",
                 )
-                return redirect("login")
+                return redirect(redirect_name)
 
             response = self.get_response(request)
 
-            if request.user.is_authenticated:
+            if self._login_succeeded(request):
                 cache.delete(f"login_fail:{ip}")
                 if username:
                     cache.delete(f"login_fail_user:{username}")
                 return response
 
-            ttl = settings_obj.login_lockout_minutes * 60
             fail_key = f"login_fail:{ip}"
             fails = cache.get(fail_key, 0) + 1
             cache.set(fail_key, fails, ttl)
-            if fails >= settings_obj.login_max_attempts:
+            if fails >= max_attempts:
                 cache.set(lock_key, True, ttl)
                 cache.delete(fail_key)
 
@@ -181,9 +226,38 @@ class LoginRateLimitMiddleware:
                 user_fail_key = f"login_fail_user:{username}"
                 user_fails = cache.get(user_fail_key, 0) + 1
                 cache.set(user_fail_key, user_fails, ttl)
-                if user_fails >= settings_obj.login_max_attempts:
+                if user_fails >= max_attempts:
                     cache.set(user_lock_key, True, ttl)
                     cache.delete(user_fail_key)
             return response
 
-        return self.get_response(request)
+        # Password reset request / confirm — throttle by IP (+ email when present).
+        email = (request.POST.get("email") or "").strip().lower()
+        lock_key = f"reset_lock:{ip}"
+        email_lock_key = f"reset_lock_email:{email}" if email else None
+
+        if cache.get(lock_key) or (email_lock_key and cache.get(email_lock_key)):
+            messages.error(
+                request,
+                f"Too many password reset attempts. Try again in "
+                f"{settings_obj.login_lockout_minutes} minutes.",
+            )
+            return redirect("password_reset")
+
+        response = self.get_response(request)
+
+        fail_key = f"reset_fail:{ip}"
+        fails = cache.get(fail_key, 0) + 1
+        cache.set(fail_key, fails, ttl)
+        if fails >= max_attempts:
+            cache.set(lock_key, True, ttl)
+            cache.delete(fail_key)
+
+        if email:
+            email_fail_key = f"reset_fail_email:{email}"
+            email_fails = cache.get(email_fail_key, 0) + 1
+            cache.set(email_fail_key, email_fails, ttl)
+            if email_fails >= max_attempts:
+                cache.set(email_lock_key, True, ttl)
+                cache.delete(email_fail_key)
+        return response

@@ -5,8 +5,7 @@ import uuid
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Sum
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -28,9 +27,8 @@ from permissions.checks import (
     can_view_pending_approvals,
     can_view_transactions,
 )
-from church_system.church_scope import filter_by_church, get_active_church, require_church
+from church_system.church_scope import get_active_church, require_church
 from church_system.flash import flash_error, flash_exception, flash_success, flash_warning
-from members.models import Member
 from transactions.forms import (
     BankReconciliationForm,
     ExpenseForm,
@@ -46,13 +44,13 @@ from transactions.idempotency import (
     claim_financial_idempotency,
     complete_financial_idempotency,
 )
-from transactions.models import BankReconciliation, FinancialAuditLog, Transaction
 from transactions.reporting import (
     build_statement_rows,
     export_statement_csv,
     export_statement_excel,
     export_statement_pdf,
 )
+from transactions import selectors
 from transactions.services import (
     PeriodLockedError,
     WorkingDayClosedError,
@@ -94,10 +92,7 @@ def _finance_required(view_func):
 
 @_finance_required
 def pending_approvals(request):
-    transactions_qs = filter_by_church(
-        Transaction.objects.filter(approval_status="PENDING"),
-        request,
-    ).select_related("member", "church").prefetch_related("lines__account").order_by("-date")
+    transactions_qs = selectors.pending_transactions_qs(request)
     paginator = Paginator(transactions_qs, 50)
     transactions = paginator.get_page(request.GET.get("page"))
     return render(request, "transactions/pending.html", {
@@ -112,10 +107,7 @@ def pending_approvals(request):
 def approve_transaction_view(request, pk):
     if not can_approve_transactions(request.user):
         raise PermissionDenied
-    transaction = get_object_or_404(
-        filter_by_church(Transaction.objects.all(), request),
-        pk=pk,
-    )
+    transaction = selectors.transaction_for_request(request, pk)
     try:
         svc_approve(transaction, request.user)
         flash_success(request, f"{transaction.reference} approved.")
@@ -138,10 +130,7 @@ def approve_transaction_view(request, pk):
 def reject_transaction_view(request, pk):
     if not can_approve_transactions(request.user):
         raise PermissionDenied
-    transaction = get_object_or_404(
-        filter_by_church(Transaction.objects.all(), request),
-        pk=pk,
-    )
+    transaction = selectors.transaction_for_request(request, pk)
     try:
         svc_reject(transaction, request.user)
         flash_success(request, f"{transaction.reference} rejected.")
@@ -156,7 +145,7 @@ def bulk_approve(request):
     if not can_approve_transactions(request.user):
         raise PermissionDenied
     ids = request.POST.getlist("transaction_ids")
-    qs = filter_by_church(Transaction.objects.filter(id__in=ids, approval_status="PENDING"), request)
+    qs = selectors.pending_transactions_by_ids_qs(request, ids)
     count = 0
     skipped = 0
     for txn in qs:
@@ -173,10 +162,7 @@ def bulk_approve(request):
 
 @_finance_required
 def transaction_receipt(request, pk):
-    transaction = get_object_or_404(
-        filter_by_church(Transaction.objects.all(), request),
-        pk=pk,
-    )
+    transaction = selectors.transaction_for_request(request, pk)
     return render(request, "transactions/receipt.html", {"transaction": transaction})
 
 
@@ -185,15 +171,11 @@ def financial_dashboard(request):
     start_date = request.GET.get("start_date")
     end_date = request.GET.get("end_date")
 
-    transactions = filter_by_church(
-        Transaction.objects.filter(approval_status="APPROVED", is_voided=False),
-        request,
-    ).order_by("date", "created_at")
-
-    if start_date:
-        transactions = transactions.filter(date__gte=parse_date(start_date))
-    if end_date:
-        transactions = transactions.filter(date__lte=parse_date(end_date))
+    start = parse_date(start_date) if start_date else None
+    end = parse_date(end_date) if end_date else None
+    transactions = selectors.approved_statement_transactions_qs(
+        request, start_date=start, end_date=end
+    )
 
     rows, total_receipt, total_expense, final_balance = build_statement_rows(transactions)
     export = request.GET.get("export")
@@ -201,10 +183,40 @@ def financial_dashboard(request):
     period = f"{start_date or 'start'} to {end_date or 'today'}"
 
     if export == "csv":
+        from reports.services import audit_export
+
+        audit_export(
+            user=request.user,
+            report_key="financial_statement",
+            export_format="csv",
+            row_count=len(rows),
+            church=church,
+            params={"start_date": start_date or "", "end_date": end_date or ""},
+        )
         return export_statement_csv(rows)
     if export == "excel":
+        from reports.services import audit_export
+
+        audit_export(
+            user=request.user,
+            report_key="financial_statement",
+            export_format="excel",
+            row_count=len(rows),
+            church=church,
+            params={"start_date": start_date or "", "end_date": end_date or ""},
+        )
         return export_statement_excel(rows)
     if export == "pdf":
+        from reports.services import audit_export
+
+        audit_export(
+            user=request.user,
+            report_key="financial_statement",
+            export_format="pdf",
+            row_count=len(rows),
+            church=church,
+            params={"start_date": start_date or "", "end_date": end_date or ""},
+        )
         return export_statement_pdf(rows, church_name=church.name if church else "", period=period)
 
     paginator = Paginator(rows, 50)
@@ -311,10 +323,7 @@ def record_expense_view(request):
 
 @_finance_required
 def audit_log(request):
-    logs_qs = filter_by_church(
-        FinancialAuditLog.objects.select_related("performed_by", "transaction", "church"),
-        request,
-    ).order_by("-created_at")
+    logs_qs = selectors.audit_logs_qs(request)
     paginator = Paginator(logs_qs, 50)
     logs = paginator.get_page(request.GET.get("page"))
     return render(request, "transactions/audit_log.html", {"logs": logs, "page_obj": logs})
@@ -370,8 +379,6 @@ def budget_report(request):
 
 @_finance_required
 def transaction_list(request):
-    from transactions.services import resolve_transaction_date
-
     church = get_active_church(request)
     business_date = resolve_transaction_date(church) if church else timezone.localdate()
 
@@ -380,28 +387,23 @@ def transaction_list(request):
     if date_from > date_to:
         date_from, date_to = date_to, date_from
 
-    transactions = filter_by_church(
-        Transaction.objects.select_related("member", "church", "created_by"),
-        request,
-    ).prefetch_related("lines__account").filter(
-        date__gte=date_from,
-        date__lte=date_to,
-    ).order_by("-date", "-created_at")
-
     status = request.GET.get("status", "")
     txn_type = request.GET.get("type", "")
-    if status:
-        transactions = transactions.filter(approval_status=status)
-    if txn_type:
-        transactions = transactions.filter(transaction_type=txn_type)
-
     show_voided = request.GET.get("voided", "")
-    if show_voided != "1":
-        transactions = transactions.filter(is_voided=False)
+
+    transactions = selectors.transaction_list_qs(
+        request,
+        date_from=date_from,
+        date_to=date_to,
+        status=status,
+        txn_type=txn_type,
+        include_voided=(show_voided == "1"),
+    )
 
     export_fmt = request.GET.get("export", "")
     if export_fmt in ("csv", "excel"):
         from reports.exporters import export_table_csv, export_table_excel
+        from reports.services import audit_export
 
         headers = ["Reference", "Date", "Type", "Status", "Description", "Amount", "Created by", "Voided"]
         rows = []
@@ -417,6 +419,19 @@ def transaction_list(request):
                 "Yes" if t.is_voided else "No",
             ])
         title = f"Transactions {date_from} to {date_to}"
+        audit_export(
+            user=request.user,
+            report_key="transactions_list",
+            export_format=export_fmt,
+            row_count=len(rows),
+            church=church,
+            params={
+                "status": status,
+                "type": txn_type,
+                "date_from": date_from.isoformat() if date_from else "",
+                "date_to": date_to.isoformat() if date_to else "",
+            },
+        )
         if export_fmt == "csv":
             return export_table_csv(headers, rows, "transactions.csv")
         return export_table_excel(headers, rows, "transactions.xlsx", title)
@@ -444,13 +459,7 @@ def transaction_list(request):
 
 @_finance_required
 def transaction_detail(request, pk):
-    transaction = get_object_or_404(
-        filter_by_church(
-            Transaction.objects.prefetch_related("lines__account", "reversals"),
-            request,
-        ),
-        pk=pk,
-    )
+    transaction = selectors.transaction_for_request(request, pk, detail=True)
     void_form = VoidTransactionForm()
     can_void = (
         can_void_transactions(request.user)
@@ -468,12 +477,9 @@ def transaction_detail(request, pk):
 @login_required
 @require_POST
 def void_transaction_view(request, pk):
-    if not can_approve_transactions(request.user):
+    if not can_void_transactions(request.user):
         raise PermissionDenied
-    transaction = get_object_or_404(
-        filter_by_church(Transaction.objects.all(), request),
-        pk=pk,
-    )
+    transaction = selectors.transaction_for_request(request, pk)
     form = VoidTransactionForm(request.POST)
     reason = form.data.get("reason", "") if form.is_valid() else request.POST.get("reason", "")
     try:
@@ -516,7 +522,7 @@ def period_list(request):
 @login_required
 @require_POST
 def working_day_open(request):
-    if not can_approve_transactions(request.user):
+    if not can_manage_working_day(request.user):
         raise PermissionDenied
     church = require_church(request)
     form = WorkingDayOpenForm(request.POST)
@@ -539,7 +545,7 @@ def working_day_open(request):
 @login_required
 @require_POST
 def working_day_close(request):
-    if not can_approve_transactions(request.user):
+    if not can_manage_working_day(request.user):
         raise PermissionDenied
     church = require_church(request)
     form = WorkingDayCloseForm(request.POST)
@@ -557,7 +563,7 @@ def working_day_close(request):
 @login_required
 @require_POST
 def period_lock(request):
-    if not can_approve_transactions(request.user):
+    if not can_lock_periods(request.user):
         raise PermissionDenied
     church = require_church(request)
     form = PeriodLockForm(request.POST)
@@ -581,7 +587,7 @@ def period_lock(request):
 @login_required
 @require_POST
 def period_unlock(request):
-    if not can_approve_transactions(request.user):
+    if not can_unlock_periods(request.user):
         raise PermissionDenied
     church = require_church(request)
     year = int(request.POST.get("year"))
@@ -596,10 +602,7 @@ def period_unlock(request):
 
 @_finance_required
 def reconciliation_list(request):
-    reconciliations_qs = filter_by_church(
-        BankReconciliation.objects.select_related("bank_account", "reconciled_by"),
-        request,
-    ).order_by("-statement_date")
+    reconciliations_qs = selectors.reconciliations_qs(request)
     paginator = Paginator(reconciliations_qs, 25)
     reconciliations = paginator.get_page(request.GET.get("page"))
     return render(request, "transactions/reconciliation_list.html", {
@@ -631,16 +634,8 @@ def reconciliation_create(request):
 
 @_finance_required
 def reconciliation_detail(request, pk):
-    recon = get_object_or_404(
-        filter_by_church(
-            BankReconciliation.objects.select_related("bank_account", "reconciled_by"),
-            request,
-        ),
-        pk=pk,
-    )
-    items = recon.items.select_related(
-        "transaction_line__transaction"
-    ).order_by("-transaction_line__transaction__date")
+    recon = selectors.reconciliation_for_request(request, pk)
+    items = selectors.reconciliation_items(recon)
 
     if request.method == "POST" and not recon.is_reconciled:
         action = request.POST.get("action")

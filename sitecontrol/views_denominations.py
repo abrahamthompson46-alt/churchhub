@@ -1,10 +1,9 @@
 """Platform denomination management — profiles, branding, billing, audit."""
 
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 
 from church_system.flash import flash_success
-from organization.models import Church, Conference
 from sitecontrol.billing_services import (
     all_denominations_billing_rollups,
     denomination_audit_log,
@@ -22,8 +21,9 @@ from sitecontrol.denomination_services import (
     get_terminology_context,
     hierarchy_chain_description,
 )
+from sitecontrol import repositories as repo
+from sitecontrol import selectors
 from sitecontrol.forms import DenominationForm
-from sitecontrol.models import Denomination
 from sitecontrol.platform_access import operator_can_access_denomination
 from sitecontrol.rbac import CAP_MANAGE_DENOMINATIONS, CAP_VIEW, CAP_VIEW_BILLING
 from sitecontrol.services import log_platform_action
@@ -53,11 +53,11 @@ def denomination_list(request):
 @platform_required
 @require_platform_capability(CAP_MANAGE_DENOMINATIONS)
 def denomination_detail(request, pk):
-    denomination = get_object_or_404(Denomination, pk=pk)
+    denomination = selectors.get_denomination_or_404(pk)
     _require_denomination_access(request, denomination)
     terminology = get_terminology_context(denomination)
-    conference_count = Conference.objects.filter(denomination=denomination).count()
-    church_count = Church.objects.filter(district__zone__conference__denomination=denomination).count()
+    conference_count = selectors.conference_count_for_denomination(denomination)
+    church_count = selectors.church_count_for_denomination(denomination)
     billing = denomination_billing_summary(denomination)
     alerts = tenant_health_alerts_for_denomination(denomination)
     recent_audit = denomination_audit_log(denomination, limit=8)
@@ -81,12 +81,13 @@ def denomination_detail(request, pk):
 @platform_required
 @require_platform_capability(CAP_MANAGE_DENOMINATIONS)
 def denomination_edit(request, pk=None):
-    denomination = get_object_or_404(Denomination, pk=pk) if pk else None
+    denomination = selectors.get_denomination_or_404(pk) if pk else None
     if denomination:
         _require_denomination_access(request, denomination)
     form = DenominationForm(request.POST or None, request.FILES or None, instance=denomination)
     if request.method == "POST" and form.is_valid():
-        obj = form.save()
+        obj = form.save(commit=False)
+        repo.save_model(obj)
         log_platform_action(
             request,
             "DENOMINATION_UPDATE" if pk else "DENOMINATION_CREATE",
@@ -113,7 +114,7 @@ def denomination_edit(request, pk=None):
 @platform_required
 @require_platform_capability(CAP_MANAGE_DENOMINATIONS)
 def denomination_terminology(request, pk):
-    denomination = get_object_or_404(Denomination, pk=pk)
+    denomination = selectors.get_denomination_or_404(pk)
     _require_denomination_access(request, denomination)
     form = DenominationTerminologyForm(denomination, request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -143,7 +144,7 @@ def denomination_terminology(request, pk):
 @platform_required
 @require_platform_capability(CAP_MANAGE_DENOMINATIONS)
 def denomination_seeds(request, pk):
-    denomination = get_object_or_404(Denomination, pk=pk)
+    denomination = selectors.get_denomination_or_404(pk)
     _require_denomination_access(request, denomination)
     form = DenominationSeedForm(denomination, request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -173,11 +174,12 @@ def denomination_seeds(request, pk):
 @platform_required
 @require_platform_capability(CAP_MANAGE_DENOMINATIONS)
 def denomination_branding(request, pk):
-    denomination = get_object_or_404(Denomination, pk=pk)
+    denomination = selectors.get_denomination_or_404(pk)
     _require_denomination_access(request, denomination)
     form = DenominationBrandingForm(request.POST or None, request.FILES or None, instance=denomination)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        obj = form.save(commit=False)
+        repo.save_model(obj)
         log_platform_action(
             request,
             "DENOMINATION_UPDATE",
@@ -203,7 +205,7 @@ def denomination_branding(request, pk):
 @platform_required
 @require_platform_capability(CAP_VIEW_BILLING)
 def denomination_billing(request, pk):
-    denomination = get_object_or_404(Denomination, pk=pk)
+    denomination = selectors.get_denomination_or_404(pk)
     _require_denomination_access(request, denomination)
     summary = denomination_billing_summary(denomination)
     audit = denomination_audit_log(denomination, limit=30)
@@ -251,11 +253,13 @@ def denomination_set_context(request, pk):
     """Set active platform denomination filter in session."""
     if request.method != "POST":
         return redirect("sitecontrol:denomination_list")
-    denomination = get_object_or_404(Denomination, pk=pk, is_active=True)
+    denomination = selectors.get_active_denomination_or_404(pk)
     _require_denomination_access(request, denomination)
     request.session["active_denomination_id"] = str(denomination.pk)
     flash_success(request, f"Platform context set to {denomination.display_name}.")
-    next_url = request.POST.get("next")
+    from dashboard.utils import safe_internal_redirect
+
+    next_url = safe_internal_redirect(request.POST.get("next"), None)
     if next_url:
         return redirect(next_url)
     return redirect("sitecontrol:denomination_detail", pk=pk)
@@ -269,7 +273,11 @@ def denomination_clear_context(request):
         return redirect("sitecontrol:denomination_list")
     request.session.pop("active_denomination_id", None)
     flash_success(request, "Platform denomination filter cleared.")
-    return redirect(request.POST.get("next") or "sitecontrol:denomination_list")
+    from dashboard.utils import safe_internal_redirect
+
+    return redirect(
+        safe_internal_redirect(request.POST.get("next"), "sitecontrol:denomination_list")
+    )
 
 
 @platform_required

@@ -5,7 +5,7 @@ from decimal import Decimal
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -21,6 +21,8 @@ from permissions.checks import (
     can_view_all_churches,
     can_view_own_payslips,
 )
+from payroll import repositories as repo
+from payroll import selectors
 from payroll.forms import (
     CompensationForm,
     EmployeeForm,
@@ -30,18 +32,7 @@ from payroll.forms import (
     StatutoryRuleForm,
     TaxBandForm,
 )
-from payroll.models import (
-    DeductionType,
-    Employee,
-    EmployeeCompensation,
-    EmployeeCompensationLine,
-    PayComponentType,
-    PayrollLine,
-    PayrollRun,
-    PayrollTaxBand,
-    PayrollTaxTable,
-    StatutoryContributionRule,
-)
+from payroll.models import EmployeeCompensationLine
 from payroll.reports import (
     department_cost_report,
     employer_cost_report,
@@ -89,12 +80,9 @@ def _payroll_access(view_func):
 @_payroll_access
 def index(request):
     church = require_church(request)
-    runs = PayrollRun.objects.filter(host_church=church).order_by("-year", "-month")[:20]
-    employees = Employee.objects.filter(host_church=church, status="ACTIVE").count()
-    over_budget = PayrollRun.objects.filter(
-        host_church=church,
-        budget_warning__over_budget=True,
-    ).exclude(status__in=("VOID", "PAID")).count()
+    runs = selectors.recent_runs_for_church(church)
+    employees = selectors.active_employee_count(church)
+    over_budget = selectors.over_budget_run_count(church)
     return render(request, "payroll/index.html", {
         "runs": runs,
         "employee_count": employees,
@@ -124,18 +112,16 @@ def hierarchy_dashboard(request):
 @_payroll_access
 def employee_list(request):
     church = require_church(request)
-    employees = Employee.objects.filter(host_church=church).select_related("department", "member", "user")
-    unit_type = request.GET.get("unit_type")
-    if unit_type:
-        employees = employees.filter(paying_unit_type=unit_type)
-    status = request.GET.get("status")
-    if status:
-        employees = employees.filter(status=status)
+    employees = selectors.employees_for_church(
+        church,
+        status=request.GET.get("status") or None,
+        unit_type=request.GET.get("unit_type") or None,
+    )
     return render(request, "payroll/employee_list.html", {
         "employees": employees,
         "active_church": church,
-        "status_filter": status,
-        "unit_type_filter": unit_type,
+        "status_filter": request.GET.get("status"),
+        "unit_type_filter": request.GET.get("unit_type"),
     })
 
 
@@ -146,7 +132,7 @@ def employee_create(request):
     if request.method == "POST" and form.is_valid():
         employee = form.save(commit=False)
         employee.created_by = request.user
-        employee.save()
+        repo.save_employee(employee)
         flash_success(request, f"Employee {employee.full_name} added.")
         return redirect("payroll:employee_detail", pk=employee.pk)
     return render(request, "payroll/employee_form.html", {
@@ -159,9 +145,9 @@ def employee_create(request):
 @_payroll_access
 def employee_detail(request, pk):
     church = require_church(request)
-    employee = get_object_or_404(Employee, pk=pk, host_church=church)
-    compensations = employee.compensations.prefetch_related("lines__pay_component", "lines__deduction_type").order_by("-effective_from")
-    loans = employee.loans.filter(status="ACTIVE")
+    employee = selectors.employee_for_church(church, pk)
+    compensations = selectors.employee_compensations(employee)
+    loans = selectors.employee_active_loans(employee)
     ytd = ytd_summary(employee, timezone.now().year)
     return render(request, "payroll/employee_detail.html", {
         "employee": employee,
@@ -176,7 +162,7 @@ def employee_detail(request, pk):
 @_payroll_access
 def employee_edit(request, pk):
     church = require_church(request)
-    employee = get_object_or_404(Employee, pk=pk, host_church=church)
+    employee = selectors.employee_for_church(church, pk)
     form = EmployeeForm(request.POST or None, instance=employee, church=church)
     if request.method == "POST" and form.is_valid():
         form.save()
@@ -193,15 +179,13 @@ def employee_edit(request, pk):
 @_payroll_access
 def compensation_create(request, employee_pk):
     church = require_church(request)
-    employee = get_object_or_404(Employee, pk=employee_pk, host_church=church)
+    employee = selectors.employee_for_church(church, employee_pk)
     comp_form = CompensationForm(request.POST or None, initial={"effective_from": timezone.now().date()})
-    components = PayComponentType.objects.filter(host_church=church, is_active=True)
-    deductions = DeductionType.objects.filter(
-        host_church=church, is_active=True, is_statutory=False,
-    ).exclude(code__in=("PAYE", "SSNIT_EE", "PENSION_T2"))
+    components = selectors.active_pay_components(church)
+    deductions = selectors.active_voluntary_deductions(church)
 
     if request.method == "POST" and comp_form.is_valid():
-        compensation = EmployeeCompensation.objects.create(
+        compensation = repo.create_compensation(
             employee=employee,
             effective_from=comp_form.cleaned_data["effective_from"],
             notes=comp_form.cleaned_data.get("notes", ""),
@@ -215,8 +199,7 @@ def compensation_create(request, employee_pk):
                     pay_component=component,
                     amount=Decimal(str(amount)),
                 )
-                line.full_clean()
-                line.save()
+                repo.save_compensation_line(line)
         for dtype in deductions:
             amount = request.POST.get(f"deduction_{dtype.code}")
             if amount and Decimal(str(amount)) > 0:
@@ -226,9 +209,8 @@ def compensation_create(request, employee_pk):
                     deduction_type=dtype,
                     amount=Decimal(str(amount)),
                 )
-                line.full_clean()
-                line.save()
-        EmployeeCompensation.objects.filter(employee=employee).exclude(pk=compensation.pk).update(is_active=False)
+                repo.save_compensation_line(line)
+        repo.deactivate_other_compensations(employee, compensation.pk)
         flash_success(request, "Compensation profile saved.")
         return redirect("payroll:employee_detail", pk=employee.pk)
 
@@ -244,12 +226,12 @@ def compensation_create(request, employee_pk):
 @_payroll_access
 def loan_create(request, employee_pk):
     church = require_church(request)
-    employee = get_object_or_404(Employee, pk=employee_pk, host_church=church)
+    employee = selectors.employee_for_church(church, employee_pk)
     form = EmployeeLoanForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         loan = form.save(commit=False)
         loan.employee = employee
-        loan.save()
+        repo.save_loan(loan)
         flash_success(request, "Loan/advance recorded.")
         return redirect("payroll:employee_detail", pk=employee.pk)
     return render(request, "payroll/loan_form.html", {
@@ -262,7 +244,7 @@ def loan_create(request, employee_pk):
 @_payroll_access
 def tax_certificate_pdf(request, pk):
     church = require_church(request)
-    employee = get_object_or_404(Employee, pk=pk, host_church=church)
+    employee = selectors.employee_for_church(church, pk)
     year = int(request.GET.get("year", timezone.now().year))
     pdf = generate_tax_certificate_pdf(employee, year)
     response = HttpResponse(pdf.read(), content_type="application/pdf")
@@ -273,7 +255,7 @@ def tax_certificate_pdf(request, pk):
 @_payroll_access
 def run_list(request):
     church = require_church(request)
-    runs = PayrollRun.objects.filter(host_church=church).order_by("-year", "-month")
+    runs = selectors.runs_for_church(church)
     return render(request, "payroll/run_list.html", {
         "runs": runs,
         "active_church": church,
@@ -318,7 +300,7 @@ def run_create(request):
 @_payroll_access
 def run_detail(request, pk):
     church = require_church(request)
-    run = get_object_or_404(PayrollRun, pk=pk, host_church=church)
+    run = selectors.run_for_church(church, pk)
     register = payroll_register_rows(run)
     statutory = statutory_schedule(run) if run.status not in ("DRAFT", "REJECTED", "VOID") else None
     dept_costs = department_cost_report(run) if run.lines.exists() else []
@@ -348,7 +330,7 @@ def run_detail(request, pk):
 @require_POST
 def run_action(request, pk):
     church = require_church(request)
-    run = get_object_or_404(PayrollRun, pk=pk, host_church=church)
+    run = selectors.run_for_church(church, pk)
     action = request.POST.get("action")
     idem_key = request.POST.get("idempotency_key") or f"{action}-{run.pk}-{request.user.pk}"
 
@@ -415,7 +397,7 @@ def run_action(request, pk):
 @_payroll_access
 def run_export_csv(request, pk):
     church = require_church(request)
-    run = get_object_or_404(PayrollRun, pk=pk, host_church=church)
+    run = selectors.run_for_church(church, pk)
     if not can_pay_payroll(request.user):
         raise PermissionDenied("Bank payment export requires pay-payroll permission.")
     content = bank_payment_csv(run, mask_accounts=False)
@@ -433,7 +415,7 @@ def run_export_csv(request, pk):
 @_payroll_access
 def run_export_register(request, pk):
     church = require_church(request)
-    run = get_object_or_404(PayrollRun, pk=pk, host_church=church)
+    run = selectors.run_for_church(church, pk)
     content = payroll_register_csv(run)
     _log_run_audit(run, "EXPORT", request.user, {"format": "register_csv"})
     response = HttpResponse(content, content_type="text/csv")
@@ -444,7 +426,7 @@ def run_export_register(request, pk):
 @_payroll_access
 def run_paye_pdf(request, pk):
     church = require_church(request)
-    run = get_object_or_404(PayrollRun, pk=pk, host_church=church)
+    run = selectors.run_for_church(church, pk)
     pdf = generate_paye_schedule_pdf(run)
     _log_run_audit(run, "EXPORT", request.user, {"format": "paye_pdf"})
     response = HttpResponse(pdf.read(), content_type="application/pdf")
@@ -455,7 +437,7 @@ def run_paye_pdf(request, pk):
 @_payroll_access
 def run_ssnit_pdf(request, pk):
     church = require_church(request)
-    run = get_object_or_404(PayrollRun, pk=pk, host_church=church)
+    run = selectors.run_for_church(church, pk)
     pdf = generate_ssnit_schedule_pdf(run)
     _log_run_audit(run, "EXPORT", request.user, {"format": "ssnit_pdf"})
     response = HttpResponse(pdf.read(), content_type="application/pdf")
@@ -466,10 +448,7 @@ def run_ssnit_pdf(request, pk):
 @login_required
 @require_feature("payroll")
 def payslip_pdf(request, line_pk):
-    line = get_object_or_404(
-        PayrollLine.objects.select_related("payroll_run", "employee", "employee__user"),
-        pk=line_pk,
-    )
+    line = selectors.payroll_line_for_payslip(line_pk)
     employee = line.employee
     if can_view_own_payslips(request.user) and employee.user_id == request.user.id:
         pass
@@ -496,10 +475,7 @@ def my_payslips(request):
             "lines": [],
             "message": "No employee profile is linked to your account.",
         })
-    lines = PayrollLine.objects.filter(
-        employee=employee,
-        payroll_run__status__in=("POSTED", "PAID"),
-    ).select_related("payroll_run").order_by("-payroll_run__year", "-payroll_run__month")
+    lines = selectors.employee_posted_payslips(employee)
     ytd = ytd_summary(employee, timezone.now().year)
     return render(request, "payroll/my_payslips.html", {
         "lines": lines,
@@ -521,8 +497,8 @@ def _policy_required(view_func):
 @_policy_required
 def policy_index(request):
     church = get_active_church(request) or require_church(request)
-    rules = StatutoryContributionRule.objects.filter(host_church=church).order_by("code", "-effective_from")
-    tables = PayrollTaxTable.objects.filter(host_church=church).prefetch_related("bands")
+    rules = selectors.statutory_rules_for_church(church)
+    tables = selectors.tax_tables_for_church(church)
     return render(request, "payroll/policy_index.html", {
         "rules": rules,
         "tables": tables,
@@ -537,7 +513,7 @@ def policy_rule_create(request):
     if request.method == "POST" and form.is_valid():
         rule = form.save(commit=False)
         rule.host_church = church
-        rule.save()
+        repo.save_statutory_rule(rule)
         flash_success(request, "Statutory rule saved.")
         return redirect("payroll:policy_index")
     return render(request, "payroll/policy_form.html", {
@@ -550,12 +526,12 @@ def policy_rule_create(request):
 @_policy_required
 def policy_band_add(request, table_pk):
     church = require_church(request)
-    table = get_object_or_404(PayrollTaxTable, pk=table_pk, host_church=church)
+    table = selectors.tax_table_for_church(church, table_pk)
     form = TaxBandForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         band = form.save(commit=False)
         band.tax_table = table
-        band.save()
+        repo.save_tax_band(band)
         flash_success(request, "Tax band added.")
         return redirect("payroll:policy_index")
     return render(request, "payroll/policy_form.html", {

@@ -157,7 +157,9 @@ def apply_org_scope(
             union = conf.union if conf else None
         user.scope_union = union
         if denomination is None and union is not None:
-            conf = union.conferences.select_related("denomination").first()
+            from permissions import selectors
+
+            conf = selectors.first_conference_for_union(union)
             denomination = conf.denomination if conf else None
     elif level == OrgScopeLevel.GENERAL_CONFERENCE:
         user.scope_general_conference = general_conference
@@ -305,15 +307,15 @@ def church_q_for_scope(user) -> models.Q | None:
 def church_in_user_scope(user, church) -> bool:
     if not church:
         return False
-    from organization.models import Church
+    from permissions import selectors
 
-    return Church.objects.filter(church_q_for_scope(user), pk=church.pk).exists()
+    return selectors.church_exists_with_q(church_q_for_scope(user), church.pk)
 
 
 def manageable_scope_units(user, level: str):
     """Org nodes the *manager* may assign when inviting at *level*."""
-    from organization.models import Church, Conference, District, GeneralConference, Union, Zone
     from church_system.denomination_scope import get_user_denomination
+    from permissions import selectors
     from permissions.scoping import get_manageable_churches
 
     denom = get_user_denomination(user)
@@ -323,31 +325,29 @@ def manageable_scope_units(user, level: str):
         return churches.select_related("district__zone__conference").order_by("name")
     if level == OrgScopeLevel.DISTRICT:
         ids = churches.values_list("district_id", flat=True).distinct()
-        return District.objects.filter(pk__in=ids).select_related("zone__conference").order_by("name")
+        return selectors.districts_by_ids(ids)
     if level == OrgScopeLevel.ZONE:
         ids = churches.values_list("district__zone_id", flat=True).distinct()
-        return Zone.objects.filter(pk__in=ids).select_related("conference").order_by("name")
+        return selectors.zones_by_ids(ids)
     if level == OrgScopeLevel.CONFERENCE:
         ids = churches.values_list("district__zone__conference_id", flat=True).distinct()
-        return Conference.objects.filter(pk__in=ids).order_by("name")
+        return selectors.conferences_by_ids(ids)
     if level == OrgScopeLevel.UNION:
         ids = churches.values_list(
             "district__zone__conference__union_id", flat=True
         ).distinct()
-        return Union.objects.filter(pk__in=ids).order_by("name")
+        return selectors.unions_by_ids(ids)
     if level == OrgScopeLevel.GENERAL_CONFERENCE:
         ids = churches.values_list(
             "district__zone__conference__union__general_conference_id", flat=True
         ).distinct()
-        return GeneralConference.objects.filter(pk__in=ids).order_by("name")
+        return selectors.general_conferences_by_ids(ids)
     if level == OrgScopeLevel.DENOMINATION:
-        from sitecontrol.models import Denomination
-
         if denom:
-            return Denomination.objects.filter(pk=denom.pk)
+            return selectors.denominations_by_pk(denom.pk)
         # Break-glass: denominations that appear in manageable churches
         denom_ids = churches.values_list(
             "district__zone__conference__denomination_id", flat=True
         ).distinct()
-        return Denomination.objects.filter(pk__in=denom_ids).order_by("name")
-    return Church.objects.none()
+        return selectors.denominations_by_ids(denom_ids)
+    return selectors.empty_churches()

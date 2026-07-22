@@ -1,7 +1,10 @@
 """Tests for meetings workflow and views."""
 
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
+from django.test.client import ContextList
 from django.urls import reverse
 from django.utils import timezone
 
@@ -13,6 +16,29 @@ User = get_user_model()
 
 
 class MeetingsTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Python 3.14 + Django test client: Context.__copy__ crashes in
+        # store_rendered_templates. Skip the copy; status/content asserts still work.
+
+        def _safe_store(store, signal, sender, template, context, **kwargs):
+            store.setdefault("templates", []).append(template)
+            if "context" not in store:
+                store["context"] = ContextList()
+            store["context"].append(context)
+
+        cls._template_store_patcher = patch(
+            "django.test.client.store_rendered_templates",
+            _safe_store,
+        )
+        cls._template_store_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._template_store_patcher.stop()
+        super().tearDownClass()
+
     @classmethod
     def setUpTestData(cls):
         conf = Conference.objects.create(code="M1", name="M Conf")

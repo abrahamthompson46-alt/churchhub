@@ -5,8 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Q
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from church_system.flash import (
@@ -17,13 +16,15 @@ from church_system.flash import (
     flash_warning,
 )
 
+from accounts import repositories as repo
+from accounts import selectors
 from accounts.forms import (
     AcceptInvitationForm,
     ProfileForm,
     UserInviteForm,
     UserManageForm,
 )
-from accounts.models import UserActivityLog, UserInvitation
+from accounts.models import UserActivityLog
 from accounts.permissions import (
     can_manage_permissions,
     can_manage_users,
@@ -69,7 +70,8 @@ def profile(request):
         elif action == "password":
             password_form = PasswordChangeForm(request.user, request.POST)
             if password_form.is_valid():
-                user = password_form.save()
+                user = password_form.save(commit=False)
+                repo.save_user(user)
                 update_session_auth_hash(request, user)
                 log_activity(user, "PASSWORD_CHANGE", ip_address=get_client_ip(request))
                 flash_success(request, "Sign in again on other devices if needed.", title="Password changed")
@@ -93,38 +95,15 @@ def user_list(request):
     role = request.GET.get("role", "").strip()
     status = request.GET.get("is_active", "").strip()
 
-    if q:
-        users = users.filter(
-            Q(username__icontains=q)
-            | Q(first_name__icontains=q)
-            | Q(last_name__icontains=q)
-            | Q(email__icontains=q)
-        )
-    if role:
-        users = users.filter(role=role)
-    if status == "1":
-        users = users.filter(is_active=True)
-    elif status == "0":
-        users = users.filter(is_active=False)
+    users = selectors.filter_manageable_users(users, q=q, role=role, status=status)
 
     paginator = Paginator(users, 25)
     page_obj = paginator.get_page(request.GET.get("page"))
 
     church_ids = list(get_manageable_churches(request.user).values_list("pk", flat=True))
-    pending_invites = UserInvitation.objects.filter(
-        is_accepted=False,
-        revoked_at__isnull=True,
-    ).filter(
-        Q(church_id__in=church_ids)
-        | Q(church__isnull=True, invited_by=request.user)
-        | Q(
-            church__isnull=True,
-            denomination_id__isnull=False,
-            denomination_id=getattr(request.user, "denomination_id", None),
-        )
-    ).select_related(
-        "church", "invited_by", "scope_district", "scope_conference", "denomination"
-    ).distinct().order_by("-created_at")[:50]
+    pending_invites = selectors.pending_invitations_for_manager(
+        request.user, church_ids
+    )
 
     from accounts.control_center import ucc_context
     from permissions.roles import UserRole
@@ -146,7 +125,7 @@ def user_list(request):
 def user_detail(request, pk):
     if not can_manage_users(request.user):
         raise PermissionDenied
-    user_obj = get_object_or_404(get_manageable_users(request.user), pk=pk)
+    user_obj = selectors.get_manageable_user_or_404(request.user, pk)
     form = UserManageForm(instance=user_obj, manager=request.user)
 
     if request.method == "POST":
@@ -184,7 +163,9 @@ def user_detail(request, pk):
             try:
                 if form.cleaned_data["role"] != old_role:
                     assert_can_assign_role(request.user, form.cleaned_data["role"])
-                saved = form.save()
+                saved = form.save(commit=False)
+                repo.save_user(saved)
+                form.save_m2m()
             except ValueError as exc:
                 flash_exception(request, exc, title="User could not be updated")
                 return redirect("accounts:user_detail", pk=pk)
@@ -222,7 +203,7 @@ def user_detail(request, pk):
             return redirect("accounts:user_detail", pk=pk)
         flash_validation_errors(request, form, title="User could not be updated")
 
-    activity = user_obj.activity_logs.order_by("-created_at")[:20]
+    activity = selectors.recent_activity_for_user(user_obj)
     from accounts.control_center import ucc_context
     from permissions.checks import can_manage_permissions as _can_manage_permissions
 
@@ -259,14 +240,10 @@ def invite_user(request):
 
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
-        existing = UserInvitation.objects.filter(
+        existing = selectors.pending_invitation_for_email(
             email=data["email"],
-            is_accepted=False,
-            revoked_at__isnull=True,
+            church=data.get("church"),
         )
-        if data.get("church"):
-            existing = existing.filter(church=data["church"])
-        existing = existing.first()
         if existing and existing.is_valid:
             flash_warning(request, "Use the existing invite link or wait for it to expire.", title="Invitation pending")
         else:
@@ -340,12 +317,7 @@ def invite_user(request):
 
 def _get_manageable_invitation(request, pk):
     """Invitation visible if its home church is in the manager subtree (or denomination invite)."""
-    invitation = get_object_or_404(
-        UserInvitation.objects.select_related(
-            "church", "scope_district", "scope_zone", "scope_conference", "denomination"
-        ),
-        pk=pk,
-    )
+    invitation = selectors.invitation_with_scope_or_404(pk)
     church_ids = set(get_manageable_churches(request.user).values_list("pk", flat=True))
     if invitation.church_id and invitation.church_id in church_ids:
         return invitation
@@ -422,7 +394,7 @@ def invite_resend(request, pk):
 
 
 def accept_invite(request, token):
-    invitation = get_object_or_404(UserInvitation, token=token)
+    invitation = selectors.get_invitation_by_token_or_404(token)
     if not invitation.is_valid:
         return render(request, "accounts/invite_invalid.html", {"invitation": invitation})
 
@@ -451,13 +423,8 @@ def activity_log(request):
     if not can_view_activity_logs(request.user):
         raise PermissionDenied
     manageable = get_manageable_users(request.user)
-    logs = UserActivityLog.objects.filter(
-        user__in=manageable,
-    ).select_related("user", "performed_by").order_by("-created_at")
-
     action = request.GET.get("action", "").strip()
-    if action:
-        logs = logs.filter(action=action)
+    logs = selectors.activity_logs_for_users(manageable, action=action)
 
     paginator = Paginator(logs, 50)
     page_obj = paginator.get_page(request.GET.get("page"))

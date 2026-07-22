@@ -4,11 +4,13 @@ from functools import wraps
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
+from announcements import repositories as repo
+from announcements import selectors
 from church_system.church_scope import get_active_church, get_user_church
 from church_system.flash import flash_exception, flash_info, flash_success
 from permissions.checks import (
@@ -24,7 +26,6 @@ from .forms import (
     AnnouncementImageFormSet,
     AnnouncementRejectForm,
 )
-from .models import Announcement
 from .services import (
     AnnouncementServiceError,
     approve_announcement,
@@ -90,7 +91,7 @@ def create_announcement_view(request):
                     auto_expire=form.cleaned_data.get("auto_expire", True),
                 )
                 formset.instance = announcement
-                formset.save()
+                repo.save_image_formset(formset)
                 if announcement.is_approved:
                     flash_success(request, "Announcement published.")
                 else:
@@ -124,14 +125,22 @@ def announcement_list(request):
     export_fmt = request.GET.get("export", "")
     if export_fmt in ("csv", "excel") and can_approve_announcements(request.user):
         payload = export_announcements_table(qs)
-        from announcements.models import AnnouncementAuditLog
-
-        AnnouncementAuditLog.objects.create(
+        repo.create_audit_log(
             announcement=None,
             church=get_user_church(request.user),
             action="EXPORT",
             performed_by=request.user,
             details={"format": export_fmt, "count": len(payload["rows"])},
+        )
+        from reports.services import audit_export
+
+        audit_export(
+            user=request.user,
+            report_key="announcements_list",
+            export_format=export_fmt,
+            row_count=len(payload["rows"]),
+            church=get_user_church(request.user),
+            params={"count": len(payload["rows"]), "q": q, "pinned_only": pinned_only},
         )
         if export_fmt == "csv":
             return export_table_csv(payload["headers"], payload["rows"], "announcements.csv")
@@ -140,10 +149,8 @@ def announcement_list(request):
         )
 
     page_obj = paginate_queryset(qs, page=request.GET.get("page", 1), per_page=15)
-    viewed_ids = set(
-        request.user.announcement_views.filter(
-            announcement_id__in=[a.pk for a in page_obj]
-        ).values_list("announcement_id", flat=True)
+    viewed_ids = selectors.viewed_announcement_ids_for_user(
+        request.user, [a.pk for a in page_obj]
     )
     return render(request, "announcements/announcement_list.html", {
         "announcements": page_obj,
@@ -158,21 +165,18 @@ def announcement_list(request):
 
 @login_required
 def announcement_detail(request, pk):
-    announcement = get_object_or_404(
-        Announcement.objects.select_related("church", "created_by", "approved_by", "rejected_by"),
-        pk=pk,
-    )
+    announcement = selectors.get_announcement_detail_or_404(pk)
     # Allow creator / approver to see pending/rejected; others only visible published
     can_see = (
         announcement.created_by_id == request.user.id
         or can_approve_announcements(request.user)
-        or visible_announcements(request.user).filter(pk=pk).exists()
+        or selectors.announcement_exists_in_qs(visible_announcements(request.user), pk)
     )
     if not can_see:
         raise PermissionDenied
 
     mark_viewed(request.user, announcement)
-    view_count = announcement.views.count()
+    view_count = selectors.announcement_view_count(announcement)
     return render(request, "announcements/detail.html", {
         "announcement": announcement,
         "view_count": view_count,
@@ -208,8 +212,8 @@ def pending_approvals(request):
 @approve_required
 @require_POST
 def approve_announcement_view(request, pk):
-    announcement = get_object_or_404(
-        Announcement, pk=pk, is_archived=False, is_rejected=False
+    announcement = selectors.get_announcement_or_404(
+        pk, is_archived=False, is_rejected=False
     )
     try:
         approve_announcement(announcement, request.user)
@@ -229,8 +233,8 @@ def approve_announcement_view(request, pk):
 @approve_required
 @require_POST
 def reject_announcement_view(request, pk):
-    announcement = get_object_or_404(
-        Announcement, pk=pk, is_archived=False, is_approved=False, is_rejected=False
+    announcement = selectors.get_announcement_or_404(
+        pk, is_archived=False, is_approved=False, is_rejected=False
     )
     form = AnnouncementRejectForm(request.POST)
     if not form.is_valid():
@@ -254,7 +258,7 @@ def reject_announcement_view(request, pk):
 
 @login_required
 def edit_announcement(request, pk):
-    announcement = get_object_or_404(Announcement, pk=pk)
+    announcement = selectors.get_announcement_or_404(pk)
     if not can_edit_announcement(request.user, announcement):
         raise PermissionDenied
     if request.method == "POST":
@@ -276,7 +280,7 @@ def edit_announcement(request, pk):
                     if "is_pinned" in form.cleaned_data
                     else None,
                 )
-                formset.save()
+                repo.save_image_formset(formset)
                 flash_success(request, "Announcement updated.")
                 if announcement.is_approved:
                     return redirect("announcements:announcement_detail", pk=announcement.pk)
@@ -297,7 +301,7 @@ def edit_announcement(request, pk):
 @login_required
 @require_POST
 def archive_announcement_view(request, pk):
-    announcement = get_object_or_404(Announcement, pk=pk, is_archived=False)
+    announcement = selectors.get_announcement_or_404(pk, is_archived=False)
     try:
         archive_announcement(announcement, request.user)
         flash_success(request, f'"{announcement.title}" archived.')
@@ -313,7 +317,9 @@ def archive_announcement_view(request, pk):
 
 @login_required
 def track_view(request, pk):
-    announcement = get_object_or_404(visible_announcements(request.user), pk=pk)
+    announcement = selectors.get_from_queryset_or_404(
+        visible_announcements(request.user), pk
+    )
     mark_viewed(request.user, announcement)
     return redirect("announcements:announcement_list")
 

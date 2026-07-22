@@ -29,6 +29,7 @@ class HealthCheckTests(TestCase):
         self.assertEqual(data["checks"]["database"], "ok")
         self.assertEqual(data["checks"]["cache"], "ok")
         self.assertEqual(data["checks"]["migrations"], "ok")
+        self.assertEqual(data["checks"]["debug"], "ok")
 
 
 class IdempotencyTests(TestCase):

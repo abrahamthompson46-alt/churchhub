@@ -4,18 +4,13 @@ import json
 from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
-from django.db.models import Count, F, Q, Sum
-from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
 from accounts.models import UserRole
-from announcements.models import Announcement
 from announcements.services import visible_announcements
-from church_system.church_scope import filter_by_church, get_active_church
-from church_system.denomination_scope import get_user_denomination
-from dashboard.models import Notification
-from members.models import Member, MemberTransfer, TransferStatus
-from organization.models import Conference, District
+from church_system.church_scope import get_active_church
+from dashboard import repositories as repo
+from dashboard import selectors
 from permissions.checks import (
     can_approve_announcements,
     can_approve_minutes,
@@ -26,22 +21,20 @@ from permissions.checks import (
     can_manage_members,
     can_manage_users,
     can_view_all_churches,
-    can_view_meetings,
     can_view_members,
     can_view_transactions,
 )
 from permissions.scoping import get_manageable_churches
-from transactions.models import FinancialPeriod, MonthlyCutoff, Transaction, TransactionLine
 
-REMIT_PAYABLE_TYPES = ("TITHE_REMIT_PAYABLE", "COMBINED_REMIT_PAYABLE")
-INCOME_REMIT_TYPES = ("TITHE", "COMBINED")
+REMIT_PAYABLE_TYPES = selectors.REMIT_PAYABLE_TYPES
+INCOME_REMIT_TYPES = selectors.INCOME_REMIT_TYPES
 
 
 def notify_user(user, title, message, category="INFO", action_url=""):
     """Create an in-app notification for a user."""
     if not user or not user.is_active:
         return None
-    return Notification.objects.create(
+    return repo.create_notification(
         user=user,
         title=title,
         message=message,
@@ -84,81 +77,49 @@ def _month_bounds(now=None):
 
 
 def _sum_account_type(lines_qs, acc_type):
-    return abs(
-        lines_qs.filter(account__account_type=acc_type).aggregate(t=Sum("amount"))["t"]
-        or Decimal("0")
-    )
+    return selectors.sum_line_amount_for_type(lines_qs, acc_type)
 
 
 def _compute_remittance_payable_mtd(church, month_start_date):
     """Sum remittance payable GL lines for a church/month without creating MonthlyCutoff."""
-    approved_filter = {
-        "transaction__church": church,
-        "transaction__approval_status": "APPROVED",
-        "transaction__is_voided": False,
-        "transaction__date__month": month_start_date.month,
-        "transaction__date__year": month_start_date.year,
-    }
-    tithe = abs(
-        TransactionLine.objects.filter(
-            account__account_type="TITHE_REMIT_PAYABLE",
-            **approved_filter,
-        ).aggregate(total=Sum("amount"))["total"]
-        or Decimal("0")
-    )
-    combined = abs(
-        TransactionLine.objects.filter(
-            account__account_type="COMBINED_REMIT_PAYABLE",
-            **approved_filter,
-        ).aggregate(total=Sum("amount"))["total"]
-        or Decimal("0")
-    )
-    return tithe, combined, tithe + combined
+    return selectors.remittance_payable_mtd_amounts(church, month_start_date)
 
 
 def get_financial_summary(request):
     """Core financial KPIs for finance dashboards (MTD primary)."""
     now, month_start, month_start_date = _month_bounds()
-    transactions = filter_by_church(Transaction.objects.all(), request)
-    approved = transactions.filter(approval_status="APPROVED", is_voided=False)
+    transactions = selectors.transactions_for_request(request)
+    approved = selectors.approved_transactions(transactions)
     mtd_approved = approved.filter(date__gte=month_start_date)
-    mtd_lines = TransactionLine.objects.filter(transaction__in=mtd_approved)
-    all_time_lines = TransactionLine.objects.filter(transaction__in=approved)
+    mtd_lines = selectors.lines_for_transactions(mtd_approved)
+    all_time_lines = selectors.lines_for_transactions(approved)
 
-    tithe_total = _sum_account_type(mtd_lines, "TITHE")
-    combined_total = _sum_account_type(mtd_lines, "COMBINED")
-    income_total = _sum_account_type(mtd_lines, "INCOME")
-    expense_total = _sum_account_type(mtd_lines, "EXPENSE")
+    mtd_totals = selectors.sum_line_amounts_by_types(
+        mtd_lines, ("TITHE", "COMBINED", "INCOME", "EXPENSE")
+    )
+    tithe_total = mtd_totals["TITHE"]
+    combined_total = mtd_totals["COMBINED"]
+    income_total = mtd_totals["INCOME"]
+    expense_total = mtd_totals["EXPENSE"]
 
     church = get_active_church(request)
     monthly_cutoff_total = Decimal("0")
     if church:
-        existing = MonthlyCutoff.objects.filter(church=church, month=month_start_date).first()
+        existing = selectors.monthly_cutoff_for_church_month(church, month_start_date)
         if existing:
             monthly_cutoff_total = existing.total_payable
         else:
             _, _, monthly_cutoff_total = _compute_remittance_payable_mtd(church, month_start_date)
     else:
-        monthly_cutoff_total = abs(
-            mtd_lines.filter(account__account_type__in=REMIT_PAYABLE_TYPES).aggregate(
-                t=Sum("amount")
-            )["t"]
-            or Decimal("0")
+        monthly_cutoff_total = selectors.sum_line_amount_for_types(
+            mtd_lines, REMIT_PAYABLE_TYPES
         )
 
     six_months_ago = (now - relativedelta(months=5)).replace(day=1)
     six_months_ago_date = (
         timezone.localdate(six_months_ago) if timezone.is_aware(six_months_ago) else six_months_ago.date()
     )
-    trend_qs = (
-        all_time_lines.filter(
-            transaction__date__gte=six_months_ago_date,
-            account__account_type__in=["INCOME", "EXPENSE"],
-        )
-        .annotate(month=TruncMonth("transaction__date"))
-        .values("month", "account__account_type")
-        .annotate(total=Sum("amount"))
-    )
+    trend_qs = selectors.income_expense_trend_aggregates(all_time_lines, six_months_ago_date)
 
     trend_dict = {}
     for i in range(6):
@@ -179,6 +140,10 @@ def get_financial_summary(request):
     income_data = [trend_dict[m]["INCOME"] for m in trend_labels]
     expense_data = [trend_dict[m]["EXPENSE"] for m in trend_labels]
 
+    all_time_totals = selectors.sum_line_amounts_by_types(
+        all_time_lines, ("TITHE", "COMBINED")
+    )
+
     return {
         "kpi_period_label": "Month to date",
         "cutoff_metric_label": "Remittance payable (MTD)",
@@ -188,10 +153,10 @@ def get_financial_summary(request):
         "expense_total": expense_total,
         "net_balance": income_total - expense_total,
         "monthly_cutoff_total": monthly_cutoff_total,
-        "tithe_total_all_time": _sum_account_type(all_time_lines, "TITHE"),
-        "combined_total_all_time": _sum_account_type(all_time_lines, "COMBINED"),
-        "pending_count": transactions.filter(approval_status="PENDING").count(),
-        "recent_transactions": approved.select_related("church").order_by("-date")[:5],
+        "tithe_total_all_time": all_time_totals["TITHE"],
+        "combined_total_all_time": all_time_totals["COMBINED"],
+        "pending_count": selectors.pending_transactions_count(transactions),
+        "recent_transactions": selectors.recent_approved_transactions(approved),
         "trend_labels": json.dumps(trend_labels),
         "income_data": json.dumps(income_data),
         "expense_data": json.dumps(expense_data),
@@ -200,11 +165,9 @@ def get_financial_summary(request):
 
 
 def get_member_summary(request):
-    members = filter_by_church(Member.objects.all(), request)
+    members = selectors.members_for_request(request)
     active_church = get_active_church(request)
-    transfers = MemberTransfer.objects.filter(status=TransferStatus.PENDING)
-    if active_church:
-        transfers = transfers.filter(Q(from_church=active_church) | Q(to_church=active_church))
+    transfers = selectors.pending_transfers_for_church(active_church)
 
     return {
         "member_count": members.filter(is_active=True).count(),
@@ -226,30 +189,13 @@ def get_admin_summary(user):
         "district__zone__conference_id", flat=True
     ).distinct()
 
-    user_denom = get_user_denomination(user)
-    conferences = Conference.objects.filter(id__in=conference_ids)
-    if user_denom:
-        conferences = conferences.filter(denomination=user_denom)
-
-    pending_ann = Announcement.objects.filter(
-        is_approved=False, is_archived=False, is_rejected=False
-    )
-    if church_ids:
-        pending_ann = pending_ann.filter(
-            Q(church_id__in=church_ids) | Q(church__isnull=True)
-        )
-    elif user_denom:
-        pending_ann = pending_ann.filter(
-            Q(church__district__zone__conference__denomination=user_denom)
-            | Q(church__isnull=True)
-        )
-    else:
-        pending_ann = pending_ann.none() if not user.is_superuser else pending_ann
+    conferences = selectors.conferences_for_admin(user, conference_ids)
+    pending_ann = selectors.pending_announcements_for_admin(user, church_ids)
 
     return {
         "conference_count": conferences.count(),
         "church_count": len(church_ids),
-        "district_count": District.objects.filter(id__in=district_ids).count(),
+        "district_count": selectors.district_count_for_ids(district_ids),
         "pending_announcements": pending_ann.count(),
     }
 
@@ -373,9 +319,7 @@ def get_alerts(request, user):
     church = get_active_church(request)
 
     if can_approve_transactions(user):
-        pending = filter_by_church(
-            Transaction.objects.filter(approval_status="PENDING"), request
-        ).count()
+        pending = selectors.pending_transactions_for_request_count(request)
         if pending:
             alerts.append({
                 "level": "warning",
@@ -395,9 +339,7 @@ def get_alerts(request, user):
             })
 
         now = timezone.now()
-        current_locked = FinancialPeriod.objects.filter(
-            church=church, year=now.year, month=now.month, is_locked=True
-        ).exists()
+        current_locked = selectors.locked_period_exists(church, now.year, now.month)
         if current_locked:
             alerts.append({
                 "level": "info",
@@ -406,9 +348,7 @@ def get_alerts(request, user):
             })
 
         prior_month = (now.replace(day=1) - relativedelta(months=1)).date().replace(day=1)
-        overdue = MonthlyCutoff.objects.filter(
-            church=church, month=prior_month, transferred=False
-        ).first()
+        overdue = selectors.overdue_cutoff_for_church(church, prior_month)
         if overdue and overdue.total_payable > 0:
             alerts.append({
                 "level": "danger",
@@ -458,9 +398,7 @@ def get_hierarchy_rollup(request, user):
         return []
 
     now, _, month_start_date = _month_bounds()
-    church_rows = list(
-        manageable.values("id", "district_id", "district__name")
-    )
+    church_rows = selectors.manageable_church_district_rows(manageable)
     if not church_rows:
         return []
 
@@ -474,18 +412,7 @@ def get_hierarchy_rollup(request, user):
         district_church_counts[did] = district_church_counts.get(did, 0) + 1
         district_names[did] = row["district__name"]
 
-    base_lines = TransactionLine.objects.filter(
-        transaction__church_id__in=church_ids,
-        transaction__date__gte=month_start_date,
-        transaction__approval_status="APPROVED",
-        transaction__is_voided=False,
-        account__account_type__in=REMIT_PAYABLE_TYPES + INCOME_REMIT_TYPES,
-    )
-
-    aggregates = (
-        base_lines.values("transaction__church__district_id", "account__account_type")
-        .annotate(total=Sum("amount"))
-    )
+    aggregates = selectors.district_remit_income_aggregates(church_ids, month_start_date)
 
     by_district = {}
     for did in district_church_counts:
@@ -526,40 +453,29 @@ def get_hierarchy_rollup(request, user):
     return sorted(rows, key=lambda r: r["remittance_payable"] or r["total"], reverse=True)[:12]
 
 
-def get_compliance_snapshot(request, user):
+def get_compliance_snapshot(request, user, *, church_ids=None, manageable=None):
     """Organization compliance indicators for executive dashboard."""
-    manageable = get_manageable_churches(user)
-    if not manageable.exists():
+    if manageable is None:
+        manageable = get_manageable_churches(user)
+    if church_ids is None:
+        if not manageable.exists():
+            return {}
+        church_ids = list(manageable.values_list("id", flat=True))
+    elif not church_ids:
         return {}
 
-    church_ids = list(manageable.values_list("id", flat=True))
     now = timezone.now()
     prior_month = (now.replace(day=1) - relativedelta(months=1)).date().replace(day=1)
 
-    overdue_qs = MonthlyCutoff.objects.filter(
-        church_id__in=church_ids,
-        month=prior_month,
-        transferred=False,
-    ).annotate(payable=F("total_tithe") + F("total_combined")).filter(
-        payable__gt=0
-    ).select_related("church").order_by("-payable")
-
+    overdue_qs = selectors.overdue_cutoffs_for_churches(church_ids, prior_month)
     overdue = overdue_qs[:5]
 
-    locked_periods = FinancialPeriod.objects.filter(
-        church_id__in=church_ids,
-        year=now.year,
-        month=now.month,
-        is_locked=True,
-    ).count()
+    locked_periods = selectors.locked_periods_count(church_ids, now.year, now.month)
 
     working_day_issues = 0
     if can_manage_finances(user):
-        from transactions.services import get_working_day_status
-
-        for church in manageable:
-            if not get_working_day_status(church)["is_open"]:
-                working_day_issues += 1
+        open_ids = selectors.open_working_day_church_ids(church_ids)
+        working_day_issues = sum(1 for cid in church_ids if cid not in open_ids)
 
     return {
         "overdue_remittances": [
@@ -576,44 +492,37 @@ def get_compliance_snapshot(request, user):
     }
 
 
-def get_executive_kpis(request, user):
+def get_executive_kpis(request, user, *, church_ids=None, manageable=None, compliance=None):
     """Organization-wide KPIs for CEO / overseer control center."""
-    manageable = get_manageable_churches(user)
-    if not manageable.exists():
+    if manageable is None:
+        manageable = get_manageable_churches(user)
+    if church_ids is None:
+        if not manageable.exists():
+            return None
+        church_ids = list(manageable.values_list("id", flat=True))
+    elif not church_ids:
         return None
 
-    church_ids = list(manageable.values_list("id", flat=True))
     now, _, month_start_date = _month_bounds()
 
-    mtd_lines = TransactionLine.objects.filter(
-        transaction__church_id__in=church_ids,
-        transaction__date__gte=month_start_date,
-        transaction__approval_status="APPROVED",
-        transaction__is_voided=False,
+    mtd_lines = selectors.mtd_lines_for_churches(church_ids, month_start_date)
+    mtd_totals = selectors.sum_line_amounts_by_types(
+        mtd_lines, ("TITHE", "COMBINED", "INCOME", "EXPENSE") + REMIT_PAYABLE_TYPES
+    )
+    mtd_tithe = mtd_totals["TITHE"]
+    mtd_combined = mtd_totals["COMBINED"]
+    mtd_income = mtd_totals["INCOME"]
+    mtd_expense = mtd_totals["EXPENSE"]
+    mtd_remit = mtd_totals.get("TITHE_REMIT_PAYABLE", Decimal("0")) + mtd_totals.get(
+        "COMBINED_REMIT_PAYABLE", Decimal("0")
     )
 
-    mtd_tithe = _sum_account_type(mtd_lines, "TITHE")
-    mtd_combined = _sum_account_type(mtd_lines, "COMBINED")
-    mtd_income = _sum_account_type(mtd_lines, "INCOME")
-    mtd_expense = _sum_account_type(mtd_lines, "EXPENSE")
-    mtd_remit = abs(
-        mtd_lines.filter(account__account_type__in=REMIT_PAYABLE_TYPES).aggregate(
-            t=Sum("amount")
-        )["t"]
-        or Decimal("0")
-    )
-
-    pending_txn = Transaction.objects.filter(
-        church_id__in=church_ids,
-        approval_status="PENDING",
-    ).count()
-
-    member_count = Member.objects.filter(
-        church_id__in=church_ids,
-        is_active=True,
-    ).count()
-
-    compliance = get_compliance_snapshot(request, user)
+    pending_txn = selectors.pending_transactions_for_churches_count(church_ids)
+    member_count = selectors.active_member_count_for_churches(church_ids)
+    if compliance is None:
+        compliance = get_compliance_snapshot(
+            request, user, church_ids=church_ids, manageable=manageable
+        )
 
     return {
         "period_label": now.strftime("%B %Y"),
@@ -654,10 +563,7 @@ def get_action_queue(request, user):
         })
 
     if can_approve_transactions(user) and church_ids:
-        pending = Transaction.objects.filter(
-            church_id__in=church_ids,
-            approval_status="PENDING",
-        ).count()
+        pending = selectors.pending_transactions_for_churches_count(church_ids)
         if pending:
             _add(
                 "high",
@@ -670,13 +576,7 @@ def get_action_queue(request, user):
 
     if church_ids:
         prior_month = (timezone.now().replace(day=1) - relativedelta(months=1)).date().replace(day=1)
-        overdue = MonthlyCutoff.objects.filter(
-            church_id__in=church_ids,
-            month=prior_month,
-            transferred=False,
-        ).annotate(payable=F("total_tithe") + F("total_combined")).filter(
-            payable__gt=0
-        ).count()
+        overdue = selectors.overdue_cutoff_count(church_ids, prior_month)
         if overdue:
             _add(
                 "critical",
@@ -716,12 +616,7 @@ def get_action_queue(request, user):
             )
 
     if church_ids and user_has_asset_approval(user):
-        from assets.models import FixedAsset
-
-        pending_assets = FixedAsset.objects.filter(
-            church_id__in=church_ids,
-            status="PENDING_APPROVAL",
-        ).count()
+        pending_assets = selectors.pending_assets_for_churches_count(church_ids)
         if pending_assets:
             _add(
                 "medium",
@@ -734,13 +629,12 @@ def get_action_queue(request, user):
             )
 
     if can_manage_members(user) or can_view_members(user):
-        transfers = MemberTransfer.objects.filter(status=TransferStatus.PENDING)
         if church:
-            transfers = transfers.filter(Q(from_church=church) | Q(to_church=church))
+            transfers = selectors.pending_transfers_for_church(church)
         elif church_ids:
-            transfers = transfers.filter(
-                Q(from_church_id__in=church_ids) | Q(to_church_id__in=church_ids)
-            )
+            transfers = selectors.pending_transfers_for_church_ids(church_ids)
+        else:
+            transfers = selectors.pending_transfers_for_church(None)
         transfer_count = transfers.count()
         if transfer_count:
             _add(
@@ -792,28 +686,8 @@ def get_church_leaderboard(request, user, limit=8):
     _, _, month_start_date = _month_bounds()
     church_ids = list(manageable.values_list("id", flat=True))
 
-    line_aggs = (
-        TransactionLine.objects.filter(
-            transaction__church_id__in=church_ids,
-            transaction__date__gte=month_start_date,
-            transaction__approval_status="APPROVED",
-            transaction__is_voided=False,
-            account__account_type__in=INCOME_REMIT_TYPES,
-        )
-        .values("transaction__church_id")
-        .annotate(total=Sum("amount"))
-    )
-    totals = {
-        row["transaction__church_id"]: abs(row["total"] or Decimal("0"))
-        for row in line_aggs
-    }
-
-    member_aggs = (
-        Member.objects.filter(church_id__in=church_ids, is_active=True)
-        .values("church_id")
-        .annotate(count=Count("id"))
-    )
-    member_counts = {row["church_id"]: row["count"] for row in member_aggs}
+    totals = selectors.church_mtd_giving_totals(church_ids, month_start_date)
+    member_counts = selectors.member_counts_by_church(church_ids)
 
     rows = []
     for church in manageable:
@@ -829,10 +703,12 @@ def get_church_leaderboard(request, user, limit=8):
     return rows[:limit]
 
 
-def get_organization_health(request, user):
+def get_organization_health(request, user, *, compliance=None, kpis=None):
     """Traffic-light health summary for mission control header."""
-    compliance = get_compliance_snapshot(request, user)
-    kpis = get_executive_kpis(request, user) or {}
+    if compliance is None:
+        compliance = get_compliance_snapshot(request, user)
+    if kpis is None:
+        kpis = get_executive_kpis(request, user) or {}
     overdue = compliance.get("overdue_count", 0)
     pending = kpis.get("pending_transactions", 0)
     locked = compliance.get("locked_periods", 0)
@@ -860,17 +736,11 @@ def get_organization_health(request, user):
 
 def get_secretary_summary(request):
     """Meeting and communication metrics for secretary dashboard."""
-    from meetings.models import Meeting, MeetingStatus
-
     church = get_active_church(request)
     if not church:
         return {}
     now = timezone.now()
-    upcoming_qs = Meeting.objects.filter(
-        church=church,
-        scheduled_at__gte=now,
-        status=MeetingStatus.SCHEDULED,
-    ).order_by("scheduled_at")
+    upcoming_qs = selectors.upcoming_meetings_for_church(church, now)
     return {
         "upcoming_meetings": upcoming_qs.count(),
         "next_meetings": upcoming_qs[:5],
@@ -905,10 +775,24 @@ def build_home_context(request):
     }
 
     if is_control_center:
-        context["executive_kpis"] = get_executive_kpis(request, user)
-        context["compliance_snapshot"] = get_compliance_snapshot(request, user)
+        manageable = get_manageable_churches(user)
+        church_ids = list(manageable.values_list("id", flat=True)) if manageable.exists() else []
+        compliance = get_compliance_snapshot(
+            request, user, church_ids=church_ids, manageable=manageable
+        )
+        executive_kpis = get_executive_kpis(
+            request,
+            user,
+            church_ids=church_ids,
+            manageable=manageable,
+            compliance=compliance,
+        )
+        context["executive_kpis"] = executive_kpis
+        context["compliance_snapshot"] = compliance
         context["church_leaderboard"] = get_church_leaderboard(request, user)
-        context["org_health"] = get_organization_health(request, user)
+        context["org_health"] = get_organization_health(
+            request, user, compliance=compliance, kpis=executive_kpis or {}
+        )
 
     if show_hierarchy:
         context["hierarchy_rollup"] = get_hierarchy_rollup(request, user)
@@ -942,7 +826,7 @@ def build_home_context(request):
 
     from announcements.calendar_services import (
         attach_calendar_urls,
-        calendar_summary_counts,
+        calendar_summary_counts_from_items,
         get_communications_calendar,
     )
 
@@ -953,7 +837,7 @@ def build_home_context(request):
             if item["kind"] == "birthday":
                 item["url"] = ""
     context["upcoming_preview"] = upcoming
-    # Lighter preview window already limited; counts use same 30-day window
-    context["upcoming_counts"] = calendar_summary_counts(request, days=30)
+    # Counts for the preview window — derived from already-fetched items (no re-query)
+    context["upcoming_counts"] = calendar_summary_counts_from_items(upcoming)
 
     return context

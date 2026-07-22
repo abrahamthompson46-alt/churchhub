@@ -67,9 +67,7 @@ WORKERS="${GUNICORN_WORKERS:-${WEB_CONCURRENCY:-2}}"
 TIMEOUT="${GUNICORN_TIMEOUT:-120}"
 
 echo "==> Starting Gunicorn on port ${PORT}"
-exec $PY -m gunicorn church_system.wsgi:application \
-  --bind "0.0.0.0:${PORT}" \
-  --workers "${WORKERS}" \
-  --timeout "${TIMEOUT}" \
-  --access-logfile - \
-  --error-logfile -
+export PORT
+exec $PY -m gunicorn \
+  --config gunicorn.conf.py \
+  church_system.wsgi:application

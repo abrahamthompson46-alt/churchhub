@@ -59,13 +59,15 @@ Present in most apps:
 - `migrations/`, `tests.py` and/or `tests_*.py`
 - Occasional: `access.py`, `signals.py`, `management/commands/`, sibling service modules
 
-**Not present project-wide:**
+**Not present project-wide (except first slice):**
 
 - `managers.py`
-- `repositories/`
-- `selectors/`
+- `repositories/` packages
+- `selectors/` packages  
 - `api/` packages
 - `services/` package directories (use flat `services.py` or a named sibling like `welfare_services.py`)
+
+**Current exception:** `transactions`, `members`, `remittance`, `payroll`, `assets`, `organization`, `reports`, `dashboard`, `permissions`, `accounts`, `sitecontrol`, `meetings`, `announcements`, `ledger`, `giving`, and `budgets` each have `selectors.py` / `repositories.py` as the P1-2 architecture slices. Those modules are complete for this pattern (views/forms/services route through selectors/repos; ModelForm CRUD uses `commit=False` + repositories). Ledger remains posting templates/categories + CoA UI only — `transactions` owns Accounts/journals. Giving is a read-only reporting/statement layer (empty repositories). Budgets is the planning UI/workflow layer over `transactions.Budget` (no local Budget model). Do not invent parallel patterns in other apps without an explicit architectural task.
 
 ---
 

@@ -1,8 +1,18 @@
 """Custom authentication views."""
 
+from django.contrib.auth import login
 from django.contrib.auth.views import LoginView
+from django.shortcuts import redirect
 from django.urls import reverse_lazy
 
+from accounts.mfa import (
+    SESSION_MFA_PENDING_BACKEND,
+    SESSION_MFA_PENDING_USER,
+    mark_mfa_verified,
+    request_has_trusted_device,
+    user_requires_mfa,
+)
+from accounts.services import get_client_ip, log_activity
 from permissions.roles import UserRole
 
 
@@ -36,7 +46,39 @@ def _branding_context():
     }
 
 
-class ChurchHubLoginView(LoginView):
+class MfaAwareLoginMixin:
+    """Challenge or enroll MFA for privileged roles after password success."""
+
+    def form_valid(self, form):
+        user = form.get_user()
+        if user_requires_mfa(user):
+            if user.mfa_enabled:
+                # Trusted device: complete login without TOTP/email challenge
+                if request_has_trusted_device(self.request, user):
+                    login(self.request, user)
+                    mark_mfa_verified(self.request)
+                    log_activity(
+                        user,
+                        "MFA_TRUSTED_DEVICE",
+                        ip_address=get_client_ip(self.request),
+                    )
+                    return redirect(self.get_success_url())
+                self.request.session[SESSION_MFA_PENDING_USER] = str(user.pk)
+                self.request.session[SESSION_MFA_PENDING_BACKEND] = getattr(
+                    user, "backend", "django.contrib.auth.backends.ModelBackend"
+                )
+                self.request.session.modified = True
+                return redirect("accounts:mfa_verify")
+            login(self.request, user)
+            self.request.session["mfa_verified"] = False
+            self.request.session.modified = True
+            return redirect("accounts:mfa_enroll")
+        login(self.request, user)
+        mark_mfa_verified(self.request)
+        return redirect(self.get_success_url())
+
+
+class ChurchHubLoginView(MfaAwareLoginMixin, LoginView):
     template_name = "login.html"
 
     def get_context_data(self, **kwargs):
@@ -48,7 +90,7 @@ class ChurchHubLoginView(LoginView):
         return post_login_url(self.request.user)
 
 
-class MemberPortalLoginView(LoginView):
+class MemberPortalLoginView(MfaAwareLoginMixin, LoginView):
     """Member-facing sign-in — separate landing from staff operations login."""
 
     template_name = "portal/login.html"

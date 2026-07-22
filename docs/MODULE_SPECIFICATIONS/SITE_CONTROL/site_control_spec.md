@@ -50,7 +50,7 @@ erDiagram
 - **TenantApplication** — public apply workflow  
 - **Denomination** — SaaS isolation wall, terminology, branding/seeds  
 
-**Managers:** none custom. Access helpers in `platform_access.py`, `rbac.py`.
+**Managers:** none custom. Access helpers in `platform_access.py`, `rbac.py`. Reads via `selectors.py`; writes via `repositories.py` (P1-2 layered).
 
 ---
 
@@ -67,18 +67,24 @@ erDiagram
 
 ---
 
-## 4. Services (Current)
+## 4. Services / selectors / repositories (Current)
 
 | Module | Role |
 |--------|------|
-| `services.py` | Settings cache, features, plans, subscriptions, tenant suspend/reactivate/offboard, stats, audit log helper, seed suite |
+| `selectors.py` | Read/query helpers: denominations, plans, payment methods, churches/subscriptions, applications, audit/announcements, operator/user lookups, hierarchy slices |
+| `repositories.py` | Persistence only: platform audit, model save, payment bulk create, plan/subscription create/update, application/denomination writes, orphan conference assign |
+| `services.py` | Settings cache, features/entitlements, plans, subscriptions lifecycle, tenant suspend/reactivate/offboard, stats, audit helper, seed suite |
 | `provisioning_services.py` | Tenant provision workflows |
 | `registration_services.py` | Apply / approve / reject applications |
 | `denomination_services.py` | Labels, seeds, builtins |
 | `billing_services.py` | Denomination billing rollups |
-| `platform_access.py` | Operator denomination filters |
+| `platform_access.py` | Operator denomination filters (reads via selectors) |
 | `crypto.py` | SMTP secret encrypt/decrypt |
 | `navigation.py` | Platform nav |
+
+**Layering (P1-2):** Views → services → selectors/repositories → models. Views/forms handle HTTP and forms only; ModelForm CRUD uses `commit=False` + repositories. Platform vs institution lanes, denomination wall, maintenance, middleware, and public `/apply/` are unchanged.
+
+`tests_layers.py` characterizes denomination isolation, platform operator scoping, application workflow, subscription state, selector reads, repository writes, and audit creation.
 
 Commands: `seed_denominations`, `expire_subscriptions`, `normalize_user_scopes`.
 
@@ -189,7 +195,7 @@ flowchart LR
 - Impersonation capability-gated + audited.  
 - Encrypted SMTP secrets preferred.  
 - Breakglass/owner paths in RBAC.  
-- Django admin requires platform superuser path (`can_access_django_admin`).  
+- Django admin requires platform superuser path (`can_access_django_admin`); church/unit ModelAdmin querysets additionally use `admin_custom.tenancy` (OWNER global; other roles limited to `managed_denominations`).  
 - Never commit SMTP passwords; prefer encrypted field.  
 - Maintenance and login lockout protect availability/auth.
 

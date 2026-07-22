@@ -78,6 +78,7 @@ class RemittancePolicyAuditLog(models.Model):
         ("CREATE", "Created"),
         ("UPDATE", "Updated"),
         ("DEACTIVATE", "Deactivated"),
+        ("SCOPE_VIOLATION", "Scope violation"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

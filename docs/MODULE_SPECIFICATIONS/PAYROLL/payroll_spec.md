@@ -57,6 +57,20 @@ erDiagram
 
 **Managers:** none custom.
 
+**Current layering (Phase 2 / P1-2 Payroll slice):**
+
+```
+Views → Services → Selectors → Repositories → Models
+```
+
+| Layer | File | Role |
+|-------|------|------|
+| Selectors | `payroll/selectors.py` | Church-scoped reads (employees, runs, lines, tax/statutory catalogs, budget/YTD aggregates) |
+| Repositories | `payroll/repositories.py` | Persistence writes (defaults seed, run/line/audit, compensation/loan, policy) |
+| Services | `payroll/services.py` | PAYE/statutory calc, run lifecycle, post/pay journals via `transactions.repositories` |
+
+Views no longer call payroll model managers / `get_object_or_404` on domain models directly for list/detail paths.
+
 ---
 
 ## 3. Business rules (Current)

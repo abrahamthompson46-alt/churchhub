@@ -7,7 +7,6 @@ from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import transaction as db_transaction
-from django.db.models import Q
 from django.utils import timezone
 
 from payroll.constants import (
@@ -16,22 +15,10 @@ from payroll.constants import (
     DEFAULT_PAYE_BANDS,
     DEFAULT_STATUTORY_RULES,
 )
+from payroll import repositories as repo
+from payroll import selectors
 from payroll.encryption import PayrollFieldCrypto
-from payroll.models import (
-    DeductionType,
-    Employee,
-    EmployeeCompensation,
-    EmployeeCompensationLine,
-    EmployeeLoan,
-    PayComponentType,
-    PayrollLine,
-    PayrollLineItem,
-    PayrollRun,
-    PayrollRunAuditLog,
-    PayrollTaxBand,
-    PayrollTaxTable,
-    StatutoryContributionRule,
-)
+from transactions import repositories as txn_repo
 
 
 class PayrollError(ValueError):
@@ -47,21 +34,17 @@ def _days_in_month(year, month):
 
 
 def _log_run_audit(payroll_run, action, user, details=None):
-    PayrollRunAuditLog.objects.create(
+    repo.create_run_audit(
         payroll_run=payroll_run,
         action=action,
         performed_by=user,
-        details=details or {},
+        details=details,
     )
 
 
 def _generate_run_reference(church, year, month):
     prefix = f"PAY-{year}-{month:02d}"
-    last = (
-        PayrollRun.objects.filter(host_church=church, reference__startswith=prefix)
-        .order_by("-reference")
-        .first()
-    )
+    last = selectors.last_run_for_reference_prefix(church, prefix)
     seq = 1
     if last and last.reference:
         try:
@@ -110,7 +93,7 @@ def get_employee_pii_display(employee):
 def ensure_payroll_defaults_for_church(church):
     """Seed pay components, deduction types, tax table, and statutory rules."""
     for row in DEFAULT_EARNING_COMPONENTS:
-        PayComponentType.objects.get_or_create(
+        repo.get_or_create_pay_component(
             host_church=church,
             code=row["code"],
             defaults={
@@ -121,7 +104,7 @@ def ensure_payroll_defaults_for_church(church):
         )
 
     for row in DEFAULT_DEDUCTION_TYPES:
-        DeductionType.objects.get_or_create(
+        repo.get_or_create_deduction_type(
             host_church=church,
             code=row["code"],
             defaults={
@@ -133,14 +116,14 @@ def ensure_payroll_defaults_for_church(church):
             },
         )
 
-    if not PayrollTaxTable.objects.filter(host_church=church, is_active=True).exists():
-        table = PayrollTaxTable.objects.create(
+    if not selectors.active_tax_table_exists(church):
+        table = repo.create_tax_table(
             host_church=church,
             name="Ghana PAYE (Default)",
             notes="Seeded default bands — update when GRA revises rates.",
         )
         for idx, band in enumerate(DEFAULT_PAYE_BANDS):
-            PayrollTaxBand.objects.create(
+            repo.create_tax_band(
                 tax_table=table,
                 lower_limit=Decimal(band["lower"]),
                 upper_limit=Decimal(band["upper"]) if band["upper"] else None,
@@ -149,7 +132,7 @@ def ensure_payroll_defaults_for_church(church):
             )
 
     for row in DEFAULT_STATUTORY_RULES:
-        StatutoryContributionRule.objects.get_or_create(
+        repo.get_or_create_statutory_rule(
             host_church=church,
             code=row["code"],
             effective_from=date(2000, 1, 1),
@@ -168,41 +151,19 @@ def ensure_payroll_defaults_for_church(church):
 
 def get_active_tax_table(church, as_of_date=None):
     as_of_date = as_of_date or timezone.now().date()
-    return (
-        PayrollTaxTable.objects.filter(
-            host_church=church,
-            is_active=True,
-            effective_from__lte=as_of_date,
-        )
-        .filter(Q(effective_to__isnull=True) | Q(effective_to__gte=as_of_date))
-        .order_by("-effective_from")
-        .first()
-    )
+    return selectors.active_tax_table(church, as_of_date)
 
 
 def get_active_statutory_rules(church, as_of_date=None):
     as_of_date = as_of_date or timezone.now().date()
     rules = {}
-    for rule in StatutoryContributionRule.objects.filter(
-        host_church=church,
-        is_active=True,
-        effective_from__lte=as_of_date,
-    ).filter(Q(effective_to__isnull=True) | Q(effective_to__gte=as_of_date)):
+    for rule in selectors.active_statutory_rules_qs(church, as_of_date):
         rules[rule.code] = rule
     return rules
 
 
 def get_active_compensation(employee, as_of_date):
-    return (
-        EmployeeCompensation.objects.filter(
-            employee=employee,
-            is_active=True,
-            effective_from__lte=as_of_date,
-        )
-        .filter(Q(effective_to__isnull=True) | Q(effective_to__gte=as_of_date))
-        .order_by("-effective_from")
-        .first()
-    )
+    return selectors.active_compensation(employee, as_of_date)
 
 
 def calculate_paye(taxable_income, tax_table):
@@ -333,7 +294,7 @@ def calculate_employee_pay(employee, year, month, church=None):
         if amount > 0:
             deductions.append({"code": dtype.code, "label": dtype.name, "amount": amount})
 
-    for loan in EmployeeLoan.objects.filter(employee=employee, status="ACTIVE"):
+    for loan in selectors.employee_active_loans(employee):
         recovery = min(loan.monthly_recovery, loan.balance)
         if recovery > 0:
             deductions.append({
@@ -369,12 +330,7 @@ def calculate_employee_pay(employee, year, month, church=None):
 
 
 def _employees_for_run(payroll_run):
-    return Employee.objects.filter(
-        host_church=payroll_run.host_church,
-        paying_unit_type=payroll_run.paying_unit_type,
-        paying_unit_id=payroll_run.paying_unit_id,
-        status="ACTIVE",
-    ).select_related("department")
+    return selectors.employees_for_run(payroll_run)
 
 
 @db_transaction.atomic
@@ -382,16 +338,12 @@ def create_payroll_run(host_church, year, month, user, paying_unit_type="CHURCH"
     paying_unit_id = paying_unit_id or host_church.pk
     pay_date = pay_date or date(year, month, _days_in_month(year, month))
 
-    if PayrollRun.objects.filter(
-        host_church=host_church,
-        paying_unit_type=paying_unit_type,
-        paying_unit_id=paying_unit_id,
-        year=year,
-        month=month,
-    ).exclude(status="VOID").exists():
+    if selectors.run_exists_for_period(
+        host_church, paying_unit_type, paying_unit_id, year, month
+    ):
         raise PayrollError("A payroll run already exists for this period and paying unit.")
 
-    run = PayrollRun.objects.create(
+    run = repo.create_payroll_run(
         reference=_generate_run_reference(host_church, year, month),
         host_church=host_church,
         paying_unit_type=paying_unit_type,
@@ -407,12 +359,37 @@ def create_payroll_run(host_church, year, month, user, paying_unit_type="CHURCH"
     return run
 
 
+_DRAFT_PAYROLL_LINE_STATUSES = frozenset({"DRAFT", "CALCULATED", "REJECTED"})
+
+
+def _clear_draft_payroll_lines(payroll_run, user, *, reason: str) -> int:
+    """
+    Remove payroll lines only while the run is still editable (draft workflow).
+
+    Posted/paid/void runs must retain line history for audit and reversal.
+    """
+    if payroll_run.status not in _DRAFT_PAYROLL_LINE_STATUSES:
+        raise PayrollError(
+            f"Cannot remove payroll lines while run status is {payroll_run.status}."
+        )
+    cleared = payroll_run.lines.count()
+    if cleared:
+        repo.delete_run_lines(payroll_run)
+        _log_run_audit(
+            payroll_run,
+            "CALCULATE",
+            user,
+            {"action": reason, "lines_cleared": cleared},
+        )
+    return cleared
+
+
 @db_transaction.atomic
 def calculate_payroll_run(payroll_run, user):
     if payroll_run.status not in ("DRAFT", "CALCULATED"):
         raise PayrollError("Only draft or calculated runs can be recalculated.")
 
-    payroll_run.lines.all().delete()
+    _clear_draft_payroll_lines(payroll_run, user, reason="recalculate")
 
     total_gross = Decimal("0.00")
     total_deductions = Decimal("0.00")
@@ -434,7 +411,7 @@ def calculate_payroll_run(payroll_run, user):
             continue
 
         seq += 1
-        line = PayrollLine.objects.create(
+        line = repo.create_payroll_line(
             payroll_run=payroll_run,
             employee=employee,
             gross_pay=result["gross_pay"],
@@ -448,7 +425,7 @@ def calculate_payroll_run(payroll_run, user):
         )
 
         for item in result["earnings"]:
-            PayrollLineItem.objects.create(
+            repo.create_payroll_line_item(
                 payroll_line=line,
                 item_type="EARNING",
                 code=item["code"],
@@ -456,7 +433,7 @@ def calculate_payroll_run(payroll_run, user):
                 amount=item["amount"],
             )
         for item in result["deductions"]:
-            PayrollLineItem.objects.create(
+            repo.create_payroll_line_item(
                 payroll_line=line,
                 item_type="DEDUCTION",
                 code=item["code"],
@@ -465,7 +442,7 @@ def calculate_payroll_run(payroll_run, user):
                 source_ref=str(item.get("loan_id") or ""),
             )
         for item in result["employer_items"]:
-            PayrollLineItem.objects.create(
+            repo.create_payroll_line_item(
                 payroll_line=line,
                 item_type="EMPLOYER",
                 code=item["code"],
@@ -502,7 +479,7 @@ def calculate_payroll_run(payroll_run, user):
             "skipped_employees": skipped,
             "skipped_count": len(skipped),
         }
-    payroll_run.save()
+    repo.save_payroll_run(payroll_run)
     _log_run_audit(
         payroll_run,
         "CALCULATE",
@@ -525,7 +502,7 @@ def treasury_approve_payroll_run(payroll_run, user):
         )
     payroll_run.treasury_approved_by = user
     payroll_run.treasury_approved_at = timezone.now()
-    payroll_run.save()
+    repo.save_payroll_run(payroll_run)
     _log_run_audit(payroll_run, "APPROVE", user, {"stage": "treasury"})
     return payroll_run
 
@@ -540,7 +517,7 @@ def reject_payroll_run(payroll_run, user, reason=""):
     payroll_run.approved_at = None
     payroll_run.treasury_approved_by = None
     payroll_run.treasury_approved_at = None
-    payroll_run.save()
+    repo.save_payroll_run(payroll_run)
     _log_run_audit(payroll_run, "REJECT", user, {"reason": reason})
     return payroll_run
 
@@ -552,7 +529,7 @@ def void_payroll_run(payroll_run, user):
     if payroll_run.status == "VOID":
         raise PayrollError("Run is already void.")
     payroll_run.status = "VOID"
-    payroll_run.save()
+    repo.save_payroll_run(payroll_run)
     _log_run_audit(payroll_run, "VOID", user)
     return payroll_run
 
@@ -563,12 +540,12 @@ def reopen_payroll_run(payroll_run, user):
     if payroll_run.status != "REJECTED":
         raise PayrollError("Only rejected runs can be reopened.")
     payroll_run.status = "DRAFT"
-    payroll_run.lines.all().delete()
+    _clear_draft_payroll_lines(payroll_run, user, reason="reopen")
     payroll_run.total_gross = Decimal("0")
     payroll_run.total_deductions = Decimal("0")
     payroll_run.total_net = Decimal("0")
     payroll_run.total_employer_cost = Decimal("0")
-    payroll_run.save()
+    repo.save_payroll_run(payroll_run)
     _log_run_audit(payroll_run, "REOPEN", user, {"action": "reopen"})
     return payroll_run
 
@@ -584,26 +561,17 @@ def approve_payroll_run(payroll_run, user):
     payroll_run.status = "APPROVED"
     payroll_run.approved_by = user
     payroll_run.approved_at = timezone.now()
-    payroll_run.save()
+    repo.save_payroll_run(payroll_run)
     _log_run_audit(payroll_run, "APPROVE", user, {"stage": "pastor"})
     return payroll_run
 
 
 def _balance_journal(transaction):
     """Apply penny adjustment to the salary expense line when rounding leaves a residual."""
-    from transactions.models import TransactionLine
-
     total = sum(line.amount for line in transaction.lines.all())
     if total == Decimal("0.00"):
         return
-    expense_line = (
-        TransactionLine.objects.filter(
-            transaction=transaction,
-            account__account_type="SALARY_EXPENSE",
-        )
-        .order_by("id")
-        .first()
-    )
+    expense_line = selectors.salary_expense_line_for_transaction(transaction)
     if expense_line:
         expense_line.amount = _quantize(expense_line.amount - Decimal(str(total)))
         expense_line.save(update_fields=["amount"])
@@ -618,17 +586,17 @@ def post_payroll_run(payroll_run, user, idempotency_key=None):
         complete_financial_idempotency,
         normalize_idempotency_key,
     )
-    from transactions.models import Transaction, TransactionLine
     from transactions.services import (
         _get_account,
         _log_audit,
+        approve_module_journal,
         assert_period_open,
         assert_working_day_allows_posting,
         resolve_transaction_date,
         validate_transaction_balance,
     )
 
-    payroll_run = PayrollRun.objects.select_for_update().get(pk=payroll_run.pk)
+    payroll_run = selectors.run_lock_for_update(payroll_run.pk)
 
     if payroll_run.status != "APPROVED":
         raise PayrollError("Only approved runs can be posted.")
@@ -686,16 +654,12 @@ def post_payroll_run(payroll_run, user, idempotency_key=None):
                 pension_total += item.amount
         net_total += line.net_pay
 
-    trx = Transaction.objects.create(
+    trx = txn_repo.create_transaction(
         transaction_type="PAYROLL",
         church=church,
-        created_by=user,
+        created_by=payroll_run.prepared_by or user,
         description=f"Payroll accrual — {payroll_run.reference}",
         date=posting_date,
-        approval_status="APPROVED",
-        approved_by=user,
-        approved_at=timezone.now(),
-        locked=False,
     )
 
     salary_expense = _get_account(church, "SALARY_EXPENSE")
@@ -709,25 +673,33 @@ def post_payroll_run(payroll_run, user, idempotency_key=None):
     debit_salary = payroll_run.total_gross
     debit_employer = employer_total
 
-    TransactionLine.objects.create(transaction=trx, account=salary_expense, amount=debit_salary)
+    txn_repo.create_transaction_line(transaction=trx, account=salary_expense, amount=debit_salary)
     if debit_employer > 0:
-        TransactionLine.objects.create(transaction=trx, account=employer_expense, amount=debit_employer)
+        txn_repo.create_transaction_line(transaction=trx, account=employer_expense, amount=debit_employer)
     if paye_total > 0:
-        TransactionLine.objects.create(transaction=trx, account=paye_payable, amount=-paye_total)
+        txn_repo.create_transaction_line(transaction=trx, account=paye_payable, amount=-paye_total)
     ssnit_all = ssnit_ee_total + ssnit_er_total
     if ssnit_all > 0:
-        TransactionLine.objects.create(transaction=trx, account=ssnit_payable, amount=-ssnit_all)
+        txn_repo.create_transaction_line(transaction=trx, account=ssnit_payable, amount=-ssnit_all)
     if pension_total > 0:
-        TransactionLine.objects.create(transaction=trx, account=pension_payable, amount=-pension_total)
+        txn_repo.create_transaction_line(transaction=trx, account=pension_payable, amount=-pension_total)
     # Net + loan + other deductions = gross - PAYE - SSNIT_EE (salaries payable credit)
     payable_credit = net_total + loan_deductions + other_deductions
     if payable_credit > 0:
-        TransactionLine.objects.create(transaction=trx, account=salaries_payable, amount=-payable_credit)
+        txn_repo.create_transaction_line(transaction=trx, account=salaries_payable, amount=-payable_credit)
 
     _balance_journal(trx)
     validate_transaction_balance(trx)
-    trx.locked = True
-    trx.save(update_fields=["locked"])
+    trx = approve_module_journal(
+        trx,
+        user,
+        payroll_run.treasury_approved_by,
+        payroll_run.approved_by,
+    )
+    if trx.approval_status != "APPROVED":
+        raise PayrollError(
+            "Payroll journal requires approval by an officer other than the preparer."
+        )
     _log_audit(
         church,
         "CREATE",
@@ -746,7 +718,7 @@ def post_payroll_run(payroll_run, user, idempotency_key=None):
     payroll_run.transaction = trx
     payroll_run.status = "POSTED"
     payroll_run.posted_at = timezone.now()
-    payroll_run.save()
+    repo.save_payroll_run(payroll_run)
     complete_financial_idempotency(idem_record, trx)
     _log_run_audit(payroll_run, "POST", user, {"transaction": trx.reference})
     return payroll_run
@@ -761,17 +733,17 @@ def pay_payroll_run(payroll_run, user, payment_account_type="BANK", idempotency_
         complete_financial_idempotency,
         normalize_idempotency_key,
     )
-    from transactions.models import Transaction, TransactionLine
     from transactions.services import (
         _get_account,
         _log_audit,
+        approve_module_journal,
         assert_period_open,
         assert_working_day_allows_posting,
         resolve_transaction_date,
         validate_transaction_balance,
     )
 
-    payroll_run = PayrollRun.objects.select_for_update().get(pk=payroll_run.pk)
+    payroll_run = selectors.run_lock_for_update(payroll_run.pk)
 
     if payroll_run.status != "POSTED":
         raise PayrollError("Only posted runs can be marked as paid.")
@@ -797,50 +769,49 @@ def pay_payroll_run(payroll_run, user, payment_account_type="BANK", idempotency_
     if amount <= 0:
         raise PayrollError("Net pay amount must be greater than zero.")
 
-    trx = Transaction.objects.create(
+    trx = txn_repo.create_transaction(
         transaction_type="TRANSFER",
         church=church,
         created_by=user,
         description=f"Payroll payment — {payroll_run.reference}",
         date=posting_date,
-        approval_status="APPROVED",
-        approved_by=user,
-        approved_at=timezone.now(),
-        locked=False,
     )
 
     salaries_payable = _get_account(church, "SALARIES_PAYABLE")
     payment = _get_account(church, payment_account_type)
 
-    TransactionLine.objects.create(transaction=trx, account=salaries_payable, amount=amount)
-    TransactionLine.objects.create(transaction=trx, account=payment, amount=-amount)
+    txn_repo.create_transaction_line(transaction=trx, account=salaries_payable, amount=amount)
+    txn_repo.create_transaction_line(transaction=trx, account=payment, amount=-amount)
 
     validate_transaction_balance(trx)
-    trx.locked = True
-    trx.save(update_fields=["locked"])
+    trx = approve_module_journal(
+        trx,
+        payroll_run.treasury_approved_by,
+        payroll_run.approved_by,
+    )
+    if trx.approval_status != "APPROVED":
+        raise PayrollError(
+            "Payroll payment journal requires approval by an officer other than the payer."
+        )
     _log_audit(church, "CREATE", user, transaction=trx, details={"payroll_payment": payroll_run.reference})
 
     for line in payroll_run.lines.prefetch_related("items"):
         for item in line.items.filter(item_type="DEDUCTION", code="LOAN"):
             loan = None
             if item.source_ref:
-                loan = EmployeeLoan.objects.filter(
-                    pk=item.source_ref, employee=line.employee
-                ).first()
+                loan = selectors.loan_for_employee(item.source_ref, line.employee)
             if not loan:
-                loan = EmployeeLoan.objects.filter(
-                    employee=line.employee, status="ACTIVE"
-                ).first()
+                loan = selectors.first_active_loan(line.employee)
             if loan:
                 loan.balance = max(Decimal("0"), loan.balance - item.amount)
                 if loan.balance == 0:
                     loan.status = "PAID"
-                loan.save()
+                repo.save_loan(loan)
 
     payroll_run.payment_transaction = trx
     payroll_run.status = "PAID"
     payroll_run.paid_at = timezone.now()
-    payroll_run.save()
+    repo.save_payroll_run(payroll_run)
     complete_financial_idempotency(idem_record, trx)
     _log_run_audit(payroll_run, "PAY", user, {"amount": str(amount)})
     return payroll_run
@@ -854,7 +825,7 @@ def reverse_payroll_run(payroll_run, user, reason=""):
     """
     from transactions.services import void_transaction
 
-    payroll_run = PayrollRun.objects.select_for_update().get(pk=payroll_run.pk)
+    payroll_run = selectors.run_lock_for_update(payroll_run.pk)
     if payroll_run.status not in ("POSTED", "PAID"):
         raise PayrollError("Only posted or paid runs can be reversed.")
     reason = (reason or "").strip() or "Payroll reversal"
@@ -870,15 +841,15 @@ def reverse_payroll_run(payroll_run, user, reason=""):
             for item in line.items.filter(item_type="DEDUCTION", code="LOAN"):
                 if not item.source_ref:
                     continue
-                loan = EmployeeLoan.objects.filter(pk=item.source_ref).first()
+                loan = selectors.loan_by_pk(item.source_ref)
                 if loan:
                     loan.balance = _quantize(loan.balance + item.amount)
                     if loan.status == "PAID" and loan.balance > 0:
                         loan.status = "ACTIVE"
-                    loan.save()
+                    repo.save_loan(loan)
 
     payroll_run.status = "VOID"
-    payroll_run.save(update_fields=["status", "updated_at"])
+    repo.save_payroll_run(payroll_run, update_fields=["status", "updated_at"])
     _log_run_audit(payroll_run, "REVERSE", user, {"reason": reason})
     return payroll_run
 
@@ -1010,11 +981,7 @@ def generate_payslip_pdf(payroll_line):
 
 def ytd_summary(employee, year):
     """Year-to-date totals for tax certificate (Phase 3)."""
-    lines = PayrollLine.objects.filter(
-        employee=employee,
-        payroll_run__year=year,
-        payroll_run__status__in=("POSTED", "PAID"),
-    )
+    lines = selectors.ytd_lines_for_employee(employee, year)
     gross = sum(l.gross_pay for l in lines)
     deductions = sum(l.total_deductions for l in lines)
     net = sum(l.net_pay for l in lines)
@@ -1033,19 +1000,15 @@ def ytd_summary(employee, year):
 
 
 def resolve_paying_unit_label(unit_type, unit_id):
-    from organization.models import Church, Conference, District, GeneralConference, Union
-
-    model_map = {
-        "CHURCH": Church,
-        "DISTRICT": District,
-        "CONFERENCE": Conference,
-        "UNION": Union,
-        "GENERAL_CONFERENCE": GeneralConference,
-    }
-    model = model_map.get(unit_type)
-    if not model:
+    obj = selectors.org_unit_by_type(unit_type, unit_id)
+    if obj is None and unit_type not in (
+        "CHURCH",
+        "DISTRICT",
+        "CONFERENCE",
+        "UNION",
+        "GENERAL_CONFERENCE",
+    ):
         return unit_type
-    obj = model.objects.filter(pk=unit_id).first()
     return str(obj) if obj else f"{unit_type} ({unit_id})"
 
 
@@ -1084,20 +1047,12 @@ def resolve_paying_unit_id(church, unit_type, unit_id=None):
 
 def check_payroll_budget(church, year, run_gross):
     """Compare payroll gross against salary budget and YTD spend."""
-    from django.db.models import Sum
-
-    from transactions.models import Account, Budget
-
-    account = Account.objects.filter(church=church, account_type="SALARY_EXPENSE").first()
+    account = selectors.salary_expense_account(church)
     if not account:
         return {}
 
-    budget = Budget.objects.filter(church=church, year=year, account=account).first()
-    ytd_posted = PayrollRun.objects.filter(
-        host_church=church,
-        year=year,
-        status__in=("POSTED", "PAID"),
-    ).aggregate(total=Sum("total_gross"))["total"] or Decimal("0")
+    budget = selectors.salary_budget(church, year, account)
+    ytd_posted = selectors.ytd_posted_gross(church, year)
 
     projected = _quantize(ytd_posted + run_gross)
     if not budget:
@@ -1133,12 +1088,7 @@ def hierarchy_payroll_rollup(user, year=None, month=None):
     if not church_ids:
         return []
 
-    qs = PayrollRun.objects.filter(
-        year=year,
-        host_church_id__in=church_ids,
-    ).exclude(status__in=("DRAFT", "VOID", "REJECTED"))
-    if month:
-        qs = qs.filter(month=month)
+    qs = selectors.hierarchy_runs_qs(church_ids, year, month=month)
 
     rows = []
     for church in churches.filter(pk__in=qs.values_list("host_church_id", flat=True).distinct()):

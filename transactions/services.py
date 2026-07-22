@@ -12,6 +12,8 @@ from django.utils import timezone
 
 from permissions.superadmin import is_superadmin
 
+from . import repositories as repo
+from . import selectors
 from .models import (
     Account,
     BankReconciliation,
@@ -38,12 +40,12 @@ class WorkingDayClosedError(ValueError):
 
 
 def _log_audit(church, action, user, transaction=None, details=None):
-    FinancialAuditLog.objects.create(
+    return repo.create_audit_log(
         church=church,
-        transaction=transaction,
         action=action,
-        performed_by=user,
-        details=details or {},
+        user=user,
+        transaction=transaction,
+        details=details,
     )
 
 
@@ -53,7 +55,7 @@ def _quantize_currency(amount):
 
 def validate_transaction_balance(transaction):
     """Raise if journal lines do not sum to zero (within one cent tolerance)."""
-    total = transaction.lines.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    total = repo.transaction_line_sum(transaction)
     if _quantize_currency(total) != Decimal("0.00"):
         raise UnbalancedTransactionError(
             f"Transaction {transaction.reference} is unbalanced: sum={total}"
@@ -64,13 +66,9 @@ def validate_transaction_balance(transaction):
 def assert_period_open(church, transaction_date=None):
     """Raise if the church's financial period for the given date is locked."""
     transaction_date = transaction_date or timezone.now().date()
-    locked = FinancialPeriod.objects.filter(
-        church=church,
-        year=transaction_date.year,
-        month=transaction_date.month,
-        is_locked=True,
-    ).exists()
-    if locked:
+    if selectors.is_financial_period_locked(
+        church, transaction_date.year, transaction_date.month
+    ):
         raise PeriodLockedError(
             f"Financial period {transaction_date.strftime('%B %Y')} is locked for {church.name}."
         )
@@ -78,12 +76,7 @@ def assert_period_open(church, transaction_date=None):
 
 def get_active_working_day(church):
     """Return the currently open working day for a church, if any."""
-    return (
-        WorkingDay.objects.filter(church=church, status=WorkingDay.STATUS_OPEN)
-        .select_related("opened_by", "closed_by")
-        .order_by("-date")
-        .first()
-    )
+    return selectors.active_working_day(church)
 
 
 def get_working_day_status(church):
@@ -95,12 +88,7 @@ def get_working_day_status(church):
         "active_working_day": active,
         "working_date": active.date if active else None,
         "is_open": bool(active),
-        "last_closed": (
-            WorkingDay.objects.filter(church=church, status=WorkingDay.STATUS_CLOSED)
-            .select_related("closed_by")
-            .order_by("-date")
-            .first()
-        ),
+        "last_closed": selectors.last_closed_working_day(church),
     }
 
 
@@ -142,7 +130,7 @@ def open_working_day(church, business_date, user, notes=""):
             f"Close the open working day ({current_open.date:%d %b %Y}) before opening another."
         )
 
-    existing = WorkingDay.objects.filter(church=church, date=business_date).first()
+    existing = selectors.working_day_for_date(church, business_date)
     if existing and existing.status == WorkingDay.STATUS_OPEN:
         raise ValueError(f"Working day {business_date:%d %b %Y} is already open.")
 
@@ -153,10 +141,9 @@ def open_working_day(church, business_date, user, notes=""):
         existing.closed_at = None
         existing.closed_by = None
         existing.notes = notes or existing.notes
-        existing.save()
-        working_day = existing
+        working_day = repo.save_working_day(existing)
     else:
-        working_day = WorkingDay.objects.create(
+        working_day = repo.create_working_day(
             church=church,
             date=business_date,
             status=WorkingDay.STATUS_OPEN,
@@ -185,7 +172,10 @@ def close_working_day(church, user, notes=""):
     active.closed_by = user
     if notes:
         active.notes = notes
-    active.save(update_fields=["status", "closed_at", "closed_by", "notes", "updated_at"])
+    repo.save_working_day(
+        active,
+        update_fields=["status", "closed_at", "closed_by", "notes", "updated_at"],
+    )
 
     _log_audit(
         church,
@@ -197,7 +187,7 @@ def close_working_day(church, user, notes=""):
 
 
 def get_recent_working_days(church, limit=10):
-    return WorkingDay.objects.filter(church=church).select_related("opened_by", "closed_by")[:limit]
+    return selectors.recent_working_days(church, limit=limit)
 
 
 def lock_financial_period(church, year, month, user, notes=""):
@@ -235,7 +225,7 @@ def get_financial_periods(church, year=None):
     year = year or timezone.now().year
     periods = {
         p.month: p
-        for p in FinancialPeriod.objects.filter(church=church, year=year)
+        for p in selectors.financial_periods_for_year(church, year)
     }
     return [
         {
@@ -278,7 +268,7 @@ def _get_account(church, account_type):
     name = CORE_ACCOUNT_NAMES.get(account_type)
     if not name:
         raise ValueError(f"Unknown account type: {account_type}")
-    return Account.objects.get(church=church, name=name)
+    return repo.get_account_by_name(church, name)
 
 
 def _post_line(transaction, account, amount, fund=""):
@@ -286,7 +276,7 @@ def _post_line(transaction, account, amount, fund=""):
         raise ValueError(
             f"Account {account.name} does not belong to church {transaction.church.name}."
         )
-    return TransactionLine.objects.create(
+    return repo.create_transaction_line(
         transaction=transaction,
         account=account,
         amount=amount,
@@ -393,7 +383,6 @@ def record_receipt(
     description="",
     member=None,
     date=None,
-    post_approved=False,
 ):
     """
     Post a balanced receipt:
@@ -411,7 +400,7 @@ def record_receipt(
     assert_period_open(church, txn_date)
     assert_working_day_allows_posting(church, txn_date)
 
-    trx = Transaction.objects.create(
+    trx = repo.create_transaction(
         transaction_type="RECEIPT",
         church=church,
         created_by=created_by,
@@ -456,12 +445,6 @@ def record_receipt(
             _post_line(trx, category.account, -amount)
 
     validate_transaction_balance(trx)
-    if post_approved:
-        trx.approval_status = "APPROVED"
-        trx.locked = True
-        trx.approved_by = created_by
-        trx.approved_at = timezone.now()
-        trx.save(update_fields=["approval_status", "locked", "approved_by", "approved_at"])
     _log_audit(
         church,
         "CREATE",
@@ -494,7 +477,7 @@ def record_expense(
     assert_period_open(church, txn_date)
     assert_working_day_allows_posting(church, txn_date)
 
-    trx = Transaction.objects.create(
+    trx = repo.create_transaction(
         transaction_type="EXPENSE",
         church=church,
         created_by=created_by,
@@ -541,7 +524,7 @@ def record_transfer(
     assert_period_open(church, txn_date)
     assert_working_day_allows_posting(church, txn_date)
 
-    trx = Transaction.objects.create(
+    trx = repo.create_transaction(
         transaction_type="TRANSFER",
         church=church,
         created_by=created_by,
@@ -598,6 +581,9 @@ def record_district_remittance(
     cutoff = generate_monthly_cutoff(church, month_date) if month_date else None
 
     if cutoff:
+        from remittance.cross_path import assert_bank_remit_not_blocked_by_settlement
+
+        assert_bank_remit_not_blocked_by_settlement(church, month_date)
         if cutoff.transferred:
             raise ValueError(
                 f"District remittance for {month_date.strftime('%B %Y')} has already been transferred."
@@ -634,7 +620,7 @@ def record_district_remittance(
     assert_period_open(church, posting_date)
     assert_working_day_allows_posting(church, posting_date)
 
-    trx = Transaction.objects.create(
+    trx = repo.create_transaction(
         transaction_type="TRANSFER",
         church=church,
         created_by=created_by,
@@ -678,6 +664,33 @@ def record_district_remittance(
 # APPROVE / REJECT
 # ==========================================
 
+
+def resolve_journal_checker(maker, *candidates):
+    """Return the first candidate user distinct from maker, or None."""
+    maker_id = getattr(maker, "pk", maker) if maker is not None else None
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        candidate_id = getattr(candidate, "pk", candidate)
+        if maker_id is None or candidate_id != maker_id:
+            return candidate
+    return None
+
+
+@db_transaction.atomic
+def approve_module_journal(transaction, *checker_candidates):
+    """
+    Approve a module-created PENDING journal through approve_transaction when a
+    checker distinct from created_by is available.
+
+    Returns the transaction (still PENDING when no distinct checker is found).
+    """
+    checker = resolve_journal_checker(transaction.created_by, *checker_candidates)
+    if checker is None:
+        return transaction
+    return approve_transaction(transaction, checker)
+
+
 @db_transaction.atomic
 def approve_transaction(transaction, user):
     if transaction.locked:
@@ -691,8 +704,9 @@ def approve_transaction(transaction, user):
     transaction.locked = True
     transaction.approved_by = user
     transaction.approved_at = timezone.now()
-    transaction.save(
-        update_fields=["approval_status", "locked", "approved_by", "approved_at"]
+    repo.save_transaction(
+        transaction,
+        update_fields=["approval_status", "locked", "approved_by", "approved_at"],
     )
     _log_audit(
         transaction.church,
@@ -702,33 +716,38 @@ def approve_transaction(transaction, user):
         details={"reference": transaction.reference},
     )
     _mark_cutoff_transferred_for_remittance(transaction)
+    try:
+        from church_system.perf_cache import invalidate_church_finance_caches
+
+        invalidate_church_finance_caches(
+            transaction.church_id,
+            year=transaction.date.year,
+            month=transaction.date.month,
+        )
+    except Exception:
+        pass
     return transaction
 
 
 def _mark_cutoff_transferred_for_remittance(transaction):
     """Mark monthly cut-off complete when a district remittance txn is approved."""
-    from .models import FinancialAuditLog, MonthlyCutoff
-
-    audit = FinancialAuditLog.objects.filter(
-        transaction=transaction,
-        action="REMIT",
-    ).first()
+    audit = selectors.remittance_audit_for_transaction(transaction)
     if not audit:
         return
     cutoff_id = (audit.details or {}).get("cutoff_id")
     if cutoff_id:
-        MonthlyCutoff.objects.filter(pk=cutoff_id, transferred=False).update(
-            transferred=True,
+        repo.mark_monthly_cutoff_transferred(
+            cutoff_id=cutoff_id,
             transfer_date=timezone.now().date(),
         )
         return
     month = (audit.details or {}).get("month")
     if month:
-        MonthlyCutoff.objects.filter(
+        repo.mark_monthly_cutoff_transferred(
             church=transaction.church,
             month=month,
-            transferred=False,
-        ).update(transferred=True, transfer_date=timezone.now().date())
+            transfer_date=timezone.now().date(),
+        )
 
 
 @db_transaction.atomic
@@ -740,8 +759,9 @@ def reject_transaction(transaction, user, reason=""):
     transaction.locked = True
     transaction.approved_by = user
     transaction.approved_at = timezone.now()
-    transaction.save(
-        update_fields=["approval_status", "locked", "approved_by", "approved_at"]
+    repo.save_transaction(
+        transaction,
+        update_fields=["approval_status", "locked", "approved_by", "approved_at"],
     )
     _log_audit(
         transaction.church,
@@ -772,7 +792,7 @@ def void_transaction(transaction, user, reason=""):
     if active_day and active_day.date == reversal_date:
         assert_working_day_allows_posting(transaction.church, reversal_date)
 
-    reversal = Transaction.objects.create(
+    reversal = repo.create_transaction(
         transaction_type=transaction.transaction_type,
         church=transaction.church,
         member=transaction.member,
@@ -791,7 +811,7 @@ def void_transaction(transaction, user, reason=""):
 
     validate_transaction_balance(reversal)
     reversal.locked = True
-    reversal.save(update_fields=["locked"])
+    repo.save_transaction(reversal, update_fields=["locked"])
 
     from remittance.welfare_services import void_welfare_for_transaction
 
@@ -800,8 +820,9 @@ def void_transaction(transaction, user, reason=""):
     transaction.is_voided = True
     transaction.voided_at = timezone.now()
     transaction.voided_by = user
-    transaction.save(update_fields=["is_voided", "voided_at", "voided_by"])
-
+    repo.save_transaction(
+        transaction, update_fields=["is_voided", "voided_at", "voided_by"]
+    )
     _log_audit(
         transaction.church,
         "VOID",
@@ -813,6 +834,16 @@ def void_transaction(transaction, user, reason=""):
             "reason": reason,
         },
     )
+    try:
+        from church_system.perf_cache import invalidate_church_finance_caches
+
+        invalidate_church_finance_caches(
+            transaction.church_id,
+            year=transaction.date.year,
+            month=transaction.date.month,
+        )
+    except Exception:
+        pass
     return reversal
 
 

@@ -32,29 +32,9 @@ services:
     environment:
       DJANGO_SECRET_KEY: docker-dev-secret-change-in-production
       DJANGO_DEBUG: "True"
+      DJANGO_ENV: development
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,web
-      DB_ENGINE: postgresql
-      DB_NAME: churchhub
-      DB_USER: churchhub
-      DB_PASSWORD: churchhub
-      DB_HOST: db
-      DB_PORT: "5432"
-      REDIS_URL: redis://redis:6379/0
-      CHURCHHUB_PUBLIC_URL: http://localhost:8000
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - media_data:/app/media
-
-  celery:
-    build: .
-    command: celery -A church_system worker -l info --concurrency=2
-    environment:
-      DJANGO_SECRET_KEY: docker-dev-secret-change-in-production
-      DJANGO_DEBUG: "True"
+      DJANGO_SETTINGS_MODULE: church_system.settings
       DB_ENGINE: postgresql
       DB_NAME: churchhub
       DB_USER: churchhub
@@ -63,6 +43,35 @@ services:
       DB_PORT: "5432"
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
+      CHURCHHUB_PUBLIC_URL: http://localhost:8000
+      CHURCHHUB_FILE_LOGS: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media_data:/app/media
+      - ./logs:/app/logs
+
+  celery:
+    build: .
+    command: celery -A church_system worker -l info --concurrency=2
+    environment:
+      DJANGO_SECRET_KEY: docker-dev-secret-change-in-production
+      DJANGO_DEBUG: "True"
+      DJANGO_ENV: development
+      DJANGO_SETTINGS_MODULE: church_system.settings
+      DB_ENGINE: postgresql
+      DB_NAME: churchhub
+      DB_USER: churchhub
+      DB_PASSWORD: churchhub
+      DB_HOST: db
+      DB_PORT: "5432"
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_TASK_ALWAYS_EAGER: "false"
+      CHURCHHUB_FILE_LOGS: "false"
     depends_on:
       db:
         condition: service_healthy
@@ -71,6 +80,34 @@ services:
     volumes:
       - media_data:/app/media
 
+  celerybeat:
+    build: .
+    command: celery -A church_system beat -l info --schedule=/app/var/celerybeat-schedule
+    environment:
+      DJANGO_SECRET_KEY: docker-dev-secret-change-in-production
+      DJANGO_DEBUG: "True"
+      DJANGO_ENV: development
+      DJANGO_SETTINGS_MODULE: church_system.settings
+      DB_ENGINE: postgresql
+      DB_NAME: churchhub
+      DB_USER: churchhub
+      DB_PASSWORD: churchhub
+      DB_HOST: db
+      DB_PORT: "5432"
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_TASK_ALWAYS_EAGER: "false"
+      CHURCHHUB_CELERY_BEAT: "true"
+      CHURCHHUB_FILE_LOGS: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - celerybeat_data:/app/var
+
 volumes:
   pgdata:
   media_data:
+  celerybeat_data:

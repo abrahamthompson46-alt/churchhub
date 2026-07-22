@@ -122,7 +122,17 @@ class User(AbstractUser):
 
     mfa_enabled = models.BooleanField(
         default=False,
-        help_text="MFA readiness stub — enforcement not yet implemented.",
+        help_text="When True, TOTP MFA is enrolled and enforced at login for privileged roles.",
+    )
+    mfa_secret = models.TextField(
+        blank=True,
+        default="",
+        help_text="Encrypted TOTP shared secret (empty when MFA is not enrolled).",
+    )
+    mfa_recovery_hashes = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="SHA-256 hashes of unused MFA recovery codes.",
     )
 
     class Meta:
@@ -228,6 +238,11 @@ class UserActivityLog(models.Model):
         ("PROFILE_UPDATE", "Profile Updated"),
         ("EMAIL_CHANGE", "Email Changed"),
         ("SCOPE_CHANGE", "Organization Scope Changed"),
+        ("MFA_ENROLL", "MFA Enrolled"),
+        ("MFA_VERIFY", "MFA Verified"),
+        ("MFA_RECOVERY", "MFA Recovery Code Used"),
+        ("MFA_EMAIL", "MFA Email Code Used"),
+        ("MFA_TRUSTED_DEVICE", "MFA Trusted Device Login"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -334,3 +349,35 @@ class UserInvitation(models.Model):
     @property
     def is_valid(self):
         return not self.is_accepted and not self.is_expired and not self.is_revoked
+
+
+class TrustedDevice(models.Model):
+    """Remembered browser/device that may skip MFA for a limited period."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="trusted_devices",
+    )
+    token_hash = models.CharField(max_length=64, db_index=True)
+    label = models.CharField(max_length=200, blank=True, default="")
+    user_agent = models.CharField(max_length=300, blank=True, default="")
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-last_used_at"]
+        indexes = [
+            models.Index(fields=["user", "expires_at"]),
+            models.Index(fields=["token_hash", "expires_at"]),
+        ]
+
+    def __str__(self):
+        return f"TrustedDevice({self.user_id}, expires={self.expires_at:%Y-%m-%d})"
+
+    @property
+    def is_valid(self):
+        return timezone.now() < self.expires_at

@@ -1,9 +1,9 @@
 """Organization hierarchy forms."""
 
 from django import forms
-from django.core.exceptions import ValidationError
 
 from church_system.widgets import input_attrs, select_attrs, textarea_attrs
+from organization import selectors
 from organization.models import Church, Conference, District, GeneralConference, Union, Zone
 
 
@@ -19,13 +19,11 @@ class DenominationScopedFormMixin:
         if "conference" in self.fields:
             self.fields["conference"].queryset = conferences_for_denomination(denomination)
         if "zone" in self.fields:
-            self.fields["zone"].queryset = Zone.objects.filter(
-                conference__denomination=denomination
-            ).select_related("conference")
+            self.fields["zone"].queryset = selectors.zones_for_denomination(denomination)
         if "district" in self.fields:
-            self.fields["district"].queryset = District.objects.filter(
-                zone__conference__denomination=denomination
-            ).select_related("zone__conference")
+            self.fields["district"].queryset = selectors.districts_for_denomination(
+                denomination
+            )
 
 
 class ConferenceForm(DenominationScopedFormMixin, forms.ModelForm):
@@ -76,8 +74,8 @@ class UnionForm(forms.ModelForm):
     def __init__(self, *args, general_conference=None, request=None, **kwargs):
         super().__init__(*args, **kwargs)
         if general_conference:
-            self.fields["general_conference"].queryset = GeneralConference.objects.filter(
-                pk=general_conference.pk
+            self.fields["general_conference"].queryset = selectors.general_conference_by_pk(
+                general_conference.pk
             )
             self.fields["general_conference"].initial = general_conference.pk
 
@@ -95,7 +93,7 @@ class ZoneForm(DenominationScopedFormMixin, forms.ModelForm):
     def __init__(self, *args, conference=None, request=None, **kwargs):
         super().__init__(*args, **kwargs)
         if conference:
-            self.fields["conference"].queryset = Conference.objects.filter(pk=conference.pk)
+            self.fields["conference"].queryset = selectors.conference_by_pk(conference.pk)
             self.fields["conference"].initial = conference.pk
         if request:
             self.apply_denomination_scope(request)
@@ -114,7 +112,7 @@ class DistrictForm(DenominationScopedFormMixin, forms.ModelForm):
     def __init__(self, *args, zone=None, request=None, **kwargs):
         super().__init__(*args, **kwargs)
         if zone:
-            self.fields["zone"].queryset = Zone.objects.filter(pk=zone.pk).select_related("conference")
+            self.fields["zone"].queryset = selectors.zone_by_pk(zone.pk)
             self.fields["zone"].initial = zone.pk
         if request:
             self.apply_denomination_scope(request)
@@ -149,7 +147,7 @@ class ChurchForm(DenominationScopedFormMixin, forms.ModelForm):
 
             scoped = scoped_districts(request).select_related("zone__conference")
         else:
-            scoped = District.objects.all().select_related("zone__conference")
+            scoped = selectors.all_districts_with_parents()
 
         if district:
             # Lock to the district from ?district= so create-from-district-detail always works.
@@ -166,7 +164,7 @@ class ChurchOnboardingForm(forms.Form):
     """Add a church under an existing district."""
 
     district = forms.ModelChoiceField(
-        queryset=District.objects.none(),
+        queryset=selectors.empty_districts(),
         widget=forms.Select(attrs=select_attrs()),
     )
     name = forms.CharField(max_length=200, widget=forms.TextInput(attrs=input_attrs()))
@@ -211,7 +209,7 @@ class FullChurchOnboardingForm(forms.Form):
 
 class ChurchTransferForm(forms.Form):
     district = forms.ModelChoiceField(
-        queryset=District.objects.none(),
+        queryset=selectors.empty_districts(),
         widget=forms.Select(attrs=select_attrs()),
         label="Target district",
     )
@@ -224,13 +222,9 @@ class ChurchTransferForm(forms.Form):
     def __init__(self, *args, church=None, request=None, **kwargs):
         super().__init__(*args, **kwargs)
         if request and church:
-            from organization.access import scoped_districts
-
-            qs = scoped_districts(request).exclude(pk=church.district_id)
-            denom_id = church.conference.denomination_id if church.conference else None
-            if denom_id:
-                qs = qs.filter(zone__conference__denomination_id=denom_id)
-            self.fields["district"].queryset = qs.select_related("zone__conference")
+            self.fields["district"].queryset = selectors.transfer_target_districts(
+                request, church
+            )
 
     def clean(self):
         cleaned = super().clean()

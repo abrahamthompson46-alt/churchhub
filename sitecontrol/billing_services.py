@@ -2,20 +2,19 @@
 
 from decimal import Decimal
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count
 from django.utils import timezone
 
-from organization.models import Church
-from sitecontrol.models import Denomination, PlatformAuditLog, TenantSubscription
+from sitecontrol import selectors
 
 
 def denomination_church_queryset(denomination):
-    return Church.objects.filter(district__zone__conference__denomination=denomination)
+    return selectors.churches_for_denomination(denomination)
 
 
 def denomination_billing_summary(denomination):
     churches = denomination_church_queryset(denomination)
-    subs = TenantSubscription.objects.filter(church__in=churches).select_related("plan", "church")
+    subs = selectors.subscriptions_for_churches(churches)
     active = subs.filter(status="ACTIVE")
     trial = subs.filter(status="TRIAL")
     suspended = subs.filter(status__in=("SUSPENDED", "EXPIRED"))
@@ -39,18 +38,14 @@ def denomination_billing_summary(denomination):
 def denomination_audit_log(denomination, *, limit=50):
     church_ids = list(denomination_church_queryset(denomination).values_list("pk", flat=True))
     church_id_strings = {str(pk) for pk in church_ids}
-    qs = PlatformAuditLog.objects.select_related("user").filter(
-        Q(denomination=denomination)
-        | Q(target_model="Denomination", target_id=str(denomination.pk))
-        | Q(target_model="Church", target_id__in=church_id_strings)
-        | Q(target_model="TenantApplication", details__denomination_id=str(denomination.pk))
-    ).order_by("-created_at")[:limit]
-    return qs
+    return selectors.denomination_scoped_audit(
+        denomination, church_id_strings, limit=limit
+    )
 
 
 def all_denominations_billing_rollups():
     rollups = []
-    for denom in Denomination.objects.filter(is_active=True).order_by("name"):
+    for denom in selectors.active_denominations_ordered():
         summary = denomination_billing_summary(denom)
         rollups.append({"denomination": denom, **summary})
     return rollups

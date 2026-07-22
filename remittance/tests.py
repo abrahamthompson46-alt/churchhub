@@ -22,7 +22,13 @@ from remittance.services import (
     post_settlement_batch,
 )
 from transactions.models import Account, Transaction, TransactionLine
-from transactions.services import approve_transaction, open_working_day, record_receipt, validate_transaction_balance
+from transactions.services import (
+    approve_transaction,
+    open_working_day,
+    record_district_remittance,
+    record_receipt,
+    validate_transaction_balance,
+)
 
 User = get_user_model()
 
@@ -147,9 +153,50 @@ class RemittancePolicyTests(TestCase):
         self.assertEqual(batch.remit_amount, Decimal("50.00"))
         self.assertEqual(batch.retain_amount, Decimal("0.00"))
 
-        post_settlement_batch(batch, self.treasurer)
+        post_settlement_batch(batch, self.pastor)
         batch.refresh_from_db()
         self.assertEqual(batch.status, "POSTED")
+
+    def test_district_settlement_post_refused_without_gl(self):
+        """District+ batches must not become POSTED without a ledger journal."""
+        txn = record_receipt(
+            church=self.church,
+            created_by=self.treasurer,
+            tithe_amount=Decimal("100.00"),
+        )
+        approve_transaction(txn, self.pastor)
+        today = timezone.now().date()
+        church_batch = create_settlement_draft(
+            from_unit_type="CHURCH",
+            from_unit_id=self.church.pk,
+            offering_type="TITHE",
+            period_start=today.replace(day=1),
+            period_end=today,
+            user=self.treasurer,
+            church=self.church,
+        )
+        post_settlement_batch(church_batch, self.pastor)
+
+        ensure_hierarchy_settlement_policies(self.church)
+        district_batch = create_settlement_draft(
+            from_unit_type="DISTRICT",
+            from_unit_id=self.church.district.pk,
+            offering_type="TITHE",
+            period_start=today.replace(day=1),
+            period_end=today,
+            user=self.treasurer,
+        )
+        self.assertEqual(district_batch.status, "DRAFT")
+        self.assertGreater(district_batch.gross_received, Decimal("0.00"))
+
+        with self.assertRaises(RemittancePolicyError) as ctx:
+            post_settlement_batch(district_batch, self.treasurer)
+        self.assertIn("not yet implemented", str(ctx.exception).lower())
+
+        district_batch.refresh_from_db()
+        self.assertEqual(district_batch.status, "DRAFT")
+        self.assertIsNone(district_batch.posted_at)
+        self.assertFalse(district_batch.lines.exists())
 
     def test_hierarchy_settlement_policies_seeded(self):
         created = ensure_hierarchy_settlement_policies(self.church)
@@ -222,3 +269,83 @@ class RemittancePolicyTests(TestCase):
         create_settlement_draft(**kwargs)
         with self.assertRaises(RemittancePolicyError):
             create_settlement_draft(**kwargs)
+
+    def test_settlement_blocked_after_bank_remittance(self):
+        txn = record_receipt(
+            church=self.church,
+            created_by=self.treasurer,
+            tithe_amount=Decimal("100.00"),
+        )
+        approve_transaction(txn, self.pastor)
+        today = timezone.now().date()
+        remit = record_district_remittance(
+            church=self.church,
+            created_by=self.pastor,
+            amount=Decimal("0.00"),
+            month_date=today,
+        )
+        approve_transaction(remit, self.treasurer)
+        with self.assertRaises(RemittancePolicyError) as ctx:
+            create_settlement_draft(
+                from_unit_type="CHURCH",
+                from_unit_id=self.church.pk,
+                offering_type="TITHE",
+                period_start=today.replace(day=1),
+                period_end=today,
+                user=self.treasurer,
+                church=self.church,
+            )
+        self.assertIn("monthly cut-off", str(ctx.exception).lower())
+
+    def test_bank_remittance_blocked_after_posted_settlement(self):
+        txn = record_receipt(
+            church=self.church,
+            created_by=self.treasurer,
+            tithe_amount=Decimal("80.00"),
+        )
+        approve_transaction(txn, self.pastor)
+        today = timezone.now().date()
+        batch = create_settlement_draft(
+            from_unit_type="CHURCH",
+            from_unit_id=self.church.pk,
+            offering_type="TITHE",
+            period_start=today.replace(day=1),
+            period_end=today,
+            user=self.treasurer,
+            church=self.church,
+        )
+        post_settlement_batch(batch, self.pastor)
+        with self.assertRaises(ValueError) as ctx:
+            record_district_remittance(
+                church=self.church,
+                created_by=self.pastor,
+                amount=Decimal("0.00"),
+                month_date=today,
+            )
+        self.assertIn("settlement batch", str(ctx.exception).lower())
+
+    def test_draft_settlement_does_not_block_bank_remittance(self):
+        txn = record_receipt(
+            church=self.church,
+            created_by=self.treasurer,
+            tithe_amount=Decimal("60.00"),
+        )
+        approve_transaction(txn, self.pastor)
+        today = timezone.now().date()
+        create_settlement_draft(
+            from_unit_type="CHURCH",
+            from_unit_id=self.church.pk,
+            offering_type="TITHE",
+            period_start=today.replace(day=1),
+            period_end=today,
+            user=self.treasurer,
+            church=self.church,
+        )
+        remit = record_district_remittance(
+            church=self.church,
+            created_by=self.pastor,
+            amount=Decimal("0.00"),
+            month_date=today,
+        )
+        self.assertEqual(remit.transaction_type, "TRANSFER")
+

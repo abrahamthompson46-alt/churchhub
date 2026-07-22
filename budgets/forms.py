@@ -1,9 +1,9 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
+from budgets import selectors
 from church_system.widgets import input_attrs, select_attrs
-from members.models import Department
-from transactions.models import Account, Budget
+from transactions.models import Budget
 
 from .services import apply_budget_scope, available_budget_levels, validate_budget_instance
 
@@ -34,12 +34,8 @@ class BudgetForm(forms.ModelForm):
         else:
             self.fields["level"].choices = [("CHURCH", "Church")]
 
-        if church:
-            self.fields["account"].queryset = Account.objects.filter(church=church).order_by("name")
-            self.fields["department"].queryset = Department.objects.filter(church=church).order_by("name")
-        else:
-            self.fields["account"].queryset = Account.objects.none()
-            self.fields["department"].queryset = Department.objects.none()
+        self.fields["account"].queryset = selectors.accounts_for_church_qs(church)
+        self.fields["department"].queryset = selectors.departments_for_church_qs(church)
 
         self.fields["department"].required = False
         self._sync_department_visibility()

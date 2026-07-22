@@ -329,7 +329,9 @@ Domain examples: transaction self-approve block, payroll dual approval, asset So
 | Capability / permission | Decorators + `user_has_permission` |
 | Subscription features | `require_feature` / `church_has_feature` |
 | Financial integrity | Transaction services (balance, period, working day) — not RBAC alone |
-| Django admin | Platform break-glass only |
+| Django admin | Platform break-glass (`can_access_django_admin`) + queryset tenancy |
+
+**Django admin tenancy (Current):** Access still requires platform `is_superuser`. Querysets for church-owned / unit-keyed models in assets, remittance, meetings, and announcements use `admin_custom.tenancy`: platform **OWNER** sees all churches; other platform admin operators are limited to `managed_denominations` (deny-all if none assigned). Audit ModelAdmins remain read-only. Platform-wide templates (e.g. `AssetCategoryTemplate`) stay unscoped.
 
 **Must not change casually:** denomination wall fail-closed; church scope without unscoped fallback; platform exclusion from institution superadmin path.
 

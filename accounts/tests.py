@@ -6,7 +6,6 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from accounts.forms import AcceptInvitationForm, UserInviteForm, UserManageForm
-from accounts.middleware import RoleEnforcementMiddleware
 from accounts.models import UserActivityLog, UserInvitation
 from accounts.permissions import (
     can_approve_transactions,
@@ -28,6 +27,7 @@ from accounts.services import (
     update_user_role,
 )
 from organization.models import Church, Conference, District, Zone
+from permissions.middleware import RoleEnforcementMiddleware
 from permissions.roles import UserRole
 from sitecontrol.models import SiteSettings
 
@@ -444,7 +444,35 @@ class FormTests(ChurchHubTestMixin, TestCase):
 
 
 class ViewTests(ChurchHubTestMixin, TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Python 3.14 + Django test client: Context.__copy__ crashes in
+        # store_rendered_templates. Skip the copy; status/content asserts still work.
+        from unittest.mock import patch
+
+        from django.test.client import ContextList
+
+        def _safe_store(store, signal, sender, template, context, **kwargs):
+            store.setdefault("templates", []).append(template)
+            if "context" not in store:
+                store["context"] = ContextList()
+            store["context"].append(context)
+
+        cls._template_store_patcher = patch(
+            "django.test.client.store_rendered_templates",
+            _safe_store,
+        )
+        cls._template_store_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._template_store_patcher.stop()
+        super().tearDownClass()
+
     def setUp(self):
+        from accounts.mfa import SESSION_MFA_VERIFIED, enable_mfa_for_user, generate_totp_secret
+
         self.client = Client()
         self.admin = User.objects.create_superuser(
             username="admin",
@@ -453,19 +481,27 @@ class ViewTests(ChurchHubTestMixin, TestCase):
             role=UserRole.SUPER_ADMIN,
             church=self.church,
         )
+        enable_mfa_for_user(self.admin, generate_totp_secret(), [])
         self.member = User.objects.create_user(
             username="member",
             password="pass12345",
             role=UserRole.MEMBER,
             church=self.church,
         )
+        self._mfa_session_key = SESSION_MFA_VERIFIED
+
+    def _login(self, username):
+        self.client.login(username=username, password="pass12345")
+        session = self.client.session
+        session[self._mfa_session_key] = True
+        session.save()
 
     def test_user_list_requires_manager_role(self):
-        self.client.login(username="member", password="pass12345")
+        self._login("member")
         response = self.client.get(reverse("accounts:user_list"))
         self.assertEqual(response.status_code, 403)
 
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.get(reverse("accounts:user_list"))
         self.assertEqual(response.status_code, 200)
 
@@ -477,7 +513,7 @@ class ViewTests(ChurchHubTestMixin, TestCase):
                 role=UserRole.MEMBER,
                 church=self.church,
             )
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.get(reverse("accounts:user_list"))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["page_obj"].object_list), 25)
@@ -486,7 +522,7 @@ class ViewTests(ChurchHubTestMixin, TestCase):
         self.assertGreater(len(response2.context["page_obj"].object_list), 0)
 
     def test_invite_user_creates_invitation(self):
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.post(
             reverse("accounts:invite_user"),
             {
@@ -508,7 +544,7 @@ class ViewTests(ChurchHubTestMixin, TestCase):
             role=UserRole.LOCAL_PASTOR,
             church=self.church,
         )
-        self.client.login(username="lp_view", password="pass12345")
+        self._login("lp_view")
         response = self.client.post(
             reverse("accounts:invite_user"),
             {
@@ -542,7 +578,7 @@ class ViewTests(ChurchHubTestMixin, TestCase):
         self.assertTrue(User.objects.filter(username="accepted").exists())
 
     def test_activity_log_accessible_to_managers(self):
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.get(reverse("accounts:activity_log"))
         self.assertEqual(response.status_code, 200)
 
@@ -554,7 +590,7 @@ class ViewTests(ChurchHubTestMixin, TestCase):
             church=self.church,
             first_name="Old",
         )
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.post(
             reverse("accounts:user_detail", kwargs={"pk": target.pk}),
             {
@@ -563,6 +599,8 @@ class ViewTests(ChurchHubTestMixin, TestCase):
                 "email": "editme@test.com",
                 "phone": "",
                 "role": UserRole.SECRETARY,
+                "scope_level": "CHURCH",
+                "scope_unit": str(self.church.pk),
                 "church": str(self.church.pk),
             },
         )
@@ -577,8 +615,7 @@ class ViewTests(ChurchHubTestMixin, TestCase):
             role=UserRole.SECRETARY,
             church=self.church,
         )
-        logged_in = self.client.login(username="admin", password="pass12345")
-        self.assertTrue(logged_in)
+        self._login("admin")
         response = self.client.post(
             reverse("accounts:user_detail", kwargs={"pk": target.pk}),
             {
@@ -588,6 +625,8 @@ class ViewTests(ChurchHubTestMixin, TestCase):
                 "email": "rolechange@test.com",
                 "phone": "",
                 "role": UserRole.TREASURY,
+                "scope_level": "CHURCH",
+                "scope_unit": str(self.church.pk),
                 "church": str(self.church.pk),
                 "member": "",
             },
@@ -604,7 +643,7 @@ class ViewTests(ChurchHubTestMixin, TestCase):
         self.assertEqual(log.details["new_role"], UserRole.TREASURY)
 
     def test_self_deactivate_blocked_in_view(self):
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.post(
             reverse("accounts:user_detail", kwargs={"pk": self.admin.pk}),
             {"action": "deactivate"},
@@ -633,7 +672,7 @@ class ViewTests(ChurchHubTestMixin, TestCase):
             church=self.church,
             invited_by=self.admin,
         )
-        self.client.login(username="admin", password="pass12345")
+        self._login("admin")
         response = self.client.post(
             reverse("accounts:invite_revoke", kwargs={"pk": invitation.pk})
         )
@@ -643,6 +682,30 @@ class ViewTests(ChurchHubTestMixin, TestCase):
 
 
 class MiddlewareTests(ChurchHubTestMixin, TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from unittest.mock import patch
+
+        from django.test.client import ContextList
+
+        def _safe_store(store, signal, sender, template, context, **kwargs):
+            store.setdefault("templates", []).append(template)
+            if "context" not in store:
+                store["context"] = ContextList()
+            store["context"].append(context)
+
+        cls._template_store_patcher = patch(
+            "django.test.client.store_rendered_templates",
+            _safe_store,
+        )
+        cls._template_store_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._template_store_patcher.stop()
+        super().tearDownClass()
+
     def test_unassigned_local_role_redirected_to_profile(self):
         user = User.objects.create_user(
             username="nochurch",

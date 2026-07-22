@@ -1,13 +1,11 @@
 """Platform settings, subscription entitlements, and tenant limits."""
 
 from django.core.cache import cache
-from django.db.models import Count, Q
 from django.utils import timezone
 
-from accounts.models import User
-from organization.models import Church, Conference, District, Zone
-
-from .models import PlatformAnnouncement, PlatformAuditLog, PlatformPaymentMethod, SiteSettings, SubscriptionPlan, TenantSubscription
+from sitecontrol import repositories as repo
+from sitecontrol import selectors
+from sitecontrol.models import PlatformPaymentMethod, SiteSettings, TenantSubscription
 
 SETTINGS_CACHE_KEY = "platform:site_settings"
 PLAN_CACHE_PREFIX = "platform:church_plan:"
@@ -52,15 +50,13 @@ def clear_settings_cache():
 
 def build_platform_setup_checklist():
     """Guided platform setup items with done/pending status for Control Room."""
-    from sitecontrol.models import Denomination
-
     settings_obj = get_site_settings()
     has_smtp = bool(settings_obj.smtp_host and (settings_obj.default_from_email or settings_obj.smtp_username))
     has_logo = bool(settings_obj.logo)
-    has_plan = SubscriptionPlan.objects.filter(is_active=True).exists()
-    has_default_plan = SubscriptionPlan.objects.filter(is_active=True, is_default=True).exists()
-    has_payment = PlatformPaymentMethod.objects.filter(is_active=True).exists()
-    has_denomination = Denomination.objects.filter(is_active=True).exists()
+    has_plan = selectors.active_plan_exists()
+    has_default_plan = selectors.active_default_plan_exists()
+    has_payment = selectors.active_payment_method_exists()
+    has_denomination = selectors.active_denomination_exists()
     has_support = bool(settings_obj.support_email)
     has_billing_copy = bool(settings_obj.billing_payment_instructions.strip())
     registration_configured = True  # always present; surface toggles as informational
@@ -134,7 +130,7 @@ def build_platform_setup_checklist():
             "id": "provision",
             "label": "Provision first church",
             "detail": "Create a live church tenant with admin invite.",
-            "done": Church.objects.exists(),
+            "done": selectors.churches_exist(),
             "url_name": "sitecontrol:tenant_provision",
             "icon": "bi-magic",
         },
@@ -153,7 +149,7 @@ def log_platform_action(request, action, summary, *, target_model="", target_id=
     ip = request.META.get("REMOTE_ADDR")
     if denomination is None:
         denomination = getattr(request, "denomination", None)
-    PlatformAuditLog.objects.create(
+    repo.create_platform_audit(
         user=request.user if request.user.is_authenticated else None,
         denomination=denomination,
         action=action,
@@ -170,22 +166,16 @@ def get_active_platform_announcement():
     if cached is not None:
         return cached
     now = timezone.now()
-    announcement = (
-        PlatformAnnouncement.objects.filter(is_active=True)
-        .filter(Q(starts_at__isnull=True) | Q(starts_at__lte=now))
-        .filter(Q(ends_at__isnull=True) | Q(ends_at__gte=now))
-        .order_by("-created_at")
-        .first()
-    )
+    announcement = selectors.active_platform_announcement_now(now)
     cache.set(ANNOUNCEMENT_CACHE_KEY, announcement, 120)
     return announcement
 
 
 def ensure_default_payment_methods():
     """Create standard payment methods if none exist."""
-    if PlatformPaymentMethod.objects.exists():
+    if selectors.any_payment_method_exists():
         return
-    PlatformPaymentMethod.objects.bulk_create([
+    repo.bulk_create_payment_methods([
         PlatformPaymentMethod(
             name="Bank Transfer",
             method_type="BANK_TRANSFER",
@@ -274,7 +264,7 @@ def build_price_snapshot(plan, billing_interval="MONTHLY"):
 
 def ensure_default_plans():
     """Create standard plans if none exist."""
-    if SubscriptionPlan.objects.exists():
+    if selectors.any_plan_exists():
         return
     plans = [
         {
@@ -318,14 +308,14 @@ def ensure_default_plans():
         },
     ]
     for data in plans:
-        SubscriptionPlan.objects.create(**data)
+        repo.create_subscription_plan(**data)
 
 
 def get_default_plan():
-    plan = SubscriptionPlan.objects.filter(is_default=True, is_active=True).first()
+    plan = selectors.default_active_plan()
     if plan:
         return plan
-    return SubscriptionPlan.objects.filter(is_active=True).order_by("sort_order").first()
+    return selectors.first_active_plan_by_sort()
 
 
 def get_church_subscription(church):
@@ -345,7 +335,7 @@ def ensure_church_subscription(church):
     if not plan:
         ensure_default_plans()
         plan = get_default_plan()
-    return TenantSubscription.objects.create(church=church, plan=plan, status="ACTIVE")
+    return repo.create_tenant_subscription(church=church, plan=plan, status="ACTIVE")
 
 
 def _plan_for_church(church):
@@ -411,7 +401,7 @@ def church_has_feature(church, feature):
 
 
 def church_user_count(church):
-    return User.objects.filter(church=church, is_active=True, is_platform_user=False).count()
+    return selectors.church_user_count(church)
 
 
 def can_add_user_to_church(church):
@@ -434,7 +424,7 @@ def can_add_branch_to_district(district):
         return False, "No district selected."
     if not subscription_enforced():
         return True, ""
-    churches = Church.objects.filter(district=district).select_related("subscription__plan")
+    churches = selectors.churches_in_district_with_subscription(district)
     count = churches.count()
     if count == 0:
         return True, ""
@@ -469,7 +459,7 @@ def suspend_tenant(church, user, reason=""):
         line = f"[{stamp}] Suspended: {reason}"
         sub.lifecycle_notes = f"{note}\n{line}".strip() if note else line
     sub.updated_by = user
-    sub.save()
+    repo.save_subscription(sub)
     clear_church_plan_cache(church)
     return sub
 
@@ -485,7 +475,7 @@ def reactivate_tenant(church, user):
     line = f"[{stamp}] Reactivated"
     sub.lifecycle_notes = f"{note}\n{line}".strip() if note else line
     sub.updated_by = user
-    sub.save()
+    repo.save_subscription(sub)
     clear_church_plan_cache(church)
     return sub
 
@@ -503,12 +493,12 @@ def offboard_tenant(church, user, reason=""):
     line = f"[{stamp}] Offboarded: {detail}"
     sub.lifecycle_notes = f"{note}\n{line}".strip() if note else line
     sub.updated_by = user
-    sub.save()
+    repo.save_subscription(sub)
 
-    User.objects.filter(church=church, is_platform_user=False, is_active=True).update(is_active=False)
+    repo.deactivate_institution_users_for_church(church)
     if hasattr(church, "is_active"):
         church.is_active = False
-        church.save(update_fields=["is_active"])
+        repo.save_church(church, update_fields=["is_active"])
     clear_church_plan_cache(church)
     return sub
 
@@ -528,15 +518,11 @@ def ip_allowed_for_platform(ip_address, settings_obj=None):
 def expire_due_subscriptions():
     """Mark ACTIVE/TRIAL subscriptions past expires_at as EXPIRED. Returns count."""
     today = timezone.now().date()
-    qs = TenantSubscription.objects.filter(
-        status__in=("ACTIVE", "TRIAL"),
-        expires_at__isnull=False,
-        expires_at__lt=today,
-    )
+    qs = selectors.subscriptions_due_to_expire(today)
     count = 0
-    for sub in qs.select_related("church"):
+    for sub in qs:
         sub.status = "EXPIRED"
-        sub.save(update_fields=["status", "updated_at"])
+        repo.save_subscription(sub, update_fields=["status", "updated_at"])
         clear_church_plan_cache(sub.church)
         count += 1
     return count
@@ -549,7 +535,7 @@ def set_tenant_feature_overrides(sub, overrides):
         if key in FEATURE_FIELDS:
             cleaned[key] = bool(value)
     sub.feature_overrides = cleaned
-    sub.save(update_fields=["feature_overrides", "updated_at"])
+    repo.save_subscription(sub, update_fields=["feature_overrides", "updated_at"])
     clear_church_plan_cache(sub.church)
     return sub
 
@@ -581,7 +567,7 @@ def assign_subscription(
         defaults["started_at"] = started_at
     if next_billing_at is not None:
         defaults["next_billing_at"] = next_billing_at
-    sub, _ = TenantSubscription.objects.update_or_create(
+    sub, _ = repo.update_or_create_tenant_subscription(
         church=church,
         defaults=defaults,
     )
@@ -595,22 +581,22 @@ def platform_stats():
     from sitecontrol.registration_services import pending_application_count
 
     return {
-        "churches": Church.objects.count(),
-        "conferences": Conference.objects.count(),
-        "zones": Zone.objects.count(),
-        "districts": District.objects.count(),
-        "active_subscriptions": TenantSubscription.objects.filter(status="ACTIVE").count(),
-        "suspended": TenantSubscription.objects.filter(status="SUSPENDED").count(),
-        "users": User.objects.filter(is_active=True, is_platform_user=False).count(),
-        "operators": User.objects.filter(is_active=True, is_platform_user=True).count(),
-        "plans": SubscriptionPlan.objects.filter(is_active=True).count(),
+        "churches": selectors.church_count(),
+        "conferences": selectors.conference_count(),
+        "zones": selectors.zone_count(),
+        "districts": selectors.district_count(),
+        "active_subscriptions": selectors.active_subscription_count(),
+        "suspended": selectors.subscription_status_count("SUSPENDED"),
+        "users": selectors.active_institution_user_count(),
+        "operators": selectors.active_operator_count(),
+        "plans": selectors.active_plans_ordered().count(),
         "pending_applications": pending_application_count(),
     }
 
 
 def tenant_health_alerts():
     alerts = []
-    churches_without = Church.objects.filter(subscription__isnull=True).count()
+    churches_without = selectors.churches_without_subscription_count()
     if churches_without:
         alerts.append({
             "level": "warning",
@@ -619,7 +605,7 @@ def tenant_health_alerts():
             "url_name": "sitecontrol:subscription_seed",
         })
 
-    suspended = TenantSubscription.objects.filter(status="SUSPENDED").count()
+    suspended = selectors.subscription_status_count("SUSPENDED")
     if suspended:
         alerts.append({
             "level": "danger",
@@ -628,7 +614,7 @@ def tenant_health_alerts():
             "url_name": "sitecontrol:subscription_list",
         })
 
-    expired = TenantSubscription.objects.filter(status="EXPIRED").count()
+    expired = selectors.subscription_status_count("EXPIRED")
     if expired:
         alerts.append({
             "level": "danger",
@@ -658,7 +644,7 @@ def tenant_health_alerts():
 
     over_limit = []
     if subscription_enforced():
-        for sub in TenantSubscription.objects.select_related("church", "plan").filter(status="ACTIVE"):
+        for sub in selectors.active_subscriptions_with_plan():
             count = church_user_count(sub.church)
             limit = sub.effective_max_users()
             if count > limit:
@@ -694,8 +680,6 @@ def tenant_detail_stats(church):
 
 def organization_tree_summary():
     return {
-        "conferences": Conference.objects.annotate(
-            zone_count=Count("zones", distinct=True),
-        ).order_by("name")[:50],
-        "church_count": Church.objects.count(),
+        "conferences": selectors.organization_tree_conferences(),
+        "church_count": selectors.church_count(),
     }

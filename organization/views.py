@@ -3,12 +3,12 @@
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
-from django.db.models import Count, Prefetch, Q
 from django.shortcuts import redirect, render
 
 from church_system.church_scope import get_active_church
 from church_system.flash import flash_error, flash_exception, flash_success, flash_warning
-from members.models import Member
+from organization import repositories as repo
+from organization import selectors
 from organization.access import (
     assert_can_manage_church,
     assert_can_manage_district,
@@ -27,12 +27,6 @@ from organization.access import (
     org_capability_flags,
     require_org_manage,
     require_org_read,
-    scoped_churches,
-    scoped_conferences,
-    scoped_districts,
-    scoped_general_conferences,
-    scoped_unions,
-    scoped_zones,
     user_district,
 )
 from organization.forms import (
@@ -46,14 +40,12 @@ from organization.forms import (
     UnionForm,
     ZoneForm,
 )
-from organization.models import Church, Conference, District, GeneralConference, Union, Zone
 from organization.services import (
     create_church,
     export_hierarchy_rows,
     get_client_ip,
     log_org_audit,
     onboard_full_hierarchy,
-    provision_church,
     set_church_active,
     transfer_church,
     update_church,
@@ -71,10 +63,7 @@ def hierarchy_overview(request):
         if district:
             return redirect("organization:district_detail", pk=district.pk)
 
-    from church_system.denomination_scope import (
-        churches_for_denomination,
-        get_active_denomination,
-    )
+    from church_system.denomination_scope import get_active_denomination
     from sitecontrol.denomination_services import (
         get_level_label,
         hierarchy_chain_description,
@@ -85,47 +74,17 @@ def hierarchy_overview(request):
     active_church = get_active_church(request)
     search_q = request.GET.get("q", "").strip()
 
-    conf_base = scoped_conferences(request)
-    if search_q:
-        matching_church_confs = scoped_churches(request).filter(
-            Q(name__icontains=search_q) | Q(code__icontains=search_q)
-        ).values_list("district__zone__conference_id", flat=True)
-        conf_base = conf_base.filter(
-            Q(name__icontains=search_q)
-            | Q(code__icontains=search_q)
-            | Q(pk__in=matching_church_confs)
-        )
+    conf_base = selectors.hierarchy_conf_base(request, search_q)
 
-    conf_prefetch = conf_base.prefetch_related("zones__districts__churches")
-
-    general_conferences = GeneralConference.objects.none()
+    general_conferences = selectors.empty_general_conferences()
     if not denomination or level_enabled(denomination, "general_conference"):
-        unions = Union.objects.filter(conferences__in=conf_base).distinct().prefetch_related(
-            Prefetch("conferences", queryset=conf_prefetch)
-        )
-        general_conferences = (
-            scoped_general_conferences(request)
-            .filter(unions__in=unions)
-            .distinct()
-            .prefetch_related(Prefetch("unions", queryset=unions))
-            .order_by("name")
-        )
+        general_conferences = selectors.hierarchy_general_conferences(request, conf_base)
 
-    orphan_conferences = conf_base.filter(union__isnull=True).prefetch_related(
-        "zones__districts__churches"
-    ).order_by("name")
+    orphan_conferences = selectors.hierarchy_orphan_conferences(conf_base)
 
     stats = {}
-    church_qs = scoped_churches(request)
-    level_stat_map = [
-        ("general_conference", GeneralConference.objects.filter(unions__conferences__in=conf_base).distinct()),
-        ("union", Union.objects.filter(conferences__in=conf_base).distinct()),
-        ("conference", conf_base),
-        ("zone", Zone.objects.filter(conference__in=conf_base)),
-        ("district", District.objects.filter(zone__conference__in=conf_base)),
-        ("church", church_qs),
-    ]
-    for key, qs in level_stat_map:
+    level_stat_map = selectors.hierarchy_level_stat_qs(request, conf_base)
+    for key, qs in level_stat_map.items():
         if level_enabled(denomination, key):
             label = get_level_label(denomination, key, plural=True)
             if label:
@@ -134,9 +93,18 @@ def hierarchy_overview(request):
     export_fmt = request.GET.get("export", "")
     if export_fmt in ("csv", "excel"):
         from reports.exporters import export_table_csv, export_table_excel
+        from reports.services import audit_export
 
         headers, rows = export_hierarchy_rows(request)
         slug = "organization-hierarchy"
+        audit_export(
+            user=request.user,
+            report_key="organization_hierarchy",
+            export_format=export_fmt,
+            row_count=len(rows),
+            church=active_church,
+            params={"search_q": search_q},
+        )
         if export_fmt == "csv":
             return export_table_csv(headers, rows, f"{slug}.csv")
         return export_table_excel(headers, rows, f"{slug}.xlsx", "Organization Hierarchy")
@@ -186,12 +154,7 @@ def unit_directory(request):
 
     rows = []
     if level == "general_conference":
-        qs = scoped_general_conferences(request).annotate(
-            union_count=Count("unions", distinct=True)
-        ).order_by("name")
-        if q:
-            qs = qs.filter(Q(name__icontains=q) | Q(code__icontains=q))
-        for obj in qs[:500]:
+        for obj in selectors.directory_general_conferences(request, q)[:500]:
             rows.append({
                 "name": obj.name,
                 "code": obj.code,
@@ -200,12 +163,7 @@ def unit_directory(request):
                 "pk": obj.pk,
             })
     elif level == "union":
-        qs = scoped_unions(request).select_related("general_conference").annotate(
-            conference_count=Count("conferences", distinct=True)
-        ).order_by("name")
-        if q:
-            qs = qs.filter(Q(name__icontains=q) | Q(code__icontains=q))
-        for obj in qs[:500]:
+        for obj in selectors.directory_unions(request, q)[:500]:
             rows.append({
                 "name": obj.name,
                 "code": obj.code,
@@ -215,12 +173,7 @@ def unit_directory(request):
                 "pk": obj.pk,
             })
     elif level == "conference":
-        qs = scoped_conferences(request).select_related("union").annotate(
-            zone_count=Count("zones", distinct=True)
-        ).order_by("name")
-        if q:
-            qs = qs.filter(Q(name__icontains=q) | Q(code__icontains=q))
-        for obj in qs[:500]:
+        for obj in selectors.directory_conferences(request, q)[:500]:
             rows.append({
                 "name": obj.name,
                 "code": obj.code,
@@ -230,12 +183,7 @@ def unit_directory(request):
                 "pk": obj.pk,
             })
     elif level == "zone":
-        qs = scoped_zones(request).select_related("conference").annotate(
-            district_count=Count("districts", distinct=True)
-        ).order_by("name")
-        if q:
-            qs = qs.filter(Q(name__icontains=q) | Q(code__icontains=q))
-        for obj in qs[:500]:
+        for obj in selectors.directory_zones(request, q)[:500]:
             rows.append({
                 "name": obj.name,
                 "code": obj.code,
@@ -245,12 +193,7 @@ def unit_directory(request):
                 "pk": obj.pk,
             })
     elif level == "district":
-        qs = scoped_districts(request).select_related("zone__conference").annotate(
-            church_count=Count("churches", distinct=True)
-        ).order_by("name")
-        if q:
-            qs = qs.filter(Q(name__icontains=q) | Q(code__icontains=q))
-        for obj in qs[:500]:
+        for obj in selectors.directory_districts(request, q)[:500]:
             rows.append({
                 "name": obj.name,
                 "code": obj.code,
@@ -260,12 +203,7 @@ def unit_directory(request):
                 "pk": obj.pk,
             })
     else:
-        qs = scoped_churches(request).select_related(
-            "district__zone__conference"
-        ).order_by("name")
-        if q:
-            qs = qs.filter(Q(name__icontains=q) | Q(code__icontains=q))
-        for obj in qs[:500]:
+        for obj in selectors.directory_churches(request, q)[:500]:
             rows.append({
                 "name": obj.name,
                 "code": obj.code,
@@ -290,8 +228,8 @@ def unit_directory(request):
 def conference_detail(request, pk):
     require_org_read(request)
     conference = get_scoped_conference(request, pk)
-    conference = Conference.objects.annotate(zone_count=Count("zones")).get(pk=conference.pk)
-    zones = conference.zones.annotate(district_count=Count("districts")).order_by("name")
+    conference = selectors.conference_for_detail(conference.pk)
+    zones = selectors.zones_for_conference(conference)
     return render(request, "organization/conference_detail.html", {
         "conference": conference,
         "zones": zones,
@@ -308,7 +246,8 @@ def conference_create(request):
     assert_global_structure_manage(request)
     form = ConferenceForm(request.POST or None, request=request)
     if request.method == "POST" and form.is_valid():
-        conference = form.save()
+        conference = form.save(commit=False)
+        repo.save_conference(conference)
         log_org_audit(
             "CREATE",
             conference,
@@ -329,7 +268,8 @@ def conference_edit(request, pk):
     conference = get_scoped_conference(request, pk)
     form = ConferenceForm(request.POST or None, instance=conference, request=request)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        conference = form.save(commit=False)
+        repo.save_conference(conference)
         log_org_audit("UPDATE", conference, performed_by=request.user, ip_address=get_client_ip(request))
         flash_success(request, "Conference updated.")
         return redirect("organization:conference_detail", pk=pk)
@@ -344,8 +284,8 @@ def conference_edit(request, pk):
 def zone_detail(request, pk):
     require_org_read(request)
     zone = get_scoped_zone(request, pk)
-    zone = Zone.objects.select_related("conference").annotate(district_count=Count("districts")).get(pk=zone.pk)
-    districts = zone.districts.annotate(church_count=Count("churches")).order_by("name")
+    zone = selectors.zone_for_detail(zone.pk)
+    districts = selectors.districts_for_zone(zone)
     return render(request, "organization/zone_detail.html", {
         "zone": zone,
         "districts": districts,
@@ -366,7 +306,8 @@ def zone_create(request):
         conference = get_scoped_conference(request, conf_pk)
     form = ZoneForm(request.POST or None, conference=conference, request=request)
     if request.method == "POST" and form.is_valid():
-        zone = form.save()
+        zone = form.save(commit=False)
+        repo.save_zone(zone)
         log_org_audit("CREATE", zone, performed_by=request.user, ip_address=get_client_ip(request))
         flash_success(request, f"Zone “{zone.name}” created.")
         return redirect("organization:zone_detail", pk=zone.pk)
@@ -383,7 +324,8 @@ def zone_edit(request, pk):
     zone = get_scoped_zone(request, pk)
     form = ZoneForm(request.POST or None, instance=zone, request=request)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        zone = form.save(commit=False)
+        repo.save_zone(zone)
         log_org_audit("UPDATE", zone, performed_by=request.user, ip_address=get_client_ip(request))
         flash_success(request, "Zone updated.")
         return redirect("organization:zone_detail", pk=pk)
@@ -398,10 +340,8 @@ def zone_edit(request, pk):
 def district_detail(request, pk):
     require_org_read(request)
     district = get_scoped_district(request, pk)
-    district = District.objects.select_related("zone__conference").annotate(
-        church_count=Count("churches")
-    ).get(pk=district.pk)
-    churches_qs = district.churches.order_by("name")
+    district = selectors.district_for_detail(district.pk)
+    churches_qs = selectors.churches_for_district(district)
     paginator = Paginator(churches_qs, 25)
     churches_page = paginator.get_page(request.GET.get("page"))
     flags = org_capability_flags(request.user)
@@ -422,7 +362,8 @@ def district_create(request):
         zone = get_scoped_zone(request, zone_pk)
     form = DistrictForm(request.POST or None, zone=zone, request=request)
     if request.method == "POST" and form.is_valid():
-        district = form.save()
+        district = form.save(commit=False)
+        repo.save_district(district)
         log_org_audit("CREATE", district, performed_by=request.user, ip_address=get_client_ip(request))
         flash_success(request, f"District “{district.name}” created.")
         return redirect("organization:district_detail", pk=district.pk)
@@ -439,7 +380,8 @@ def district_edit(request, pk):
     assert_can_manage_district(request, district)
     form = DistrictForm(request.POST or None, instance=district, request=request)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        district = form.save(commit=False)
+        repo.save_district(district)
         log_org_audit("UPDATE", district, performed_by=request.user, ip_address=get_client_ip(request))
         flash_success(request, "District updated.")
         return redirect("organization:district_detail", pk=pk)
@@ -454,12 +396,12 @@ def district_edit(request, pk):
 def church_detail(request, pk):
     require_org_read(request)
     church = get_scoped_church(request, pk)
-    member_count = Member.objects.filter(church=church, is_active=True).count()
+    member_count = selectors.active_member_count(church)
     return render(request, "organization/church_detail.html", {
         "church": church,
         "member_count": member_count,
-        "account_count": church.accounts.count(),
-        "txn_count": church.transactions.count(),
+        "account_count": selectors.church_account_count(church),
+        "txn_count": selectors.church_transaction_count(church),
         **org_capability_flags(request.user),
     })
 
@@ -682,8 +624,8 @@ def church_onboard(request):
 def general_conference_detail(request, pk):
     require_org_read(request)
     gc = get_scoped_general_conference(request, pk)
-    gc = GeneralConference.objects.annotate(union_count=Count("unions")).get(pk=gc.pk)
-    unions = gc.unions.annotate(conference_count=Count("conferences")).order_by("name")
+    gc = selectors.general_conference_for_detail(gc.pk)
+    unions = selectors.unions_for_general_conference(gc)
     return render(request, "organization/general_conference_detail.html", {
         "general_conference": gc,
         "unions": unions,
@@ -696,7 +638,8 @@ def general_conference_create(request):
     assert_global_structure_manage(request)
     form = GeneralConferenceForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        gc = form.save()
+        gc = form.save(commit=False)
+        repo.save_general_conference(gc)
         log_org_audit("CREATE", gc, performed_by=request.user, ip_address=get_client_ip(request))
         flash_success(request, f"General Conference “{gc.name}” created.")
         return redirect("organization:general_conference_detail", pk=gc.pk)
@@ -712,7 +655,8 @@ def general_conference_edit(request, pk):
     gc = get_scoped_general_conference(request, pk)
     form = GeneralConferenceForm(request.POST or None, instance=gc)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        gc = form.save(commit=False)
+        repo.save_general_conference(gc)
         log_org_audit("UPDATE", gc, performed_by=request.user, ip_address=get_client_ip(request))
         flash_success(request, "General Conference updated.")
         return redirect("organization:general_conference_detail", pk=pk)
@@ -727,10 +671,8 @@ def general_conference_edit(request, pk):
 def union_detail(request, pk):
     require_org_read(request)
     union = get_scoped_union(request, pk)
-    union = Union.objects.select_related("general_conference").annotate(
-        conference_count=Count("conferences")
-    ).get(pk=union.pk)
-    conferences = union.conferences.annotate(zone_count=Count("zones")).order_by("name")
+    union = selectors.union_for_detail(union.pk)
+    conferences = selectors.conferences_for_union(union)
     return render(request, "organization/union_detail.html", {
         "union": union,
         "conferences": conferences,
@@ -747,7 +689,8 @@ def union_create(request):
         general_conference = get_scoped_general_conference(request, gc_pk)
     form = UnionForm(request.POST or None, general_conference=general_conference, request=request)
     if request.method == "POST" and form.is_valid():
-        union = form.save()
+        union = form.save(commit=False)
+        repo.save_union(union)
         log_org_audit("CREATE", union, performed_by=request.user, ip_address=get_client_ip(request))
         flash_success(request, f"Union “{union.name}” created.")
         return redirect("organization:union_detail", pk=union.pk)
@@ -764,7 +707,8 @@ def union_edit(request, pk):
     union = get_scoped_union(request, pk)
     form = UnionForm(request.POST or None, instance=union, request=request)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        union = form.save(commit=False)
+        repo.save_union(union)
         log_org_audit("UPDATE", union, performed_by=request.user, ip_address=get_client_ip(request))
         flash_success(request, "Union updated.")
         return redirect("organization:union_detail", pk=pk)

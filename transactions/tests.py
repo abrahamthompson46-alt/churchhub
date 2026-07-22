@@ -300,6 +300,178 @@ class TransactionViewTests(FinancialServicesTests):
         self.assertEqual(response.status_code, 200)
 
 
+class TransactionPostPermissionTests(TestCase):
+    """Regression: POST handlers use granular finance permissions, not approve-only."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        conf = Conference.objects.create(name="Perm Conf", code="PCONF")
+        zone = Zone.objects.create(name="Perm Zone", code="PZON", conference=conf)
+        district = District.objects.create(name="Perm District", code="PDIS", zone=zone)
+        cls.church = Church.objects.create(name="Perm Church", code="PCH", district=district)
+        cls.treasurer = User.objects.create_user(
+            username="perm_treasury",
+            password="pass12345",
+            role="TREASURY",
+            church=cls.church,
+        )
+        cls.pastor = User.objects.create_user(
+            username="perm_pastor",
+            password="pass12345",
+            role="LOCAL_PASTOR",
+            church=cls.church,
+        )
+
+    def setUp(self):
+        self.client = Client()
+        open_working_day(self.church, timezone.localdate(), self.pastor)
+
+    def _login_church(self, username):
+        self.client.login(username=username, password="pass12345")
+        session = self.client.session
+        session["current_church_id"] = str(self.church.pk)
+        session.save()
+
+    def _approved_receipt(self):
+        txn = record_receipt(
+            church=self.church,
+            created_by=self.treasurer,
+            income_amount=Decimal("50.00"),
+        )
+        approve_transaction(txn, self.pastor)
+        return txn
+
+    def test_treasurer_with_manage_finances_cannot_void_via_post(self):
+        txn = self._approved_receipt()
+        self._login_church("perm_treasury")
+        response = self.client.post(
+            reverse("transactions:void_transaction", kwargs={"pk": txn.pk}),
+            {"reason": "Unauthorized void attempt"},
+        )
+        self.assertEqual(response.status_code, 403)
+        txn.refresh_from_db()
+        self.assertFalse(txn.is_voided)
+
+    def test_approver_denied_void_cannot_void_via_post(self):
+        from permissions.models import Permission
+        from permissions.services import create_override
+
+        void_perm = Permission.objects.get(codename="void_transactions")
+        create_override(self.pastor, void_perm, granted=False, reason="Separation of duties")
+        txn = self._approved_receipt()
+        self._login_church("perm_pastor")
+        response = self.client.post(
+            reverse("transactions:void_transaction", kwargs={"pk": txn.pk}),
+            {"reason": "Should be blocked"},
+        )
+        self.assertEqual(response.status_code, 403)
+        txn.refresh_from_db()
+        self.assertFalse(txn.is_voided)
+
+    def test_void_grant_without_approve_can_void_via_post(self):
+        from permissions.models import Permission
+        from permissions.services import create_override
+
+        void_perm = Permission.objects.get(codename="void_transactions")
+        create_override(self.treasurer, void_perm, granted=True, reason="Void-only delegate")
+        txn = self._approved_receipt()
+        self._login_church("perm_treasury")
+        response = self.client.post(
+            reverse("transactions:void_transaction", kwargs={"pk": txn.pk}),
+            {"reason": "Correcting duplicate entry"},
+        )
+        self.assertEqual(response.status_code, 302)
+        txn.refresh_from_db()
+        self.assertTrue(txn.is_voided)
+
+    def test_treasurer_cannot_open_working_day_via_post(self):
+        close_working_day(self.church, self.pastor)
+        self._login_church("perm_treasury")
+        response = self.client.post(
+            reverse("transactions:working_day_open"),
+            {"date": timezone.localdate().isoformat(), "notes": ""},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_treasurer_cannot_lock_period_via_post(self):
+        today = timezone.localdate()
+        self._login_church("perm_treasury")
+        response = self.client.post(
+            reverse("transactions:period_lock"),
+            {"year": today.year, "month": today.month, "notes": ""},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_treasurer_cannot_unlock_period_via_post(self):
+        today = timezone.localdate()
+        lock_financial_period(self.church, today.year, today.month, self.pastor)
+        self._login_church("perm_treasury")
+        response = self.client.post(
+            reverse("transactions:period_unlock"),
+            {"year": today.year, "month": today.month},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_local_pastor_cannot_unlock_period_via_post(self):
+        today = timezone.localdate()
+        lock_financial_period(self.church, today.year, today.month, self.pastor)
+        self._login_church("perm_pastor")
+        response = self.client.post(
+            reverse("transactions:period_unlock"),
+            {"year": today.year, "month": today.month},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_unlock_grant_can_unlock_period_via_post(self):
+        from permissions.models import Permission
+        from permissions.services import create_override
+
+        today = timezone.localdate()
+        lock_financial_period(self.church, today.year, today.month, self.pastor)
+        unlock_perm = Permission.objects.get(codename="unlock_periods")
+        create_override(self.treasurer, unlock_perm, granted=True, reason="Period unlock delegate")
+        self._login_church("perm_treasury")
+        response = self.client.post(
+            reverse("transactions:period_unlock"),
+            {"year": today.year, "month": today.month},
+        )
+        self.assertEqual(response.status_code, 302)
+        period = FinancialPeriod.objects.get(church=self.church, year=today.year, month=today.month)
+        self.assertFalse(period.is_locked)
+
+    def test_pastor_can_lock_period_via_post(self):
+        today = timezone.localdate()
+        self._login_church("perm_pastor")
+        response = self.client.post(
+            reverse("transactions:period_lock"),
+            {"year": today.year, "month": today.month, "notes": ""},
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_pastor_retains_void_and_working_day_post_access(self):
+        today = timezone.localdate()
+        txn = self._approved_receipt()
+        close_working_day(self.church, self.pastor)
+        self._login_church("perm_pastor")
+
+        open_response = self.client.post(
+            reverse("transactions:working_day_open"),
+            {"date": today.isoformat(), "notes": "Re-open"},
+        )
+        self.assertEqual(open_response.status_code, 302)
+
+        void_response = self.client.post(
+            reverse("transactions:void_transaction", kwargs={"pk": txn.pk}),
+            {"reason": "Pastor void"},
+        )
+        self.assertEqual(void_response.status_code, 302)
+        txn.refresh_from_db()
+        self.assertTrue(txn.is_voided)
+
+
 class SecurityAndIntegrityTests(FinancialServicesTests):
     def test_missing_idempotency_key_rejected(self):
         from transactions.idempotency import MissingIdempotencyKey, claim_financial_idempotency

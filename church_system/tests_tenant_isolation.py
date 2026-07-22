@@ -14,15 +14,26 @@ from members.models import Gender, Member, MembershipStatus
 from organization.models import Church, Conference, District, Zone
 from payroll.models import Employee
 from permissions.roles import UserRole
+from sitecontrol.test_support import SiteControlClientHarness
 from transactions.models import Transaction
 from transactions.services import open_working_day, record_receipt
 
 User = get_user_model()
 
 
-class TenantIsolationMixin:
+class TenantIsolationMixin(SiteControlClientHarness):
     @classmethod
     def setUpTestData(cls):
+        # Isolation assertions must not be short-circuited by MFA enroll redirects.
+        from sitecontrol.models import SiteSettings
+        from sitecontrol.services import clear_settings_cache
+
+        SiteSettings.objects.update_or_create(
+            singleton_id=1,
+            defaults={"mfa_required_for_privileged": False},
+        )
+        clear_settings_cache()
+
         conf = Conference.objects.create(name="Conf", code="CF")
         zone = Zone.objects.create(conference=conf, name="Zone", code="Z1")
         d1 = District.objects.create(zone=zone, name="D1", code="D1")

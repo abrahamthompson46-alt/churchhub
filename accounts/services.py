@@ -6,10 +6,12 @@ from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from django.utils import timezone
 
+from accounts import repositories as repo
+from accounts import selectors
 from permissions.roles import UserRole
 from permissions.services import get_client_ip, sync_role_groups
 
-from .models import User, UserActivityLog, UserInvitation
+from .models import User
 
 __all__ = [
     "get_client_ip",
@@ -30,12 +32,12 @@ __all__ = [
 
 
 def log_activity(user, action, performed_by=None, ip_address=None, details=None):
-    return UserActivityLog.objects.create(
+    return repo.create_activity_log(
         user=user,
         action=action,
         performed_by=performed_by,
         ip_address=ip_address,
-        details=details or {},
+        details=details,
     )
 
 
@@ -58,7 +60,7 @@ def assign_user_to_church(user, church, performed_by=None, ip_address=None):
     if denom and user.denomination_id != denom.pk:
         user.denomination = denom
         update_fields.append("denomination")
-    user.save(update_fields=update_fields)
+    repo.save_user(user, update_fields=update_fields)
     log_activity(
         user,
         "CHURCH_ASSIGN",
@@ -96,15 +98,15 @@ def create_invitation(
     if UserRole.requires_church(role) and not church:
         raise ValueError("Local roles require a home church.")
 
-    if User.objects.filter(username__iexact=username).exists():
+    if selectors.username_exists_iexact(username):
         raise ValueError("Username is already taken.")
-    if User.objects.filter(email__iexact=email, is_active=True).exists():
+    if selectors.active_email_exists_iexact(email):
         raise ValueError("An active user with this email already exists.")
 
     if church and not denomination:
         denomination = getattr(church, "denomination", None)
 
-    invitation = UserInvitation.objects.create(
+    invitation = repo.create_invitation(
         email=email,
         username=username,
         role=role,
@@ -172,7 +174,7 @@ def accept_invitation(invitation, password, first_name="", last_name=""):
     from permissions.org_scope import apply_org_scope
     from sitecontrol.services import can_add_user_to_church
 
-    invitation = UserInvitation.objects.select_for_update().get(pk=invitation.pk)
+    invitation = selectors.invitation_for_update(invitation.pk)
 
     if not invitation.is_valid:
         raise ValueError("This invitation is no longer valid.")
@@ -182,15 +184,15 @@ def accept_invitation(invitation, password, first_name="", last_name=""):
         if not allowed:
             raise ValueError(message)
 
-    if User.objects.filter(username__iexact=invitation.username).exists():
+    if selectors.username_exists_iexact(invitation.username):
         raise ValueError("Username is already taken.")
-    if User.objects.filter(email__iexact=invitation.email, is_active=True).exists():
+    if selectors.active_email_exists_iexact(invitation.email):
         raise ValueError("An active user with this email already exists.")
 
     validate_password(password, user=User(username=invitation.username, email=invitation.email))
 
     denom = invitation.denomination or getattr(invitation.church, "denomination", None)
-    user = User.objects.create_user(
+    user = repo.create_user(
         username=invitation.username,
         email=invitation.email,
         password=password,
@@ -214,12 +216,12 @@ def accept_invitation(invitation, password, first_name="", last_name=""):
         general_conference=invitation.scope_general_conference,
         denomination=denom,
     )
-    user.save()
+    repo.save_user(user)
     sync_role_groups(user)
 
     invitation.is_accepted = True
     invitation.accepted_at = timezone.now()
-    invitation.save(update_fields=["is_accepted", "accepted_at"])
+    repo.save_invitation(invitation, update_fields=["is_accepted", "accepted_at"])
 
     log_activity(
         user,
@@ -237,7 +239,7 @@ def revoke_invitation(invitation, performed_by=None, ip_address=None):
         return invitation
 
     invitation.revoked_at = timezone.now()
-    invitation.save(update_fields=["revoked_at"])
+    repo.save_invitation(invitation, update_fields=["revoked_at"])
     actor = performed_by or invitation.invited_by
     if actor:
         log_activity(
@@ -261,7 +263,7 @@ def resend_invitation(invitation, performed_by=None, ip_address=None, days_valid
         raise ValueError("Revoked invitations cannot be resent.")
 
     invitation.expires_at = timezone.now() + timedelta(days=days_valid)
-    invitation.save(update_fields=["expires_at"])
+    repo.save_invitation(invitation, update_fields=["expires_at"])
     actor = performed_by or invitation.invited_by
     if actor:
         log_activity(
@@ -284,14 +286,14 @@ def deactivate_user(user, performed_by=None, ip_address=None):
     if performed_by is not None and performed_by.pk == user.pk:
         raise ValueError("You cannot deactivate your own account.")
     user.is_active = False
-    user.save(update_fields=["is_active"])
+    repo.save_user(user, update_fields=["is_active"])
     log_activity(user, "USER_DEACTIVATE", performed_by=performed_by, ip_address=ip_address)
     return user
 
 
 def activate_user(user, performed_by=None, ip_address=None):
     user.is_active = True
-    user.save(update_fields=["is_active"])
+    repo.save_user(user, update_fields=["is_active"])
     log_activity(user, "USER_ACTIVATE", performed_by=performed_by, ip_address=ip_address)
     return user
 
@@ -321,9 +323,9 @@ def update_user_role(user, new_role, performed_by=None, ip_address=None, *, real
             general_conference=user.scope_general_conference,
             denomination=user.denomination,
         )
-        user.save()
+        repo.save_user(user)
     else:
-        user.save(update_fields=["role"])
+        repo.save_user(user, update_fields=["role"])
     sync_role_groups(user)
     log_activity(
         user,
@@ -353,7 +355,7 @@ def update_user_profile(user, cleaned_data, performed_by=None, ip_address=None):
     if not changes:
         return user
 
-    user.save(update_fields=list(changes.keys()))
+    repo.save_user(user, update_fields=list(changes.keys()))
 
     log_activity(
         user,

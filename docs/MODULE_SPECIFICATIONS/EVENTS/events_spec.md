@@ -69,11 +69,18 @@ Structured minutes fields (opening, previous, deliberations, motions, votes, adj
 
 ---
 
-## 4. Services (Current)
+## 4. Services / selectors / repositories (Current)
 
-**`meetings/services.py`:** `mark_meeting_held`, `record_meeting_attendance`, `record_event_attendance`.
+| Module | Role |
+|--------|------|
+| `selectors.py` | Church-scoped meeting/attendance reads, filter helpers, member/department form querysets, attachment lookup |
+| `repositories.py` | Meeting / attachment / action / decision / attendance persistence; attendance upsert + roll sync deletes |
+| `services.py` | Mark held; bulk attendance sync with church-member validation |
+| `workflow.py` | Minutes draft/submit/approve/reject, pending queue, capability helpers |
 
-**`meetings/workflow.py`:** minutes draft/submit/approve/reject, pending queue, capability helpers.
+**Layering (P1-2):** Views → services/workflow → selectors/repositories → models. Views/forms handle HTTP and forms only; ModelForm CRUD uses `commit=False` + repositories. Church scope, minutes maker-checker, and attendance behavior are unchanged.
+
+`tests_layers.py` characterizes selector reads, attendance isolation, cross-church denial, repository writes, attachment handling, and attendance re-record identity.
 
 ---
 

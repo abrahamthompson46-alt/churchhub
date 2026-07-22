@@ -116,6 +116,7 @@ class WelfareEnterpriseTests(TestCase):
         )
         self.assertIsNotNone(trx)
         self.assertIsNotNone(contribution)
+        approve_transaction(trx, self.pastor)
         self.assertGreater(get_welfare_fund_balance(self.church), Decimal("0"))
 
     def test_fund_balance_guard(self):

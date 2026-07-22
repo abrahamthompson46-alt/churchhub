@@ -2,7 +2,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import HttpResponseForbidden, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -10,13 +10,13 @@ from accounts.permissions import can_approve_transactions, can_manage_finances
 from announcements.services import pending_for_user
 from church_system.church_scope import get_active_church
 from church_system.flash import flash_exception, flash_success, flash_warning
-from dashboard.models import Notification
+from dashboard import repositories as repo
+from dashboard import selectors
 from dashboard.services import (
     _compute_remittance_payable_mtd,
     build_home_context,
 )
 from dashboard.utils import safe_internal_redirect
-from permissions.scoping import get_manageable_churches
 from transactions.models import MonthlyCutoff
 from transactions.services import generate_monthly_cutoff
 
@@ -34,7 +34,7 @@ def _apply_church_switch(request, church_param):
     if value == "" or value.lower() == "all":
         request.session.pop("current_church_id", None)
         return
-    church = get_manageable_churches(request.user).filter(pk=value).first()
+    church = selectors.manageable_church_by_pk(request.user, value)
     if church:
         request.session["current_church_id"] = str(church.id)
 
@@ -105,8 +105,8 @@ def switch_church(request):
 
 @login_required
 def notification_list(request):
-    qs = Notification.objects.filter(user=request.user).order_by("-created_at")
-    unread = qs.filter(read=False).count()
+    qs = selectors.notifications_for_user(request.user)
+    unread = selectors.unread_notification_count(request.user)
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get("page"))
     return render(request, "dashboard/notifications.html", {
@@ -119,8 +119,8 @@ def notification_list(request):
 @login_required
 @require_http_methods(["GET", "POST"])
 def notification_mark_read(request, pk):
-    notification = get_object_or_404(Notification, pk=pk, user=request.user)
-    notification.mark_read()
+    notification = selectors.notification_for_user(request.user, pk)
+    repo.mark_notification_read(notification)
 
     follow = request.POST.get("follow") or request.GET.get("follow")
     if follow and notification.action_url:
@@ -145,14 +145,14 @@ def notification_mark_read(request, pk):
 @login_required
 @require_POST
 def notification_mark_all_read(request):
-    Notification.objects.filter(user=request.user, read=False).update(read=True)
+    repo.mark_all_notifications_read(request.user)
     flash_success(request, "All notifications marked as read.", title="Inbox updated")
     return redirect("dashboard:notifications")
 
 
 @login_required
 def notification_count(request):
-    count = Notification.objects.filter(user=request.user, read=False).count()
+    count = selectors.unread_notification_count(request.user)
     return JsonResponse({"count": count})
 
 
@@ -201,7 +201,7 @@ def cutoff(request):
             return redirect("dashboard:cutoff")
 
         # GET — display only; never create/mutate MonthlyCutoff
-        cutoff_obj = MonthlyCutoff.objects.filter(church=church, month=month_start).first()
+        cutoff_obj = selectors.monthly_cutoff_for_church_month(church, month_start)
         if cutoff_obj:
             monthly_total = cutoff_obj.total_payable
             total_tithe = cutoff_obj.total_tithe

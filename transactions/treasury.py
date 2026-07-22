@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.db.models.functions import Coalesce
 
 from transactions.models import Transaction, TransactionLine
@@ -13,6 +13,7 @@ def get_cash_position(church):
     """
     Book balances for liquid accounts (approved, non-voided lines).
     Asset convention: debit-positive → balance = sum(amount).
+    Single grouped query instead of four separate aggregates.
     """
     empty = {
         "cash": Decimal("0.00"),
@@ -24,26 +25,31 @@ def get_cash_position(church):
     if not church:
         return empty
 
-    base = TransactionLine.objects.filter(
-        transaction__church=church,
-        transaction__approval_status="APPROVED",
-        transaction__is_voided=False,
-        account__is_active=True,
-    )
-
-    def _sum(qs):
-        return qs.aggregate(t=Coalesce(Sum("amount"), Decimal("0.00")))["t"] or Decimal("0.00")
-
-    cash = _sum(base.filter(account__name="Cash", account__account_type="CASH"))
-    petty = _sum(base.filter(account__name="Petty Cash"))
-    # Other CASH-type drawers (if any) roll into cash
-    other_cash = _sum(
-        base.filter(account__account_type="CASH").exclude(
-            account__name__in=["Cash", "Petty Cash"]
+    rows = (
+        TransactionLine.objects.filter(
+            transaction__church=church,
+            transaction__approval_status="APPROVED",
+            transaction__is_voided=False,
+            account__is_active=True,
         )
+        .filter(Q(account__account_type__in=["CASH", "BANK"]) | Q(account__name="Petty Cash"))
+        .values("account__account_type", "account__name")
+        .annotate(t=Coalesce(Sum("amount"), Decimal("0.00")))
     )
-    cash = cash + other_cash
-    bank = _sum(base.filter(account__account_type="BANK"))
+
+    cash = Decimal("0.00")
+    bank = Decimal("0.00")
+    petty = Decimal("0.00")
+    for row in rows:
+        amount = row["t"] or Decimal("0.00")
+        name = row["account__name"]
+        acc_type = row["account__account_type"]
+        if name == "Petty Cash":
+            petty += amount
+        elif acc_type == "BANK":
+            bank += amount
+        elif acc_type == "CASH":
+            cash += amount
 
     return {
         "cash": cash,
@@ -67,7 +73,7 @@ def get_teller_daily_summary(church, business_date=None):
             is_voided=False,
         )
         .select_related("created_by")
-        .prefetch_related("lines")
+        .prefetch_related("lines__account")
     )
 
     by_user = {}

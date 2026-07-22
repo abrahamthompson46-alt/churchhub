@@ -1,10 +1,24 @@
 """Structured logging configuration for ChurchHub."""
 
+from __future__ import annotations
+
 import os
+from pathlib import Path
 
 
-def build_logging_config(*, debug: bool) -> dict:
-    """Return Django LOGGING dict — quiet console in dev, structured in production."""
+def build_logging_config(
+    *,
+    debug: bool,
+    log_dir: Path | str | None = None,
+    enable_file_logs: bool | None = None,
+) -> dict:
+    """
+    Return Django LOGGING dict.
+
+    - Console: always on (platform-friendly for Docker/Render)
+    - Optional rotating files under log_dir:
+      application.log, security.log, audit.log
+    """
     env_level = os.environ.get("DJANGO_LOG_LEVEL", "").upper()
     if env_level in {"DEBUG", "INFO", "WARNING", "ERROR"}:
         app_level = env_level
@@ -13,6 +27,59 @@ def build_logging_config(*, debug: bool) -> dict:
 
     console_level = env_level if env_level else "INFO"
     formatter_name = "verbose" if debug else "structured"
+
+    if enable_file_logs is None:
+        enable_file_logs = os.environ.get("CHURCHHUB_FILE_LOGS", "").lower() in (
+            "true",
+            "1",
+            "yes",
+        ) or (not debug)
+
+    handlers: dict = {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": formatter_name,
+            "level": console_level,
+        },
+    }
+    app_handlers = ["console"]
+    security_handlers = ["console"]
+    audit_handlers = ["console"]
+
+    if enable_file_logs:
+        base = Path(log_dir or os.environ.get("CHURCHHUB_LOG_DIR") or "logs")
+        try:
+            base.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            enable_file_logs = False
+
+    if enable_file_logs:
+        base = Path(log_dir or os.environ.get("CHURCHHUB_LOG_DIR") or "logs")
+        common_file = {
+            "class": "logging.handlers.RotatingFileHandler",
+            "formatter": "structured",
+            "maxBytes": int(os.environ.get("CHURCHHUB_LOG_MAX_BYTES", str(10 * 1024 * 1024))),
+            "backupCount": int(os.environ.get("CHURCHHUB_LOG_BACKUP_COUNT", "10")),
+            "encoding": "utf-8",
+        }
+        handlers["app_file"] = {
+            **common_file,
+            "filename": str(base / "application.log"),
+            "level": app_level,
+        }
+        handlers["security_file"] = {
+            **common_file,
+            "filename": str(base / "security.log"),
+            "level": "INFO",
+        }
+        handlers["audit_file"] = {
+            **common_file,
+            "filename": str(base / "audit.log"),
+            "level": "INFO",
+        }
+        app_handlers = ["console", "app_file"]
+        security_handlers = ["console", "security_file"]
+        audit_handlers = ["console", "audit_file"]
 
     return {
         "version": 1,
@@ -30,26 +97,29 @@ def build_logging_config(*, debug: bool) -> dict:
                 "style": "{",
             },
         },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": formatter_name,
-                "level": console_level,
-            },
-        },
+        "handlers": handlers,
         "root": {
-            "handlers": ["console"],
+            "handlers": app_handlers,
             "level": console_level,
         },
         "loggers": {
-            "django": {"handlers": ["console"], "level": "INFO", "propagate": False},
+            "django": {
+                "handlers": app_handlers,
+                "level": "INFO",
+                "propagate": False,
+            },
             "django.request": {
-                "handlers": ["console"],
+                "handlers": security_handlers,
                 "level": "WARNING" if not debug else "INFO",
                 "propagate": False,
             },
+            "django.security": {
+                "handlers": security_handlers,
+                "level": "INFO",
+                "propagate": False,
+            },
             "django.server": {
-                "handlers": ["console"],
+                "handlers": app_handlers,
                 "level": "INFO",
                 "propagate": False,
             },
@@ -63,7 +133,26 @@ def build_logging_config(*, debug: bool) -> dict:
                 "level": "WARNING",
                 "propagate": False,
             },
-            "churchhub": {"handlers": ["console"], "level": app_level, "propagate": False},
+            "churchhub": {
+                "handlers": app_handlers,
+                "level": app_level,
+                "propagate": False,
+            },
+            "churchhub.security": {
+                "handlers": security_handlers,
+                "level": "INFO",
+                "propagate": False,
+            },
+            "churchhub.audit": {
+                "handlers": audit_handlers,
+                "level": "INFO",
+                "propagate": False,
+            },
+            "celery": {
+                "handlers": app_handlers,
+                "level": "INFO",
+                "propagate": False,
+            },
         },
     }
 
@@ -75,14 +164,23 @@ def configure_sentry() -> None:
         return
     try:
         import sentry_sdk
+        from sentry_sdk.integrations.celery import CeleryIntegration
         from sentry_sdk.integrations.django import DjangoIntegration
+        from sentry_sdk.integrations.redis import RedisIntegration
 
         sentry_sdk.init(
             dsn=dsn,
-            integrations=[DjangoIntegration()],
+            integrations=[
+                DjangoIntegration(),
+                CeleryIntegration(),
+                RedisIntegration(),
+            ],
             traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
             send_default_pii=False,
-            environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
+            environment=os.environ.get(
+                "SENTRY_ENVIRONMENT",
+                os.environ.get("DJANGO_ENV", "production"),
+            ),
         )
     except ImportError:
         import logging

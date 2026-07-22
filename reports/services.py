@@ -3,12 +3,10 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
-from church_system.church_scope import get_active_church, get_user_church
-from members.models import Member, MemberTransfer, MembershipStatus
-from organization.models import Church, Conference, District, Zone
+from church_system.church_scope import get_user_church
+from members.models import MembershipStatus
 from permissions.checks import (
     can_manage_finances,
     can_manage_members,
@@ -19,8 +17,9 @@ from permissions.checks import (
 from permissions.scoping import get_manageable_churches
 from permissions.superadmin import is_superadmin
 from sitecontrol.services import church_has_feature
-from transactions.models import Transaction, TransactionLine
 
+from . import repositories as repo
+from . import selectors
 from .registry import PERIOD_CHOICES, REPORT_CATALOG
 
 ASSET_TYPES = {"CASH", "BANK", "REMITTANCE_RECEIVABLE", "FIXED_ASSET", "ACCUMULATED_DEPRECIATION"}
@@ -132,64 +131,60 @@ def resolve_date_range(period, start_date=None, end_date=None):
 
 
 def _churches_in_scope(request, conference_id=None, zone_id=None, district_id=None, church_id=None):
-    """
-    Resolve church queryset from hierarchy filters.
-
-    Always intersects with get_manageable_churches(user). Out-of-scope IDs yield empty.
-    """
-    user = request.user
-    manageable = get_manageable_churches(user)
-    qs = manageable
-
-    if church_id:
-        qs = qs.filter(pk=church_id)
-    elif district_id:
-        qs = qs.filter(district_id=district_id)
-    elif zone_id:
-        qs = qs.filter(district__zone_id=zone_id)
-    elif conference_id:
-        qs = qs.filter(district__zone__conference_id=conference_id)
-    else:
-        active = get_active_church(request)
-        if active and manageable.filter(pk=active.pk).exists():
-            return Church.objects.filter(pk=active.pk)
-        if can_view_all_churches(user):
-            return qs
-        user_church = get_user_church(user)
-        if user_church and manageable.filter(pk=user_church.pk).exists():
-            return Church.objects.filter(pk=user_church.pk)
-        return Church.objects.none()
-
-    return qs
-
-
-def _transactions_in_scope(request, start, end, **hierarchy):
-    churches = _churches_in_scope(request, **hierarchy)
-    return Transaction.objects.filter(
-        church__in=churches,
-        date__gte=start,
-        date__lte=end,
-        approval_status="APPROVED",
-        is_voided=False,
+    return selectors.churches_in_scope(
+        request,
+        conference_id=conference_id,
+        zone_id=zone_id,
+        district_id=district_id,
+        church_id=church_id,
     )
 
 
+def _transactions_in_scope(request, start, end, **hierarchy):
+    return selectors.transactions_in_scope(request, start, end, **hierarchy)
+
+
 def _members_in_scope(request, **hierarchy):
-    churches = _churches_in_scope(request, **hierarchy)
-    return Member.objects.filter(church__in=churches)
+    return selectors.members_in_scope(request, **hierarchy)
 
 
 def log_report_access(*, user, report_key, action, params=None, row_count=0, church=None, export_format=""):
-    from .models import ReportAccessAuditLog
-
-    ReportAccessAuditLog.objects.create(
-        user=user if getattr(user, "is_authenticated", False) else None,
+    return repo.create_access_audit(
+        user=user,
         report_key=report_key,
         action=action,
-        export_format=export_format or "",
-        params=params or {},
-        row_count=row_count or 0,
+        params=params,
+        row_count=row_count,
         church=church,
+        export_format=export_format,
+    )
+
+
+def audit_export(
+    *,
+    user,
+    report_key,
+    export_format,
+    row_count=0,
+    church=None,
+    params=None,
+):
+    """
+    Write ReportAccessAuditLog for a domain/module file export.
+
+    Call before returning CSV/Excel/PDF from views that use ``reports.exporters``
+    (or equivalent) outside the reports catalog runner.
+    """
+    from .models import ReportAccessAuditLog
+
+    log_report_access(
+        user=user,
+        report_key=report_key,
+        action=ReportAccessAuditLog.ACTION_EXPORT,
+        params=params,
+        row_count=row_count,
+        church=church,
+        export_format=export_format or "",
     )
 
 
@@ -225,10 +220,10 @@ def build_report(report_key, request, period="monthly", start_date=None, end_dat
 
 def _financial_summary(request, start, end, **hierarchy):
     txns = _transactions_in_scope(request, start, end, **hierarchy)
-    lines = TransactionLine.objects.filter(transaction__in=txns).select_related("account")
+    lines = selectors.transaction_lines_for_transactions(txns)
 
     def _sum_type(acc_type):
-        return abs(lines.filter(account__account_type=acc_type).aggregate(t=Sum("amount"))["t"] or Decimal("0"))
+        return abs(selectors.sum_line_amount_for_type(lines, acc_type) or Decimal("0"))
 
     summary = {
         "tithe": _sum_type("TITHE"),
@@ -254,14 +249,9 @@ def _financial_summary(request, start, end, **hierarchy):
 
 def _member_summary(request, start, end, **hierarchy):
     members = _members_in_scope(request, **hierarchy)
-    by_gender = members.values("gender").annotate(count=Count("id")).order_by("gender")
-    by_status = members.values("membership_status").annotate(count=Count("id")).order_by("membership_status")
-    by_dept = (
-        members.filter(department__isnull=False)
-        .values("department__name")
-        .annotate(count=Count("id"))
-        .order_by("-count")
-    )
+    by_gender = selectors.member_gender_counts(members)
+    by_status = selectors.member_status_counts(members)
+    by_dept = selectors.member_department_counts(members)
     headers = ["Metric", "Count"]
     rows = [
         ["Total Members", members.count()],
@@ -286,20 +276,7 @@ def _member_summary(request, start, end, **hierarchy):
 
 def _tithe_report(request, start, end, **hierarchy):
     txns = _transactions_in_scope(request, start, end, **hierarchy)
-    aggregates = (
-        TransactionLine.objects.filter(
-            transaction__in=txns,
-            account__account_type__in=["TITHE", "COMBINED"],
-            transaction__member__isnull=False,
-        )
-        .values(
-            "transaction__member_id",
-            "transaction__member__first_name",
-            "transaction__member__last_name",
-            "account__account_type",
-        )
-        .annotate(total=Sum("amount"))
-    )
+    aggregates = selectors.tithe_combined_by_member(txns)
 
     member_totals = {}
     for row in aggregates:
@@ -334,11 +311,7 @@ def _tithe_report(request, start, end, **hierarchy):
 
 def _transfer_report(request, start, end, **hierarchy):
     churches = _churches_in_scope(request, **hierarchy)
-    transfers = MemberTransfer.objects.filter(
-        Q(from_church__in=churches) | Q(to_church__in=churches),
-        transfer_date__gte=start,
-        transfer_date__lte=end,
-    ).select_related("member", "from_church", "to_church")
+    transfers = selectors.transfers_in_scope(churches, start, end)
 
     headers = ["Member", "From", "To", "Status", "Date"]
     qs = transfers.order_by("-transfer_date")
@@ -360,22 +333,8 @@ def _transfer_report(request, start, end, **hierarchy):
 
 
 def _attendance_summary(request, start, end, **hierarchy):
-    from meetings.models import AttendanceEvent
-
     churches = _churches_in_scope(request, **hierarchy)
-    events = (
-        AttendanceEvent.objects.filter(
-            church__in=churches,
-            event_date__gte=start,
-            event_date__lte=end,
-        )
-        .select_related("church")
-        .annotate(
-            present_count=Count("records", filter=Q(records__is_present=True)),
-            total_count=Count("records"),
-        )
-        .order_by("-event_date")
-    )
+    events = selectors.attendance_events_in_scope(churches, start, end)
     headers = ["Event", "Type", "Date", "Present", "Total"]
     total_count = events.count()
     truncated = total_count > REPORT_ROW_LIMIT
@@ -400,7 +359,7 @@ def _hierarchy_rollup(request, start, end, **hierarchy):
         return {"title": "District Roll-up", "headers": [], "rows": []}
 
     churches = _churches_in_scope(request, **hierarchy)
-    church_rows = list(churches.values("id", "district_id", "district__name"))
+    church_rows = selectors.church_district_rows(churches)
     if not church_rows:
         return {"title": "District Roll-up", "headers": ["District", "Churches", "Tithe", "Combined", "Total"], "rows": []}
 
@@ -412,18 +371,7 @@ def _hierarchy_rollup(request, start, end, **hierarchy):
             district_meta[d_id] = {"name": r["district__name"], "church_count": 0}
         district_meta[d_id]["church_count"] += 1
 
-    line_aggs = (
-        TransactionLine.objects.filter(
-            transaction__church_id__in=church_ids,
-            transaction__date__gte=start,
-            transaction__date__lte=end,
-            transaction__approval_status="APPROVED",
-            transaction__is_voided=False,
-            account__account_type__in=["TITHE", "COMBINED"],
-        )
-        .values("transaction__church__district_id", "account__account_type")
-        .annotate(total=Sum("amount"))
-    )
+    line_aggs = selectors.district_tithe_combined_aggregates(church_ids, start, end)
 
     amounts = {d_id: {"tithe": Decimal("0"), "combined": Decimal("0")} for d_id in district_meta}
     for row in line_aggs:
@@ -454,7 +402,7 @@ def _payroll_summary(request, start, end, **hierarchy):
     year = end.year
     month = end.month if start.month == end.month and start.year == end.year else None
     rows_data = hierarchy_payroll_rollup(request.user, year=year, month=month)
-    church_names = set(churches.values_list("name", flat=True))
+    church_names = selectors.church_names_set(churches)
     rows_data = [r for r in rows_data if r["church"] in church_names]
 
     headers = ["Church", "District", "Runs", "Gross", "Net", "Employer Cost"]
@@ -471,15 +419,7 @@ def _quantize(value):
 
 
 def _lines_for_churches(churches, end, start=None):
-    qs = TransactionLine.objects.filter(
-        transaction__church__in=churches,
-        transaction__approval_status="APPROVED",
-        transaction__is_voided=False,
-        transaction__date__lte=end,
-    ).select_related("account", "transaction__church")
-    if start:
-        qs = qs.filter(transaction__date__gte=start)
-    return qs
+    return selectors.lines_for_churches(churches, end, start=start)
 
 
 def _account_balances(churches, end, start=None):
@@ -488,29 +428,9 @@ def _account_balances(churches, end, start=None):
 
     Balance is the signed sum of line amounts (debit-positive convention used by GL).
     """
-    from transactions.models import Account
-
-    qs = (
-        TransactionLine.objects.filter(
-            transaction__church__in=churches,
-            transaction__approval_status="APPROVED",
-            transaction__is_voided=False,
-            transaction__date__lte=end,
-        )
-    )
-    if start:
-        qs = qs.filter(transaction__date__gte=start)
-
-    aggregates = qs.values(
-        "account_id",
-        "account__name",
-        "account__account_type",
-        "transaction__church_id",
-        "transaction__church__name",
-    ).annotate(balance=Sum("amount"))
-
+    aggregates = selectors.account_balance_aggregates(churches, end, start=start)
     account_ids = {row["account_id"] for row in aggregates}
-    accounts = {a.pk: a for a in Account.objects.filter(pk__in=account_ids)}
+    accounts = selectors.accounts_by_ids(account_ids)
 
     balances = {}
     for row in aggregates:
@@ -668,24 +588,15 @@ def _asset_hierarchy_rollup_report(request, start, end, **hierarchy):
 
 
 def _welfare_register_report(request, start, end, **hierarchy):
-    from remittance.models import WelfareAssistanceCase, WelfareContribution
     from remittance.welfare_services import get_welfare_fund_balance
 
     churches = _churches_in_scope(request, **hierarchy)
     church_list = list(churches)
-    contributions = WelfareContribution.objects.filter(
-        church__in=churches,
-        contribution_date__gte=start,
-        contribution_date__lte=end,
-    ).select_related("member", "church", "transaction")
-    cases = WelfareAssistanceCase.objects.filter(
-        church__in=churches,
-        created_at__date__gte=start,
-        created_at__date__lte=end,
-    ).select_related("member", "church")
+    contributions = selectors.welfare_contributions_in_scope(churches, start, end)
+    cases = selectors.welfare_cases_in_scope(churches, start, end)
 
-    contributed = contributions.aggregate(total=Sum("amount"))["total"] or Decimal("0")
-    disbursed = cases.filter(status="DISBURSED").aggregate(total=Sum("amount_approved"))["total"] or Decimal("0")
+    contributed = selectors.welfare_contribution_total(contributions) or Decimal("0")
+    disbursed = selectors.welfare_disbursed_total(cases) or Decimal("0")
     pending = cases.filter(status__in=("PENDING", "UNDER_REVIEW")).count()
     approved_awaiting = cases.filter(status="APPROVED").count()
 
@@ -813,22 +724,20 @@ def get_hierarchy_context(user):
     """Dropdown options for hierarchy filters (manageable churches only)."""
     manageable = get_manageable_churches(user)
     ctx = {
-        "conferences": Conference.objects.none(),
-        "zones": Zone.objects.none(),
-        "districts": District.objects.none(),
-        "churches": Church.objects.none(),
+        "conferences": selectors.empty_conferences(),
+        "zones": selectors.empty_zones(),
+        "districts": selectors.empty_districts(),
+        "churches": selectors.empty_churches(),
         "can_filter_hierarchy": False,
     }
     if not can_view_all_churches(user):
         ctx["churches"] = manageable
         return ctx
 
-    conf_ids = manageable.values_list("district__zone__conference_id", flat=True).distinct()
-    zone_ids = manageable.values_list("district__zone_id", flat=True).distinct()
-    dist_ids = manageable.values_list("district_id", flat=True).distinct()
+    ids = selectors.manageable_hierarchy_ids(manageable)
     ctx["can_filter_hierarchy"] = True
-    ctx["conferences"] = Conference.objects.filter(pk__in=conf_ids).order_by("name")
-    ctx["zones"] = Zone.objects.filter(pk__in=zone_ids).select_related("conference").order_by("name")
-    ctx["districts"] = District.objects.filter(pk__in=dist_ids).select_related("zone").order_by("name")
-    ctx["churches"] = manageable.select_related("district").order_by("name")
+    ctx["conferences"] = selectors.conferences_by_ids(ids["conference_ids"])
+    ctx["zones"] = selectors.zones_by_ids(ids["zone_ids"])
+    ctx["districts"] = selectors.districts_by_ids(ids["district_ids"])
+    ctx["churches"] = selectors.manageable_churches_ordered(manageable)
     return ctx

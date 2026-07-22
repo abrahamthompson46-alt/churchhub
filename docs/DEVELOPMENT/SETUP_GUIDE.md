@@ -66,14 +66,14 @@ copy .env.example .env
 # cp .env.example .env
 ```
 
-Edit `.env`. Settings load via `_load_dotenv` in `church_system/settings.py` (no python-dotenv package required).
+Edit `.env`. Settings load via `church_system.env.load_dotenv` from `church_system/settings/base.py` (no python-dotenv package required). Select environment with `DJANGO_ENV=development|staging|production` (default: development).
 
 ### Minimum local `.env`
 
 | Variable | Local typical |
 |----------|---------------|
 | `DJANGO_SECRET_KEY` | Any long random string |
-| `DJANGO_DEBUG` | `True` |
+| `DJANGO_DEBUG` | `True` (explicit). If unset: True locally, **False** when `DATABASE_URL` / Render / PythonAnywhere / Dyno is present |
 | `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` |
 
 SQLite is used automatically when `DATABASE_URL` / `DB_ENGINE=postgresql` are unset (and not on Render).
@@ -83,7 +83,8 @@ SQLite is used automatically when `DATABASE_URL` / `DB_ENGINE=postgresql` are un
 | Variable | Purpose |
 |----------|---------|
 | `DJANGO_SECRET_KEY` | Required when `DEBUG=False` |
-| `DJANGO_DEBUG` | Debug mode |
+| `DJANGO_DEBUG` | Debug mode — **must be set explicitly in production** (`False`). Unset defaults to False when production markers exist |
+| `DJANGO_ALLOW_DEBUG_IN_PROD` | Temporary override to allow `DJANGO_DEBUG=True` with `DATABASE_URL`/Render (not for production use) |
 | `DJANGO_ALLOWED_HOSTS` | Host allowlist |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | HTTPS CSRF origins |
 | `CHURCHHUB_PUBLIC_URL` | Absolute links in emails |

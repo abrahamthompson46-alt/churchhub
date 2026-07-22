@@ -1,15 +1,17 @@
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import FileResponse, Http404
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 
 from church_system.church_scope import get_active_church, require_church
 from church_system.flash import flash_info
 from permissions.checks import can_view_reports
 
+from . import repositories as repo
+from . import selectors
 from .exporters import export_table_csv, export_table_excel, export_table_pdf
 from .forms import ReportFilterForm, WelfareStatementForm
-from .models import ReportAccessAuditLog, ReportExportJob
+from .models import ReportAccessAuditLog
 from .registry import REPORT_CATALOG
 from .services import (
     build_report,
@@ -69,7 +71,7 @@ def _export_params_from_form(cleaned):
 def _queue_async_export(user, report_key, export_fmt, params):
     from church_system.tasks import generate_report_export_task
 
-    job = ReportExportJob.objects.create(
+    job = repo.create_export_job(
         user=user,
         report_key=report_key,
         export_format=export_fmt,
@@ -81,13 +83,13 @@ def _queue_async_export(user, report_key, export_fmt, params):
 
 @login_required
 def export_job_status(request, pk):
-    job = get_object_or_404(ReportExportJob, pk=pk, user=request.user)
+    job = selectors.export_job_for_user(request.user, pk)
     return render(request, "reports/export_job.html", {"job": job, "meta": REPORT_CATALOG.get(job.report_key)})
 
 
 @login_required
 def export_job_download(request, pk):
-    job = get_object_or_404(ReportExportJob, pk=pk, user=request.user)
+    job = selectors.export_job_for_user(request.user, pk)
     if not job.is_ready:
         raise Http404
     return FileResponse(
@@ -108,6 +110,30 @@ def run_report(request, report_key):
     form = ReportFilterForm(request.GET or None, user=request.user, hierarchy=hierarchy)
 
     data = None
+    export_fmt = request.GET.get("export")
+    want_async = export_fmt in ("csv", "excel", "pdf") and request.GET.get("async") == "1"
+
+    if form.is_valid() and want_async:
+        # Skip sync build_report — Celery rebuilds the export (avoids double work)
+        params = _export_params_from_form(form.cleaned_data)
+        job = _queue_async_export(
+            request.user,
+            report_key,
+            export_fmt,
+            params,
+        )
+        log_report_access(
+            user=request.user,
+            report_key=report_key,
+            action=ReportAccessAuditLog.ACTION_EXPORT,
+            params={**params, "async": True, "job_id": str(job.pk)},
+            row_count=0,
+            church=active,
+            export_format=export_fmt,
+        )
+        flash_info(request, "Your export is being prepared. You will be notified when it is ready.")
+        return redirect("reports:export_job", pk=job.pk)
+
     if form.is_valid():
         cleaned = form.cleaned_data
         data = build_report(
@@ -119,28 +145,9 @@ def run_report(request, report_key):
             **_hierarchy_kwargs(cleaned),
         )
 
-    export_fmt = request.GET.get("export")
     if data and export_fmt in ("csv", "excel", "pdf"):
         params = _export_params_from_form(form.cleaned_data)
         row_count = len(data.get("rows") or [])
-        if request.GET.get("async") == "1":
-            job = _queue_async_export(
-                request.user,
-                report_key,
-                export_fmt,
-                params,
-            )
-            log_report_access(
-                user=request.user,
-                report_key=report_key,
-                action=ReportAccessAuditLog.ACTION_EXPORT,
-                params={**params, "async": True, "job_id": str(job.pk)},
-                row_count=row_count,
-                church=active,
-                export_format=export_fmt,
-            )
-            flash_info(request, "Your export is being prepared. You will be notified when it is ready.")
-            return redirect("reports:export_job", pk=job.pk)
         log_report_access(
             user=request.user,
             report_key=report_key,

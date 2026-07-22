@@ -38,15 +38,16 @@ class RemittancePolicyForm(forms.ModelForm):
             "notes": forms.Textarea(attrs=textarea_attrs(rows=3)),
         }
 
-    def __init__(self, *args, church=None, **kwargs):
+    def __init__(self, *args, church=None, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.church = church
+        self.user = user
         unit_type = (
             self.data.get("unit_type")
             or (self.instance.unit_type if self.instance.pk else None)
             or self.initial.get("unit_type", "CHURCH")
         )
-        choices = get_unit_choices(unit_type, church=church)
+        choices = get_unit_choices(unit_type, church=church, user=user)
         initial_unit = (
             self.data.get("unit_id")
             or (str(self.instance.unit_id) if self.instance.pk else None)
@@ -65,6 +66,27 @@ class RemittancePolicyForm(forms.ModelForm):
         if retain is not None and remit is not None:
             if Decimal(str(retain)) + Decimal(str(remit)) != Decimal("100"):
                 raise ValidationError("Retain and remit percentages must sum to 100.")
+
+        raw_unit = self.data.get("unit_id") if self.data else None
+        unit_type = cleaned.get("unit_type")
+        if not unit_type and self.data:
+            unit_type = self.data.get("unit_type")
+        if raw_unit and self.user and unit_type:
+            allowed = {
+                choice_id
+                for choice_id, _label in self.fields["unit_id"].choices
+                if choice_id
+            }
+            if str(raw_unit) not in allowed:
+                from remittance.services import log_remittance_scope_violation
+
+                log_remittance_scope_violation(
+                    self.user,
+                    unit_type,
+                    raw_unit,
+                    reason="RemittancePolicyForm rejected out-of-scope unit_id",
+                    church=self.church,
+                )
         return cleaned
 
 

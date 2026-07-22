@@ -2,13 +2,11 @@
 
 from decimal import Decimal
 
-from django.db.models import Sum
-
 from permissions.checks import can_manage_finances, can_manage_members, can_view_giving, can_view_own_giving
-from transactions.models import Transaction, TransactionLine
 
+from giving import selectors
 
-GIVING_ACCOUNT_TYPES = ("TITHE", "COMBINED", "INCOME", "WELFARE_FUND")
+GIVING_ACCOUNT_TYPES = selectors.GIVING_LINE_ACCOUNT_TYPES
 
 
 def can_view_member_giving(user, member):
@@ -23,26 +21,13 @@ def can_view_member_giving(user, member):
 
 
 def member_giving_lines(member, year=None):
-    txns = Transaction.objects.filter(
-        member=member,
-        approval_status="APPROVED",
-        is_voided=False,
-    ).order_by("-date")
-    if year:
-        txns = txns.filter(date__year=year)
-    lines = TransactionLine.objects.filter(
-        transaction__in=txns,
-        account__account_type__in=GIVING_ACCOUNT_TYPES,
-    ).select_related("transaction", "account")
-    return lines
+    return selectors.member_giving_lines_qs(member, year=year)
 
 
 def member_giving_summary(member, year=None):
     lines = member_giving_lines(member, year)
-    by_type = {}
-    for acc_type in GIVING_ACCOUNT_TYPES:
-        total = lines.filter(account__account_type=acc_type).aggregate(t=Sum("amount"))["t"] or Decimal("0")
-        by_type[acc_type] = abs(total)
+    raw = selectors.line_totals_by_account_type(lines, GIVING_ACCOUNT_TYPES)
+    by_type = {acc: abs(raw.get(acc) or Decimal("0")) for acc in GIVING_ACCOUNT_TYPES}
     by_type["total"] = sum(by_type.values())
 
     from remittance.welfare_services import member_welfare_summary
@@ -54,25 +39,53 @@ def member_giving_summary(member, year=None):
 
 
 def church_giving_leaders(church, year=None, limit=20):
-    """Top contributing members for a church."""
-    from members.models import Member
+    """Top contributing members for a church (ORM aggregated)."""
+    from church_system.perf_cache import cache_get, cache_set, giving_leaders_key
 
-    txns = Transaction.objects.filter(
-        church=church,
-        approval_status="APPROVED",
-        is_voided=False,
-        member__isnull=False,
+    cache_key = giving_leaders_key(church.pk, year)
+    cached = cache_get(cache_key)
+    if cached is not None:
+        # Rehydrate member objects for cached id/total pairs
+        members = {m.pk: m for m in selectors.members_by_ids([row["member_id"] for row in cached])}
+        return [
+            {"member": members[row["member_id"]], "total": Decimal(row["total"])}
+            for row in cached
+            if row["member_id"] in members
+        ]
+
+    ranked = selectors.church_giving_leader_totals(church, year=year, limit=limit)
+    member_ids = [row["transaction__member_id"] for row in ranked]
+    members = {m.pk: m for m in selectors.members_by_ids(member_ids)}
+    result = [
+        {
+            "member": members[row["transaction__member_id"]],
+            "total": row["total"] or Decimal("0"),
+        }
+        for row in ranked
+        if row["transaction__member_id"] in members
+    ]
+    cache_set(
+        cache_key,
+        [{"member_id": r["member"].pk, "total": str(r["total"])} for r in result],
+        timeout=300,
     )
-    if year:
-        txns = txns.filter(date__year=year)
-    lines = TransactionLine.objects.filter(
-        transaction__in=txns,
-        account__account_type__in=("TITHE", "COMBINED"),
-    )
-    totals = {}
-    for line in lines.select_related("transaction__member"):
-        mid = line.transaction.member_id
-        totals[mid] = totals.get(mid, Decimal("0")) + abs(line.amount)
-    ranked = sorted(totals.items(), key=lambda x: x[1], reverse=True)[:limit]
-    members = {m.pk: m for m in Member.objects.filter(pk__in=[r[0] for r in ranked])}
-    return [{"member": members[mid], "total": total} for mid, total in ranked if mid in members]
+    return result
+
+
+def export_giving_statement_table(lines):
+    """Prepare headers/rows for giving statement export (amounts as abs)."""
+    headers = ["Date", "Reference", "Account", "Amount"]
+    rows = [
+        [
+            line.transaction.date,
+            line.transaction.reference,
+            line.account.name,
+            abs(line.amount),
+        ]
+        for line in lines
+    ]
+    return {
+        "headers": headers,
+        "rows": rows,
+        "title": "Giving Statement",
+    }

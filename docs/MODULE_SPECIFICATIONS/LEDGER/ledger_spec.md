@@ -114,9 +114,18 @@ erDiagram
 
 ---
 
-## 7. Managers
+## 7. Managers / selectors / repositories (Current)
 
-**None.** Default ORM + service query helpers (`get_all_categories`, `get_ledger_entries`, etc.).
+**Managers:** none custom.
+
+| Module | Role |
+|--------|------|
+| `selectors.py` | Category/account/entry reads, church-scoped lookups, summary counts, budget lookup for expense warning |
+| `repositories.py` | LedgerCategory create/update/seed writes; Account/Transaction persistence via `transactions.repositories` |
+
+**Layering (P1-2):** Views → services → selectors/repositories → models. Views/forms handle HTTP and forms only. **Ledger = posting templates/categories + CoA UI.** **Transactions = Account, Transaction, TransactionLine (books of record).** Church scope, finance permissions, and posting behavior are unchanged.
+
+`tests_layers.py` characterizes selector reads, church isolation, permission helpers, repository writes, and transaction integration.
 
 ---
 

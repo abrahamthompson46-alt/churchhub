@@ -6,12 +6,13 @@ from functools import wraps
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods
 
 from church_system.church_scope import require_church
 from church_system.flash import flash_exception, flash_success
+from ledger import selectors
 from ledger.forms import (
     AccountForm,
     LedgerCategoryCreateForm,
@@ -36,7 +37,6 @@ from ledger.services import (
     update_gl_account,
     update_ledger_category,
 )
-from members.models import Member
 from permissions.checks import (
     any_permission_required,
     can_manage_chart_of_accounts,
@@ -46,7 +46,7 @@ from permissions.checks import (
 from reports.exporters import export_table_csv, export_table_excel
 from sitecontrol.checks import require_feature
 from transactions.idempotency import IdempotencyReplay, MissingIdempotencyKey
-from transactions.models import Account, Transaction
+from transactions.models import Account
 from transactions.services import PeriodLockedError, WorkingDayClosedError
 
 SESSION_DRAFT_KEY = "ledger_entry_draft"
@@ -73,11 +73,7 @@ def _entry_initial(church, request):
     cat_id = request.GET.get("category")
     if not cat_id:
         return initial
-    category = LedgerCategory.objects.filter(
-        pk=cat_id,
-        church=church,
-        is_active=True,
-    ).select_related("default_debit_account", "default_credit_account").first()
+    category = selectors.get_active_category_or_none(church, cat_id)
     if not category:
         return initial
     initial.update({
@@ -172,20 +168,8 @@ def category_create(request):
 @ledger_finance_required
 def category_detail(request, pk):
     church = require_church(request)
-    category = get_object_or_404(
-        LedgerCategory.objects.select_related(
-            "default_debit_account",
-            "default_credit_account",
-        ),
-        pk=pk,
-        church=church,
-    )
-    recent_entries = Transaction.objects.filter(
-        church=church,
-        ledger_category=category,
-    ).select_related("ledger_category").prefetch_related("lines__account").order_by(
-        "-date", "-created_at"
-    )[:8]
+    category = selectors.get_category_or_404(church, pk)
+    recent_entries = selectors.recent_entries_for_category_qs(church, category)
     entry_url = f"{reverse('ledger:entry')}?category={category.pk}"
     return render(request, "ledger/category_detail.html", {
         "category": category,
@@ -209,7 +193,7 @@ def category_detail(request, pk):
 @require_http_methods(["GET", "POST"])
 def category_edit(request, pk):
     church = require_church(request)
-    category = get_object_or_404(LedgerCategory, pk=pk, church=church)
+    category = selectors.get_category_or_404(church, pk)
     if request.method == "POST":
         form = LedgerCategoryEditForm(request.POST, church=church, instance=category)
         if form.is_valid():
@@ -255,10 +239,10 @@ def entry_list(request):
 
     member = None
     if member_id:
-        member = Member.objects.filter(pk=member_id, church=church).first()
+        member = selectors.member_for_church(church, member_id)
     category = None
     if category_id:
-        category = LedgerCategory.objects.filter(pk=category_id, church=church).first()
+        category = selectors.category_for_church_or_none(church, category_id)
 
     entries_qs = get_ledger_entries(
         church,
@@ -272,7 +256,22 @@ def entry_list(request):
 
     export_fmt = request.GET.get("export", "")
     if export_fmt in ("csv", "excel"):
+        from reports.services import audit_export
+
         payload = export_ledger_entries_table(entries_qs[:5000])
+        audit_export(
+            user=request.user,
+            report_key="ledger_entries",
+            export_format=export_fmt,
+            row_count=len(payload["rows"]),
+            church=church,
+            params={
+                "status": status,
+                "type": txn_type,
+                "date_from": date_from.isoformat() if date_from else "",
+                "date_to": date_to.isoformat() if date_to else "",
+            },
+        )
         if export_fmt == "csv":
             return export_table_csv(payload["headers"], payload["rows"], "ledger-entries.csv")
         return export_table_excel(
@@ -289,9 +288,7 @@ def entry_list(request):
         "date_to": date_to.isoformat() if date_to else "",
         "member_filter": str(member.pk) if member else "",
         "category_filter": str(category.pk) if category else "",
-        "members": Member.objects.filter(church=church, is_active=True).order_by(
-            "last_name", "first_name"
-        )[:500],
+        "members": selectors.active_members_for_church_qs(church, limit=500),
         "categories": get_all_categories(church),
         "breadcrumbs": [
             {"label": "Ledger", "url": reverse("ledger:index")},
@@ -321,6 +318,19 @@ def category_report(request):
             ]
             for r in rows
         ]
+        from reports.services import audit_export
+
+        audit_export(
+            user=request.user,
+            report_key="ledger_by_category",
+            export_format=export_fmt,
+            row_count=len(export_rows),
+            church=church,
+            params={
+                "date_from": date_from.isoformat() if date_from else "",
+                "date_to": date_to.isoformat() if date_to else "",
+            },
+        )
         if export_fmt == "csv":
             return export_table_csv(headers, export_rows, "ledger-by-category.csv")
         return export_table_excel(headers, export_rows, "ledger-by-category.xlsx", "GL by Category")
@@ -445,15 +455,7 @@ def api_categories(request):
 @require_GET
 def api_category_detail(request, pk):
     church = require_church(request)
-    category = get_object_or_404(
-        LedgerCategory.objects.select_related(
-            "default_debit_account",
-            "default_credit_account",
-        ),
-        pk=pk,
-        church=church,
-        is_active=True,
-    )
+    category = selectors.get_active_category_or_404(church, pk)
     return JsonResponse(category_to_dict(category))
 
 
@@ -461,12 +463,14 @@ def api_category_detail(request, pk):
 def account_list(request):
     church = require_church(request)
     show_inactive = request.GET.get("inactive") == "1"
-    accounts = Account.objects.filter(church=church).order_by("account_type", "name")
-    if not show_inactive:
-        accounts = accounts.filter(is_active=True)
     type_filter = request.GET.get("type", "")
-    if type_filter and type_filter in dict(Account.ACCOUNT_TYPES):
-        accounts = accounts.filter(account_type=type_filter)
+    if type_filter and type_filter not in dict(Account.ACCOUNT_TYPES):
+        type_filter = ""
+    accounts = selectors.accounts_for_church_qs(
+        church,
+        active_only=not show_inactive,
+        account_type=type_filter or None,
+    )
     return render(request, "ledger/accounts.html", {
         "accounts": accounts,
         "type_filter": type_filter,
@@ -516,7 +520,7 @@ def account_create(request):
 @require_http_methods(["GET", "POST"])
 def account_edit(request, pk):
     church = require_church(request)
-    account = get_object_or_404(Account, pk=pk, church=church)
+    account = selectors.get_account_or_404(church, pk)
     form = AccountForm(request.POST or None, church=church, instance=account)
     if request.method == "POST" and form.is_valid():
         try:

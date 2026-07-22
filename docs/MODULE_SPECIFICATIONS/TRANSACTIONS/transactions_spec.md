@@ -34,17 +34,23 @@ Provide the church general ledger: chart of accounts, double-entry journals, app
 
 ```mermaid
 flowchart TD
-  Form[Receipt/Expense/Remittance forms] --> Svc[transactions.services]
+  Views[transactions.views] --> Sel[transactions.selectors]
+  Views --> Svc[transactions.services]
+  Form[Receipt/Expense/Remittance forms] --> Svc
+  Svc --> Sel
+  Svc --> Repo[transactions.repositories]
   Svc --> Bal[validate_transaction_balance]
   Svc --> WD[assert_working_day_allows_posting]
   Svc --> FP[assert_period_open]
-  Svc --> TXN[Transaction + Lines]
+  Repo --> TXN[Transaction + Lines]
   TXN --> Pend[PENDING]
   Pend --> Appr[approve_transaction]
   Appr --> Lock[APPROVED + locked]
   Lock --> Void[void_transaction]
   Void --> Rev[Reversal Transaction]
 ```
+
+**Layering (P1-2 slice):** Views use `selectors` for church-scoped reads; services keep business rules and call `repositories` for journal/line/audit persistence. Public service APIs are unchanged.
 
 ---
 
@@ -169,6 +175,7 @@ Under `/transactions/` (`app_name=transactions`):
 | Period open | `assert_period_open` |
 | Working day matches date | `assert_working_day_allows_posting` |
 | No self-approve (except superadmin) | `approve_transaction` |
+| Module posters use PENDING + checker | `approve_module_journal` |
 | Approve → APPROVED + locked | `approve_transaction` |
 | Void only APPROVED non-reversal → reversal | `void_transaction` |
 | Locked lines immutable | `TransactionLine.save` |
@@ -189,6 +196,8 @@ stateDiagram-v2
 
 Void creates opposite-line APPROVED reversal linked by `reversal_of`; marks original `is_voided`; may call `void_welfare_for_transaction`.
 
+**Module integration (Current):** Settlement, payroll post/pay, and asset capitalization create PENDING journals with `created_by` set to the module maker (batch creator, payroll preparer, asset submitter). Posting completes only when `approve_module_journal` finds a checker distinct from `created_by` (typically the officer posting after module-level SoD). Depreciation and disposal journals remain PENDING until approved in the transactions queue.
+
 ---
 
 ## 16. Validation rules
@@ -199,9 +208,7 @@ Forms + service asserts + model `clean`/`save`. Idempotency keys on receipt/expe
 
 ## 17. Permissions (Current)
 
-Uses `can_view_transactions`, `can_manage_finances`, `can_manage_receipts`, `can_manage_expenses`, `can_approve_transactions`, plus template flags for void/period/working-day/recon.
-
-**Debt:** several POST paths primarily check `can_approve_transactions` even when finer codes exist (`void_transactions`, `lock_periods`, etc.).
+Uses `can_view_transactions`, `can_manage_finances`, `can_manage_receipts`, `can_manage_expenses`, `can_approve_transactions`, plus granular POST gates: `can_void_transactions`, `can_manage_working_day`, `can_lock_periods`, `can_unlock_periods` (aligned with template flags on period list and transaction detail).
 
 ---
 
@@ -229,7 +236,7 @@ Transaction list export; financial dashboard statement CSV/Excel/PDF (`reporting
 |--------|-------------|
 | remittance | Offering credit splits; welfare; void hook; clearing accounts |
 | ledger | Posts PENDING txns with `ledger_category` |
-| payroll / assets | Create PAYROLL/CAPITAL txns |
+| payroll / assets | Create PAYROLL/CAPITAL txns via `approve_module_journal` |
 | budgets | Shares `Budget` model |
 | giving | Reads approved lines |
 | dashboard | Treasury JSON / cash position |
@@ -253,7 +260,7 @@ Transaction list export; financial dashboard statement CSV/Excel/PDF (`reporting
 
 - Mega `services.py`.  
 - Permission gate inconsistency.  
-- Cutoff vs settlement dual remittance story.  
+- Cutoff vs settlement dual remittance UIs remain; `record_district_remittance` refuses when a POSTED church settlement overlaps the cutoff month (`remittance.cross_path`).  
 - Some imported `can_*` unused on POST.  
 
 ---
@@ -269,7 +276,7 @@ Transaction list export; financial dashboard statement CSV/Excel/PDF (`reporting
 
 ## 25. Testing notes (Current)
 
-`tests.py`, `tests_working_day.py`, `tests_treasury.py` — balance, approve/void, remittance, period, recon, idempotency, security, cross-church, working day, cash position.
+`tests.py`, `tests_working_day.py`, `tests_treasury.py`, `tests_auto_approve.py`, `tests_layers.py` — balance, approve/void, remittance, period, recon, idempotency, security, cross-church, working day, cash position, module journal maker-checker, selectors/repositories layering.
 
 ---
 
@@ -299,7 +306,6 @@ No app-local middleware. Depends on auth/CSRF, permissions middleware, sitecontr
 ## 29. Known architectural gaps
 
 - Mega `services.py`.  
-- Some POST gates overuse `can_approve_transactions`.  
 - Dual remittance with remittance app.  
 - No soft-delete columns; no REST API.
 

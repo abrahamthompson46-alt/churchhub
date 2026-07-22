@@ -1,6 +1,6 @@
 """Platform operator access scoping per denomination."""
 
-from sitecontrol.models import Denomination
+from sitecontrol import selectors
 from sitecontrol.rbac import ROLE_OWNER
 
 
@@ -15,9 +15,9 @@ def operator_has_global_access(user):
 
 def get_operator_denominations(user):
     if not user.is_authenticated or not getattr(user, "is_platform_user", False):
-        return Denomination.objects.none()
+        return selectors.empty_denominations()
     if operator_has_global_access(user):
-        return Denomination.objects.filter(is_active=True).order_by("name")
+        return selectors.active_denominations_ordered()
     return user.managed_denominations.filter(is_active=True).order_by("name")
 
 

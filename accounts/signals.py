@@ -12,5 +12,9 @@ def on_user_login(sender, request, user, **kwargs):
 
 @receiver(user_logged_out)
 def on_user_logout(sender, request, user, **kwargs):
+    from accounts.mfa import clear_mfa_session
+
+    if request is not None:
+        clear_mfa_session(request)
     if user:
         log_activity(user, "LOGOUT", ip_address=get_client_ip(request))

@@ -2,7 +2,7 @@ from django import forms
 
 from church_system.widgets import input_attrs, select_attrs, textarea_attrs
 
-from permissions.models import Permission, PermissionOverride
+from permissions.models import PermissionOverride
 from permissions.roles import UserRole
 
 
@@ -50,9 +50,9 @@ class PermissionOverrideForm(forms.ModelForm):
         if manager:
             from permissions.scoping import get_manageable_users
             self.fields["user"].queryset = get_manageable_users(manager).filter(is_active=True)
-        self.fields["permission"].queryset = Permission.objects.filter(is_active=True).order_by(
-            "category", "sort_order"
-        )
+        from permissions import selectors
+
+        self.fields["permission"].queryset = selectors.active_permissions_ordered()
 
     def clean_granted(self):
         value = self.cleaned_data.get("granted")

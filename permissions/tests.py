@@ -335,7 +335,35 @@ class ScopingTests(ChurchHubTestMixin, TestCase):
 
 
 class PermissionViewTests(ChurchHubTestMixin, TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Python 3.14 + Django test client: Context.__copy__ crashes in
+        # store_rendered_templates. Skip the copy; status/content asserts still work.
+        from unittest.mock import patch
+
+        from django.test.client import ContextList
+
+        def _safe_store(store, signal, sender, template, context, **kwargs):
+            store.setdefault("templates", []).append(template)
+            if "context" not in store:
+                store["context"] = ContextList()
+            store["context"].append(context)
+
+        cls._template_store_patcher = patch(
+            "django.test.client.store_rendered_templates",
+            _safe_store,
+        )
+        cls._template_store_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._template_store_patcher.stop()
+        super().tearDownClass()
+
     def setUp(self):
+        from accounts.mfa import SESSION_MFA_VERIFIED, enable_mfa_for_user, generate_totp_secret
+
         self.client = Client()
         self.admin = User.objects.create_superuser(
             username="perm_super",
@@ -343,20 +371,28 @@ class PermissionViewTests(ChurchHubTestMixin, TestCase):
             email="super@test.com",
             role=UserRole.SUPER_ADMIN,
         )
+        enable_mfa_for_user(self.admin, generate_totp_secret(), [])
         self.member = User.objects.create_user(
             username="perm_member_view",
             password="pass12345",
             role=UserRole.MEMBER,
             church=self.church,
         )
+        self._mfa_session_key = SESSION_MFA_VERIFIED
+
+    def _login(self, username):
+        self.client.login(username=username, password="pass12345")
+        session = self.client.session
+        session[self._mfa_session_key] = True
+        session.save()
 
     def test_matrix_requires_admin(self):
-        self.client.login(username="perm_member_view", password="pass12345")
+        self._login("perm_member_view")
         response = self.client.get(reverse("permissions:matrix"))
         self.assertEqual(response.status_code, 403)
 
     def test_index_renders_for_superuser(self):
-        self.client.login(username="perm_super", password="pass12345")
+        self._login("perm_super")
         response = self.client.get(reverse("permissions:index"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Permissions")

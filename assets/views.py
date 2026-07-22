@@ -3,9 +3,8 @@
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Q
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -19,6 +18,8 @@ from permissions.checks import (
 )
 from sitecontrol.checks import require_feature
 
+from . import repositories as repo
+from . import selectors
 from .forms import (
     AssetCategoryForm,
     DepreciationPolicyForm,
@@ -27,7 +28,7 @@ from .forms import (
     RejectAssetForm,
     RunDepreciationForm,
 )
-from .models import AssetCategory, FixedAsset
+from .models import FixedAsset
 from .rbac import get_hierarchy_context, user_may_view_assets
 from .services import (
     AssetError,
@@ -93,21 +94,12 @@ def index(request):
     return render(request, "assets/index.html", context)
 
 
-@_assets_access
+@_assets_read_access
 def asset_list(request):
     church = require_church(request)
     status = request.GET.get("status", "")
     q = request.GET.get("q", "").strip()
-    assets = FixedAsset.objects.filter(church=church).select_related("category")
-    if status:
-        assets = assets.filter(status=status)
-    if q:
-        assets = assets.filter(
-            Q(asset_code__icontains=q)
-            | Q(name__icontains=q)
-            | Q(serial_number__icontains=q)
-            | Q(location__icontains=q)
-        )
+    assets = selectors.assets_for_church(church, status=status, q=q)
     paginator = Paginator(assets, 25)
     page_obj = paginator.get_page(request.GET.get("page"))
     return render(request, "assets/asset_list.html", {
@@ -116,6 +108,7 @@ def asset_list(request):
         "status_filter": status,
         "search_query": q,
         "status_choices": FixedAsset.STATUS_CHOICES,
+        "can_manage": can_manage_assets(request.user),
         "can_approve": can_approve_assets(request.user),
     })
 
@@ -131,7 +124,7 @@ def asset_create(request):
             asset.asset_code = generate_asset_code(church)
             asset.created_by = request.user
             asset.status = "DRAFT"
-            asset.save()
+            repo.save_asset(asset)
             flash_success(request, f"Asset {asset.asset_code} saved as draft.")
             return redirect("assets:asset_detail", pk=asset.pk)
     else:
@@ -143,7 +136,7 @@ def asset_create(request):
 @require_feature("assets")
 def asset_detail(request, pk):
     church = require_church(request)
-    asset = get_object_or_404(FixedAsset, pk=pk, church=church)
+    asset = selectors.asset_for_church(church, pk)
     if not user_may_view_assets(request.user):
         raise PermissionDenied
     maintenance_form = MaintenanceLogForm()
@@ -154,16 +147,16 @@ def asset_detail(request, pk):
         "reject_form": reject_form,
         "can_manage": can_manage_assets(request.user),
         "can_approve": can_approve_assets(request.user),
-        "depreciation_entries": asset.depreciation_entries.all()[:24],
-        "audit_logs": asset.audit_logs.all()[:20],
-        "maintenance_logs": asset.maintenance_logs.all()[:20],
+        "depreciation_entries": selectors.asset_depreciation_entries(asset, limit=24),
+        "audit_logs": selectors.asset_audit_logs(asset, limit=20),
+        "maintenance_logs": selectors.asset_maintenance_logs(asset, limit=20),
     })
 
 
 @_assets_access
 def asset_edit(request, pk):
     church = require_church(request)
-    asset = get_object_or_404(FixedAsset, pk=pk, church=church)
+    asset = selectors.asset_for_church(church, pk)
     if not asset.is_editable:
         flash_warning(request, "Approved assets cannot be edited. Contact an administrator.")
         return redirect("assets:asset_detail", pk=asset.pk)
@@ -182,7 +175,7 @@ def asset_edit(request, pk):
 @require_POST
 def asset_submit(request, pk):
     church = require_church(request)
-    asset = get_object_or_404(FixedAsset, pk=pk, church=church)
+    asset = selectors.asset_for_church(church, pk)
     try:
         submit_asset_for_approval(asset, request.user)
         flash_success(request, "Asset submitted for approval.")
@@ -198,7 +191,7 @@ def asset_approve(request, pk):
     if not can_approve_assets(request.user):
         raise PermissionDenied
     church = require_church(request)
-    asset = get_object_or_404(FixedAsset, pk=pk, church=church)
+    asset = selectors.asset_for_church(church, pk)
     try:
         approve_asset(asset, request.user)
         flash_success(request, f"Asset {asset.asset_code} approved and activated.")
@@ -214,7 +207,7 @@ def asset_reject(request, pk):
     if not can_approve_assets(request.user):
         raise PermissionDenied
     church = require_church(request)
-    asset = get_object_or_404(FixedAsset, pk=pk, church=church)
+    asset = selectors.asset_for_church(church, pk)
     form = RejectAssetForm(request.POST)
     if form.is_valid():
         try:
@@ -231,7 +224,7 @@ def asset_reject(request, pk):
 @require_POST
 def asset_dispose(request, pk):
     church = require_church(request)
-    asset = get_object_or_404(FixedAsset, pk=pk, church=church)
+    asset = selectors.asset_for_church(church, pk)
     notes = request.POST.get("notes", "")
     try:
         dispose_asset(asset, request.user, notes=notes)
@@ -254,7 +247,7 @@ def asset_export_csv(request):
 @require_POST
 def maintenance_add(request, pk):
     church = require_church(request)
-    asset = get_object_or_404(FixedAsset, pk=pk, church=church)
+    asset = selectors.asset_for_church(church, pk)
     if asset.status == "DISPOSED":
         flash_warning(request, "Cannot add maintenance to a disposed asset.")
         return redirect("assets:asset_detail", pk=asset.pk)
@@ -263,7 +256,7 @@ def maintenance_add(request, pk):
         log = form.save(commit=False)
         log.asset = asset
         log.recorded_by = request.user
-        log.save()
+        repo.save_maintenance_log(log)
         flash_success(request, "Maintenance record added.")
     return redirect("assets:asset_detail", pk=asset.pk)
 
@@ -293,7 +286,7 @@ def policy_edit(request):
 @_policy_access
 def category_list(request):
     church = require_church(request)
-    categories = AssetCategory.objects.filter(church=church).select_related("template")
+    categories = selectors.categories_for_church(church)
     return render(request, "assets/category_list.html", {"categories": categories})
 
 
@@ -306,7 +299,7 @@ def category_create(request):
             category = form.save(commit=False)
             category.church = church
             category.is_custom = True
-            category.save()
+            repo.save_category(category)
             log_policy_change(
                 church,
                 "CATEGORY_CREATE",
@@ -324,7 +317,7 @@ def category_create(request):
 @_policy_access
 def category_edit(request, pk):
     church = require_church(request)
-    category = get_object_or_404(AssetCategory, pk=pk, church=church)
+    category = selectors.category_for_church(church, pk)
     if request.method == "POST":
         form = AssetCategoryForm(request.POST, instance=category)
         if form.is_valid():

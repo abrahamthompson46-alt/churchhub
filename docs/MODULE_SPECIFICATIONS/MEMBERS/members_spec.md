@@ -65,9 +65,23 @@ Own **local church membership**: directory, member CRUD, families/departments, p
 
 ---
 
-## 4. Managers
+## 4. Managers / selectors / repositories
 
-**None custom.** No repositories/selectors.
+**Custom managers:** none.
+
+**Current layering (Phase 2 / P1-2 Members slice):**
+
+```
+Views → Services → Selectors → Repositories → Models
+```
+
+| Layer | File | Role |
+|-------|------|------|
+| Selectors | `members/selectors.py` | Church-/manageable-scoped reads (directory, search, detail, records, families, transfers, leadership, gifts) |
+| Repositories | `members/repositories.py` | Persistence writes (member/transfer/record/audit/dept/family/gift/leadership) |
+| Services | `members/services.py` | Business rules, uniqueness, transfer lifecycle, delete blockers, audit orchestration |
+
+Views no longer call `Member.objects` / `filter_by_church` directly for list/detail paths; they use selectors. Form `save()` on edit paths remains for ModelForm updates.
 
 ---
 
@@ -240,7 +254,7 @@ flowchart LR
 - Honor granular deny overrides (access.py design).  
 - Exports require export permission + audit.  
 - Search returns limited fields for picker — still PII; keep permissioned.  
-- Department delete / gift unassign are **hard deletes** — use carefully.  
+- Department delete allowed only when no members, active leadership, or budget lines reference the row; writes `MemberAuditLog` `DEPARTMENT_DELETE`. Spiritual-gift unassign writes `GIFT_UNASSIGN` audit before delete.
 - No member hard-delete view; status/`is_active` used instead.
 
 ---
@@ -271,7 +285,7 @@ Extend with isolation tests when changing detail/update URLs.
 
 - Large AGENTS membership surface not modeled (skills, Bible studies, documents versioning, small groups).  
 - Fat views in places.  
-- Hard delete on departments/gift assignments vs “never delete history” spirit.  
+- Hard delete on departments/gift assignments vs “never delete history” spirit — **mitigated:** departments blocked when referenced; gift unassign audited.  
 - `Occupation` / some record tables use BigAuto PKs vs UUID majority.  
 - `MemberSpiritualGift` not registered in admin.
 

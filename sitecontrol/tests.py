@@ -8,10 +8,12 @@ from organization.models import Church, Conference, District, Zone
 from permissions.roles import UserRole
 from sitecontrol.models import SiteSettings
 from sitecontrol.services import ensure_default_plans
+from sitecontrol.test_support import SiteControlClientHarness
 
 
-class PlatformAccessTests(TestCase):
+class PlatformAccessTests(SiteControlClientHarness, TestCase):
     def setUp(self):
+        self.disable_privileged_mfa()
         ensure_default_plans()
         conf = Conference.objects.create(name="C", code="C1")
         zone = Zone.objects.create(name="Z", code="Z1", conference=conf)
@@ -159,8 +161,9 @@ class PlatformServiceTests(TestCase):
         self.assertIsNone(sub.suspended_at)
 
 
-class PlatformRBACTests(TestCase):
+class PlatformRBACTests(SiteControlClientHarness, TestCase):
     def setUp(self):
+        self.disable_privileged_mfa()
         ensure_default_plans()
         from sitecontrol.denomination_services import ensure_builtin_denominations
         from sitecontrol.models import Denomination
@@ -314,8 +317,9 @@ class PlatformRBACTests(TestCase):
         self.assertEqual(resolve_smtp_password(settings_obj), "s3cret-pass")
 
 
-class RegistrationWorkflowTests(TestCase):
+class RegistrationWorkflowTests(SiteControlClientHarness, TestCase):
     def setUp(self):
+        self.disable_privileged_mfa()
         ensure_default_plans()
         from sitecontrol.denomination_services import ensure_builtin_denominations
         from sitecontrol.models import Denomination
@@ -327,6 +331,7 @@ class RegistrationWorkflowTests(TestCase):
         self.district = District.objects.create(name="RegDist", code="RD1", zone=zone)
         settings_obj = SiteSettings.load()
         settings_obj.allow_church_self_registration = True
+        settings_obj.mfa_required_for_privileged = False
         settings_obj.save()
         from sitecontrol.services import clear_settings_cache
         clear_settings_cache()
@@ -390,8 +395,9 @@ class RegistrationWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-class BillingProvisioningTests(TestCase):
+class BillingProvisioningTests(SiteControlClientHarness, TestCase):
     def setUp(self):
+        self.disable_privileged_mfa()
         ensure_default_plans()
         from sitecontrol.denomination_services import ensure_builtin_denominations
         from sitecontrol.models import Denomination
@@ -407,6 +413,7 @@ class BillingProvisioningTests(TestCase):
         self.district = District.objects.create(name="ProvDist", code="PD1", zone=zone)
         settings_obj = SiteSettings.load()
         settings_obj.allow_church_self_registration = True
+        settings_obj.mfa_required_for_privileged = False
         settings_obj.save()
         clear_settings_cache()
 

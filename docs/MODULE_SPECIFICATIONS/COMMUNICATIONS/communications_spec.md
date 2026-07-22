@@ -65,11 +65,18 @@ erDiagram
 
 ---
 
-## 4. Services (Current)
+## 4. Services / selectors / repositories (Current)
 
-**`announcements/services.py`:** create/update/approve/reject/archive, visibility querysets, pin asserts, export table, view counts.
+| Module | Role |
+|--------|------|
+| `selectors.py` | Announcement list/detail/pending/visibility query helpers, view counts, calendar member/meeting reads |
+| `repositories.py` | Announcement save/create, audit log, view tracking, image formset persistence |
+| `services.py` | Create/update/approve/reject/archive, visibility rules, pin limits, export table, mark viewed |
+| `calendar_services.py` | Upcoming birthdays/meetings/announcement events, grouped calendar, summary counts |
 
-**`announcements/calendar_services.py`:** upcoming birthdays/meetings/announcement events, grouped calendar, summary counts.
+**Layering (P1-2):** Views → services → selectors/repositories → models. Views handle HTTP/forms only; image formsets save via repositories. Church/visibility scope, approval workflow, and audit behavior are unchanged.
+
+`tests_layers.py` characterizes selector reads, church/denomination isolation, publishing workflow, repository writes, view tracking, and audit creation.
 
 ---
 

@@ -49,6 +49,10 @@ htmlcov/
 
 # Logs
 *.log
+logs/
+var/
+celerybeat-schedule
+celerybeat-schedule.*
 
 # Cursor / local tooling
 .cursor/

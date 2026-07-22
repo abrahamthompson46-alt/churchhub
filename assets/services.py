@@ -5,10 +5,9 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db import transaction as db_transaction
-from django.db.models import Count, Sum
+from django.db.models import Sum
 from django.utils import timezone
 
-from transactions.models import Account, Transaction, TransactionLine
 from transactions.services import (
     PeriodLockedError,
     UnbalancedTransactionError,
@@ -16,20 +15,14 @@ from transactions.services import (
     _log_audit,
     _post_line,
     _quantize_currency,
+    approve_module_journal,
     assert_period_open,
     validate_transaction_balance,
 )
+from transactions import repositories as txn_repo
 
-from .models import (
-    AssetAuditLog,
-    AssetCategory,
-    AssetCategoryTemplate,
-    AssetDepreciationEntry,
-    AssetMaintenanceLog,
-    AssetPolicyAuditLog,
-    DepreciationPolicy,
-    FixedAsset,
-)
+from . import repositories as repo
+from . import selectors
 
 
 class AssetError(ValueError):
@@ -125,40 +118,37 @@ def _quantize(amount):
 
 
 def _asset_log(asset, action, user, notes=""):
-    AssetAuditLog.objects.create(asset=asset, action=action, user=user, notes=notes)
+    repo.create_asset_audit(asset=asset, action=action, user=user, notes=notes)
 
 
 def log_policy_change(church, action, user, *, target_label="", notes="", details=None):
-    return AssetPolicyAuditLog.objects.create(
+    return repo.create_policy_audit(
         church=church,
         action=action,
         user=user,
         target_label=target_label,
         notes=notes,
-        details=details or {},
+        details=details,
     )
 
 
 def seed_platform_category_templates():
     """Seed or refresh platform-wide asset category templates."""
     for row in PLATFORM_CATEGORY_TEMPLATES:
-        AssetCategoryTemplate.objects.update_or_create(
-            code=row["code"],
-            defaults=row,
-        )
+        repo.update_or_create_template(code=row["code"], defaults=row)
 
 
 def ensure_depreciation_policy(church):
-    policy, _ = DepreciationPolicy.objects.get_or_create(church=church)
+    policy, _ = repo.get_or_create_depreciation_policy(church)
     return policy
 
 
 def seed_church_categories(church):
     """Copy platform templates into church-specific categories."""
     ensure_depreciation_policy(church)
-    templates = AssetCategoryTemplate.objects.filter(is_active=True)
+    templates = selectors.active_templates()
     for template in templates:
-        AssetCategory.objects.update_or_create(
+        repo.update_or_create_category(
             church=church,
             code=template.code,
             defaults={
@@ -183,18 +173,12 @@ def ensure_asset_defaults_for_church(church):
 def generate_asset_code(church):
     prefix = church.code.upper()[:6] if church.code else "AST"
     pattern = f"{prefix}-FA-"
-    last_code = (
-        FixedAsset.objects.filter(church=church, asset_code__startswith=pattern)
-        .select_for_update()
-        .order_by("-asset_code")
-        .values_list("asset_code", flat=True)
-        .first()
-    )
+    last_code = selectors.last_asset_code_for_prefix(church, pattern)
     if last_code:
         try:
             seq = int(last_code.rsplit("-", 1)[-1]) + 1
         except (ValueError, IndexError):
-            seq = FixedAsset.objects.filter(church=church).count() + 1
+            seq = selectors.asset_count_for_church(church) + 1
     else:
         seq = 1
     return f"{pattern}{seq:04d}"
@@ -296,15 +280,12 @@ def post_acquisition_to_ledger(asset, user):
     assert_period_open(asset.church, asset.purchase_date)
     payment_type = policy.default_payment_account_type
 
-    trx = Transaction.objects.create(
+    trx = txn_repo.create_transaction(
         transaction_type="CAPITAL",
         church=asset.church,
-        created_by=user,
+        created_by=asset.submitted_by or asset.created_by or user,
         description=f"Capitalize asset {asset.asset_code} — {asset.name}",
         date=asset.purchase_date,
-        approval_status="APPROVED",
-        approved_by=user,
-        approved_at=timezone.now(),
     )
 
     ppe = _get_account(asset.church, "FIXED_ASSET")
@@ -314,6 +295,11 @@ def post_acquisition_to_ledger(asset, user):
     _post_line(trx, ppe, amount)
     _post_line(trx, payment, -amount)
     validate_transaction_balance(trx)
+    trx = approve_module_journal(trx, user)
+    if trx.approval_status != "APPROVED":
+        raise AssetError(
+            "Asset capitalization journal requires approval by an officer other than the submitter."
+        )
     _log_audit(
         asset.church,
         "CREATE",
@@ -322,7 +308,7 @@ def post_acquisition_to_ledger(asset, user):
         details={"type": "ASSET_ACQUISITION", "asset_id": str(asset.pk), "amount": str(amount)},
     )
     asset.acquisition_transaction = trx
-    asset.save(update_fields=["acquisition_transaction", "updated_at"])
+    repo.save_asset(asset, update_fields=["acquisition_transaction", "updated_at"])
     return trx
 
 
@@ -338,7 +324,7 @@ def submit_asset_for_approval(asset, user):
     asset.rejected_by = None
     asset.rejected_at = None
     asset.rejection_reason = ""
-    asset.save()
+    repo.save_asset(asset)
     _asset_log(asset, "SUBMIT", user)
     return asset
 
@@ -351,7 +337,7 @@ def approve_asset(asset, user):
     asset.status = "ACTIVE"
     asset.approved_by = user
     asset.approved_at = timezone.now()
-    asset.save()
+    repo.save_asset(asset)
     post_acquisition_to_ledger(asset, user)
     _asset_log(asset, "APPROVE", user)
     return asset
@@ -365,7 +351,7 @@ def reject_asset(asset, user, reason=""):
     asset.rejected_by = user
     asset.rejected_at = timezone.now()
     asset.rejection_reason = reason
-    asset.save()
+    repo.save_asset(asset)
     _asset_log(asset, "REJECT", user, notes=reason)
     return asset
 
@@ -375,9 +361,7 @@ def post_depreciation_entry(asset, period_year, period_month, user, *, force=Fal
     if asset.status != "ACTIVE":
         raise AssetError("Depreciation applies only to active assets.")
     validate_depreciation_period(period_year, period_month)
-    if AssetDepreciationEntry.objects.filter(
-        asset=asset, period_year=period_year, period_month=period_month
-    ).exists():
+    if selectors.depreciation_entry_exists(asset, period_year, period_month):
         if not force:
             raise AssetError("Depreciation already posted for this period.")
 
@@ -391,15 +375,12 @@ def post_depreciation_entry(asset, period_year, period_month, user, *, force=Fal
 
     trx = None
     if policy.post_depreciation_to_ledger:
-        trx = Transaction.objects.create(
+        trx = txn_repo.create_transaction(
             transaction_type="CAPITAL",
             church=asset.church,
             created_by=user,
             description=f"Depreciation {asset.asset_code} {period_year}-{period_month:02d}",
             date=period_date,
-            approval_status="APPROVED",
-            approved_by=user,
-            approved_at=timezone.now(),
         )
         dep_expense = _get_account(asset.church, "DEPRECIATION_EXPENSE")
         accum = _get_account(asset.church, "ACCUMULATED_DEPRECIATION")
@@ -419,7 +400,7 @@ def post_depreciation_entry(asset, period_year, period_month, user, *, force=Fal
             },
         )
 
-    entry, _ = AssetDepreciationEntry.objects.update_or_create(
+    entry, _ = repo.update_or_create_depreciation_entry(
         asset=asset,
         period_year=period_year,
         period_month=period_month,
@@ -430,10 +411,8 @@ def post_depreciation_entry(asset, period_year, period_month, user, *, force=Fal
             "posted_by": user,
         },
     )
-    asset.accumulated_depreciation = _quantize(
-        asset.depreciation_entries.aggregate(t=Sum("amount"))["t"] or Decimal("0")
-    )
-    asset.save(update_fields=["accumulated_depreciation", "updated_at"])
+    asset.accumulated_depreciation = _quantize(selectors.asset_depreciation_total(asset))
+    repo.save_asset(asset, update_fields=["accumulated_depreciation", "updated_at"])
     _asset_log(asset, "DEPRECIATE", user, notes=f"{period_year}-{period_month:02d}: {amount}")
     return entry
 
@@ -443,9 +422,7 @@ def preview_monthly_depreciation(church, year, month):
     validate_depreciation_period(year, month)
     rows = []
     total = Decimal("0.00")
-    for asset in FixedAsset.objects.filter(church=church, status="ACTIVE").select_related(
-        "category"
-    ):
+    for asset in selectors.active_assets_for_church(church, with_category=True):
         amount = calculate_monthly_depreciation(asset, year, month)
         if amount > 0:
             rows.append({
@@ -468,7 +445,7 @@ def run_monthly_depreciation(church, year, month, user):
     posted = 0
     skipped = 0
     errors = []
-    for asset in FixedAsset.objects.filter(church=church, status="ACTIVE"):
+    for asset in selectors.active_assets_for_church(church):
         try:
             result = post_depreciation_entry(asset, year, month, user)
             if result:
@@ -497,15 +474,12 @@ def post_disposal_to_ledger(asset, user, disposal_date=None):
     cost = _quantize(asset.acquisition_cost)
     nbv = _quantize(cost - accum)
 
-    trx = Transaction.objects.create(
+    trx = txn_repo.create_transaction(
         transaction_type="CAPITAL",
         church=asset.church,
         created_by=user,
         description=f"Dispose asset {asset.asset_code} — {asset.name}",
         date=disposal_date,
-        approval_status="APPROVED",
-        approved_by=user,
-        approved_at=timezone.now(),
     )
 
     ppe = _get_account(asset.church, "FIXED_ASSET")
@@ -533,7 +507,7 @@ def post_disposal_to_ledger(asset, user, disposal_date=None):
         },
     )
     asset.disposal_transaction = trx
-    asset.save(update_fields=["disposal_transaction", "updated_at"])
+    repo.save_asset(asset, update_fields=["disposal_transaction", "updated_at"])
     return trx
 
 
@@ -544,18 +518,16 @@ def dispose_asset(asset, user, disposal_date=None, notes=""):
     asset.status = "DISPOSED"
     asset.disposed_at = disposal_date or timezone.now().date()
     asset.disposal_notes = notes
-    asset.save()
+    repo.save_asset(asset)
     post_disposal_to_ledger(asset, user, disposal_date=asset.disposed_at)
     _asset_log(asset, "DISPOSE", user, notes=notes)
     return asset
 
 
 def asset_register_rows(church, status=None):
-    qs = FixedAsset.objects.filter(church=church).select_related("category")
-    if status:
-        qs = qs.filter(status=status)
+    qs = selectors.assets_register_qs(church, status=status)
     rows = []
-    for asset in qs.order_by("asset_code"):
+    for asset in qs:
         rows.append({
             "code": asset.asset_code,
             "name": asset.name,
@@ -613,16 +585,7 @@ def hierarchy_asset_rollup(user, conference_id=None, zone_id=None, district_id=N
         district_id=district_id,
     )
 
-    agg = (
-        FixedAsset.objects.filter(church__in=churches, status="ACTIVE")
-        .values("church__name", "church__district__name")
-        .annotate(
-            asset_count=Count("id"),
-            total_cost=Sum("acquisition_cost"),
-            total_accum=Sum("accumulated_depreciation"),
-        )
-        .order_by("church__district__name", "church__name")
-    )
+    agg = selectors.active_assets_rollup_agg(churches)
     rows = []
     for row in agg:
         cost = row["total_cost"] or Decimal("0")
@@ -640,15 +603,8 @@ def hierarchy_asset_rollup(user, conference_id=None, zone_id=None, district_id=N
 
 def church_activity_logs(church, *, action="", limit=500):
     """Combined asset and policy audit entries for a church."""
-    asset_logs = AssetAuditLog.objects.filter(asset__church=church).select_related(
-        "asset", "user"
-    )
-    if action:
-        asset_logs = asset_logs.filter(action=action)
-
-    policy_logs = AssetPolicyAuditLog.objects.filter(church=church).select_related("user")
-    if action:
-        policy_logs = policy_logs.filter(action=action)
+    asset_logs = selectors.asset_audit_logs_for_church(church, action=action)
+    policy_logs = selectors.policy_audit_logs_for_church(church, action=action)
 
     entries = []
     for log in asset_logs[:limit]:
@@ -675,7 +631,7 @@ def church_activity_logs(church, *, action="", limit=500):
 
 def register_dashboard_kpis(church):
     """Summary metrics for the asset dashboard."""
-    assets = FixedAsset.objects.filter(church=church)
+    assets = selectors.church_assets_qs(church)
     active = assets.filter(status="ACTIVE")
     agg = active.aggregate(
         total_cost=Sum("acquisition_cost"),
@@ -697,7 +653,7 @@ def insurance_warranty_alerts(church, days=60):
     """Assets with insurance or warranty expiring within N days."""
     today = timezone.now().date()
     horizon = today + timedelta(days=days)
-    qs = FixedAsset.objects.filter(church=church, status="ACTIVE").select_related("category")
+    qs = selectors.active_assets_for_church(church, with_category=True)
     alerts = []
     for asset in qs:
         if asset.insurance_expiry and today <= asset.insurance_expiry <= horizon:
@@ -729,7 +685,7 @@ def report_asset_register(request, start, end, **hierarchy):
         "Cost (GHS)", "Accumulated (GHS)", "NBV (GHS)", "GRA Class",
     ]
     rows = []
-    qs = FixedAsset.objects.filter(church__in=churches).select_related("church", "category")
+    qs = selectors.assets_for_churches(churches)
     for asset in qs.order_by("church__name", "asset_code"):
         rows.append([
             asset.church.name,
@@ -751,9 +707,7 @@ def report_depreciation_schedule(request, start, end, **hierarchy):
     churches = _churches_in_scope(request, **hierarchy)
     headers = ["Church", "Asset", "Period", "Amount (GHS)", "Method"]
     rows = []
-    entries = AssetDepreciationEntry.objects.filter(
-        asset__church__in=churches,
-    ).select_related("asset__church", "asset")
+    entries = selectors.depreciation_entries_for_churches(churches)
     if start:
         entries = entries.filter(
             period_year__gte=start.year,

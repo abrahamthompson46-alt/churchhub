@@ -1,0 +1,28 @@
+name: Deploy Production
+
+# Manual production deployment with environment protection rules.
+# Configure GitHub Environment "production" with required reviewers.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type deploy to confirm production deployment'
+        required: true
+        default: ''
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Confirm
+        if: github.event.inputs.confirm != 'deploy'
+        run: |
+          echo "Set confirm=deploy to proceed"
+          exit 1
+      - uses: actions/checkout@v4
+      - name: Notify
+        run: |
+          echo "Production deploy approved for ${{ github.sha }}"
+          echo "Hook your provider here (Render deploy hook, SSH, container promote)."

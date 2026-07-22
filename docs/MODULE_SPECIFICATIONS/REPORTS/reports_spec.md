@@ -70,12 +70,28 @@ erDiagram
 
 ## 4. Services (Current)
 
-**`reports/services.py`:** `user_may_access_report`, `reports_for_user`, date range resolve, `build_report`, per-report builders, hierarchy context, `log_report_access`.
+**Layering (Phase 2 / P1-2 Reports slice):**
+
+```
+Views → Services → Selectors → Repositories → Models
+```
+
+| Layer | File | Role |
+|-------|------|------|
+| Selectors | `reports/selectors.py` | Church/hierarchy scope, transaction/member/welfare/attendance querysets, account balance aggregates, export-job reads |
+| Repositories | `reports/repositories.py` | `ReportAccessAuditLog` writes; `ReportExportJob` create/save |
+| Services | `reports/services.py` | Access gates, period resolution, builders/formatting, `audit_export` / `log_report_access` |
+| Exporters | `reports/exporters.py` | CSV / Excel / PDF bytes (unchanged) |
+
+**`reports/services.py`:** `user_may_access_report`, `reports_for_user`, date range resolve, `build_report`, per-report builders, hierarchy context, `log_report_access`, `audit_export` (domain CSV/Excel/PDF downloads → `ReportAccessAuditLog` via repository).
 
 **`reports/exporters.py`:** CSV / Excel / PDF table exporters; `build_export_bytes`.
 
 **`reports/registry.py`:** `REPORT_CATALOG`, `PERIOD_CHOICES`.
 
+Domain modules that export via `reports.exporters` should call `audit_export` before returning the file response.
+
+`tests_layers.py` characterizes church scope, forged-ID isolation, export audit, and export-job ownership.
 ---
 
 ## 5. Permissions (Current)

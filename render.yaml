@@ -1,23 +1,22 @@
 # Render Blueprint — ChurchHub production stack
 # Deploy: connect repo at https://dashboard.render.com → New → Blueprint
-# Or: render blueprint apply
 
 services:
   - type: web
     name: churchhub
     runtime: python
-    # Use `free` for trials (cold starts) or `starter` for always-on production
-    plan: free
+    plan: starter
     region: frankfurt
     branch: main
-    # Strip CRLF (Windows), then build. Prefer python3 via scripts.
     buildCommand: sed -i 's/\r$//' scripts/render_build.sh scripts/render_start.sh && chmod +x scripts/render_build.sh scripts/render_start.sh && bash scripts/render_build.sh
     startCommand: bash scripts/render_start.sh
-    healthCheckPath: /health/
+    healthCheckPath: /health/ready/
     autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
         value: "3.13.0"
+      - key: DJANGO_ENV
+        value: production
       - key: DJANGO_DEBUG
         value: "False"
       - key: DJANGO_SETTINGS_MODULE
@@ -26,7 +25,6 @@ services:
         generateValue: true
       - key: DJANGO_ALLOWED_HOSTS
         sync: false
-        # Replace with your real hostname, e.g. churchhub-q27c.onrender.com
         value: churchhub-q27c.onrender.com
       - key: DJANGO_CSRF_TRUSTED_ORIGINS
         sync: false
@@ -36,6 +34,8 @@ services:
         value: https://churchhub-q27c.onrender.com
       - key: CHURCHHUB_BOOTSTRAP
         value: "1"
+      - key: CHURCHHUB_FILE_LOGS
+        value: "false"
       - key: DJANGO_SUPERUSER_USERNAME
         value: platform
       - key: DJANGO_SUPERUSER_EMAIL
@@ -48,8 +48,107 @@ services:
         fromDatabase:
           name: churchhub-db
           property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: churchhub-redis
+          type: redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: churchhub-redis
+          type: redis
+          property: connectionString
       - key: WEB_CONCURRENCY
         value: "2"
+
+  - type: worker
+    name: churchhub-celery
+    runtime: python
+    plan: starter
+    region: frankfurt
+    branch: main
+    buildCommand: sed -i 's/\r$//' scripts/render_build.sh && chmod +x scripts/render_build.sh && bash scripts/render_build.sh
+    startCommand: celery -A church_system worker -l info --concurrency=2
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.0"
+      - key: DJANGO_ENV
+        value: production
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_SETTINGS_MODULE
+        value: church_system.settings
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          name: churchhub
+          type: web
+          envVarKey: DJANGO_SECRET_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: churchhub-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: churchhub-redis
+          type: redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: churchhub-redis
+          type: redis
+          property: connectionString
+      - key: CELERY_TASK_ALWAYS_EAGER
+        value: "false"
+      - key: CHURCHHUB_FILE_LOGS
+        value: "false"
+
+  - type: worker
+    name: churchhub-celerybeat
+    runtime: python
+    plan: starter
+    region: frankfurt
+    branch: main
+    buildCommand: sed -i 's/\r$//' scripts/render_build.sh && chmod +x scripts/render_build.sh && bash scripts/render_build.sh
+    startCommand: celery -A church_system beat -l info
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.0"
+      - key: DJANGO_ENV
+        value: production
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_SETTINGS_MODULE
+        value: church_system.settings
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          name: churchhub
+          type: web
+          envVarKey: DJANGO_SECRET_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: churchhub-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: churchhub-redis
+          type: redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: churchhub-redis
+          type: redis
+          property: connectionString
+      - key: CHURCHHUB_CELERY_BEAT
+        value: "true"
+      - key: CHURCHHUB_FILE_LOGS
+        value: "false"
+
+  - type: redis
+    name: churchhub-redis
+    plan: starter
+    region: frankfurt
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
 
 databases:
   - name: churchhub-db

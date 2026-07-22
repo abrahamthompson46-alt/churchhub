@@ -65,13 +65,32 @@ erDiagram
 
 ---
 
+## 4b. Layering (Current — Phase 2 / P1-2 Organization slice)
+
+```
+Views → Services → Selectors → Repositories → Models
+```
+
+| Layer | File | Role |
+|-------|------|------|
+| Selectors | `organization/selectors.py` | Scoped hierarchy reads, directory/detail/stats, export/reconcile, form dropdown querysets |
+| Repositories | `organization/repositories.py` | Audit + GC/Union/Conference/Zone/District/Church persistence (no business rules) |
+| Access | `organization/access.py` | Authz gates + thin wrappers over selectors (`scoped_*`, `get_scoped_*`) |
+| Services | `organization/services.py` | Hierarchy rules, provisioning orchestration, transfer/activate |
+| Forms | `organization/forms.py` | Widget binding; parent FK querysets via selectors |
+| Views | `organization/views.py` | Permissions, forms, HTTP only; ModelForm saves use `commit=False` + repositories |
+
+`tests_layers.py` characterizes denomination/church isolation, hierarchy selectors, repositories, and cross-church denial.
+
+---
+
 ## 5. Services (Current)
 
 **File:** `organization/services.py`
 
 | Function | Role |
 |----------|------|
-| `log_org_audit` | Audit writer |
+| `log_org_audit` | Audit writer (via repository) |
 | `get_church_financial_chain` | Hierarchy chain helper |
 | `setup_church_financials` / `provision_church` | Seed accounts/offerings/remittance/payroll/assets/ledger (denom or defaults) |
 | `create_church` | Seat check, create, provision, subscription, audit |
@@ -79,7 +98,7 @@ erDiagram
 | `update_church` | Field updates; **rejects district change** |
 | `transfer_church` | Same-denomination district move + TRANSFER audit |
 | `set_church_active` | Toggle `is_active` |
-| `export_hierarchy_rows` | Export rows |
+| `export_hierarchy_rows` | Export rows (via selectors) |
 | `reconcile_organization` | Detect unprovisioned / missing subscription / orphans |
 
 **File:** `organization/access.py` — scoped getters, `require_org_read` / `require_org_manage`, subtree/global manage asserts, capability flags.

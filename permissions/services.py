@@ -2,11 +2,10 @@
 
 import threading
 
-from django.contrib.auth.models import Group
-from django.db import OperationalError, ProgrammingError, transaction
-from django.utils import timezone
+from django.db import transaction
 
-from permissions.models import Permission, PermissionAuditLog, PermissionOverride, RolePermission
+from permissions import repositories as repo
+from permissions import selectors
 from permissions.registry import PERMISSION_REGISTRY, registry_conflicts, registry_default_roles, registry_implies
 from permissions.roles import UserRole
 from permissions.superadmin import is_superadmin
@@ -30,11 +29,7 @@ def _get_request_cache():
 
 
 def _tables_ready():
-    try:
-        Permission.objects.exists()
-        return True
-    except (OperationalError, ProgrammingError):
-        return False
+    return selectors.permission_tables_ready()
 
 
 def ensure_permission_matrix(force_defaults=False):
@@ -48,7 +43,7 @@ def ensure_permission_matrix(force_defaults=False):
     sort = 0
     for codename, meta in PERMISSION_REGISTRY.items():
         sort += 1
-        perm, _ = Permission.objects.update_or_create(
+        perm, _ = repo.update_or_create_permission(
             codename=codename,
             defaults={
                 "name": meta["name"],
@@ -60,13 +55,15 @@ def ensure_permission_matrix(force_defaults=False):
         )
         for role, _label in UserRole.CHOICES:
             granted = role in meta.get("default_roles", set())
-            RolePermission.objects.get_or_create(
+            repo.get_or_create_role_permission(
                 role=role,
                 permission=perm,
                 defaults={"granted": granted},
             )
             if force_defaults:
-                RolePermission.objects.filter(role=role, permission=perm).update(granted=granted)
+                repo.update_role_permissions_granted(
+                    role=role, permission=perm, granted=granted
+                )
 
 
 def reset_matrix_to_defaults(performed_by=None, ip_address=None):
@@ -81,12 +78,12 @@ def reset_matrix_to_defaults(performed_by=None, ip_address=None):
 
 
 def log_permission_audit(action, performed_by=None, target_user=None, ip_address=None, details=None):
-    return PermissionAuditLog.objects.create(
+    return repo.create_permission_audit(
         action=action,
         performed_by=performed_by,
         target_user=target_user,
         ip_address=ip_address,
-        details=details or {},
+        details=details,
     )
 
 
@@ -94,11 +91,7 @@ def get_active_override(user, codename):
     """Return effective override for user+permission, or None."""
     if not user.is_authenticated:
         return None
-    qs = PermissionOverride.objects.filter(
-        user=user,
-        permission__codename=codename,
-        is_active=True,
-    ).select_related("permission")
+    qs = selectors.active_overrides_for_user_codename(user, codename)
     for override in qs:
         if override.is_expired:
             continue
@@ -107,17 +100,29 @@ def get_active_override(user, codename):
 
 
 def _direct_matrix_grant(user, codename):
+    from django.conf import settings
+    from django.core.cache import cache
+
+    from church_system.perf_cache import perm_role_key
+    from permissions.models import RolePermission
+
     if not _tables_ready():
         return registry_default_roles(codename) and user.role in registry_default_roles(codename)
+
+    key = perm_role_key(user.role, codename)
+    cached = cache.get(key)
+    if cached is not None:
+        return bool(cached)
+
     try:
-        rp = RolePermission.objects.select_related("permission").get(
-            role=user.role,
-            permission__codename=codename,
-            permission__is_active=True,
-        )
-        return rp.granted
+        rp = selectors.role_permission_for(user.role, codename)
+        granted = rp.granted
     except RolePermission.DoesNotExist:
-        return user.role in registry_default_roles(codename)
+        granted = user.role in registry_default_roles(codename)
+
+    timeout = getattr(settings, "PERMISSION_CACHE_TIMEOUT", 300)
+    cache.set(key, granted, timeout)
+    return granted
 
 
 def _resolve_permission(user, codename, _stack=None):
@@ -167,7 +172,7 @@ def get_effective_permissions(user):
     """Return dict codename → bool for all active permissions."""
     if not _tables_ready():
         return {codename: user_has_permission(user, codename) for codename in PERMISSION_REGISTRY}
-    perms = Permission.objects.filter(is_active=True).order_by("category", "sort_order")
+    perms = selectors.active_permissions_ordered()
     return {p.codename: user_has_permission(user, p.codename) for p in perms}
 
 
@@ -175,10 +180,10 @@ def get_matrix_data():
     """Build role × permission matrix for templates."""
     if not _tables_ready():
         ensure_permission_matrix()
-    permissions = list(Permission.objects.filter(is_active=True).order_by("category", "sort_order"))
+    permissions = list(selectors.active_permissions_ordered())
     roles = UserRole.CHOICES
     cells = {}
-    for rp in RolePermission.objects.select_related("permission"):
+    for rp in selectors.all_role_permissions():
         cells[(rp.role, rp.permission_id)] = rp.granted
     categories = {}
     for perm in permissions:
@@ -205,13 +210,7 @@ def _validate_no_conflicts(role, permission, granting):
     conflicts = registry_conflicts(permission.codename)
     if not conflicts:
         return
-    conflict_names = list(
-        RolePermission.objects.filter(
-            role=role,
-            permission__codename__in=conflicts,
-            granted=True,
-        ).values_list("permission__codename", flat=True)
-    )
+    conflict_names = selectors.granted_conflict_codenames(role, conflicts)
     if conflict_names:
         raise ValueError(
             f"Cannot grant {permission.codename} to {role}: conflicts with {', '.join(conflict_names)}."
@@ -220,9 +219,9 @@ def _validate_no_conflicts(role, permission, granting):
 
 @transaction.atomic
 def update_matrix_cell(role, permission_id, granted, updated_by=None, ip_address=None):
-    permission = Permission.objects.get(pk=permission_id)
+    permission = selectors.permission_by_pk(permission_id)
     _validate_no_conflicts(role, permission, granted)
-    rp, _ = RolePermission.objects.get_or_create(
+    rp, _ = repo.get_or_create_role_permission_by_ids(
         role=role,
         permission_id=permission_id,
         defaults={"granted": granted},
@@ -230,7 +229,12 @@ def update_matrix_cell(role, permission_id, granted, updated_by=None, ip_address
     if rp.granted != granted:
         rp.granted = granted
         rp.updated_by = updated_by
-        rp.save(update_fields=["granted", "updated_by", "updated_at"])
+        repo.save_role_permission(
+            rp, update_fields=["granted", "updated_by", "updated_at"]
+        )
+        from church_system.perf_cache import invalidate_permission_role_cache
+
+        invalidate_permission_role_cache(role=role, codename=permission.codename)
         log_permission_audit(
             "MATRIX_UPDATE",
             performed_by=updated_by,
@@ -251,7 +255,7 @@ def bulk_update_matrix(updates, updated_by=None, ip_address=None):
 
 
 def create_override(user, permission, granted, reason="", expires_at=None, created_by=None, ip_address=None):
-    override = PermissionOverride.objects.create(
+    override = repo.create_override(
         user=user,
         permission=permission,
         granted=granted,

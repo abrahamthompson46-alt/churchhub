@@ -52,6 +52,24 @@ Platform capabilities (`sitecontrol.rbac`) are separate.
 
 ---
 
+## 4b. Layering (Current — Phase 2 / P1-2 Permissions slice)
+
+```
+Views → Services → Selectors → Repositories → Models
+```
+
+| Layer | File | Role |
+|-------|------|------|
+| Selectors | `permissions/selectors.py` | Permission/matrix/override/audit reads; church/user scope querysets; form dropdowns |
+| Repositories | `permissions/repositories.py` | Permission/matrix/override/audit persistence (no business rules) |
+| Services | `permissions/services.py` | Resolution engine, matrix sync, override/matrix business rules, request cache |
+| Scoping | `permissions/scoping.py` / `org_scope.py` / `scoping_checks.py` | Authz scope APIs; ORM via selectors |
+| Views / forms | `permissions/views.py`, `forms.py` | HTTP/forms only; ModelForm saves via `commit=False` + repositories |
+
+`tests_layers.py` characterizes effective resolution, override precedence, church/denom isolation, repository writes, and audit creation.
+
+---
+
 ## 5. Services and supporting modules (Current)
 
 ### `services.py`

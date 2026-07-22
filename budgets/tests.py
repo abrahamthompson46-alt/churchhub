@@ -1,16 +1,19 @@
 """Tests for budgets app — CRUD, variance, audit, permissions, and exports."""
 
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
+from django.test.client import ContextList
 from django.urls import reverse
 from django.utils import timezone
 
-from accounts.models import UserRole
 from members.models import Department
 from organization.models import Church, Conference, District, Zone
+from permissions.roles import UserRole
 from permissions.services import ensure_permission_matrix
+from sitecontrol.models import SiteSettings
 from transactions.models import Account, Budget, FinancialAuditLog
 
 User = get_user_model()
@@ -18,7 +21,32 @@ User = get_user_model()
 
 class BudgetsTestMixin:
     @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
+        def _safe_store(store, signal, sender, template, context, **kwargs):
+            store.setdefault("templates", []).append(template)
+            if "context" not in store:
+                store["context"] = ContextList()
+            store["context"].append(context)
+
+        cls._template_store_patcher = patch(
+            "django.test.client.store_rendered_templates",
+            _safe_store,
+        )
+        cls._template_store_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._template_store_patcher.stop()
+        super().tearDownClass()
+
+    @classmethod
     def setUpTestData(cls):
+        SiteSettings.objects.update_or_create(
+            singleton_id=1,
+            defaults={"mfa_required_for_privileged": False},
+        )
         cls.conference = Conference.objects.create(code="BC", name="Budget Conf")
         cls.zone = Zone.objects.create(conference=cls.conference, code="BZ", name="Budget Zone")
         cls.district = District.objects.create(zone=cls.zone, code="BD", name="Budget District")

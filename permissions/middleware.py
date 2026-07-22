@@ -13,6 +13,7 @@ EXEMPT_PREFIXES = (
     "/accounts/password",
     "/accounts/invite/accept",
     "/accounts/profile",
+    "/accounts/mfa/",
     "/admin/",
     "/platform/",
     "/apply/",

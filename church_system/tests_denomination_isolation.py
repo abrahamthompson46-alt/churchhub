@@ -12,13 +12,24 @@ from organization.models import Church, Conference, District, Zone
 from permissions.roles import UserRole
 from sitecontrol.denomination_services import ensure_builtin_denominations
 from sitecontrol.models import Denomination
+from sitecontrol.test_support import SiteControlClientHarness
 
 User = get_user_model()
 
 
-class DenominationIsolationMixin:
+class DenominationIsolationMixin(SiteControlClientHarness):
     @classmethod
     def setUpTestData(cls):
+        # Isolation assertions must not be short-circuited by MFA enroll redirects.
+        from sitecontrol.models import SiteSettings
+        from sitecontrol.services import clear_settings_cache
+
+        SiteSettings.objects.update_or_create(
+            singleton_id=1,
+            defaults={"mfa_required_for_privileged": False},
+        )
+        clear_settings_cache()
+
         ensure_builtin_denominations()
         cls.sda = Denomination.objects.get(code="sda")
         cls.methodist = Denomination.objects.get(code="methodist")

@@ -258,6 +258,9 @@ class AssetServicesTests(TestCase):
 class AssetRbacTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
         conf = Conference.objects.create(name="Conf", code="CF")
         zone = Zone.objects.create(conference=conf, name="Zone", code="Z1")
         d1 = District.objects.create(zone=zone, name="D1", code="D1")
@@ -270,16 +273,40 @@ class AssetRbacTests(TestCase):
             role=UserRole.DISTRICT_PASTOR,
             church=cls.church1,
         )
+        cls.board = User.objects.create_user(
+            username="board_viewer",
+            password="test12345",
+            role=UserRole.BOARD_MEMBER,
+            church=cls.church1,
+        )
+        cls.member = User.objects.create_user(
+            username="member_no_assets",
+            password="test12345",
+            role=UserRole.MEMBER,
+            church=cls.church1,
+        )
 
     def test_churches_in_scope_district_pastor(self):
         scoped = churches_in_asset_scope(self.overseer)
         self.assertEqual(scoped.count(), 1)
         self.assertEqual(scoped.first().pk, self.church1.pk)
 
+    def test_view_assets_grants_read_access(self):
+        from assets.rbac import user_may_view_assets
+        from permissions.checks import can_manage_assets, can_view_assets
+
+        self.assertTrue(can_view_assets(self.board))
+        self.assertFalse(can_manage_assets(self.board))
+        self.assertTrue(user_may_view_assets(self.board))
+        self.assertFalse(user_may_view_assets(self.member))
+
 
 class AssetViewTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
         seed_platform_category_templates()
         conf = Conference.objects.create(name="Conf", code="CF")
         zone = Zone.objects.create(conference=conf, name="Zone", code="Z1")
@@ -298,6 +325,12 @@ class AssetViewTests(TestCase):
             role=UserRole.DISTRICT_PASTOR,
             church=cls.church,
         )
+        cls.board = User.objects.create_user(
+            username="board_assets",
+            password="test12345",
+            role=UserRole.BOARD_MEMBER,
+            church=cls.church,
+        )
         category = cls.church.asset_categories.first()
         cls.asset = FixedAsset.objects.create(
             church=cls.church,
@@ -312,15 +345,47 @@ class AssetViewTests(TestCase):
             created_by=cls.treasury,
         )
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Python 3.14 + Django test client: Context.__copy__ crashes in
+        # store_rendered_templates. Skip the copy; status/content asserts still work.
+        from django.test.client import ContextList
+        from unittest.mock import patch
+
+        def _safe_store(store, signal, sender, template, context, **kwargs):
+            store.setdefault("templates", []).append(template)
+            if "context" not in store:
+                store["context"] = ContextList()
+            store["context"].append(context)
+
+        cls._template_store_patcher = patch(
+            "django.test.client.store_rendered_templates",
+            _safe_store,
+        )
+        cls._template_store_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._template_store_patcher.stop()
+        super().tearDownClass()
+
     def _login(self, user):
+        from accounts.mfa import SESSION_MFA_VERIFIED, enable_mfa_for_user, generate_totp_secret
+
+        # Privileged roles require MFA; satisfy middleware so view tests stay focused.
+        if not getattr(user, "mfa_enabled", False):
+            enable_mfa_for_user(user, generate_totp_secret(), [])
+            user.refresh_from_db()
         client = Client()
         client.login(username=user.username, password="test12345")
         session = client.session
         session["current_church_id"] = str(self.church.pk)
+        session[SESSION_MFA_VERIFIED] = True
         session.save()
         return client
 
-    def test_asset_list_requires_manage_permission(self):
+    def test_asset_list_requires_view_permission(self):
         member = User.objects.create_user(
             username="memberuser",
             password="test12345",
@@ -330,6 +395,25 @@ class AssetViewTests(TestCase):
         client = self._login(member)
         response = client.get(reverse("assets:asset_list"))
         self.assertEqual(response.status_code, 403)
+
+    def test_view_only_board_member_can_read_register(self):
+        client = self._login(self.board)
+        index_response = client.get(reverse("assets:index"))
+        self.assertEqual(index_response.status_code, 200)
+        list_response = client.get(reverse("assets:asset_list"))
+        self.assertEqual(list_response.status_code, 200)
+        self.assertFalse(list_response.context["can_manage"])
+        detail_response = client.get(
+            reverse("assets:asset_detail", kwargs={"pk": self.asset.pk})
+        )
+        self.assertEqual(detail_response.status_code, 200)
+
+    def test_view_only_board_member_cannot_create_or_export(self):
+        client = self._login(self.board)
+        create_response = client.get(reverse("assets:asset_create"))
+        self.assertEqual(create_response.status_code, 403)
+        export_response = client.get(reverse("assets:asset_export_csv"))
+        self.assertEqual(export_response.status_code, 403)
 
     def test_index_accessible_to_treasury(self):
         client = self._login(self.treasury)

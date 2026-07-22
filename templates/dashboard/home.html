@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load humanize churchhub_tags %}
 
 {% block title %}Mission Control — {{ institution_display_name|default:"ChurchHub" }}{% endblock %}
 
@@ -39,7 +39,7 @@
 
             {% if quick_actions %}
             <div class="cc-hero__actions quick-actions">
-                {% for action in quick_actions|slice:":5" %}
+                {% for action in quick_actions %}
                 <a href="{% if action.report_key %}{% url 'reports:run' action.report_key %}{% else %}{% url action.url_name %}{% endif %}" class="quick-action-btn">
                     {% if action.icon %}<i class="bi {{ action.icon }}"></i>{% endif %}{{ action.label }}
                 </a>
@@ -63,17 +63,17 @@
         </a>
         <a href="{% url 'reports:run' 'hierarchy_rollup' %}" class="cc-kpi-card cc-kpi-card--primary">
             <span class="cc-kpi-card__label">Tithe MTD</span>
-            <span class="cc-kpi-card__value text-currency">₵{{ executive_kpis.mtd_tithe|floatformat:0|intcomma }}</span>
+            <span class="cc-kpi-card__value text-currency">{% money executive_kpis.mtd_tithe 0 %}</span>
             <span class="cc-kpi-card__hint">{{ executive_kpis.period_label }}</span>
         </a>
-        <a href="{% url 'reports:run' 'hierarchy_rollup' %}" class="cc-kpi-card cc-kpi-card--teal">
+        <a href="{% url 'reports:run' 'hierarchy_rollup' %}" class="cc-kpi-card cc-kpi-card--accent">
             <span class="cc-kpi-card__label">Combined MTD</span>
-            <span class="cc-kpi-card__value text-currency">₵{{ executive_kpis.mtd_combined|floatformat:0|intcomma }}</span>
+            <span class="cc-kpi-card__value text-currency">{% money executive_kpis.mtd_combined 0 %}</span>
             <span class="cc-kpi-card__hint">{{ executive_kpis.period_label }}</span>
         </a>
         <a href="{% url 'dashboard:cutoff' %}" class="cc-kpi-card cc-kpi-card--warning">
             <span class="cc-kpi-card__label">Remittance Payable</span>
-            <span class="cc-kpi-card__value text-currency">₵{{ executive_kpis.mtd_remittance_payable|floatformat:0|intcomma }}</span>
+            <span class="cc-kpi-card__value text-currency">{% money executive_kpis.mtd_remittance_payable 0 %}</span>
             <span class="cc-kpi-card__hint">Month to date</span>
         </a>
         <a href="{% url 'transactions:pending_approvals' %}" class="cc-kpi-card cc-kpi-card--danger">
@@ -88,26 +88,26 @@
     {% if show_finance and has_active_church or show_members %}
     <section class="cc-kpi-grid mb-4" aria-label="Church KPIs">
         {% if show_finance and has_active_church %}
-        <div class="cc-kpi-card cc-kpi-card--primary">
+        <a href="{% url 'reports:run' 'tithe_report' %}" class="cc-kpi-card cc-kpi-card--primary">
             <span class="cc-kpi-card__label">Tithe (MTD)</span>
-            <span class="cc-kpi-card__value text-currency">₵{{ tithe_total|floatformat:2|intcomma }}</span>
+            <span class="cc-kpi-card__value text-currency">{% money tithe_total 2 %}</span>
             <span class="cc-kpi-card__hint">Month to date</span>
-        </div>
-        <div class="cc-kpi-card cc-kpi-card--teal">
+        </a>
+        <a href="{% url 'reports:run' 'financial_summary' %}" class="cc-kpi-card cc-kpi-card--accent">
             <span class="cc-kpi-card__label">Combined (MTD)</span>
-            <span class="cc-kpi-card__value text-currency">₵{{ combined_total|floatformat:2|intcomma }}</span>
+            <span class="cc-kpi-card__value text-currency">{% money combined_total 2 %}</span>
             <span class="cc-kpi-card__hint">Month to date</span>
-        </div>
-        <div class="cc-kpi-card">
+        </a>
+        <a href="{% url 'transactions:transaction_list' %}" class="cc-kpi-card cc-kpi-card--success">
             <span class="cc-kpi-card__label">Income (MTD)</span>
-            <span class="cc-kpi-card__value text-currency">₵{{ church_income_total|floatformat:2|intcomma }}</span>
+            <span class="cc-kpi-card__value text-currency">{% money church_income_total 2 %}</span>
             <span class="cc-kpi-card__hint">All receipts</span>
-        </div>
-        <div class="cc-kpi-card cc-kpi-card--danger">
+        </a>
+        <a href="{% url 'transactions:transaction_list' %}?type=EXPENSE" class="cc-kpi-card cc-kpi-card--danger">
             <span class="cc-kpi-card__label">Expenses (MTD)</span>
-            <span class="cc-kpi-card__value text-currency">₵{{ expense_total|floatformat:2|intcomma }}</span>
+            <span class="cc-kpi-card__value text-currency">{% money expense_total 2 %}</span>
             <span class="cc-kpi-card__hint">Month to date</span>
-        </div>
+        </a>
         {% endif %}
         {% if show_members %}
         <a href="{% url 'members:list' %}" class="cc-kpi-card">
@@ -126,7 +126,7 @@
     {% endif %}
 
     {% if show_teller_console and teller_console %}
-    <section class="cc-panel mb-4" id="teller-console" data-refresh-url="{% url 'dashboard:teller_console_api' %}" aria-label="Teller console">
+    <section class="cc-panel mb-4" id="teller-console" data-currency-symbol="{{ currency_symbol }}" data-refresh-url="{% url 'dashboard:teller_console_api' %}" aria-label="Teller console">
         <div class="cc-panel__header">
             <h2 class="cc-panel__title"><i class="bi bi-person-badge"></i> Teller Console</h2>
             <div class="d-flex align-items-center gap-2">
@@ -156,8 +156,8 @@
                     <tr>
                         <td class="fw-medium">{{ row.name }}</td>
                         <td class="text-end">{{ row.entries }}</td>
-                        <td class="text-end text-currency">₵{{ row.receipts|floatformat:2|intcomma }}</td>
-                        <td class="text-end text-currency">₵{{ row.expenses|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency">{% money row.receipts 2 %}</td>
+                        <td class="text-end text-currency">{% money row.expenses 2 %}</td>
                         <td class="text-end">{{ row.pending }}</td>
                         <td class="text-end">{{ row.approved }}</td>
                     </tr>
@@ -172,8 +172,8 @@
                     <tr class="fw-semibold">
                         <td>Total</td>
                         <td class="text-end" id="teller-total-entries">{{ teller_console.totals.entries }}</td>
-                        <td class="text-end text-currency" id="teller-total-receipts">₵{{ teller_console.totals.receipts|floatformat:2|intcomma }}</td>
-                        <td class="text-end text-currency" id="teller-total-expenses">₵{{ teller_console.totals.expenses|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency" id="teller-total-receipts">{% money teller_console.totals.receipts 2 %}</td>
+                        <td class="text-end text-currency" id="teller-total-expenses">{% money teller_console.totals.expenses 2 %}</td>
                         <td class="text-end" id="teller-total-pending">{{ teller_console.totals.pending }}</td>
                         <td></td>
                     </tr>
@@ -212,6 +212,16 @@
                 </ul>
             </section>
 
+            {% if quick_actions_more %}
+            <div class="role-focus-chips mb-4" aria-label="More shortcuts">
+                {% for action in quick_actions_more %}
+                <a href="{% if action.report_key %}{% url 'reports:run' action.report_key %}{% else %}{% url action.url_name %}{% endif %}" class="chip chip--muted text-decoration-none">
+                    {% if action.icon %}<i class="bi {{ action.icon }}"></i>{% endif %}{{ action.label }}
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
             {% if compliance_snapshot and compliance_snapshot.overdue_remittances %}
             <section class="cc-panel mb-4">
                 <div class="cc-panel__header">
@@ -222,7 +232,7 @@
                     <li class="cc-compliance-item">
                         <span class="fw-medium">{{ row.church }}</span>
                         <span class="text-muted small d-block">{{ row.month }}</span>
-                        <span class="text-currency text-danger fw-semibold">₵{{ row.amount|floatformat:2|intcomma }}</span>
+                        <span class="text-currency text-danger fw-semibold">{% money row.amount 2 %}</span>
                     </li>
                     {% endfor %}
                 </ul>
@@ -264,7 +274,7 @@
                                 <td class="fw-medium">{{ row.church }}</td>
                                 <td class="text-muted small">{{ row.district }}</td>
                                 <td class="text-end">{{ row.members|intcomma }}</td>
-                                <td class="text-end text-currency fw-semibold">₵{{ row.mtd_giving|floatformat:0|intcomma }}</td>
+                                <td class="text-end text-currency fw-semibold">{% money row.mtd_giving 0 %}</td>
                             </tr>
                             {% empty %}
                             <tr><td colspan="5" class="text-muted text-center py-3">No giving data for this period.</td></tr>
@@ -298,10 +308,10 @@
                             <tr>
                                 <td class="fw-medium">{{ row.district }}</td>
                                 <td class="text-end">{{ row.church_count }}</td>
-                                <td class="text-end text-currency">₵{{ row.tithe|floatformat:0|intcomma }}</td>
-                                <td class="text-end text-currency">₵{{ row.combined|floatformat:0|intcomma }}</td>
-                                <td class="text-end text-currency">₵{{ row.remittance_payable|floatformat:0|intcomma }}</td>
-                                <td class="text-end text-currency fw-semibold">₵{{ row.total|floatformat:0|intcomma }}</td>
+                                <td class="text-end text-currency">{% money row.tithe 0 %}</td>
+                                <td class="text-end text-currency">{% money row.combined 0 %}</td>
+                                <td class="text-end text-currency">{% money row.remittance_payable 0 %}</td>
+                                <td class="text-end text-currency fw-semibold">{% money row.total 0 %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -310,7 +320,7 @@
             </section>
             {% endif %}
 
-            {% if show_finance and has_active_church %}
+            {% if show_finance_charts and has_active_church %}
             <div class="row g-4 mb-4">
                 <div class="col-lg-7">
                     <section class="cc-panel mb-0">
@@ -328,10 +338,10 @@
                             <h2 class="cc-panel__title">Church Finance MTD</h2>
                         </div>
                         <div class="cc-mini-kpis">
-                            <div class="cc-mini-kpi"><span>Tithe</span><strong class="text-currency">₵{{ tithe_total|floatformat:0|intcomma }}</strong></div>
-                            <div class="cc-mini-kpi"><span>Combined</span><strong class="text-currency">₵{{ combined_total|floatformat:0|intcomma }}</strong></div>
-                            <div class="cc-mini-kpi"><span>Remittance payable</span><strong class="text-currency">₵{{ monthly_cutoff_total|floatformat:0|intcomma }}</strong></div>
-                            <div class="cc-mini-kpi"><span>Net balance</span><strong class="text-currency">₵{{ net_balance|floatformat:0|intcomma }}</strong></div>
+                            <div class="cc-mini-kpi"><span>Tithe</span><strong class="text-currency">{% money tithe_total 0 %}</strong></div>
+                            <div class="cc-mini-kpi"><span>Combined</span><strong class="text-currency">{% money combined_total 0 %}</strong></div>
+                            <div class="cc-mini-kpi"><span>Remittance payable</span><strong class="text-currency">{% money monthly_cutoff_total 0 %}</strong></div>
+                            <div class="cc-mini-kpi"><span>Net balance</span><strong class="text-currency">{% money net_balance 0 %}</strong></div>
                         </div>
                     </section>
                 </div>
@@ -464,7 +474,7 @@ if (ctx) {
 
     function money(v) {
         const n = Number(v || 0);
-        return '₵' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return (panel.dataset.currencySymbol || '₵') + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function render(data) {

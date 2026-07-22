@@ -7,19 +7,77 @@
     <div class="platform-card-body">
         <form method="post">
             {% csrf_token %}
-            <div class="platform-form-grid">
-                {% for field in form %}
-                <div>
-                    {% if field.field.widget.input_type == 'checkbox' %}
-                    <div class="platform-form-check">{{ field }}<label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label></div>
-                    {% else %}
-                    <label class="form-label fw-semibold">{{ field.label }}</label>
-                    {{ field }}
-                    {% endif %}
-                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+
+            <section class="mb-4">
+                <h2 class="h5 mb-2">Password policy</h2>
+                <p class="text-muted small mb-3">Baseline password rules for institution and platform accounts.</p>
+                <div class="platform-form-grid">
+                    <div>
+                        <label class="form-label fw-semibold" for="{{ form.password_min_length.id_for_label }}">{{ form.password_min_length.label }}</label>
+                        {{ form.password_min_length }}
+                        {% if form.password_min_length.help_text %}<div class="form-text">{{ form.password_min_length.help_text }}</div>{% endif %}
+                        {{ form.password_min_length.errors }}
+                    </div>
+                    <div class="platform-form-check">
+                        {{ form.password_require_uppercase }}
+                        <label class="form-check-label" for="{{ form.password_require_uppercase.id_for_label }}">{{ form.password_require_uppercase.label }}</label>
+                        {% if form.password_require_uppercase.help_text %}<div class="form-text">{{ form.password_require_uppercase.help_text }}</div>{% endif %}
+                        {{ form.password_require_uppercase.errors }}
+                    </div>
                 </div>
-                {% endfor %}
-            </div>
+            </section>
+
+            <section class="mb-4">
+                <h2 class="h5 mb-2">Multi-factor authentication (MFA)</h2>
+                <p class="text-muted small mb-3">
+                    MFA is optional. Enable enforcement when your organization is ready, then choose which audiences must enroll (authenticator app, email OTP, or recovery codes).
+                </p>
+                <div class="platform-form-grid">
+                    <div class="platform-form-check">
+                        {{ form.mfa_required_for_privileged }}
+                        <label class="form-check-label" for="{{ form.mfa_required_for_privileged.id_for_label }}">{{ form.mfa_required_for_privileged.label }}</label>
+                        {% if form.mfa_required_for_privileged.help_text %}<div class="form-text">{{ form.mfa_required_for_privileged.help_text }}</div>{% endif %}
+                        {{ form.mfa_required_for_privileged.errors }}
+                    </div>
+                    <div class="platform-form-check">
+                        {{ form.mfa_include_django_superusers }}
+                        <label class="form-check-label" for="{{ form.mfa_include_django_superusers.id_for_label }}">{{ form.mfa_include_django_superusers.label }}</label>
+                        {% if form.mfa_include_django_superusers.help_text %}<div class="form-text">{{ form.mfa_include_django_superusers.help_text }}</div>{% endif %}
+                        {{ form.mfa_include_django_superusers.errors }}
+                    </div>
+                    <div>
+                        <label class="form-label fw-semibold">{{ form.mfa_institution_roles.label }}</label>
+                        <div class="platform-check-list">{{ form.mfa_institution_roles }}</div>
+                        {% if form.mfa_institution_roles.help_text %}<div class="form-text">{{ form.mfa_institution_roles.help_text }}</div>{% endif %}
+                        {{ form.mfa_institution_roles.errors }}
+                    </div>
+                    <div>
+                        <label class="form-label fw-semibold">{{ form.mfa_platform_roles.label }}</label>
+                        <div class="platform-check-list">{{ form.mfa_platform_roles }}</div>
+                        {% if form.mfa_platform_roles.help_text %}<div class="form-text">{{ form.mfa_platform_roles.help_text }}</div>{% endif %}
+                        {{ form.mfa_platform_roles.errors }}
+                    </div>
+                </div>
+            </section>
+
+            <section class="mb-4">
+                <h2 class="h5 mb-2">Platform access</h2>
+                <div class="platform-form-grid">
+                    <div>
+                        <label class="form-label fw-semibold" for="{{ form.platform_ip_allowlist.id_for_label }}">{{ form.platform_ip_allowlist.label }}</label>
+                        {{ form.platform_ip_allowlist }}
+                        {% if form.platform_ip_allowlist.help_text %}<div class="form-text">{{ form.platform_ip_allowlist.help_text }}</div>{% endif %}
+                        {{ form.platform_ip_allowlist.errors }}
+                    </div>
+                    <div class="platform-form-check">
+                        {{ form.maintenance_block_apply }}
+                        <label class="form-check-label" for="{{ form.maintenance_block_apply.id_for_label }}">{{ form.maintenance_block_apply.label }}</label>
+                        {% if form.maintenance_block_apply.help_text %}<div class="form-text">{{ form.maintenance_block_apply.help_text }}</div>{% endif %}
+                        {{ form.maintenance_block_apply.errors }}
+                    </div>
+                </div>
+            </section>
+
             <div class="mt-4"><button type="submit" class="btn btn-primary">Save Security Policy</button></div>
         </form>
     </div>

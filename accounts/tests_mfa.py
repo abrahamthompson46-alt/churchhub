@@ -31,7 +31,12 @@ class MfaRequirementTests(TestCase):
 
         SiteSettings.objects.update_or_create(
             singleton_id=1,
-            defaults={"mfa_required_for_privileged": True},
+            defaults={
+                "mfa_required_for_privileged": True,
+                "mfa_institution_roles": ["SUPER_ADMIN", "TREASURY"],
+                "mfa_platform_roles": ["OWNER", "SECURITY"],
+                "mfa_include_django_superusers": True,
+            },
         )
         clear_settings_cache()
 
@@ -74,6 +79,38 @@ class MfaRequirementTests(TestCase):
             church=self.church,
         )
         self.assertFalse(user_requires_mfa(user))
+
+    def test_custom_institution_audience(self):
+        from sitecontrol.services import clear_settings_cache
+
+        SiteSettings.objects.filter(singleton_id=1).update(
+            mfa_required_for_privileged=True,
+            mfa_institution_roles=["SECRETARY"],
+        )
+        clear_settings_cache()
+        secretary = User.objects.create_user(
+            username="mfa_custom_sec",
+            password="pass12345",
+            role=UserRole.SECRETARY,
+            church=self.church,
+        )
+        treasury = User.objects.create_user(
+            username="mfa_custom_treas",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        self.assertTrue(user_requires_mfa(secretary))
+        self.assertFalse(user_requires_mfa(treasury))
+
+    def test_mfa_optional_by_default(self):
+        from sitecontrol.services import clear_settings_cache
+
+        SiteSettings.objects.filter(singleton_id=1).update(mfa_required_for_privileged=False)
+        clear_settings_cache()
+        from accounts.mfa import mfa_enforcement_enabled
+
+        self.assertFalse(mfa_enforcement_enabled())
 
 
 class MfaLoginFlowTests(TestCase):
@@ -121,7 +158,12 @@ class MfaLoginFlowTests(TestCase):
 
         SiteSettings.objects.update_or_create(
             singleton_id=1,
-            defaults={"mfa_required_for_privileged": True},
+            defaults={
+                "mfa_required_for_privileged": True,
+                "mfa_institution_roles": ["SUPER_ADMIN", "TREASURY"],
+                "mfa_platform_roles": ["OWNER", "SECURITY"],
+                "mfa_include_django_superusers": True,
+            },
         )
         clear_settings_cache()
 

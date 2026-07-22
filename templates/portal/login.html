@@ -8,9 +8,9 @@
     <aside class="auth-split-brand auth-split-brand--portal">
         <div class="auth-split-brand-inner">
             {% if denomination_logo or tenant_logo or site_logo %}
-            <img src="{% if denomination_logo %}{{ denomination_logo.url }}{% elif tenant_logo %}{{ tenant_logo.url }}{% else %}{{ site_logo.url }}{% endif %}" alt="" class="auth-platform-logo mb-4">
+            <img src="{% if denomination_logo %}{{ denomination_logo.url }}{% elif tenant_logo %}{{ tenant_logo.url }}{% else %}{{ site_logo.url }}{% endif %}" alt="{{ institution_display_name|default:site_name }}" class="auth-platform-logo mb-4">
             {% else %}
-            <div class="brand-mark auth-platform-mark mb-4"><i class="bi bi-people-fill"></i></div>
+            <div class="brand-mark auth-platform-mark mb-4" aria-hidden="true"><i class="bi bi-people-fill"></i></div>
             {% endif %}
             <p class="auth-platform-eyebrow mb-2">Member Portal</p>
             <h2 class="auth-split-title">{{ institution_display_name|default:site_name }}</h2>
@@ -29,9 +29,21 @@
         </div>
     </aside>
     <section class="auth-split-form">
+        <div class="auth-mobile-brand d-lg-none">
+            {% if denomination_logo or tenant_logo or site_logo %}
+            <img src="{% if denomination_logo %}{{ denomination_logo.url }}{% elif tenant_logo %}{{ tenant_logo.url }}{% else %}{{ site_logo.url }}{% endif %}" alt="{{ institution_display_name|default:site_name }}" class="auth-platform-logo-sm">
+            {% else %}
+            <span class="brand-mark auth-platform-mark-sm" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
+            {% endif %}
+            <div>
+                <p class="auth-platform-eyebrow mb-0">Member Portal</p>
+                <p class="auth-mobile-brand__name mb-0">{{ institution_display_name|default:site_name }}</p>
+            </div>
+        </div>
+
         <div class="auth-card card">
             <div class="card-body p-4 p-md-5">
-                <h1 class="h4 fw-bold mb-1 text-center">Member sign in</h1>
+                <h1 class="auth-form-title text-center">Sign in</h1>
                 <p class="text-muted small mb-4 text-center">Access your personal church portal.</p>
 
                 {% if form.errors %}
@@ -45,22 +57,27 @@
                     <div class="form-group">
                         <label class="form-label" for="id_username">Username</label>
                         <div class="input-icon-wrap">
-                            <i class="bi bi-person input-icon"></i>
-                            <input type="text" name="username" id="id_username" class="form-control form-control-sm ps-5" autofocus required autocomplete="username" placeholder="Username">
+                            <i class="bi bi-person input-icon" aria-hidden="true"></i>
+                            <input type="text" name="username" id="id_username" class="form-control ps-5" autofocus required autocomplete="username" placeholder="Username">
                         </div>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="id_password">Password</label>
-                        <div class="input-icon-wrap">
-                            <i class="bi bi-lock input-icon"></i>
-                            <input type="password" name="password" id="id_password" class="form-control form-control-sm ps-5" required autocomplete="current-password" placeholder="Password">
+                        <div class="input-icon-wrap input-icon-wrap--password">
+                            <i class="bi bi-lock input-icon" aria-hidden="true"></i>
+                            <input type="password" name="password" id="id_password" class="form-control ps-5" required autocomplete="current-password" placeholder="Password">
+                            <button type="button" class="password-toggle" data-toggle-password="id_password" aria-label="Show password">
+                                <i class="bi bi-eye" aria-hidden="true"></i>
+                            </button>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-sm w-100 py-2 mt-1">Enter Portal</button>
+                    <button type="submit" class="btn btn-primary w-100 py-2 mt-2">Enter Portal</button>
                 </form>
-                <p class="text-center mt-4 mb-0 small">
+                <p class="text-center mt-3 mb-0 small">
                     <a href="{% url 'password_reset' %}" class="text-muted text-decoration-none">Forgot password?</a>
-                    · <a href="{% url 'login' %}" class="text-decoration-none">Staff sign in</a>
+                </p>
+                <p class="auth-secondary-links text-center mt-3 mb-0 small">
+                    <a href="{% url 'login' %}" class="text-decoration-none">Staff sign in</a>
                 </p>
             </div>
         </div>

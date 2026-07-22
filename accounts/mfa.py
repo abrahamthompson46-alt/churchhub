@@ -1,8 +1,8 @@
-"""TOTP MFA helpers for privileged ChurchHub accounts.
+"""TOTP MFA helpers for ChurchHub accounts.
 
-Enforcement applies to platform OWNER/SECURITY, institution SUPER_ADMIN,
-TREASURY, and Django superusers when SiteSettings.mfa_required_for_privileged
-is enabled (default True).
+Enforcement is optional and configured by platform owners in Site Settings
+(Security Policy): master toggle + which institution/platform roles (and
+optionally Django superusers) must enroll and verify.
 
 Also supports:
 - Email OTP as an alternate challenge channel
@@ -33,8 +33,12 @@ SESSION_MFA_PENDING_USER = "mfa_pending_user_id"
 SESSION_MFA_PENDING_BACKEND = "mfa_pending_backend"
 SESSION_MFA_ENROLL_SECRET = "mfa_enroll_secret"
 
-MFA_PRIVILEGED_PLATFORM_ROLES = frozenset({"OWNER", "SECURITY"})
-MFA_PRIVILEGED_INSTITUTION_ROLES = frozenset({UserRole.SUPER_ADMIN, UserRole.TREASURY})
+# Recommended defaults when owners enable MFA without customizing audiences.
+MFA_DEFAULT_PLATFORM_ROLES = frozenset({"OWNER", "SECURITY"})
+MFA_DEFAULT_INSTITUTION_ROLES = frozenset({UserRole.SUPER_ADMIN, UserRole.TREASURY})
+# Backward-compatible aliases
+MFA_PRIVILEGED_PLATFORM_ROLES = MFA_DEFAULT_PLATFORM_ROLES
+MFA_PRIVILEGED_INSTITUTION_ROLES = MFA_DEFAULT_INSTITUTION_ROLES
 RECOVERY_CODE_COUNT = 10
 
 TRUSTED_DEVICE_COOKIE = "ch_trusted_device"
@@ -144,26 +148,60 @@ def consume_recovery_code(user, code: str) -> bool:
     return True
 
 
-def mfa_enforcement_enabled() -> bool:
+def _mfa_role_set(raw, fallback: frozenset[str]) -> frozenset[str]:
+    """Normalize stored JSON role lists; empty means use recommended defaults."""
+    if not raw:
+        return fallback
+    return frozenset(str(r).strip() for r in raw if str(r).strip())
+
+
+def get_mfa_audience_policy() -> dict:
+    """Return current MFA audience policy from SiteSettings (with defaults)."""
     try:
         from sitecontrol.services import get_site_settings
 
-        return bool(get_site_settings().mfa_required_for_privileged)
+        cfg = get_site_settings()
+        return {
+            "enabled": bool(cfg.mfa_required_for_privileged),
+            "institution_roles": _mfa_role_set(
+                getattr(cfg, "mfa_institution_roles", None),
+                MFA_DEFAULT_INSTITUTION_ROLES,
+            ),
+            "platform_roles": _mfa_role_set(
+                getattr(cfg, "mfa_platform_roles", None),
+                MFA_DEFAULT_PLATFORM_ROLES,
+            ),
+            "include_superusers": bool(
+                getattr(cfg, "mfa_include_django_superusers", True)
+            ),
+        }
     except Exception:
-        return True
+        return {
+            "enabled": False,
+            "institution_roles": MFA_DEFAULT_INSTITUTION_ROLES,
+            "platform_roles": MFA_DEFAULT_PLATFORM_ROLES,
+            "include_superusers": True,
+        }
+
+
+def mfa_enforcement_enabled() -> bool:
+    """Master switch — MFA is optional until platform owners enable it."""
+    return bool(get_mfa_audience_policy()["enabled"])
 
 
 def user_requires_mfa(user) -> bool:
     """Whether this account must complete MFA before using the app."""
     if not user or not getattr(user, "pk", None):
         return False
-    if not mfa_enforcement_enabled():
+    policy = get_mfa_audience_policy()
+    if not policy["enabled"]:
         return False
     if getattr(user, "is_superuser", False):
-        return True
+        return bool(policy["include_superusers"])
     if getattr(user, "is_platform_user", False):
-        return (getattr(user, "platform_role", "") or "") in MFA_PRIVILEGED_PLATFORM_ROLES
-    return getattr(user, "role", None) in MFA_PRIVILEGED_INSTITUTION_ROLES
+        role = (getattr(user, "platform_role", "") or "").strip()
+        return role in policy["platform_roles"]
+    return getattr(user, "role", None) in policy["institution_roles"]
 
 
 def session_mfa_verified(request) -> bool:

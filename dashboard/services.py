@@ -758,15 +758,19 @@ def build_home_context(request):
     show_hierarchy = role in ("admin", "overseer", "district_overseer") or show_admin
     is_control_center = role in ("admin", "overseer", "district_overseer")
 
+    actions = get_quick_actions(user)
     context = {
         "dashboard_role": role,
         "role_label": user.get_role_display(),
         "role_focus": get_role_focus(role),
         "current_time": timezone.now(),
-        "quick_actions": get_quick_actions(user),
+        "quick_actions": actions[:3],
+        "quick_actions_more": actions[3:],
         "alerts": get_alerts(request, user),
         "action_queue": get_action_queue(request, user),
         "show_finance": show_finance,
+        "show_finance_charts": show_finance
+        and role in ("treasury", "admin", "finance", "overseer", "district_overseer"),
         "show_members": show_members,
         "show_admin": show_admin,
         "show_hierarchy": show_hierarchy,

@@ -5,7 +5,8 @@ from django.core.paginator import Paginator
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, render
 
-from church_system.flash import flash_error, flash_success
+from church_system.flash import flash_error, flash_success, flash_warning
+from accounts.services import send_invitation_email
 from sitecontrol.checks import platform_required, require_platform_capability
 from sitecontrol.forms import ApplicationReviewForm, RegistrationSettingsForm, TenantApplicationForm
 from sitecontrol import repositories as repo
@@ -178,9 +179,31 @@ def application_approve(request, pk):
                     "denomination_id": str(application.denomination_id) if application.denomination_id else "",
                 },
             )
+            invite_note = ""
+            if invitation:
+                try:
+                    emailed = send_invitation_email(
+                        invitation,
+                        request=request,
+                        fail_silently=False,
+                    )
+                    if emailed:
+                        invite_note = f" Invitation email sent to {application.contact_email}."
+                    else:
+                        flash_warning(
+                            request,
+                            f"Invitation created for {application.contact_email}, but SMTP is not configured.",
+                            title="Invite not emailed",
+                        )
+                except Exception as exc:
+                    flash_warning(
+                        request,
+                        f"Invitation created, but email failed: {exc}. Resend from the tenant page.",
+                        title="Invite email failed",
+                    )
             flash_success(
                 request,
-                f"Church “{church.name}” created. Share the invite link with {application.contact_email}.",
+                f"Church “{church.name}” created.{invite_note}",
                 title="Application approved",
             )
             return redirect("sitecontrol:application_detail", pk=application.pk)

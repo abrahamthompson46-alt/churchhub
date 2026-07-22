@@ -424,20 +424,74 @@ class EmailSettingsForm(forms.ModelForm):
 
 
 class SecuritySettingsForm(forms.ModelForm):
+    PLATFORM_ROLE_CHOICES = [
+        ("OWNER", "Platform Owner"),
+        ("SECURITY", "Security Admin"),
+        ("BILLING", "Billing Admin"),
+        ("SUPPORT", "Support Operator"),
+        ("READONLY", "Read Only"),
+    ]
+
+    mfa_institution_roles = forms.MultipleChoiceField(
+        choices=UserRole.CHOICES,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Institution roles requiring MFA",
+        help_text="Applied only when MFA enforcement is enabled.",
+    )
+    mfa_platform_roles = forms.MultipleChoiceField(
+        choices=PLATFORM_ROLE_CHOICES,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Platform roles requiring MFA",
+        help_text="Applied only when MFA enforcement is enabled.",
+    )
+
     class Meta:
         model = SiteSettings
         fields = (
             "password_min_length",
             "password_require_uppercase",
+            "mfa_required_for_privileged",
+            "mfa_include_django_superusers",
             "platform_ip_allowlist",
             "maintenance_block_apply",
         )
         widgets = {
             "password_min_length": forms.NumberInput(attrs=input_attrs(min="6", max="128")),
             "password_require_uppercase": forms.CheckboxInput(attrs=checkbox_attrs()),
+            "mfa_required_for_privileged": forms.CheckboxInput(attrs=checkbox_attrs()),
+            "mfa_include_django_superusers": forms.CheckboxInput(attrs=checkbox_attrs()),
             "platform_ip_allowlist": forms.Textarea(attrs=textarea_attrs(rows=4)),
             "maintenance_block_apply": forms.CheckboxInput(attrs=checkbox_attrs()),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = self.instance
+        if instance and instance.pk:
+            inst_roles = list(instance.mfa_institution_roles or [])
+            plat_roles = list(instance.mfa_platform_roles or [])
+            if not inst_roles:
+                from sitecontrol.models import default_mfa_institution_roles
+
+                inst_roles = default_mfa_institution_roles()
+            if not plat_roles:
+                from sitecontrol.models import default_mfa_platform_roles
+
+                plat_roles = default_mfa_platform_roles()
+            self.fields["mfa_institution_roles"].initial = inst_roles
+            self.fields["mfa_platform_roles"].initial = plat_roles
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.mfa_institution_roles = list(
+            self.cleaned_data.get("mfa_institution_roles") or []
+        )
+        instance.mfa_platform_roles = list(self.cleaned_data.get("mfa_platform_roles") or [])
+        if commit:
+            repo.save_model(instance)
+        return instance
 
 
 class FeatureRegistryForm(forms.ModelForm):

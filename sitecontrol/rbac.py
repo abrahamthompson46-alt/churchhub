@@ -114,6 +114,8 @@ NAV_ITEM_CAPABILITIES = {
     "sitecontrol:payment_method_list": CAP_MANAGE_PLANS,
     "sitecontrol:billing_settings": CAP_MANAGE_PLANS,
     "sitecontrol:tenant_provision": CAP_MANAGE_TENANTS,
+    "sitecontrol:tenant_resend_invitation": CAP_MANAGE_TENANTS,
+    "sitecontrol:tenant_create_admin_invitation": CAP_MANAGE_TENANTS,
     "sitecontrol:hierarchy": CAP_VIEW,
     "sitecontrol:registration_settings": CAP_MANAGE_REGISTRATION,
     "sitecontrol:operator_list": CAP_MANAGE_OPERATORS,

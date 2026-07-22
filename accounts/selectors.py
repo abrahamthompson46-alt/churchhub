@@ -119,6 +119,19 @@ def pending_invitations_for_manager(manager, church_ids, *, limit=50):
     )
 
 
+def pending_invitations_for_church(church, *, limit=20):
+    """Open (not accepted / not revoked) invitations for a church tenant."""
+    return list(
+        UserInvitation.objects.filter(
+            church=church,
+            is_accepted=False,
+            revoked_at__isnull=True,
+        )
+        .select_related("invited_by")
+        .order_by("-created_at")[:limit]
+    )
+
+
 def pending_invitation_for_email(*, email, church=None):
     qs = UserInvitation.objects.filter(
         email=email,

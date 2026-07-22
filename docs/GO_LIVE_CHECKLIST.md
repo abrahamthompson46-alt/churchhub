@@ -34,8 +34,8 @@ Mark each item **Done** before declaring pilot live. Do not commit secrets.
 ## 2. Security gate
 
 - [ ] `PRODUCTION_SECURITY_CHECKLIST.md` completed for this environment
-- [ ] `mfa_required_for_privileged=True`
-- [ ] Platform OWNER/SECURITY and all Wave 1 TREASURY users MFA-enrolled
+- [ ] SiteSettings MFA policy reviewed: enable when ready; select institution/platform roles (and superusers) under Platform → Security
+- [ ] If MFA enabled: selected audiences (e.g. OWNER/SECURITY, TREASURY) enrolled before go-live
 - [ ] `/metrics/` not publicly reachable (401 anonymous)
 - [ ] Impersonation policy briefed to support staff
 

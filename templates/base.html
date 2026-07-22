@@ -12,17 +12,23 @@
     <link rel="stylesheet" href="{% static 'vendor/fonts/plus-jakarta-sans/plus-jakarta-sans.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/font/bootstrap-icons.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260717c">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260722b">
     <meta name="theme-color" content="{{ institution_primary_color|default:'#0f2942' }}">
-    {% if institution_primary_color %}
     <style>
         :root {
-            --ch-primary: {{ institution_primary_color }};
-            --ch-primary-hover: {{ institution_primary_color }};
-            --ch-accent: {{ institution_accent_color|default:'#0e7490' }};
+            --ch-brand: {{ institution_primary_color|default:'#0f2942' }};
+            --ch-brand-mid: color-mix(in srgb, {{ institution_primary_color|default:'#0f2942' }} 82%, white);
+            --ch-navy: var(--ch-brand);
+            --ch-navy-mid: var(--ch-brand-mid);
+            --ch-action: {{ institution_accent_color|default:'#1d4ed8' }};
+            --ch-action-hover: color-mix(in srgb, {{ institution_accent_color|default:'#1d4ed8' }} 82%, black);
+            --ch-primary: var(--ch-action);
+            --ch-primary-hover: var(--ch-action-hover);
+            --ch-accent: {{ institution_highlight_color|default:'#0e7490' }};
+            --ch-focus-ring: color-mix(in srgb, var(--ch-action) 22%, transparent);
+            --ch-table-head-bg: var(--ch-brand);
         }
     </style>
-    {% endif %}
     {% block extra_css %}{% endblock %}
 </head>
 <body class="app-body {% block body_class %}{% endblock %}">

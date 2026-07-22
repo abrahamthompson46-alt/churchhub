@@ -45,7 +45,7 @@ Own **identity and user administration** for ChurchHub: custom user model, invit
 | Role / scope | `role` (`UserRole`), `scope_level` (`OrgScopeLevel`), FKs `church`, `scope_district/zone/conference/union/general_conference` |
 | Links | OneToOne `member` → `members.Member`; FK `denomination`; M2M `managed_denominations` |
 | Platform | `is_platform_user`, `platform_role` (OWNER/SECURITY/BILLING/SUPPORT/READONLY) |
-| Other | `phone`, `mfa_enabled` (**stub**) |
+| Other | `phone`, `mfa_enabled` / `mfa_secret` / recovery hashes (enforced per site MFA policy) |
 | Indexes | `(role, is_active)`, `(church, is_active)`, `(scope_level, is_active)` |
 
 `clean()` / `save()`: platform users cannot have church; scope anchors required by level; local roles require church; `is_staff` cleared unless superuser.
@@ -241,7 +241,7 @@ flowchart LR
 ## 17. Security considerations (Current)
 
 - Passwords hashed by Django; validators include SiteSettings min length / uppercase.
-- MFA field is stub — not enforced.
+- MFA optional; platform Security Policy selects audiences (`docs/SECURITY/AUTHENTICATION.md`).
 - Invitation tokens are capability URLs — treat as secrets.
 - Activity log for auth events; do not log passwords.
 - Manageable-user scoping prevents cross-tenant user admin when helpers used correctly.
@@ -269,7 +269,7 @@ flowchart LR
 
 ## 20. Known technical debt
 
-- MFA stub / admin readonly checkbox.  
+- MFA UX polish (device list UI); admin enrollment tooling.  
 - `sync_role_groups` no-op (Django groups retired).  
 - Activity log not full AGENTS audit schema.  
 - Views use broad `can_manage_users` vs granular invite/deactivate codes.

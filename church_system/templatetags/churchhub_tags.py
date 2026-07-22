@@ -65,3 +65,17 @@ def message_body(message):
     if TITLE_SEP in text:
         return text.split(TITLE_SEP, 1)[1].strip()
     return text
+
+
+@register.simple_tag(takes_context=True)
+def money(context, amount, places=2):
+    """Format amount with site currency symbol from context."""
+    from django.contrib.humanize.templatetags.humanize import intcomma
+    from django.template.defaultfilters import floatformat
+
+    symbol = context.get("currency_symbol") or "₵"
+    try:
+        formatted = intcomma(floatformat(amount, places))
+    except (TypeError, ValueError):
+        formatted = str(amount)
+    return f"{symbol}{formatted}"

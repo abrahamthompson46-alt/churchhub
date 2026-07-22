@@ -1,11 +1,11 @@
 <aside class="auth-split-brand auth-split-brand--platform">
     <div class="auth-split-brand-inner">
         {% if site_logo %}
-        <img src="{{ site_logo.url }}" alt="" class="auth-platform-logo mb-4">
+        <img src="{{ site_logo.url }}" alt="{{ platform_name|default:site_settings.site_name|default:site_name }}" class="auth-platform-logo mb-4">
         {% else %}
-        <div class="brand-mark auth-platform-mark mb-4"><i class="bi bi-grid-1x2-fill"></i></div>
+        <div class="brand-mark auth-platform-mark mb-4" aria-hidden="true"><i class="bi bi-grid-1x2-fill"></i></div>
         {% endif %}
-        <p class="auth-platform-eyebrow mb-2">Platform</p>
+        <p class="auth-platform-eyebrow mb-2">Church management</p>
         <h2 class="auth-split-title">{{ platform_name|default:site_settings.site_name|default:site_name }}</h2>
         {% if site_tagline %}
         <p class="auth-split-tagline">{{ site_tagline }}</p>
@@ -13,7 +13,7 @@
         {% if login_highlights %}
         <ul class="auth-feature-list">
             {% for item in login_highlights %}
-            <li><i class="bi bi-check2-circle"></i> {{ item }}</li>
+            <li><i class="bi bi-check2-circle" aria-hidden="true"></i> {{ item }}</li>
             {% endfor %}
         </ul>
         {% endif %}

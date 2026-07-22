@@ -122,7 +122,7 @@ class User(AbstractUser):
 
     mfa_enabled = models.BooleanField(
         default=False,
-        help_text="When True, TOTP MFA is enrolled and enforced at login for privileged roles.",
+        help_text="When True, MFA is enrolled for this user (enforced only if site policy requires it).",
     )
     mfa_secret = models.TextField(
         blank=True,

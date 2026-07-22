@@ -1,4 +1,4 @@
-{% load humanize %}
+{% load humanize churchhub_tags %}
 {% if user.is_authenticated and not user.is_platform_user and user.role != "MEMBER" %}
 {% if show_working_day_status or system_date or active_church or cash_position %}
 <div class="workspace-status-bar" aria-label="Workspace status">
@@ -31,19 +31,19 @@
             {% endif %}
         </div>
         {% if cash_position and show_cash_position %}
-        <div class="workspace-status-bar__cash" title="Approved book balances">
+        <div class="workspace-status-bar__cash" title="Approved book balances" data-currency-symbol="{{ currency_symbol }}">
             <span class="workspace-status-pill workspace-status-pill--cash">
                 <span class="workspace-status-pill__label">Cash</span>
-                <strong class="text-currency" data-cash-field="cash">₵{{ cash_position.cash|floatformat:2|intcomma }}</strong>
+                <strong class="text-currency" data-cash-field="cash">{% money cash_position.cash 2 %}</strong>
             </span>
             <span class="workspace-status-pill workspace-status-pill--cash">
                 <span class="workspace-status-pill__label">Bank</span>
-                <strong class="text-currency" data-cash-field="bank">₵{{ cash_position.bank|floatformat:2|intcomma }}</strong>
+                <strong class="text-currency" data-cash-field="bank">{% money cash_position.bank 2 %}</strong>
             </span>
             {% if cash_position.petty_cash %}
             <span class="workspace-status-pill workspace-status-pill--cash">
                 <span class="workspace-status-pill__label">Petty</span>
-                <strong class="text-currency" data-cash-field="petty_cash">₵{{ cash_position.petty_cash|floatformat:2|intcomma }}</strong>
+                <strong class="text-currency" data-cash-field="petty_cash">{% money cash_position.petty_cash 2 %}</strong>
             </span>
             {% endif %}
         </div>

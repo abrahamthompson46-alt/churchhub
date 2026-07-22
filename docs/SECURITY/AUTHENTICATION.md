@@ -69,7 +69,7 @@ Portal login additionally sends users with `member_id` to the portal.
 | `is_platform_user` | Platform lane (`/platform/`) |
 | `platform_role` | OWNER / SECURITY / BILLING / SUPPORT / READONLY |
 | `managed_denominations` | M2M — operator denomination access |
-| `mfa_enabled` | **Stub only** — enforcement not implemented |
+| `mfa_enabled` | Enrolled MFA flag (enforced only when site MFA policy requires the user’s audience) |
 | `member` | Optional OneToOne to `members.Member` |
 
 Password hashing: Django’s password framework only — never plaintext.
@@ -263,11 +263,11 @@ Public tenant onboarding: `/apply/` → platform approve → church provision + 
 
 | State | Detail |
 |-------|--------|
-| **Current** | MFA enforced for privileged roles when `SiteSettings.mfa_required_for_privileged` is True (default). Platform OWNER/SECURITY, institution SUPER_ADMIN, TREASURY, and Django superusers must enroll and verify. Methods: **TOTP** (QR enroll), **email OTP** (alternate), **recovery codes**. **Trusted device** cookie skips MFA for 30 days when checked. Secrets stored encrypted. |
+| **Current** | MFA is **optional**. Platform owners enable it under **Platform → Security** (`SiteSettings.mfa_required_for_privileged`) and choose **who**: institution roles (`mfa_institution_roles`), platform roles (`mfa_platform_roles`), and optionally Django superusers (`mfa_include_django_superusers`). Recommended starter audiences: OWNER/SECURITY + SUPER_ADMIN/TREASURY. Methods: **TOTP** (QR enroll), **email OTP**, **recovery codes**. **Trusted device** cookie skips MFA for 30 days when checked. Secrets stored encrypted. Default for new sites: enforcement **off**. |
 | **Planned (AGENTS.md)** | Optional SMS OTP, richer device management UI |
 | **Recommended** | Dedicated `MFA_ENCRYPTION_KEY`; rate-limit TOTP verify attempts |
 
-Login flow: password success → trusted device (if cookie valid) → home; else if privileged and enrolled → `/accounts/mfa/verify/` (TOTP, email code, or recovery) → if privileged and not enrolled → login then `/accounts/mfa/enroll/` (scannable QR). `MfaEnforcementMiddleware` blocks the rest of the app until verified (or trusted device).
+Login flow: password success → trusted device (if cookie valid) → home; else if site policy requires MFA for that user and enrolled → `/accounts/mfa/verify/` (TOTP, email code, or recovery) → if required and not enrolled → `/accounts/mfa/enroll/` (scannable QR). `MfaEnforcementMiddleware` blocks the rest of the app until verified (or trusted device). When enforcement is off, MFA is not required even if a user has enrolled.
 
 ---
 

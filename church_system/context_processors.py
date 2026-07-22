@@ -125,6 +125,7 @@ def platform_context(request):
 
 
 def denomination_context(request):
+    from church_system.currency import currency_symbol, normalize_currency_code
     from church_system.denomination_scope import get_active_denomination
     from sitecontrol.denomination_services import get_terminology_context, hierarchy_chain_description
     from sitecontrol.services import get_site_settings
@@ -133,8 +134,10 @@ def denomination_context(request):
     terminology = get_terminology_context(denomination)
     settings_obj = get_site_settings()
     display_name = settings_obj.site_name
-    primary_color = "#1d4ed8"
-    accent_color = "#0e7490"
+    # Brand = navy chrome; action = CTA blue (SiteSettings / denomination)
+    primary_color = settings_obj.admin_primary_color or "#1e3a5f"
+    accent_color = settings_obj.accent_color or "#1d4ed8"
+    highlight_color = "#0e7490"
     logo = None
     tenant_display_name = ""
     if denomination:
@@ -143,6 +146,10 @@ def denomination_context(request):
         primary_color = denomination.primary_color or primary_color
         accent_color = denomination.accent_color or accent_color
         logo = denomination.logo
+
+    currency_code = normalize_currency_code(
+        getattr(settings_obj, "default_billing_currency", None) or "GHS"
+    )
 
     ctx = {
         "active_denomination": denomination,
@@ -153,9 +160,12 @@ def denomination_context(request):
         "tenant_display_name": tenant_display_name,
         "institution_primary_color": primary_color,
         "institution_accent_color": accent_color,
+        "institution_highlight_color": highlight_color,
         "denomination_logo": logo,
         "tenant_logo": logo,
         "hierarchy_chain": hierarchy_chain_description(denomination),
+        "currency_code": currency_code,
+        "currency_symbol": currency_symbol(currency_code),
     }
     if request.user.is_authenticated and getattr(request.user, "is_platform_user", False):
         from sitecontrol.platform_access import get_operator_denominations

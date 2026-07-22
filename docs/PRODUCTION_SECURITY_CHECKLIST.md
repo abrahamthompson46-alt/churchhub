@@ -35,8 +35,8 @@ Mark each item **Done** before declaring production live.
 
 ## C. Authentication & MFA
 
-- [ ] SiteSettings: `mfa_required_for_privileged=True` in production
-- [ ] Platform OWNER/SECURITY and TREASURY users enrolled in MFA
+- [ ] SiteSettings MFA policy set intentionally (off until ready, or on with selected roles)
+- [ ] If MFA on: selected platform/institution roles enrolled before go-live
 - [ ] Login lockout thresholds reviewed (`login_max_attempts`, `login_lockout_minutes`)
 - [ ] Password reset email delivery verified (no open redirect in reset links)
 - [ ] Impersonation only used by authorized platform operators; exit path tested

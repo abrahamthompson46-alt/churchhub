@@ -13,7 +13,44 @@ from sitecontrol.models import (
 
 @admin.register(SiteSettings)
 class SiteSettingsAdmin(admin.ModelAdmin):
-    list_display = ("site_name", "session_timeout_minutes", "maintenance_mode", "updated_at")
+    list_display = (
+        "site_name",
+        "mfa_required_for_privileged",
+        "session_timeout_minutes",
+        "maintenance_mode",
+        "updated_at",
+    )
+    fieldsets = (
+        (None, {"fields": ("site_name", "site_tagline", "support_email")}),
+        (
+            "MFA policy",
+            {
+                "fields": (
+                    "mfa_required_for_privileged",
+                    "mfa_institution_roles",
+                    "mfa_platform_roles",
+                    "mfa_include_django_superusers",
+                )
+            },
+        ),
+        (
+            "Security",
+            {
+                "fields": (
+                    "password_min_length",
+                    "password_require_uppercase",
+                    "session_timeout_minutes",
+                    "login_max_attempts",
+                    "login_lockout_minutes",
+                    "platform_ip_allowlist",
+                )
+            },
+        ),
+        (
+            "Maintenance",
+            {"fields": ("maintenance_mode", "maintenance_block_apply", "maintenance_message")},
+        ),
+    )
 
     def has_add_permission(self, request):
         return not SiteSettings.objects.exists()

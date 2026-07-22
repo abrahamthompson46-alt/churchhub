@@ -1,5 +1,7 @@
 """Platform access control and control room tests."""
 
+from unittest.mock import patch
+
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -461,6 +463,65 @@ class BillingProvisioningTests(SiteControlClientHarness, TestCase):
         self.assertTrue(sub.price_snapshot)
         self.assertIsNotNone(invitation)
 
+    @patch("sitecontrol.views.send_invitation_email", return_value=True)
+    def test_tenant_provision_view_sends_invitation_email(self, mock_send):
+        from sitecontrol.models import SubscriptionPlan
+
+        plan = SubscriptionPlan.objects.filter(is_active=True).first()
+        self.client.login(username="billingowner", password="pass12345")
+        response = self.client.post(
+            reverse("sitecontrol:tenant_provision"),
+            {
+                "setup_mode": "EXISTING_DISTRICT",
+                "denomination": str(self.denomination.pk),
+                "district": str(self.district.pk),
+                "church_name": "Emailed Church",
+                "church_code": "EML1",
+                "admin_email": "admin@email.test",
+                "admin_username": "emailadmin",
+                "plan": str(plan.pk),
+                "status": "TRIAL",
+                "billing_interval": "MONTHLY",
+                "send_invite": "on",
+                "admin_role": "LOCAL_PASTOR",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        mock_send.assert_called_once()
+        invitation = mock_send.call_args.args[0]
+        self.assertEqual(invitation.email, "admin@email.test")
+
+    @patch("sitecontrol.views.resend_invitation")
+    def test_tenant_resend_invitation_view(self, mock_resend):
+        from accounts.models import UserInvitation
+        from sitecontrol.models import SubscriptionPlan
+        from sitecontrol.provisioning_services import provision_tenant
+
+        plan = SubscriptionPlan.objects.filter(is_active=True).first()
+        church, _sub, invitation = provision_tenant(
+            setup_mode="EXISTING_DISTRICT",
+            denomination=self.denomination,
+            district=self.district,
+            church_name="Resend Church",
+            church_code="RSN1",
+            admin_email="resend@prov.test",
+            admin_username="resendadmin",
+            plan=plan,
+            status="TRIAL",
+            reviewer=self.platform_user,
+        )
+        mock_resend.return_value = (invitation, True)
+        self.client.login(username="billingowner", password="pass12345")
+        response = self.client.post(
+            reverse(
+                "sitecontrol:tenant_resend_invitation",
+                kwargs={"pk": church.pk, "invite_pk": invitation.pk},
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        mock_resend.assert_called_once()
+        self.assertTrue(UserInvitation.objects.filter(pk=invitation.pk).exists())
+
     def test_payment_method_crud_view(self):
         self.client.login(username="billingowner", password="pass12345")
         response = self.client.get(reverse("sitecontrol:payment_method_list"))
@@ -519,3 +580,40 @@ class BillingProvisioningTests(SiteControlClientHarness, TestCase):
         sub.refresh_from_db()
         self.assertGreaterEqual(count, 1)
         self.assertEqual(sub.status, "EXPIRED")
+
+
+class MfaSecurityPolicyTests(SiteControlClientHarness, TestCase):
+    """Platform owners configure optional MFA audiences under Security Policy."""
+
+    def setUp(self):
+        self.disable_privileged_mfa()
+        self.owner = User.objects.create_user(
+            username="mfa_policy_owner",
+            password="pass12345",
+            is_platform_user=True,
+            is_superuser=True,
+            is_staff=True,
+            platform_role="OWNER",
+        )
+
+    def test_security_settings_saves_mfa_audiences(self):
+        self.client.login(username="mfa_policy_owner", password="pass12345")
+        response = self.client.post(
+            reverse("sitecontrol:security_settings"),
+            {
+                "password_min_length": 8,
+                "password_require_uppercase": "on",
+                "mfa_required_for_privileged": "on",
+                "mfa_include_django_superusers": "on",
+                "mfa_institution_roles": ["SECRETARY", "TREASURY"],
+                "mfa_platform_roles": ["OWNER"],
+                "platform_ip_allowlist": "",
+                "maintenance_block_apply": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        settings_obj = SiteSettings.load()
+        self.assertTrue(settings_obj.mfa_required_for_privileged)
+        self.assertEqual(set(settings_obj.mfa_institution_roles), {"SECRETARY", "TREASURY"})
+        self.assertEqual(set(settings_obj.mfa_platform_roles), {"OWNER"})
+        self.assertTrue(settings_obj.mfa_include_django_superusers)

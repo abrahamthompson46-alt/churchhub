@@ -31,7 +31,12 @@
                 <td>{{ church.district.name }}</td>
                 <td>{% if church.subscription %}{{ church.subscription.plan.name }}{% else %}<span class="text-warning">None</span>{% endif %}</td>
                 <td>{% if church.subscription %}<span class="badge bg-{% if church.subscription.status == 'ACTIVE' %}success{% elif church.subscription.status == 'SUSPENDED' %}danger{% else %}secondary{% endif %}">{{ church.subscription.get_status_display }}</span>{% else %}—{% endif %}</td>
-                <td><a href="{% url 'sitecontrol:tenant_detail' church.pk %}" class="btn btn-sm btn-outline-primary">View</a></td>
+                <td class="text-nowrap">
+                    <a href="{% url 'sitecontrol:tenant_detail' church.pk %}" class="btn btn-sm btn-outline-primary">View</a>
+                    {% if can_manage_tenants %}
+                    <a href="{% url 'sitecontrol:tenant_detail' church.pk %}#invitations" class="btn btn-sm btn-outline-secondary" title="Resend or create admin invite">Invite</a>
+                    {% endif %}
+                </td>
             </tr>
             {% empty %}
             <tr><td colspan="6" class="text-muted">No churches found.</td></tr>

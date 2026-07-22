@@ -14,7 +14,12 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.models import User
-from church_system.flash import flash_success
+from accounts.services import (
+    create_invitation,
+    resend_invitation,
+    send_invitation_email,
+)
+from church_system.flash import flash_error, flash_success, flash_warning
 from sitecontrol import repositories as repo
 from sitecontrol import selectors
 from sitecontrol.checks import can_access_django_admin, platform_required, require_platform_capability
@@ -562,14 +567,18 @@ def tenant_list(request):
 @platform_required
 @require_platform_capability(CAP_VIEW)
 def tenant_detail(request, pk):
+    from accounts import selectors as account_selectors
+
     church = selectors.get_church_or_404(selectors.church_detail_qs(), pk)
     _require_tenant_access(request, church)
     stats = tenant_detail_stats(church)
     users = selectors.institution_users_for_church(church, limit=20)
+    pending_invites = account_selectors.pending_invitations_for_church(church)
     return render(request, "sitecontrol/tenant_detail.html", {
         "church": church,
         "stats": stats,
         "users": users,
+        "pending_invites": pending_invites,
         "can_manage_lifecycle": operator_has_capability(request.user, CAP_MANAGE_TENANTS),
         "can_impersonate": operator_has_capability(request.user, CAP_IMPERSONATE),
         "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Tenants", "/platform/tenants/"), (church.name,)),
@@ -671,6 +680,106 @@ def tenant_reprovision_financials(request, pk):
 
 @platform_required
 @require_platform_capability(CAP_MANAGE_TENANTS)
+@require_POST
+def tenant_resend_invitation(request, pk, invite_pk):
+    from accounts.models import UserInvitation
+
+    church = selectors.get_church_or_404(selectors.church_tenant_access_qs(), pk)
+    _require_tenant_access(request, church)
+    invitation = get_object_or_404(UserInvitation, pk=invite_pk, church=church)
+    try:
+        _inv, emailed = resend_invitation(
+            invitation,
+            performed_by=request.user,
+            ip_address=request.META.get("REMOTE_ADDR"),
+            days_valid=14,
+            request=request,
+            fail_silently=False,
+        )
+    except ValueError as exc:
+        flash_error(request, str(exc), title="Resend failed")
+        return redirect("sitecontrol:tenant_detail", pk=church.pk)
+    except Exception as exc:
+        flash_error(request, f"Email failed: {exc}", title="Resend failed")
+        return redirect("sitecontrol:tenant_detail", pk=church.pk)
+
+    log_platform_action(
+        request,
+        "TENANT_INVITE_RESEND",
+        f"Resent admin invite for '{church.name}' to {invitation.email}",
+        target_model="UserInvitation",
+        target_id=invitation.pk,
+        details={"church_id": str(church.pk)},
+    )
+    if emailed:
+        flash_success(request, f"Invitation email resent to {invitation.email}.")
+    else:
+        flash_warning(
+            request,
+            "Invitation extended, but SMTP is not configured. Configure Email settings and try again.",
+            title="Not emailed",
+        )
+    return redirect("sitecontrol:tenant_detail", pk=church.pk)
+
+
+@platform_required
+@require_platform_capability(CAP_MANAGE_TENANTS)
+@require_POST
+def tenant_create_admin_invitation(request, pk):
+    """Create (and email) a new admin invitation when none is pending."""
+    from permissions.roles import UserRole
+    from sitecontrol.services import get_site_settings
+
+    church = selectors.get_church_or_404(selectors.church_tenant_access_qs(), pk)
+    _require_tenant_access(request, church)
+    email = (request.POST.get("email") or "").strip().lower()
+    username = (request.POST.get("username") or "").strip()
+    role = (request.POST.get("role") or "").strip() or get_site_settings().application_default_role
+    if not email or not username:
+        flash_error(request, "Email and username are required.", title="Invite failed")
+        return redirect("sitecontrol:tenant_detail", pk=church.pk)
+    try:
+        invitation = create_invitation(
+            email=email,
+            username=username,
+            role=role if role in {c[0] for c in UserRole.CHOICES} else UserRole.LOCAL_PASTOR,
+            church=church,
+            invited_by=request.user,
+            days_valid=14,
+        )
+        emailed = send_invitation_email(invitation, request=request, fail_silently=False)
+    except ValueError as exc:
+        flash_error(request, str(exc), title="Invite failed")
+        return redirect("sitecontrol:tenant_detail", pk=church.pk)
+    except Exception as exc:
+        flash_warning(
+            request,
+            f"Invitation created for {email}, but email failed: {exc}. Use Resend after fixing SMTP.",
+            title="Invite email failed",
+        )
+        return redirect("sitecontrol:tenant_detail", pk=church.pk)
+
+    log_platform_action(
+        request,
+        "TENANT_INVITE_CREATE",
+        f"Created admin invite for '{church.name}' to {email}",
+        target_model="UserInvitation",
+        target_id=invitation.pk,
+        details={"church_id": str(church.pk)},
+    )
+    if emailed:
+        flash_success(request, f"Invitation email sent to {email}.")
+    else:
+        flash_warning(
+            request,
+            "Invitation created, but SMTP is not configured.",
+            title="Not emailed",
+        )
+    return redirect("sitecontrol:tenant_detail", pk=church.pk)
+
+
+@platform_required
+@require_platform_capability(CAP_MANAGE_TENANTS)
 def tenant_provision(request):
     from church_system.flash import flash_error
     from sitecontrol.provisioning_services import provision_tenant
@@ -720,10 +829,37 @@ def tenant_provision(request):
                     "invitation_id": str(invitation.pk) if invitation else "",
                 },
             )
+            invite_note = ""
+            if invitation:
+                try:
+                    emailed = send_invitation_email(
+                        invitation,
+                        request=request,
+                        fail_silently=False,
+                    )
+                    if emailed:
+                        invite_note = f" Invitation email sent to {invitation.email}."
+                    else:
+                        invite_note = (
+                            f" Invitation created for {invitation.email}, but SMTP is not "
+                            "configured — open the tenant and use Resend after email settings work."
+                        )
+                        flash_warning(
+                            request,
+                            invite_note.strip(),
+                            title="Invite not emailed",
+                        )
+                        invite_note = ""
+                except Exception as exc:
+                    flash_warning(
+                        request,
+                        f"Invitation created for {invitation.email}, but email failed: {exc}. "
+                        "Use Resend on the tenant page after fixing SMTP.",
+                        title="Invite email failed",
+                    )
             flash_success(
                 request,
-                f"Tenant “{church.name}” provisioned with plan {sub.plan.name}."
-                + (f" Invite sent to {data['admin_email']}." if invitation else ""),
+                f"Tenant “{church.name}” provisioned with plan {sub.plan.name}.{invite_note}",
                 title="Tenant provisioned",
             )
             return redirect("sitecontrol:tenant_detail", pk=church.pk)

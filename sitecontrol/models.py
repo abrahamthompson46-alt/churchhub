@@ -8,6 +8,14 @@ from django.db import models
 from django.utils import timezone
 
 
+def default_mfa_institution_roles():
+    return ["SUPER_ADMIN", "TREASURY"]
+
+
+def default_mfa_platform_roles():
+    return ["OWNER", "SECURITY"]
+
+
 class SiteSettings(models.Model):
     """Singleton platform configuration (site owner)."""
 
@@ -24,8 +32,16 @@ class SiteSettings(models.Model):
         help_text="Login page highlights — one per line. Leave blank to hide the list.",
     )
     support_email = models.EmailField(blank=True, default="support@churchhub.local")
-    admin_primary_color = models.CharField(max_length=7, default="#1e3a5f")
-    accent_color = models.CharField(max_length=7, default="#1d4ed8")
+    admin_primary_color = models.CharField(
+        max_length=7,
+        default="#1e3a5f",
+        help_text="Brand/chrome color (navbar, table headers). Navy recommended.",
+    )
+    accent_color = models.CharField(
+        max_length=7,
+        default="#1d4ed8",
+        help_text="Action color for primary buttons and links.",
+    )
     logo = models.ImageField(upload_to="platform/branding/", blank=True, null=True)
     favicon = models.ImageField(upload_to="platform/branding/", blank=True, null=True)
     footer_text = models.CharField(max_length=200, blank=True, default="Enterprise Church Management")
@@ -43,11 +59,32 @@ class SiteSettings(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(120)],
     )
     mfa_required_for_privileged = models.BooleanField(
-        default=True,
+        default=False,
         help_text=(
-            "Require TOTP MFA for platform OWNER/SECURITY, institution SUPER_ADMIN, "
-            "TREASURY, and Django superusers."
+            "When enabled, require MFA (TOTP / email OTP / recovery) for the audiences "
+            "selected below. Off by default — platform owners decide when to enforce."
         ),
+        verbose_name="Require MFA for selected audiences",
+    )
+    mfa_institution_roles = models.JSONField(
+        default=default_mfa_institution_roles,
+        blank=True,
+        help_text=(
+            "Institution User.role codes that must use MFA when enforcement is on. "
+            "Recommended starter set: SUPER_ADMIN, TREASURY."
+        ),
+    )
+    mfa_platform_roles = models.JSONField(
+        default=default_mfa_platform_roles,
+        blank=True,
+        help_text=(
+            "Platform operator roles that must use MFA when enforcement is on. "
+            "Recommended starter set: OWNER, SECURITY."
+        ),
+    )
+    mfa_include_django_superusers = models.BooleanField(
+        default=True,
+        help_text="When MFA enforcement is on, also require MFA for Django superusers.",
     )
     maintenance_mode = models.BooleanField(
         default=False,

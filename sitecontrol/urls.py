@@ -54,6 +54,16 @@ urlpatterns = [
     path("tenants/<uuid:pk>/suspend/", views.tenant_suspend, name="tenant_suspend"),
     path("tenants/<uuid:pk>/reactivate/", views.tenant_reactivate, name="tenant_reactivate"),
     path("tenants/<uuid:pk>/offboard/", views.tenant_offboard, name="tenant_offboard"),
+    path(
+        "tenants/<uuid:pk>/invitations/<uuid:invite_pk>/resend/",
+        views.tenant_resend_invitation,
+        name="tenant_resend_invitation",
+    ),
+    path(
+        "tenants/<uuid:pk>/invitations/create/",
+        views.tenant_create_admin_invitation,
+        name="tenant_create_admin_invitation",
+    ),
     path("impersonate/<uuid:user_id>/", views.impersonate_start, name="impersonate_start"),
     path("impersonate/end/", views.impersonate_end, name="impersonate_end"),
     path("organization/", views.hierarchy, name="hierarchy"),

@@ -10,12 +10,13 @@
     --pf-bg: #f0f4f8;
     --pf-card: #ffffff;
     --pf-border: #dde4ee;
-    --pf-accent: #1d4ed8;
-    --pf-accent-soft: #eff6ff;
-    --pf-navy: #0f2942;
-    --pf-success: #047857;
-    --pf-warning: #b45309;
-    --pf-danger: #b91c1c;
+    /* Alias institution design tokens when available */
+    --pf-accent: var(--ch-action, #1d4ed8);
+    --pf-accent-soft: var(--ch-primary-soft, #eff6ff);
+    --pf-navy: var(--ch-brand, #0f2942);
+    --pf-success: var(--ch-success, #047857);
+    --pf-warning: var(--ch-warning, #b45309);
+    --pf-danger: var(--ch-danger, #b91c1c);
     --pf-sidebar-width: 260px;
 }
 
@@ -50,6 +51,10 @@ body.platform-body {
 .platform-sidebar-brand {
     padding: 1.25rem 1.25rem 1rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
 }
 
 .platform-sidebar-brand a {
@@ -64,7 +69,7 @@ body.platform-body {
     width: 40px;
     height: 40px;
     border-radius: 10px;
-    background: linear-gradient(135deg, var(--pf-accent), #0e7490);
+    background: linear-gradient(135deg, var(--pf-accent), var(--ch-accent, #0e7490));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -180,6 +185,37 @@ body.platform-body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+.platform-topbar-start {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.platform-nav-toggle,
+.platform-nav-close {
+    border: 1px solid var(--pf-border);
+    background: #fff;
+    color: var(--pf-navy);
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.platform-nav-close {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.platform-nav-backdrop {
+    display: none;
 }
 
 .platform-user-chip {
@@ -463,14 +499,48 @@ body.platform-body {
 }
 
 @media (max-width: 991px) {
+    body.platform-nav-open {
+        overflow: hidden;
+    }
     .platform-sidebar {
         transform: translateX(-100%);
+        transition: transform 0.2s ease;
+        box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
+    }
+    body.platform-nav-open .platform-sidebar {
+        transform: translateX(0);
+    }
+    .platform-nav-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 41, 66, 0.45);
+        z-index: 1035;
+    }
+    .platform-nav-backdrop[hidden] {
+        display: none !important;
     }
     .platform-main {
         margin-left: 0;
     }
+    .platform-topbar {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        padding: 0.65rem 1rem;
+    }
+    .platform-topbar-actions {
+        width: 100%;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+    .platform-content {
+        padding: 1rem;
+    }
     .platform-form-grid {
         grid-template-columns: 1fr;
+    }
+    .platform-stat-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 

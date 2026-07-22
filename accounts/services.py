@@ -256,7 +256,15 @@ def revoke_invitation(invitation, performed_by=None, ip_address=None):
     return invitation
 
 
-def resend_invitation(invitation, performed_by=None, ip_address=None, days_valid=7, request=None):
+def resend_invitation(
+    invitation,
+    performed_by=None,
+    ip_address=None,
+    days_valid=7,
+    request=None,
+    *,
+    fail_silently=True,
+):
     if invitation.is_accepted:
         raise ValueError("Accepted invitations cannot be resent.")
     if invitation.is_revoked:
@@ -278,7 +286,9 @@ def resend_invitation(invitation, performed_by=None, ip_address=None, days_valid
                 "expires_at": invitation.expires_at.isoformat(),
             },
         )
-    emailed = send_invitation_email(invitation, request=request, fail_silently=True)
+    emailed = send_invitation_email(
+        invitation, request=request, fail_silently=fail_silently
+    )
     return invitation, emailed
 
 

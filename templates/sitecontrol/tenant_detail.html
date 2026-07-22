@@ -42,12 +42,92 @@
                         {% endif %}
                     </tr>
                     {% empty %}
-                    <tr><td colspan="{% if can_impersonate %}5{% else %}4{% endif %}" class="text-muted">No users assigned.</td></tr>
+                    <tr><td colspan="{% if can_impersonate %}5{% else %}4{% endif %}" class="text-muted">No users assigned yet. Send an admin invitation below.</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
+
+        {% if can_manage_lifecycle %}
+        <div class="platform-card mt-4" id="invitations">
+            <div class="platform-card-header">
+                <span>Admin invitations</span>
+            </div>
+            <div class="platform-card-body">
+                {% if pending_invites %}
+                <div class="table-responsive mb-3">
+                    <table class="platform-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Expires</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for inv in pending_invites %}
+                        <tr>
+                            <td>{{ inv.email }}</td>
+                            <td><code>{{ inv.username }}</code></td>
+                            <td>{{ inv.get_role_display }}</td>
+                            <td>
+                                {% if inv.is_expired %}
+                                <span class="badge bg-danger">Expired</span>
+                                {% else %}
+                                {{ inv.expires_at|date:"j M Y H:i" }}
+                                {% endif %}
+                            </td>
+                            <td class="text-nowrap">
+                                <form method="post" action="{% url 'sitecontrol:tenant_resend_invitation' church.pk inv.pk %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-envelope me-1"></i>Resend email
+                                    </button>
+                                </form>
+                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'accounts:accept_invite' inv.token %}" target="_blank" rel="noopener">Open link</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted small mb-0">Use Resend if the admin never received the provision email (common for tenants created before email was wired).</p>
+                {% else %}
+                <p class="text-muted small">No open invitations. Create one to onboard a church admin.</p>
+                {% endif %}
+
+                <hr>
+                <h3 class="h6 mb-2">Create admin invitation</h3>
+                <form method="post" action="{% url 'sitecontrol:tenant_create_admin_invitation' church.pk %}" class="row g-2 align-items-end">
+                    {% csrf_token %}
+                    <div class="col-md-4">
+                        <label class="form-label" for="invite-email">Email</label>
+                        <input id="invite-email" type="email" name="email" class="form-control form-control-sm" required placeholder="admin@church.org">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="invite-username">Username</label>
+                        <input id="invite-username" type="text" name="username" class="form-control form-control-sm" required placeholder="churchadmin">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="invite-role">Role</label>
+                        <select id="invite-role" name="role" class="form-select form-select-sm">
+                            <option value="LOCAL_PASTOR">Local Pastor</option>
+                            <option value="TREASURY">Treasury</option>
+                            <option value="SECRETARY">Secretary</option>
+                            <option value="SUPER_ADMIN">Super Admin</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-sm btn-primary w-100">Send invite</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
         {% if stats.subscription.lifecycle_notes %}
         <div class="platform-card mt-4">
             <div class="platform-card-header">Lifecycle Notes</div>
@@ -108,11 +188,14 @@
                         {% endif %}
                         {% if church.is_active %}
                         <hr>
-                        <form method="post" action="{% url 'sitecontrol:tenant_offboard' church.pk %}" class="d-grid gap-2" onsubmit="return confirm('Offboard permanently deactivates users. Data is retained. Continue?');">
+                        <p class="small text-muted mb-2">
+                            Delete/offboard deactivates the church and its users. Financial and membership history is retained (not hard-deleted).
+                        </p>
+                        <form method="post" action="{% url 'sitecontrol:tenant_offboard' church.pk %}" class="d-grid gap-2" onsubmit="return confirm('Delete/offboard this tenant? Users are deactivated; data is retained.');">
                             {% csrf_token %}
-                            <input type="text" name="reason" class="form-control form-control-sm" placeholder="Offboard reason">
-                            <input type="text" name="confirm" class="form-control form-control-sm" placeholder='Type OFFBOARD to confirm' required>
-                            <button type="submit" class="btn btn-sm btn-danger">Offboard Tenant</button>
+                            <input type="text" name="reason" class="form-control form-control-sm" placeholder="Delete reason">
+                            <input type="text" name="confirm" class="form-control form-control-sm" placeholder='Type OFFBOARD to confirm' required autocomplete="off">
+                            <button type="submit" class="btn btn-sm btn-danger">Delete / Offboard Tenant</button>
                         </form>
                         {% endif %}
                     {% endif %}

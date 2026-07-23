@@ -1,0 +1,18 @@
+{# Shared actionable alert banners (dashboard + reusable). #}
+{% if alerts %}
+<section class="alert-banner-stack mb-3" aria-label="Alerts">
+    {% for alert in alerts %}
+    <div class="alert-banner alert-{{ alert.level|default:'info' }}">
+        <span>{{ alert.text }}</span>
+        {% if alert.url_name %}
+        <a href="{% url alert.url_name %}" class="alert-banner__link">View</a>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% if alerts_extra_count %}
+    <p class="alert-banner-more text-muted small mb-0">
+        +{{ alerts_extra_count }} more — see Action Queue below.
+    </p>
+    {% endif %}
+</section>
+{% endif %}

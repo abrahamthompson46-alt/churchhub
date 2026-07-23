@@ -283,7 +283,7 @@ def get_quick_actions(user):
     elif role in ("overseer", "district_overseer", "admin"):
         _add(_item("Organization", "organization:hierarchy", "bi-diagram-3"))
         _add(_item("Roll-up Report", report_key="hierarchy_rollup", icon="bi-bar-chart-steps"))
-        _add(_item("Churches", "organization:hierarchy", "bi-building"))
+        _add(_item("Cut-off", "dashboard:cutoff", "bi-calendar-check"))
     else:
         if can_manage_finances(user):
             _add(_item("Ledger Entry", "ledger:entry", "bi-journal-plus"))
@@ -309,14 +309,44 @@ def get_quick_actions(user):
     if not actions and not can_manage_finances(user) and not can_view_members(user):
         _add(_item("Announcements", "announcements:announcement_list", "bi-newspaper"))
 
-    _add(_item("Upcoming", "announcements:upcoming_calendar", "bi-calendar-heart"))
-    return actions
+    # Keep hero to primary CTAs; calendar lives under Communications.
+    if role in ("member", "members") and len(actions) < 3:
+        _add(_item("Upcoming", "announcements:upcoming_calendar", "bi-calendar-heart"))
+    return actions[:6]
+
+
+def get_nav_badges(request):
+    """Lightweight badge counts for primary nav menus (mobile + desktop)."""
+    user = request.user
+    if not user.is_authenticated or getattr(user, "is_platform_user", False):
+        return {}
+    badges = {}
+    if can_approve_transactions(user):
+        pending = selectors.pending_transactions_for_request_count(request)
+        if pending:
+            badges["finance"] = pending
+    if can_approve_announcements(user):
+        from announcements.services import pending_for_user
+
+        pending_ann = pending_for_user(user).count()
+        if pending_ann:
+            badges["communications"] = pending_ann
+    if can_approve_minutes(user):
+        from meetings.workflow import pending_minutes_for_user
+
+        pending_mins = pending_minutes_for_user(user).count()
+        if pending_mins:
+            badges["people"] = pending_mins
+    return badges
 
 
 def get_alerts(request, user):
     """Actionable alert items for the dashboard banner."""
+    from church_system.currency import currency_symbol
+
     alerts = []
     church = get_active_church(request)
+    symbol = currency_symbol()
 
     if can_approve_transactions(user):
         pending = selectors.pending_transactions_for_request_count(request)
@@ -354,7 +384,7 @@ def get_alerts(request, user):
                 "level": "danger",
                 "text": (
                     f"Remittance overdue for {prior_month.strftime('%B %Y')} "
-                    f"(₵ {overdue.total_payable:,.2f} payable)."
+                    f"({symbol}{overdue.total_payable:,.2f} payable)."
                 ),
                 "url_name": "dashboard:cutoff",
             })
@@ -759,18 +789,38 @@ def build_home_context(request):
     is_control_center = role in ("admin", "overseer", "district_overseer")
 
     actions = get_quick_actions(user)
+    alerts = get_alerts(request, user)
+    show_finance_charts = show_finance and role in (
+        "treasury", "admin", "finance", "overseer", "district_overseer",
+    )
+    # Role-density: hide panels that duplicate or clutter for a given role.
+    show_church_finance_kpis = (
+        not is_control_center and show_finance and role in ("treasury", "finance", "leadership", "admin")
+    )
+    show_member_kpis = show_members and role in ("secretary", "members", "member", "leadership")
+    show_upcoming_panel = role in ("secretary", "leadership", "members", "member", "admin")
+    show_announcements_panel = role != "treasury"
+    # Avoid repeating Tithe/Combined when the KPI strip already shows them.
+    show_finance_mini_kpis = show_finance_charts and is_control_center
+
     context = {
         "dashboard_role": role,
         "role_label": user.get_role_display(),
         "role_focus": get_role_focus(role),
         "current_time": timezone.now(),
         "quick_actions": actions[:3],
-        "quick_actions_more": actions[3:],
-        "alerts": get_alerts(request, user),
+        "quick_actions_more": [],
+        "alerts": alerts[:3],
+        "alerts_extra_count": max(0, len(alerts) - 3),
         "action_queue": get_action_queue(request, user),
         "show_finance": show_finance,
-        "show_finance_charts": show_finance
-        and role in ("treasury", "admin", "finance", "overseer", "district_overseer"),
+        "show_finance_charts": show_finance_charts,
+        "show_finance_mini_kpis": show_finance_mini_kpis,
+        "show_church_finance_kpis": show_church_finance_kpis,
+        "show_member_kpis": show_member_kpis,
+        "show_upcoming_panel": show_upcoming_panel,
+        "show_announcements_panel": show_announcements_panel,
+        "show_leaderboard": is_control_center,
         "show_members": show_members,
         "show_admin": show_admin,
         "show_hierarchy": show_hierarchy,
@@ -815,10 +865,13 @@ def build_home_context(request):
             context["cash_position"] = get_cash_position(church)
             context["teller_console"] = get_teller_daily_summary(church)
             context["show_teller_console"] = True
+            context["suppress_workspace_cash"] = True
         else:
             context["show_teller_console"] = False
+            context["suppress_workspace_cash"] = False
     else:
         context["show_teller_console"] = False
+        context["suppress_workspace_cash"] = False
 
     if show_members:
         context.update(get_member_summary(request))
@@ -843,5 +896,11 @@ def build_home_context(request):
     context["upcoming_preview"] = upcoming
     # Counts for the preview window — derived from already-fetched items (no re-query)
     context["upcoming_counts"] = calendar_summary_counts_from_items(upcoming)
+
+    if role == "member":
+        context["member_home_kpis"] = {
+            "announcements": len(context["recent_announcements"]),
+            "upcoming": context["upcoming_counts"].get("total", 0),
+        }
 
     return context

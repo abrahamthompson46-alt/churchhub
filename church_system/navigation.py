@@ -555,15 +555,15 @@ MODULE_TABS = {
         _item("Records", "members:record_list", "bi-journal-text"),
     ],
     "finance": [
+        _item("Entry", "ledger:entry", "bi-journal-plus"),
+        _item("Pending", "transactions:pending_approvals", "bi-hourglass-split"),
+        _item("Transactions", "transactions:transaction_list", "bi-list-check"),
+        _item("Remittance", "remittance:index", "bi-percent"),
+        _item("Reconcile", "transactions:reconciliation_list", "bi-bank"),
         _item("Ledger", "ledger:index", "bi-journal-text"),
         _item("Accounts", "ledger:accounts", "bi-journal-bookmark"),
         _item("Categories", "ledger:categories", "bi-tags"),
-        _item("Entry", "ledger:entry", "bi-journal-plus"),
-        _item("Transactions", "transactions:transaction_list", "bi-list-check"),
-        _item("Pending", "transactions:pending_approvals", "bi-hourglass-split"),
         _item("Budgets", "budgets:list", "bi-calculator"),
-        _item("Reconcile", "transactions:reconciliation_list", "bi-bank"),
-        _item("Remittance", "remittance:index", "bi-percent"),
         _item("Payroll", "payroll:index", "bi-currency-exchange"),
         _item("Assets", "assets:index", "bi-box-seam"),
     ],
@@ -594,6 +594,97 @@ MODULE_TABS = {
         _item("Calendar", "transactions:period_list", "bi-calendar-event"),
     ],
 }
+
+# Role-pruned finance tabs (url_name allow-lists). Admins / overseers keep full set.
+FINANCE_TABS_TREASURY = frozenset({
+    "ledger:entry",
+    "transactions:pending_approvals",
+    "transactions:transaction_list",
+    "remittance:index",
+    "transactions:reconciliation_list",
+    "ledger:index",
+})
+FINANCE_TABS_LEADERSHIP = frozenset({
+    "ledger:entry",
+    "transactions:pending_approvals",
+    "transactions:transaction_list",
+    "remittance:index",
+    "budgets:list",
+})
+
+
+def _prune_finance_tabs(user, tabs):
+    """Keep finance module tabs role-relevant; permission filter already applied."""
+    from accounts.models import UserRole
+
+    if user.is_superuser or user.role in (
+        UserRole.SUPER_ADMIN,
+        UserRole.GENERAL_OVERSEER,
+        UserRole.DISTRICT_PASTOR,
+    ):
+        return tabs
+    if user.role == UserRole.TREASURY:
+        allow = FINANCE_TABS_TREASURY
+    elif user.role == UserRole.LOCAL_PASTOR:
+        allow = FINANCE_TABS_LEADERSHIP
+    else:
+        # Other roles: primary ops tabs only when present.
+        allow = FINANCE_TABS_TREASURY | {"budgets:list", "payroll:index", "assets:index"}
+        # Still prefer a short list — take first matching priority order.
+        priority = [
+            "ledger:entry",
+            "transactions:pending_approvals",
+            "transactions:transaction_list",
+            "remittance:index",
+            "transactions:reconciliation_list",
+            "budgets:list",
+            "payroll:index",
+            "assets:index",
+            "ledger:index",
+        ]
+        by_name = {t.get("url_name"): t for t in tabs if t.get("url_name") in allow}
+        return [by_name[name] for name in priority if name in by_name][:6]
+
+    return [t for t in tabs if t.get("url_name") in allow]
+
+
+MODULE_LABELS = {
+    "home": "Home",
+    "people": "People",
+    "finance": "Finance",
+    "communications": "Communications",
+    "reports": "Reports",
+    "organization": "Organization",
+    "settings": "Settings",
+}
+
+
+def get_page_eyebrow(module_key, module_tabs, current_view="", report_key=""):
+    """Section › Page crumb for module chrome (skip bare Home overview)."""
+    if not module_key:
+        return None
+    if module_key == "home" and current_view in ("", "dashboard:home"):
+        return None
+    section = MODULE_LABELS.get(module_key, module_key.replace("_", " ").title())
+    page = None
+    for tab in module_tabs or []:
+        if tab.get("report_key") and report_key and tab["report_key"] == report_key:
+            page = tab["label"]
+            break
+        if not tab.get("report_key") and tab.get("url_name") == current_view:
+            page = tab["label"]
+            break
+    return {"section": section, "page": page}
+
+
+def annotate_nav_badges(nav, badges):
+    if not badges:
+        return nav
+    for menu in nav:
+        count = badges.get(menu.get("id"))
+        if count:
+            menu["badge"] = count
+    return nav
 
 
 def _tab_allowed(user, url_name, active_church=None):
@@ -686,6 +777,8 @@ def get_module_tabs(user, namespace, current_view="", active_church=None):
         return None, None
     if module_key == "finance" and not _church_feature(active_church, "budgets", user):
         tabs = [t for t in tabs if t.get("url_name") != "budgets:list"]
+    if module_key == "finance":
+        tabs = _prune_finance_tabs(user, tabs)
 
     if module_key == "reports" and not _can_access_reports(user):
         return None, None

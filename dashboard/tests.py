@@ -12,10 +12,12 @@ from accounts.models import UserRole
 from dashboard.models import Notification
 from dashboard.services import (
     get_action_queue,
+    get_alerts,
     get_dashboard_role,
     get_executive_kpis,
     get_financial_summary,
     get_hierarchy_rollup,
+    get_quick_actions,
     get_role_focus,
     notify_user,
 )
@@ -121,6 +123,51 @@ class ServiceTests(DashboardTestMixin, TestCase):
         self.assertEqual(summary["kpi_period_label"], "Month to date")
         self.assertEqual(summary["cutoff_metric_label"], "Remittance payable (MTD)")
 
+    def test_quick_actions_capped_and_no_duplicate_org(self):
+        admin = User.objects.create_user(
+            username="dashadmin",
+            password="pass12345",
+            role=UserRole.SUPER_ADMIN,
+            church=self.church,
+        )
+        actions = get_quick_actions(admin)
+        labels = [a["label"] for a in actions]
+        self.assertLessEqual(len(actions), 6)
+        self.assertEqual(labels.count("Organization"), 1)
+        self.assertNotIn("Churches", labels)
+        self.assertNotIn("Upcoming", labels)
+
+    def test_alerts_use_currency_symbol(self):
+        from unittest.mock import MagicMock, patch
+
+        treasury = User.objects.create_user(
+            username="alerttreasury",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = treasury
+        request.session = {}
+        overdue = MagicMock()
+        overdue.total_payable = Decimal("1250.50")
+        with patch("dashboard.services.get_active_church", return_value=self.church), patch(
+            "dashboard.selectors.overdue_cutoff_for_church", return_value=overdue
+        ), patch(
+            "transactions.services.get_working_day_status",
+            return_value={"is_open": True},
+        ), patch(
+            "dashboard.selectors.locked_period_exists", return_value=False
+        ), patch(
+            "church_system.currency.currency_symbol", return_value="GHS "
+        ):
+            alerts = get_alerts(request, treasury)
+        remittance = [a for a in alerts if "Remittance overdue" in a["text"]]
+        self.assertTrue(remittance)
+        self.assertIn("GHS ", remittance[0]["text"])
+        self.assertNotIn("₵", remittance[0]["text"])
+
 
 class HierarchyScopeTests(TestCase):
     @classmethod
@@ -153,6 +200,41 @@ class HierarchyScopeTests(TestCase):
         self.assertIn("District SDA", names)
         self.assertNotIn("District Meth", names)
         self.assertTrue(all("remittance_payable" in r for r in rows))
+
+
+class NavigationDensityTests(DashboardTestMixin, TestCase):
+    def test_finance_tabs_pruned_for_treasury(self):
+        from church_system.navigation import get_module_tabs
+
+        treasury = User.objects.create_user(
+            username="tabtreasury",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        key, tabs = get_module_tabs(treasury, "ledger", "ledger:entry", active_church=self.church)
+        self.assertEqual(key, "finance")
+        names = {t["url_name"] for t in tabs}
+        self.assertIn("ledger:entry", names)
+        self.assertIn("transactions:transaction_list", names)
+        self.assertNotIn("ledger:accounts", names)
+        self.assertNotIn("ledger:categories", names)
+
+    def test_page_eyebrow_for_finance_pending(self):
+        from church_system.navigation import get_module_tabs, get_page_eyebrow
+
+        treasury = User.objects.create_user(
+            username="eyebrowtreasury",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        key, tabs = get_module_tabs(
+            treasury, "transactions", "transactions:pending_approvals", active_church=self.church
+        )
+        eyebrow = get_page_eyebrow(key, tabs, "transactions:pending_approvals")
+        self.assertEqual(eyebrow["section"], "Finance")
+        self.assertEqual(eyebrow["page"], "Pending")
 
 
 class ViewTests(DashboardTestMixin, TestCase):
@@ -221,6 +303,25 @@ class ViewTests(DashboardTestMixin, TestCase):
         response = self.client.get(reverse("dashboard:home"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Good day")
+        self.assertTrue(response.context["suppress_workspace_cash"])
+        self.assertLessEqual(len(response.context["quick_actions"]), 3)
+        self.assertEqual(response.context["quick_actions_more"], [])
+
+    def test_home_renders_alerts_banner(self):
+        from unittest.mock import patch
+
+        self._login("treasury")
+        fake_alerts = [
+            {"level": "warning", "text": "2 transaction(s) awaiting approval.", "url_name": "transactions:pending_approvals"},
+            {"level": "danger", "text": "Remittance overdue.", "url_name": "dashboard:cutoff"},
+            {"level": "info", "text": "Period locked.", "url_name": "transactions:period_list"},
+            {"level": "secondary", "text": "Extra alert.", "url_name": "dashboard:home"},
+        ]
+        with patch("dashboard.services.get_alerts", return_value=fake_alerts):
+            response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "awaiting approval")
+        self.assertContains(response, "+1 more")
 
     def test_notification_inbox(self):
         notify_user(self.treasury, "Alert", "Test message")

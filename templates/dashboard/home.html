@@ -49,6 +49,8 @@
         </div>
     </header>
 
+    {% include "includes/alert_banners.html" %}
+
     {% if is_control_center and executive_kpis %}
     <section class="cc-kpi-grid mb-4" aria-label="Executive KPIs">
         <a href="{% url 'organization:hierarchy' %}" class="cc-kpi-card">
@@ -85,9 +87,9 @@
     {% endif %}
 
     {% if not is_control_center %}
-    {% if show_finance and has_active_church or show_members %}
+    {% if show_church_finance_kpis and has_active_church or show_member_kpis or member_home_kpis %}
     <section class="cc-kpi-grid mb-4" aria-label="Church KPIs">
-        {% if show_finance and has_active_church %}
+        {% if show_church_finance_kpis and has_active_church %}
         <a href="{% url 'reports:run' 'tithe_report' %}" class="cc-kpi-card cc-kpi-card--primary">
             <span class="cc-kpi-card__label">Tithe (MTD)</span>
             <span class="cc-kpi-card__value text-currency">{% money tithe_total 2 %}</span>
@@ -109,7 +111,7 @@
             <span class="cc-kpi-card__hint">Month to date</span>
         </a>
         {% endif %}
-        {% if show_members %}
+        {% if show_member_kpis %}
         <a href="{% url 'members:list' %}" class="cc-kpi-card">
             <span class="cc-kpi-card__label">Active Members</span>
             <span class="cc-kpi-card__value">{{ member_count|intcomma }}</span>
@@ -119,6 +121,18 @@
             <span class="cc-kpi-card__label">Pending Transfers</span>
             <span class="cc-kpi-card__value">{{ pending_transfers|default:0 }}</span>
             <span class="cc-kpi-card__hint">Needs attention</span>
+        </a>
+        {% endif %}
+        {% if member_home_kpis %}
+        <a href="{% url 'announcements:announcement_list' %}" class="cc-kpi-card">
+            <span class="cc-kpi-card__label">Announcements</span>
+            <span class="cc-kpi-card__value">{{ member_home_kpis.announcements }}</span>
+            <span class="cc-kpi-card__hint">Recent</span>
+        </a>
+        <a href="{% url 'announcements:upcoming_calendar' %}" class="cc-kpi-card cc-kpi-card--accent">
+            <span class="cc-kpi-card__label">Upcoming</span>
+            <span class="cc-kpi-card__value">{{ member_home_kpis.upcoming }}</span>
+            <span class="cc-kpi-card__hint">Next 30 days</span>
         </a>
         {% endif %}
     </section>
@@ -212,16 +226,6 @@
                 </ul>
             </section>
 
-            {% if quick_actions_more %}
-            <div class="role-focus-chips mb-4" aria-label="More shortcuts">
-                {% for action in quick_actions_more %}
-                <a href="{% if action.report_key %}{% url 'reports:run' action.report_key %}{% else %}{% url action.url_name %}{% endif %}" class="chip chip--muted text-decoration-none">
-                    {% if action.icon %}<i class="bi {{ action.icon }}"></i>{% endif %}{{ action.label }}
-                </a>
-                {% endfor %}
-            </div>
-            {% endif %}
-
             {% if compliance_snapshot and compliance_snapshot.overdue_remittances %}
             <section class="cc-panel mb-4">
                 <div class="cc-panel__header">
@@ -250,7 +254,7 @@
         </div>
 
         <div class="col-xl-8">
-            {% if is_control_center and church_leaderboard %}
+            {% if show_leaderboard and church_leaderboard %}
             <section class="cc-panel mb-4">
                 <div class="cc-panel__header">
                     <h2 class="cc-panel__title"><i class="bi bi-trophy"></i> Church Performance — {{ executive_kpis.period_label }}</h2>
@@ -322,7 +326,7 @@
 
             {% if show_finance_charts and has_active_church %}
             <div class="row g-4 mb-4">
-                <div class="col-lg-7">
+                <div class="{% if show_finance_mini_kpis %}col-lg-7{% else %}col-12{% endif %}">
                     <section class="cc-panel mb-0">
                         <div class="cc-panel__header">
                             <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Income vs Expense — 6 months</h2>
@@ -332,6 +336,7 @@
                         </div>
                     </section>
                 </div>
+                {% if show_finance_mini_kpis %}
                 <div class="col-lg-5">
                     <section class="cc-panel mb-0 h-100">
                         <div class="cc-panel__header">
@@ -345,6 +350,7 @@
                         </div>
                     </section>
                 </div>
+                {% endif %}
             </div>
             {% elif show_finance and not has_active_church %}
             <div class="alert-banner alert-warning mb-4">
@@ -352,7 +358,7 @@
             </div>
             {% endif %}
 
-            {% if upcoming_preview %}
+            {% if show_upcoming_panel and upcoming_preview %}
             <section class="cc-panel mb-4">
                 <div class="cc-panel__header">
                     <h2 class="cc-panel__title"><i class="bi bi-calendar-heart"></i> Upcoming</h2>
@@ -378,7 +384,7 @@
                         <span class="calendar-preview-item__icon"><i class="bi {% if item.kind == 'birthday' %}bi-gift{% elif item.kind == 'meeting' %}bi-calendar-event{% else %}bi-megaphone{% endif %}"></i></span>
                         <div class="flex-grow-1">
                             {% if item.url %}<a href="{{ item.url }}" class="table-link">{{ item.title }}</a>{% else %}<span class="fw-semibold">{{ item.title }}</span>{% endif %}
-                            <div class="text-muted" style="font-size:0.75rem">{{ item.date|date:"M j" }}{% if item.subtitle %} · {{ item.subtitle }}{% endif %}</div>
+                            <div class="text-muted calendar-preview-item__meta">{{ item.date|date:"M j" }}{% if item.subtitle %} · {{ item.subtitle }}{% endif %}</div>
                         </div>
                     </li>
                     {% endfor %}
@@ -388,7 +394,7 @@
         </div>
     </div>
 
-    {% if recent_announcements %}
+    {% if show_announcements_panel and recent_announcements %}
     <section class="cc-panel mb-4">
         <div class="cc-panel__header">
             <h2 class="cc-panel__title"><i class="bi bi-megaphone"></i> Announcements</h2>
@@ -399,7 +405,7 @@
             <li class="d-flex justify-content-between align-items-start gap-2 py-2">
                 <div>
                     <a href="{% url 'announcements:announcement_detail' ann.pk %}" class="table-link">{{ ann.title }}</a>
-                    <div class="text-muted" style="font-size:0.75rem">{{ ann.created_at|date:"M j, Y" }}</div>
+                    <div class="text-muted calendar-preview-item__meta">{{ ann.created_at|date:"M j, Y" }}</div>
                 </div>
             </li>
             {% endfor %}
@@ -420,7 +426,7 @@
                     <li class="d-flex justify-content-between align-items-start gap-2 py-2">
                         <div>
                             <a href="{% url 'meetings:detail' meeting.pk %}" class="table-link">{{ meeting.title }}</a>
-                            <div class="text-muted" style="font-size:0.75rem">{{ meeting.scheduled_at|date:"M j, Y · g:i A" }}</div>
+                            <div class="text-muted calendar-preview-item__meta">{{ meeting.scheduled_at|date:"M j, Y · g:i A" }}</div>
                         </div>
                         <span class="chip chip--muted">{{ meeting.get_meeting_type_display }}</span>
                     </li>
@@ -437,7 +443,7 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if show_finance and has_active_church %}
+{% if show_finance_charts and has_active_church %}
 <script>
 const ctx = document.getElementById('trendChart');
 if (ctx) {

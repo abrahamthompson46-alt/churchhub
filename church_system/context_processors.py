@@ -2,9 +2,11 @@
 
 from church_system.church_scope import get_active_church, get_available_churches, get_user_church
 from church_system.navigation import (
+    annotate_nav_badges,
     get_account_navigation,
     get_main_navigation,
     get_module_tabs,
+    get_page_eyebrow,
 )
 
 
@@ -62,8 +64,14 @@ def navigation_context(request):
         request.user, namespace, current_view, active_church=active_church
     )
 
+    main_navigation = get_main_navigation(request.user, active_church=active_church)
+    if request.user.is_authenticated:
+        from dashboard.services import get_nav_badges
+
+        main_navigation = annotate_nav_badges(main_navigation, get_nav_badges(request))
+
     return {
-        "main_navigation": get_main_navigation(request.user, active_church=active_church),
+        "main_navigation": main_navigation,
         "account_navigation": get_account_navigation(request.user),
         "current_view": current_view,
         "current_namespace": namespace,
@@ -71,6 +79,7 @@ def navigation_context(request):
         "unread_notification_count": unread_notifications,
         "module_key": module_key,
         "module_tabs": module_tabs,
+        "page_eyebrow": get_page_eyebrow(module_key, module_tabs, current_view, report_key),
     }
 
 

@@ -30,7 +30,7 @@
             </span>
             {% endif %}
         </div>
-        {% if cash_position and show_cash_position %}
+        {% if cash_position and show_cash_position and not suppress_workspace_cash %}
         <div class="workspace-status-bar__cash" title="Approved book balances" data-currency-symbol="{{ currency_symbol }}">
             <span class="workspace-status-pill workspace-status-pill--cash">
                 <span class="workspace-status-pill__label">Cash</span>

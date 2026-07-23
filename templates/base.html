@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{% static 'vendor/fonts/plus-jakarta-sans/plus-jakarta-sans.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/font/bootstrap-icons.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260722b">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260723a">
     <meta name="theme-color" content="{{ institution_primary_color|default:'#0f2942' }}">
     <style>
         :root {
@@ -71,6 +71,9 @@
     {% include "includes/messages.html" %}
 
     <main class="main-content {% if not user.is_authenticated %}main-content--auth{% endif %}">
+        {% if user.is_authenticated and not user.is_platform_user and user.role != "MEMBER" %}
+        {% include "includes/page_eyebrow.html" %}
+        {% endif %}
         {% block content %}{% endblock %}
     </main>
 

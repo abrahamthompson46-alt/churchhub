@@ -105,7 +105,8 @@
                 </form>
                 {% endif %}
 
-                <ul class="navbar-nav nav-primary align-items-lg-center">
+                {# Desktop mega menus #}
+                <ul class="navbar-nav nav-primary align-items-lg-center d-none d-lg-flex">
                     {% for menu in main_navigation %}
                     {% if menu.type == "link" %}
                     <li class="nav-item">
@@ -113,6 +114,7 @@
                            href="{% url menu.url_name %}">
                             <i class="bi {{ menu.icon }}"></i>
                             <span>{{ menu.label }}</span>
+                            {% if menu.badge %}<span class="nav-link-badge">{{ menu.badge }}</span>{% endif %}
                         </a>
                     </li>
                     {% else %}
@@ -122,6 +124,7 @@
                            aria-expanded="false" id="nav-{{ menu.id }}" aria-haspopup="true">
                             <i class="bi {{ menu.icon }}"></i>
                             <span>{{ menu.label }}</span>
+                            {% if menu.badge %}<span class="nav-link-badge">{{ menu.badge }}</span>{% endif %}
                         </a>
                         <div class="dropdown-menu nav-mega nav-mega--full" aria-labelledby="nav-{{ menu.id }}">
                             <div class="nav-mega-inner">
@@ -163,6 +166,62 @@
                     {% endif %}
                     {% endfor %}
                 </ul>
+
+                {# Mobile accordion navigation #}
+                <div class="nav-mobile-accordion d-lg-none w-100" id="navMobileAccordion">
+                    {% for menu in main_navigation %}
+                    {% if menu.type == "link" %}
+                    <a class="nav-mobile-link{% if current_view == menu.url_name %} is-active{% endif %}"
+                       href="{% url menu.url_name %}">
+                        <span class="nav-mobile-link__label">
+                            <i class="bi {{ menu.icon }}"></i>{{ menu.label }}
+                        </span>
+                        {% if menu.badge %}<span class="nav-link-badge">{{ menu.badge }}</span>{% endif %}
+                    </a>
+                    {% else %}
+                    <div class="nav-mobile-section">
+                        <button class="nav-mobile-toggle{% if menu.id == module_key %} is-active{% endif %}"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#mnav-{{ menu.id }}"
+                                aria-expanded="{% if menu.id == module_key %}true{% else %}false{% endif %}"
+                                aria-controls="mnav-{{ menu.id }}">
+                            <span class="nav-mobile-link__label">
+                                <i class="bi {{ menu.icon }}"></i>{{ menu.label }}
+                            </span>
+                            <span class="nav-mobile-toggle__meta">
+                                {% if menu.badge %}<span class="nav-link-badge">{{ menu.badge }}</span>{% endif %}
+                                <i class="bi bi-chevron-down"></i>
+                            </span>
+                        </button>
+                        <div class="collapse{% if menu.id == module_key %} show{% endif %}" id="mnav-{{ menu.id }}" data-bs-parent="#navMobileAccordion">
+                            <div class="nav-mobile-panel">
+                                {% if menu.sections %}
+                                    {% for section in menu.sections %}
+                                    <p class="nav-mobile-panel__title">{{ section.title }}</p>
+                                    {% for item in section.items %}
+                                    <a class="nav-mobile-item{% if item.report_key and report_key == item.report_key %} is-active{% elif not item.report_key and current_view == item.url_name %} is-active{% endif %}"
+                                       href="{% if item.report_key %}{% url 'reports:run' item.report_key %}{% else %}{% url item.url_name %}{% if item.query %}?{{ item.query }}{% endif %}{% endif %}">
+                                        {% if item.icon %}<i class="bi {{ item.icon }}"></i>{% endif %}
+                                        <span>{{ item.label }}</span>
+                                    </a>
+                                    {% endfor %}
+                                    {% endfor %}
+                                {% elif menu.items %}
+                                    {% for item in menu.items %}
+                                    <a class="nav-mobile-item{% if current_view == item.url_name %} is-active{% endif %}"
+                                       href="{% url item.url_name %}{% if item.query %}?{{ item.query }}{% endif %}">
+                                        {% if item.icon %}<i class="bi {{ item.icon }}"></i>{% endif %}
+                                        <span>{{ item.label }}</span>
+                                    </a>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
             </div>
         </div>
     </nav>

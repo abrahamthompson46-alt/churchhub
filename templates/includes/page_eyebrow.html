@@ -1,0 +1,11 @@
+{% if page_eyebrow %}
+<nav class="page-eyebrow" aria-label="Location">
+    <div class="page-container page-eyebrow__inner">
+        <span class="page-eyebrow__section">{{ page_eyebrow.section }}</span>
+        {% if page_eyebrow.page %}
+        <span class="page-eyebrow__sep" aria-hidden="true">›</span>
+        <span class="page-eyebrow__page">{{ page_eyebrow.page }}</span>
+        {% endif %}
+    </div>
+</nav>
+{% endif %}

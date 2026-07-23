@@ -54,12 +54,16 @@ if ON_PYTHONANYWHERE:
     except ImportError:
         pass
 
-DATABASES = configure_databases(require_managed=True)
+DATABASES = configure_databases(require_managed=not ON_PYTHONANYWHERE)
 
 # PythonAnywhere free/hacker plans usually have no Redis; allow LocMem there.
 _require_redis = not ON_PYTHONANYWHERE
 if env_flag("CHURCHHUB_REQUIRE_REDIS", None) is not None:
     _require_redis = bool(env_flag("CHURCHHUB_REQUIRE_REDIS", True))
+
+_allow_sqlite = ON_PYTHONANYWHERE
+if env_flag("CHURCHHUB_ALLOW_SQLITE", None) is not None:
+    _allow_sqlite = bool(env_flag("CHURCHHUB_ALLOW_SQLITE", False)) and ON_PYTHONANYWHERE
 
 validate_production_environment(
     secret_key=SECRET_KEY,
@@ -70,7 +74,7 @@ validate_production_environment(
     csrf_trusted_origins=CSRF_TRUSTED_ORIGINS,
     require_redis=_require_redis,
     allow_mysql=True,
-    allow_sqlite=bool(env_flag("CHURCHHUB_ALLOW_SQLITE", False) and ON_PYTHONANYWHERE),
+    allow_sqlite=_allow_sqlite,
 )
 
 # File logs on by default in production

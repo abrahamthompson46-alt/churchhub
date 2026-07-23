@@ -144,14 +144,19 @@ def configure_databases(*, require_postgres: bool = False, require_managed: bool
     Database priority:
     1. DATABASE_URL (PostgreSQL or MySQL)
     2. Explicit DB_ENGINE=postgresql | mysql + DB_* vars
-    3. SQLite (local only — blocked when require_managed/require_postgres)
+    3. SQLite (local; also allowed on PythonAnywhere free-tier by default)
     """
     from django.core.exceptions import ImproperlyConfigured
 
     database_url = os.environ.get("DATABASE_URL", "").strip()
     conn_max_age = env_int("DB_CONN_MAX_AGE", 600)
     engine = (os.environ.get("DB_ENGINE") or "").strip().lower()
-    allow_sqlite = bool(env_flag("CHURCHHUB_ALLOW_SQLITE", False))
+    # Free-tier PythonAnywhere: SQLite is the default when no managed DB is configured.
+    allow_sqlite_flag = env_flag("CHURCHHUB_ALLOW_SQLITE", None)
+    if allow_sqlite_flag is None:
+        allow_sqlite = ON_PYTHONANYWHERE
+    else:
+        allow_sqlite = bool(allow_sqlite_flag)
     must_have_managed = require_managed or require_postgres or ON_RENDER
 
     if database_url:
@@ -203,11 +208,11 @@ def configure_databases(*, require_postgres: bool = False, require_managed: bool
             }
         }
 
-    if must_have_managed and not (allow_sqlite and ON_PYTHONANYWHERE):
+    if must_have_managed and not allow_sqlite:
         raise ImproperlyConfigured(
             "DATABASE_URL (or DB_ENGINE=postgresql|mysql with DB_*) must be "
-            "configured for this environment. On PythonAnywhere, put credentials "
-            "in ~/churchhub/.env — Bash does not inherit Web-tab env vars."
+            "configured for this environment. On PythonAnywhere free tier, omit "
+            "DB_ENGINE/DATABASE_URL to use SQLite (db.sqlite3)."
         )
 
     return {

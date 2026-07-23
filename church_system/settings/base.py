@@ -49,6 +49,12 @@ CSRF_TRUSTED_ORIGINS = [
     for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+if ON_PYTHONANYWHERE and not CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS = [
+        "https://churchhub.pythonanywhere.com",
+        "https://www.churchhub.pythonanywhere.com",
+        "https://ChurchHub.pythonanywhere.com",
+    ]
 
 _RENDER_HOST = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip()
 if _RENDER_HOST:
@@ -133,17 +139,20 @@ TEMPLATES = [
 ]
 
 
-def configure_databases(*, require_postgres: bool = False) -> dict:
+def configure_databases(*, require_postgres: bool = False, require_managed: bool = False) -> dict:
     """
     Database priority:
-    1. DATABASE_URL
-    2. Explicit PostgreSQL (DB_ENGINE=postgresql)
-    3. SQLite (local only)
+    1. DATABASE_URL (PostgreSQL or MySQL)
+    2. Explicit DB_ENGINE=postgresql | mysql + DB_* vars
+    3. SQLite (local only — blocked when require_managed/require_postgres)
     """
     from django.core.exceptions import ImproperlyConfigured
 
     database_url = os.environ.get("DATABASE_URL", "").strip()
     conn_max_age = env_int("DB_CONN_MAX_AGE", 600)
+    engine = (os.environ.get("DB_ENGINE") or "").strip().lower()
+    allow_sqlite = bool(env_flag("CHURCHHUB_ALLOW_SQLITE", False))
+    must_have_managed = require_managed or require_postgres or ON_RENDER
 
     if database_url:
         import dj_database_url
@@ -153,11 +162,16 @@ def configure_databases(*, require_postgres: bool = False) -> dict:
             conn_max_age=conn_max_age,
             conn_health_checks=True,
         )
-        if ON_RENDER or env_flag("DB_SSL_REQUIRE", False):
+        engine_name = (db.get("ENGINE") or "").lower()
+        if "postgresql" in engine_name and (ON_RENDER or env_flag("DB_SSL_REQUIRE", False)):
             db.setdefault("OPTIONS", {}).setdefault("sslmode", "require")
+        if "mysql" in engine_name:
+            opts = db.setdefault("OPTIONS", {})
+            opts.setdefault("charset", "utf8mb4")
+            opts.setdefault("init_command", "SET sql_mode='STRICT_TRANS_TABLES'")
         return {"default": db}
 
-    if os.environ.get("DB_ENGINE") == "postgresql":
+    if engine in {"postgresql", "postgres"}:
         return {
             "default": {
                 "ENGINE": "django.db.backends.postgresql",
@@ -171,9 +185,29 @@ def configure_databases(*, require_postgres: bool = False) -> dict:
             }
         }
 
-    if require_postgres or ON_RENDER:
+    if engine == "mysql":
+        return {
+            "default": {
+                "ENGINE": "django.db.backends.mysql",
+                "NAME": os.environ.get("DB_NAME"),
+                "USER": os.environ.get("DB_USER"),
+                "PASSWORD": os.environ.get("DB_PASSWORD"),
+                "HOST": os.environ.get("DB_HOST"),
+                "PORT": os.environ.get("DB_PORT", "3306"),
+                "CONN_MAX_AGE": conn_max_age,
+                "CONN_HEALTH_CHECKS": True,
+                "OPTIONS": {
+                    "charset": "utf8mb4",
+                    "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+                },
+            }
+        }
+
+    if must_have_managed and not (allow_sqlite and ON_PYTHONANYWHERE):
         raise ImproperlyConfigured(
-            "DATABASE_URL (PostgreSQL) must be configured for this environment."
+            "DATABASE_URL (or DB_ENGINE=postgresql|mysql with DB_*) must be "
+            "configured for this environment. On PythonAnywhere, put credentials "
+            "in ~/churchhub/.env — Bash does not inherit Web-tab env vars."
         )
 
     return {

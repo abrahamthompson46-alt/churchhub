@@ -91,6 +91,8 @@ def validate_production_environment(
     redis_url: str,
     csrf_trusted_origins: list[str],
     require_redis: bool = True,
+    allow_mysql: bool = False,
+    allow_sqlite: bool = False,
 ) -> None:
     """Raise ImproperlyConfigured when production essentials are missing."""
     errors: list[str] = []
@@ -101,8 +103,23 @@ def validate_production_environment(
         errors.append("DJANGO_SECRET_KEY must be set to a unique non-default value.")
     if not allowed_hosts or allowed_hosts == ["*"]:
         errors.append("DJANGO_ALLOWED_HOSTS must list explicit hostnames.")
-    if "sqlite" in (database_engine or "").lower():
+
+    engine = (database_engine or "").lower()
+    if "sqlite" in engine and not allow_sqlite:
+        errors.append(
+            "A managed database is required (DATABASE_URL or DB_ENGINE=postgresql"
+            + ("|mysql" if allow_mysql else "")
+            + ")."
+        )
+    elif "mysql" in engine and not allow_mysql:
         errors.append("PostgreSQL is required (DATABASE_URL or DB_ENGINE=postgresql).")
+    elif (
+        "postgresql" not in engine
+        and "mysql" not in engine
+        and "sqlite" not in engine
+    ):
+        errors.append("Unrecognized database engine for production.")
+
     if require_redis and not redis_url:
         errors.append(
             "REDIS_URL is required for multi-worker cache, rate limits, and Celery."

@@ -36,7 +36,7 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 if os.environ.get("CHURCHHUB_ALLOW_SQLITE", "").lower() not in ("true", "1", "yes"):
-    DATABASES = configure_databases(require_postgres=True)
+    DATABASES = configure_databases(require_managed=True)
 
 validate_production_environment(
     secret_key=SECRET_KEY,
@@ -47,4 +47,5 @@ validate_production_environment(
     csrf_trusted_origins=CSRF_TRUSTED_ORIGINS,
     require_redis=os.environ.get("CHURCHHUB_REQUIRE_REDIS", "true").lower()
     in ("true", "1", "yes"),
+    allow_mysql=True,
 )

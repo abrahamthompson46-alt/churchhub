@@ -41,7 +41,7 @@ class EnvHelperTests(SimpleTestCase):
         msg = str(ctx.exception)
         self.assertIn("DEBUG", msg)
         self.assertIn("DJANGO_SECRET_KEY", msg)
-        self.assertIn("PostgreSQL", msg)
+        self.assertIn("managed database", msg.lower())
         self.assertIn("REDIS_URL", msg)
 
     def test_validate_production_passes_minimal(self):
@@ -53,6 +53,18 @@ class EnvHelperTests(SimpleTestCase):
             redis_url="redis://localhost:6379/0",
             csrf_trusted_origins=["https://app.example.com"],
             require_redis=True,
+        )
+
+    def test_validate_production_allows_mysql_when_enabled(self):
+        validate_production_environment(
+            secret_key="unique-production-secret-key-value",
+            debug=False,
+            allowed_hosts=["churchhub.pythonanywhere.com"],
+            database_engine="django.db.backends.mysql",
+            redis_url="",
+            csrf_trusted_origins=["https://churchhub.pythonanywhere.com"],
+            require_redis=False,
+            allow_mysql=True,
         )
 
 

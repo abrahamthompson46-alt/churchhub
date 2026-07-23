@@ -4,12 +4,13 @@ import os
 
 from django.core.exceptions import ImproperlyConfigured
 
-from church_system.env import validate_production_environment
+from church_system.env import env_flag, validate_production_environment
 from church_system.settings.base import *  # noqa: F401,F403
 from church_system.settings.base import (
     ALLOWED_HOSTS,
     CSRF_TRUSTED_ORIGINS,
     DEBUG,
+    ON_PYTHONANYWHERE,
     REDIS_URL,
     SECRET_KEY,
     _INSECURE_SECRET,
@@ -44,7 +45,21 @@ SECURE_HSTS_PRELOAD = os.environ.get("SECURE_HSTS_PRELOAD", "false").lower() in 
 )
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-DATABASES = configure_databases(require_postgres=True)
+# Pure-Python MySQL driver for PythonAnywhere (mysqlclient often unavailable).
+if ON_PYTHONANYWHERE:
+    try:
+        import pymysql
+
+        pymysql.install_as_MySQLdb()
+    except ImportError:
+        pass
+
+DATABASES = configure_databases(require_managed=True)
+
+# PythonAnywhere free/hacker plans usually have no Redis; allow LocMem there.
+_require_redis = not ON_PYTHONANYWHERE
+if env_flag("CHURCHHUB_REQUIRE_REDIS", None) is not None:
+    _require_redis = bool(env_flag("CHURCHHUB_REQUIRE_REDIS", True))
 
 validate_production_environment(
     secret_key=SECRET_KEY,
@@ -53,7 +68,9 @@ validate_production_environment(
     database_engine=DATABASES["default"]["ENGINE"],
     redis_url=REDIS_URL,
     csrf_trusted_origins=CSRF_TRUSTED_ORIGINS,
-    require_redis=True,
+    require_redis=_require_redis,
+    allow_mysql=True,
+    allow_sqlite=bool(env_flag("CHURCHHUB_ALLOW_SQLITE", False) and ON_PYTHONANYWHERE),
 )
 
 # File logs on by default in production

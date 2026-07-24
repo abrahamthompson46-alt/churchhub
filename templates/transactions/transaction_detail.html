@@ -17,7 +17,7 @@
     <div class="d-flex flex-wrap gap-2 mb-4">
             <span class="badge {% if transaction.approval_status == 'APPROVED' %}bg-success{% elif transaction.approval_status == 'PENDING' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ transaction.approval_status }}</span>
             {% if transaction.is_voided %}<span class="badge bg-dark">VOIDED</span>{% endif %}
-        <a href="{% url 'transactions:transaction_receipt' transaction.id %}" class="btn btn-outline-secondary btn-sm">Print Receipt</a>
+        <a href="{% url 'transactions:transaction_confirm' transaction.id %}" class="btn btn-outline-secondary btn-sm">Confirmation / Print</a>
     </div>
 
     <div class="detail-grid">
@@ -32,7 +32,7 @@
                             <tr>
                                 <td>{{ line.account.name }}</td>
                                 <td class="text-muted small">{{ line.account.account_type }}</td>
-                                <td class="text-end text-currency {% if line.amount < 0 %}text-danger{% else %}text-success{% endif %}">₵ {{ line.amount|floatformat:2|intcomma }}</td>
+                                <td class="text-end text-currency {% if line.amount < 0 %}text-danger{% else %}text-success{% endif %}">{{ line.amount|floatformat:2|intcomma }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

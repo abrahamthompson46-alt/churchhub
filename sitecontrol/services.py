@@ -577,6 +577,68 @@ def assign_subscription(
     return sub
 
 
+def record_subscription_payment(
+    subscription,
+    *,
+    user=None,
+    payment_method=None,
+    payment_reference="",
+    paid_at=None,
+    reactivate=True,
+    notes="",
+):
+    """Record payment against a tenant subscription and advance billing window."""
+    from dateutil.relativedelta import relativedelta
+
+    now = timezone.now()
+    paid_at = paid_at or now
+    if timezone.is_naive(paid_at):
+        paid_at = timezone.make_aware(paid_at, timezone.get_current_timezone())
+
+    subscription.last_payment_at = paid_at
+    if payment_method is not None:
+        subscription.payment_method = payment_method
+    if payment_reference:
+        subscription.payment_reference = payment_reference.strip()
+
+    if subscription.billing_interval == "YEARLY":
+        delta = relativedelta(years=1)
+    else:
+        delta = relativedelta(months=1)
+
+    paid_date = paid_at.date()
+    base = subscription.next_billing_at or paid_date
+    if base < paid_date:
+        base = paid_date
+    subscription.next_billing_at = base + delta
+
+    if subscription.expires_at:
+        subscription.expires_at = max(subscription.expires_at, subscription.next_billing_at)
+    else:
+        subscription.expires_at = subscription.next_billing_at
+
+    if reactivate and subscription.status in ("EXPIRED", "SUSPENDED", "TRIAL"):
+        subscription.status = "ACTIVE"
+        subscription.suspended_at = None
+        subscription.suspended_by = None
+
+    if notes:
+        stamp = paid_at.strftime("%Y-%m-%d %H:%M")
+        prior = (subscription.lifecycle_notes or "").strip()
+        line = f"[{stamp}] Payment recorded"
+        if payment_reference:
+            line += f" ({payment_reference.strip()})"
+        line += f": {notes.strip()}"
+        subscription.lifecycle_notes = f"{prior}\n{line}".strip() if prior else line
+
+    if user is not None:
+        subscription.updated_by = user
+
+    repo.save_subscription(subscription)
+    clear_church_plan_cache(subscription.church)
+    return subscription
+
+
 def platform_stats():
     from sitecontrol.registration_services import pending_application_count
 

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}{{ meeting.title }} — Member Portal{% endblock %}
+{% block body_class %}portal-app{% endblock %}
+
+{% block content %}
+<div class="page-container page-shell" style="max-width:40rem;">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'portal:home' %}">Portal</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Live session</li>
+        </ol>
+    </nav>
+    {% include "includes/page_header.html" with page_subtitle="Online / Live" page_title=meeting.title %}
+
+    <article class="data-card p-3 p-md-4">
+        <p class="text-muted small mb-3">
+            {{ meeting.scheduled_at|date:"l, F j, Y · g:i A" }}
+            {% if meeting.church %} · {{ meeting.church.name }}{% endif %}
+            {% if meeting.location %} · {{ meeting.location }}{% endif %}
+        </p>
+        {% if meeting.agenda %}
+        <div class="mb-3">{{ meeting.agenda|linebreaks }}</div>
+        {% endif %}
+        {% if meeting.join_url %}
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <a href="{{ meeting.join_url }}" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+                <i class="bi bi-camera-video me-1" aria-hidden="true"></i>Join on Zoom
+            </a>
+            {% if meeting.join_passcode %}
+            <span class="text-muted small">Passcode: <strong>{{ meeting.join_passcode }}</strong></span>
+            {% endif %}
+        </div>
+        <p class="text-muted small mb-0">Opens Zoom in a new tab. Use the passcode if Zoom asks for one.</p>
+        {% else %}
+        <p class="text-muted mb-0">No join link is available for this session.</p>
+        {% endif %}
+    </article>
+    <div>
+        <a href="{% url 'portal:home' %}" class="btn btn-outline-secondary btn-sm">← Back to portal</a>
+    </div>
+</div>
+{% endblock %}

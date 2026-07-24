@@ -25,13 +25,13 @@
                     <tr>
                         <td>{{ r.bank_account.name }}</td>
                         <td>{{ r.statement_date }}</td>
-                        <td class="text-end text-currency">₵ {{ r.statement_balance|floatformat:2|intcomma }}</td>
-                        <td class="text-end text-currency">₵ {{ r.book_balance|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency">{{ r.statement_balance|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency">{{ r.book_balance|floatformat:2|intcomma }}</td>
                         <td>
                             {% if r.is_reconciled %}
-                            <span class="badge bg-success">Reconciled</span>
+                            Reconciled
                             {% else %}
-                            <span class="badge bg-warning text-dark">In Progress</span>
+                            In Progress
                             {% endif %}
                         </td>
                         <td class="text-end"><a href="{% url 'transactions:reconciliation_detail' r.pk %}" class="table-link">Open</a></td>

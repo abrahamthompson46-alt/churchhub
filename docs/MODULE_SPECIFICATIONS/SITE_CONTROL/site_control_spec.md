@@ -112,7 +112,7 @@ Institution feature gate decorator: `require_feature` in `sitecontrol.checks`.
 | Audit | `audit/`, `audit/export/` |
 | Settings | `settings/`, branding, email, security, features |
 | Registration | `registration/`, `applications/…` |
-| Billing | plans, subscriptions, payment-methods, billing |
+| Billing | plans, subscriptions, `subscriptions/<id>/record-payment/`, payment-methods, billing |
 | Denominations | list/detail/edit/terminology/seeds/branding/billing/context |
 | Tenants | list/detail/edit/provision/suspend/reactivate/offboard/reprovision-financials |
 | Operators | list/add/edit/deactivate |
@@ -203,9 +203,10 @@ flowchart LR
 
 ## 13. Known architectural gaps
 
-- MFA not fully implemented (AGENTS aspiration).  
+- MFA audience policy + enforcement exist in SiteSettings / accounts middleware; richer recovery UX remains Planned.  
 - Soft-delete for tenants = suspend/offboard statuses.  
-- No customer self-serve billing portal.  
+- No customer self-serve billing portal / payment gateway.  
+- Operators can **record subscription payments** and advance `next_billing_at` / `expires_at` (manual SaaS billing). Full invoice ledger is Recommended.  
 - Feature keys must stay synced across FEATURE_FIELDS / plan fields / `require_feature` callers.
 
 ---
@@ -215,7 +216,8 @@ flowchart LR
 | Topic | Current | Planned (AGENTS) | Recommended |
 |-------|---------|------------------|-------------|
 | Tenancy | Denomination + church subscription | Richer multi-tenant ops | Keep denomination wall |
-| Auth hardening | Login rate limit + session timeout | MFA, device tracking | Wire MFA without bypassing middleware |
+| Auth hardening | Login rate limit, session timeout, MFA audiences/enforcement | Device tracking, recovery UX | Keep MFA fail-closed for required audiences |
+| Billing ops | Plans, payment methods, record payment / renew dates | Gateway + invoices | Automate dunning after manual payment flow |
 | Compliance | Platform audit | GDPR tooling | Expand audit export carefully |
 
 **Must not change:** denomination isolation; `church_has_feature` fail-closed semantics; capability checks on `/platform/`; maintenance/login middleware behavior without security review.

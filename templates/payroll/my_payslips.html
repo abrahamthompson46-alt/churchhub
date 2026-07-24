@@ -11,9 +11,9 @@
     {% else %}
     {% if ytd %}
     <div class="dash-inline-stats mb-4">
-        <div class="dash-inline-stat"><span class="dash-inline-stat__label">YTD Gross</span><span class="dash-inline-stat__value">₵{{ ytd.gross|floatformat:2 }}</span></div>
-        <div class="dash-inline-stat"><span class="dash-inline-stat__label">YTD Net</span><span class="dash-inline-stat__value">₵{{ ytd.net|floatformat:2 }}</span></div>
-        <div class="dash-inline-stat"><span class="dash-inline-stat__label">YTD PAYE</span><span class="dash-inline-stat__value">₵{{ ytd.paye|floatformat:2 }}</span></div>
+        <div class="dash-inline-stat"><span class="dash-inline-stat__label">YTD Gross</span><span class="dash-inline-stat__value">{{ ytd.gross|floatformat:2 }}</span></div>
+        <div class="dash-inline-stat"><span class="dash-inline-stat__label">YTD Net</span><span class="dash-inline-stat__value">{{ ytd.net|floatformat:2 }}</span></div>
+        <div class="dash-inline-stat"><span class="dash-inline-stat__label">YTD PAYE</span><span class="dash-inline-stat__value">{{ ytd.paye|floatformat:2 }}</span></div>
     </div>
     {% endif %}
     <div class="table-responsive table-in-card">
@@ -23,8 +23,8 @@
                 {% for line in lines %}
                 <tr>
                     <td>{{ line.payroll_run.period_label }}</td>
-                    <td class="text-end">₵{{ line.gross_pay|floatformat:2 }}</td>
-                    <td class="text-end">₵{{ line.net_pay|floatformat:2 }}</td>
+                    <td class="text-end">{{ line.gross_pay|floatformat:2 }}</td>
+                    <td class="text-end">{{ line.net_pay|floatformat:2 }}</td>
                     <td class="text-end"><a href="{% url 'payroll:payslip_pdf' line.pk %}" class="btn btn-sm btn-outline-secondary" target="_blank">PDF</a></td>
                 </tr>
                 {% empty %}

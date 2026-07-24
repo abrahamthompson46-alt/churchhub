@@ -98,23 +98,39 @@ def get_upcoming_meetings(request, days=60, limit=50):
         return []
     now = timezone.now()
     end = now + timedelta(days=days)
+    from permissions.checks import can_view_meetings
+
+    portal_visible_only = not can_view_meetings(request.user)
     qs = selectors.scheduled_meetings_for_church_in_window(
-        church, start=now, end=end, limit=limit
+        church,
+        start=now,
+        end=end,
+        limit=limit,
+        portal_visible_only=portal_visible_only,
     )
     items = []
     for meeting in qs:
         subtitle = meeting.location or ""
         if meeting.department:
             subtitle = f"{meeting.department.name}" + (f" · {subtitle}" if subtitle else "")
+        if meeting.join_url:
+            subtitle = (subtitle + " · Online").strip(" ·") if subtitle else "Online"
+        use_portal = portal_visible_only or (
+            meeting.show_on_portal and getattr(request.user, "role", "") == "MEMBER"
+        )
         items.append(
             _calendar_item(
                 kind="meeting",
                 when=meeting.scheduled_at,
                 title=meeting.title,
                 subtitle=subtitle,
-                url_name="meetings:detail",
+                url_name="portal:meeting_live" if use_portal else "meetings:detail",
                 url_kwargs={"pk": meeting.pk},
-                meta={"location": meeting.location},
+                meta={
+                    "location": meeting.location,
+                    "join_url": meeting.join_url or "",
+                    "show_on_portal": meeting.show_on_portal,
+                },
             )
         )
     return items

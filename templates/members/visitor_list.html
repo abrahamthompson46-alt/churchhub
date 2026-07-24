@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Visitors — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container page-shell">
+    {% if can_manage %}
+    {% url 'members:visitor_add' as add_url %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Visitors" page_description="Track guests and follow-up status." action_url=add_url action_label="Add Visitor" action_icon="bi-person-plus" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Visitors" page_description="Track guests and follow-up status." %}
+    {% endif %}
+
+    <div class="filter-bar filter-bar--sticky">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
+                <label class="form-label">Search</label>
+                {{ filter_form.q }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Status</label>
+                {{ filter_form.status }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">From</label>
+                {{ filter_form.date_from }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">To</label>
+                {{ filter_form.date_to }}
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Filter</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Visit date</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th>Assigned</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for visitor in visitors %}
+                    <tr>
+                        <td><strong>{{ visitor.full_name }}</strong></td>
+                        <td>{{ visitor.visit_date }}</td>
+                        <td>{{ visitor.phone|default:"—" }}</td>
+                        <td>{{ visitor.follow_up_status }}</td>
+                        <td>{% if visitor.assigned_elder %}{{ visitor.assigned_elder.full_name }}{% else %}—{% endif %}</td>
+                        <td class="text-end text-nowrap">
+                            {% if can_manage %}
+                            <a href="{% url 'members:visitor_edit' visitor.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            {% if not visitor.converted_member_id %}
+                            <a href="{% url 'members:visitor_convert' visitor.pk %}" class="btn btn-sm btn-outline-primary">Convert</a>
+                            {% else %}
+                            <a href="{% url 'members:detail' visitor.converted_member_id %}" class="btn btn-sm btn-link">Member</a>
+                            {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6">
+                        {% if can_manage %}
+                        {% url 'members:visitor_add' as add_url %}
+                        {% include "includes/empty_state.html" with icon="bi-person-heart" message="No visitors recorded yet." action_url=add_url action_label="Add visitor" %}
+                        {% else %}
+                        {% include "includes/empty_state.html" with icon="bi-person-heart" message="No visitors recorded yet." %}
+                        {% endif %}
+                    </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page_obj.has_other_pages %}
+        <nav class="d-flex justify-content-center py-3" aria-label="Visitors pagination">
+            <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filter_qs %}&amp;{{ filter_qs }}{% endif %}">Previous</a></li>
+                {% endif %}
+                <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filter_qs %}&amp;{{ filter_qs }}{% endif %}">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

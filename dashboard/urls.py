@@ -9,6 +9,7 @@ urlpatterns = [
     path("switch-church/", views.switch_church, name="switch_church"),
     path("notifications/", views.notification_list, name="notifications"),
     path("notifications/<int:pk>/read/", views.notification_mark_read, name="notification_mark_read"),
+    path("notifications/<int:pk>/delete/", views.notification_delete, name="notification_delete"),
     path("notifications/read-all/", views.notification_mark_all_read, name="notification_mark_all_read"),
     path("notifications/count/", views.notification_count, name="notification_count"),
     path("notifications/pending/", views.pending_announcements_ajax, name="pending_announcements_count"),

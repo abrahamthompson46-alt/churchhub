@@ -430,3 +430,81 @@ def get_union_or_404(qs, pk):
 
 def get_general_conference_or_404(qs, pk):
     return get_object_or_404(qs, pk=pk)
+
+
+def church_history_base_queryset():
+    from organization.models import ChurchHistoryEntry
+
+    return ChurchHistoryEntry.objects.select_related(
+        "church",
+        "church__district__zone__conference",
+        "created_by",
+        "updated_by",
+    )
+
+
+def church_history_for_churches(church_ids):
+    return church_history_base_queryset().filter(church_id__in=church_ids)
+
+
+def church_history_entry_or_404(church_ids, pk):
+    return get_object_or_404(church_history_for_churches(church_ids), pk=pk)
+
+
+def search_church_history(
+    qs,
+    *,
+    q="",
+    category="",
+    church_id=None,
+    conference_id=None,
+    date_from=None,
+    date_to=None,
+):
+    """
+    Apply clear, additive search filters to a church history queryset.
+
+    Search (`q`) matches title, body, tags, location, and church name.
+    Scope filters (church / conference) are exact UUID matches.
+    """
+    from django.db.models import Q
+
+    if church_id:
+        qs = qs.filter(church_id=church_id)
+    if conference_id:
+        qs = qs.filter(church__district__zone__conference_id=conference_id)
+    if category:
+        qs = qs.filter(category=category)
+    if date_from:
+        qs = qs.filter(event_date__gte=date_from)
+    if date_to:
+        qs = qs.filter(event_date__lte=date_to)
+
+    q = (q or "").strip()
+    if q:
+        qs = qs.filter(
+            Q(title__icontains=q)
+            | Q(body__icontains=q)
+            | Q(tags__icontains=q)
+            | Q(location__icontains=q)
+            | Q(church__name__icontains=q)
+            | Q(church__code__icontains=q)
+        )
+    return qs.order_by("-event_date", "-created_at")
+
+
+def church_history_count_for_church(church):
+    from organization.models import ChurchHistoryEntry
+
+    return ChurchHistoryEntry.objects.filter(church=church).count()
+
+
+def church_history_count_for_conference(conference, church_ids=None):
+    from organization.models import ChurchHistoryEntry
+
+    qs = ChurchHistoryEntry.objects.filter(
+        church__district__zone__conference=conference,
+    )
+    if church_ids is not None:
+        qs = qs.filter(church_id__in=church_ids)
+    return qs.count()

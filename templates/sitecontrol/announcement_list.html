@@ -15,7 +15,7 @@
             {% for item in announcements %}
             <tr>
                 <td class="fw-semibold">{{ item.title }}</td>
-                <td>{% if item.is_current %}<span class="badge bg-success">Live</span>{% elif item.is_active %}<span class="badge bg-warning text-dark">Scheduled</span>{% else %}<span class="badge bg-secondary">Off</span>{% endif %}</td>
+                <td>{% if item.is_current %}Live{% elif item.is_active %}Scheduled{% else %}Off{% endif %}</td>
                 <td>{% if item.show_on_login %}Yes{% else %}No{% endif %}</td>
                 <td class="small text-muted">{{ item.starts_at|default:"—" }} → {{ item.ends_at|default:"—" }}</td>
                 <td><a href="{% url 'sitecontrol:announcement_edit' item.pk %}" class="btn btn-sm btn-outline-primary">Edit</a></td>

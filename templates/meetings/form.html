@@ -3,10 +3,16 @@
 {% block title %}{{ title }} — ChurchHub{% endblock %}
 
 {% block content %}
-{% include "includes/form_open.html" with breadcrumbs=breadcrumbs form_subtitle="People" form_title=title %}
+{% include "includes/form_open.html" with breadcrumbs=breadcrumbs form_subtitle="People" form_title=title wide=True %}
 <form method="post" novalidate>
     {% csrf_token %}
-    {% for field in form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+    <div class="row g-3">
+        {% for field in form %}
+        <div class="col-md-6{% if field.field.widget.input_type == 'textarea' or 'notes' in field.name or 'description' in field.name %} col-12{% endif %}">
+            {% include "includes/form_field.html" with field=field %}
+        </div>
+        {% endfor %}
+    </div>
     <div class="d-flex gap-2 pt-3">
         <button type="submit" class="btn btn-primary">Save</button>
         <a href="{% url 'meetings:list' %}" class="btn btn-outline-secondary">Cancel</a>

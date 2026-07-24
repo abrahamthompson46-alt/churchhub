@@ -34,6 +34,19 @@
             {% if meeting.secretary_name %} · <strong>Secretary:</strong> {{ meeting.secretary_name }}{% endif %}
         </p>
         {% endif %}
+        {% if meeting.join_url %}
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+            <a href="{{ meeting.join_url }}" class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer">
+                <i class="bi bi-camera-video me-1" aria-hidden="true"></i>Join Zoom
+            </a>
+            {% if meeting.join_passcode %}
+            <span class="small text-muted">Passcode: <strong>{{ meeting.join_passcode }}</strong></span>
+            {% endif %}
+            {% if meeting.show_on_portal %}
+            <span class="chip chip--muted">On member portal</span>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 
     {% if meeting.minutes_status == 'REJECTED' and meeting.minutes_rejection_reason %}

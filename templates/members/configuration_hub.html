@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container page-shell">
+    {% include "includes/page_header.html" with page_subtitle="Administration" page_title="Configuration" page_description="Church lists and setup used across member forms." %}
+
+    <div class="row g-4">
+        {% if can_occupations %}
+        <div class="col-md-6">
+            <div class="data-card h-100">
+                <div class="data-card__header"><span>Occupations</span></div>
+                <div class="p-3">
+                    <p class="text-muted small mb-3">Church-specific occupation list shown on Add/Edit Member.</p>
+                    {% if church %}
+                    <a href="{% url 'members:occupation_list' %}" class="btn btn-primary btn-sm">Manage occupations</a>
+                    {% else %}
+                    <p class="text-warning small mb-0">Select an active church to manage occupations.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% if can_lookups %}
+        <div class="col-md-6">
+            <div class="data-card h-100">
+                <div class="data-card__header"><span>Member lists</span></div>
+                <div class="p-3">
+                    <p class="text-muted small mb-3">Membership status, gender, marital status, record types, and related dropdowns.</p>
+                    <a href="{% url 'members:member_lookup_list' %}" class="btn btn-primary btn-sm">Manage lists</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

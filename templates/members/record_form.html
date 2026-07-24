@@ -3,32 +3,22 @@
 {% block title %}{{ title }} — ChurchHub{% endblock %}
 
 {% block content %}
-<div class="page-container">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <nav aria-label="breadcrumb" class="app-breadcrumb">
-                <ol class="breadcrumb mb-0">
-                    <li class="breadcrumb-item"><a href="{% url 'members:list' %}">Members</a></li>
-                    <li class="breadcrumb-item"><a href="{% url 'members:record_list' %}">Records</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
-                </ol>
-            </nav>
-            {% include "includes/page_header.html" with page_subtitle="Members" page_title=title %}
-            <div class="form-card-inner card">
-                <div class="card-body p-4 p-md-5">
-                    <form method="post" novalidate>
-                        {% csrf_token %}
-                        {% for field in form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
-                        <div class="d-flex gap-2 pt-2">
-                            <button type="submit" class="btn btn-primary">Save Record</button>
-                            {% if record %}<a href="{% url 'members:record_detail' record.pk %}" class="btn btn-link">Cancel</a>
-                            {% elif member %}<a href="{% url 'members:detail' member.id %}" class="btn btn-link">Cancel</a>
-                            {% else %}<a href="{% url 'members:record_list' %}" class="btn btn-link">Cancel</a>{% endif %}
-                        </div>
-                    </form>
-                </div>
-            </div>
+{% include "includes/form_open.html" with form_subtitle="Members" form_title=title wide=True %}
+<form method="post" novalidate>
+    {% csrf_token %}
+    <div class="row g-3">
+        {% for field in form %}
+        <div class="col-md-6{% if 'notes' in field.name or 'description' in field.name or field.field.widget.input_type == 'textarea' %} col-12{% endif %}">
+            {% include "includes/form_field.html" with field=field %}
         </div>
+        {% endfor %}
     </div>
-</div>
+    <div class="d-flex gap-2 pt-3">
+        <button type="submit" class="btn btn-primary">Save Record</button>
+        {% if record %}<a href="{% url 'members:record_detail' record.pk %}" class="btn btn-outline-secondary">Cancel</a>
+        {% elif member %}<a href="{% url 'members:detail' member.id %}" class="btn btn-outline-secondary">Cancel</a>
+        {% else %}<a href="{% url 'members:record_list' %}" class="btn btn-outline-secondary">Cancel</a>{% endif %}
+    </div>
+</form>
+{% include "includes/form_close.html" %}
 {% endblock %}

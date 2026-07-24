@@ -20,6 +20,7 @@ class MeetingType(models.TextChoices):
     DEACONS = "DEACONS", "Deacons Council"
     DEPARTMENT = "DEPARTMENT", "Department Meeting"
     GENERAL = "GENERAL", "General Meeting"
+    ONLINE_SERVICE = "ONLINE_SERVICE", "Online / Live Service"
     OTHER = "OTHER", "Other"
 
 
@@ -44,6 +45,19 @@ class Meeting(models.Model):
     title = models.CharField(max_length=255)
     agenda = models.TextField(blank=True)
     location = models.CharField(max_length=255, blank=True)
+    join_url = models.URLField(
+        blank=True,
+        help_text="Zoom (or other) join link for online / live sessions.",
+    )
+    join_passcode = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text="Optional meeting passcode shown to authorized members.",
+    )
+    show_on_portal = models.BooleanField(
+        default=False,
+        help_text="When enabled, scheduled meetings with a join link appear on the member portal.",
+    )
     chair_person = models.CharField(max_length=150, blank=True)
     secretary_name = models.CharField(max_length=150, blank=True)
     scheduled_at = models.DateTimeField()
@@ -91,6 +105,7 @@ class Meeting(models.Model):
             models.Index(fields=["church", "scheduled_at"]),
             models.Index(fields=["church", "minutes_status"]),
             models.Index(fields=["church", "meeting_type"]),
+            models.Index(fields=["church", "show_on_portal", "scheduled_at"]),
         ]
 
     def __str__(self):
@@ -128,6 +143,22 @@ class MeetingAttachment(models.Model):
         related_name="meeting_attachments_uploaded",
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        from church_system.uploads import validate_upload
+
+        super().clean()
+        if not self.file:
+            return
+        try:
+            validate_upload(self.file, kind="document")
+        except ValidationError as exc:
+            raise ValidationError({"file": exc.messages}) from exc
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return self.label or self.file.name

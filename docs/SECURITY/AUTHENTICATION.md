@@ -34,11 +34,22 @@ flowchart TD
 | Item | Detail |
 |------|--------|
 | Primary login | `/accounts/login/` → `church_system.auth.ChurchHubLoginView` |
-| Portal login | `/portal/login/` → `MemberPortalLoginView` |
-| Backend | Default `ModelBackend` (no custom `AUTHENTICATION_BACKENDS`) |
+| Portal login | `/portal/login/` → `portal.views.portal_login` (member email + DOB/password) |
+| Backend | Default `ModelBackend` for staff; portal verifies against `members.Member` then establishes a session |
 | Settings | `LOGIN_URL=/accounts/login/`; `LOGIN_REDIRECT_URL=/dashboard/` (overridden by view) |
 | Root | `""` redirects to `login` |
-| Also mounted | `django.contrib.auth.urls` under `/accounts/` (password reset/change) |
+| Also mounted | `django.contrib.auth.urls` under `/accounts/` (staff password reset/change); portal reset under `/portal/password/` |
+
+### Member portal credentials (Current)
+
+| Step | Behavior |
+|------|----------|
+| Username | Member **email** (must match an active `members.Member.email`) |
+| First password | Member **date of birth** as `YYYY-MM-DD` (other common date formats accepted) |
+| Match rule | Email and DOB must both match the member directory before a portal session is issued |
+| Provisioning | First successful match creates/links a `User` (`role=MEMBER`, `must_change_password=True`) |
+| New device / first login | Confirmation email link (`/portal/confirm/<token>/`) before session; trusted-device cookie afterward |
+| After login | Forced password change when `must_change_password`; change at `/portal/password/change/`; reset at `/portal/password/reset/` |
 
 ### Success redirects (`post_login_url`)
 
@@ -71,6 +82,7 @@ Portal login additionally sends users with `member_id` to the portal.
 | `managed_denominations` | M2M — operator denomination access |
 | `mfa_enabled` | Enrolled MFA flag (enforced only when site MFA policy requires the user’s audience) |
 | `member` | Optional OneToOne to `members.Member` |
+| `must_change_password` | Portal users must set a non-DOB password after first confirmed sign-in |
 
 Password hashing: Django’s password framework only — never plaintext.
 
@@ -329,7 +341,7 @@ SiteSettings also: session timeout, login attempts/lockout, password min length 
 | Lockout | Cache rate-limit | Account lock + admin unlock | Persist lock events; unlock UI |
 | Sessions | Idle via SiteSettings | Absolute + logout-all + devices | Absolute timeout + logout-all |
 | MFA | TOTP + email OTP + recovery; trusted device 30d | SMS OTP | Expand optional roles |
-| Portal | Separate login view | Richer member auth | Keep lane separation |
+| Portal | Email + DOB bootstrap, device confirm, forced password change, portal reset | Richer member auth / optional portal MFA | Keep lane separation; enforce unique member email + DOB |
 
 ---
 

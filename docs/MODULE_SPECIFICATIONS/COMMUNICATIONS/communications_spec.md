@@ -24,7 +24,8 @@ Church **announcements** with create → approve/reject → archive lifecycle, p
 | Announcement + images + views + audit | Platform announcements (→ `sitecontrol` `/platform/announcements/`) |
 | Approval workflow | Email/SMS blast engine (absent) |
 | Upcoming calendar aggregation | Member pastoral edits |
-| Nav label “Communications” | App folder remains `announcements` |
+| Nav label "Church Life" | App folder remains `announcements` |
+| Church History mega-nav entry (UI) | Chronicle model lives in `organization.ChurchHistoryEntry` |
 
 ---
 
@@ -44,7 +45,7 @@ erDiagram
 - Status: PENDING / APPROVED / REJECTED / ARCHIVED (plus legacy boolean flags `is_approved`, `is_archived`, `is_rejected`)  
 - `event_date`, `publish_at`, `auto_expire`, `is_pinned`  
 - Max pinned per church: `MAX_PINNED_PER_CHURCH = 3`  
-- Image rules: max 5 MB; jpeg/png/gif/webp  
+- Image rules: max 5 MB; jpeg/png/gif/webp via shared `church_system.uploads` validators
 
 **PK type:** integer (not UUID) on Announcement.
 
@@ -54,14 +55,16 @@ erDiagram
 
 ## 3. Business rules (Current)
 
-1. Create may land PENDING pending approval permissions.  
+1. Create lands PENDING by default (maker-checker). Explicit `auto_approve=True` only when the actor may approve that scope.  
 2. Pin limit enforced in services.  
 3. Scheduled items hidden until `publish_at`.  
-4. Self-approve blocked where `can_approve_announcement` enforces.  
-5. Archive / reject recorded with audit.  
+4. Pending queue excludes the submitter's own rows; approve/reject require `approve_announcements` + church scope.  
+5. Archive / reject recorded with audit; archive requires `archive_announcements` or creator.  
 6. View tracking via `mark_viewed` / `track_view`.  
 7. Calendar combines birthdays (members), meetings, announcement event dates.  
-8. **No `@require_feature`** on announcement views — module is available whenever the user has announcement permissions (unlike meetings/ledger/etc.).
+8. Optional `target_roles` + department targeting; empty = entire visibility scope.  
+9. List/detail/calendar require `view_announcements`; export uses `export_announcements`.  
+10. **No `@require_feature`** on announcement views — module is available whenever the user has announcement permissions.
 
 ---
 
@@ -168,8 +171,10 @@ flowchart LR
 
 | Topic | Current | Planned (AGENTS) | Recommended |
 |-------|---------|------------------|-------------|
-| Channels | In-app announcements | Multi-channel comms | Add providers without rewriting model |
+| Channels | In-app announcements + dashboard notifications | Multi-channel comms | Email for publish/export (Phase 3) |
+| Audience | Church/general + optional roles/departments | Richer pastoral targeting | Keep server-side filters |
 | Calendar | Aggregated upcoming | Richer pastoral calendar | Keep service-based aggregation |
 | Status fields | status + booleans | Single status | Migrate carefully |
+| Notifications | Inbox filters, POST mark-read, MEETING/SYSTEM categories, export-ready notify | Preferences / push | Optional email prefs |
 
 **Must not change:** pin limit without product approval; approval before broad visibility; church scoping.

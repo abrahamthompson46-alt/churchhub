@@ -16,7 +16,7 @@
             {% for row in fund_balances %}
             <div class="dash-inline-stat">
                 <span class="dash-inline-stat__label">{{ row.label }}</span>
-                <span class="dash-inline-stat__value">₵{{ row.balance|floatformat:2 }}</span>
+                <span class="dash-inline-stat__value">{{ row.balance|floatformat:2 }}</span>
             </div>
             {% endfor %}
         </div>
@@ -80,9 +80,9 @@
                         <td>{{ policy.effective_from }}{% if policy.effective_to %} – {{ policy.effective_to }}{% endif %}</td>
                         <td>
                             {% if policy.is_active %}
-                            <span class="badge bg-success-subtle text-success">Active</span>
+                            Active
                             {% else %}
-                            <span class="badge bg-secondary-subtle text-secondary">Inactive</span>
+                            Inactive
                             {% endif %}
                         </td>
                         {% if can_edit %}
@@ -106,8 +106,12 @@
     </div>
 
     <div class="mt-3 d-flex gap-2">
+        {% if can_manage_finances or can_manage_remittance_policy or can_manage_settlements %}
         <a href="{% url 'remittance:settlements' %}" class="btn btn-outline-secondary btn-sm">Settlement Batches</a>
+        {% endif %}
+        {% if can_view_welfare or can_manage_welfare_cases %}
         <a href="{% url 'remittance:welfare' %}" class="btn btn-outline-secondary btn-sm">Welfare Register</a>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

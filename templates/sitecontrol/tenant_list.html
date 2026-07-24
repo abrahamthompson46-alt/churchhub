@@ -30,7 +30,7 @@
                 <td><code>{{ church.code }}</code></td>
                 <td>{{ church.district.name }}</td>
                 <td>{% if church.subscription %}{{ church.subscription.plan.name }}{% else %}<span class="text-warning">None</span>{% endif %}</td>
-                <td>{% if church.subscription %}<span class="badge bg-{% if church.subscription.status == 'ACTIVE' %}success{% elif church.subscription.status == 'SUSPENDED' %}danger{% else %}secondary{% endif %}">{{ church.subscription.get_status_display }}</span>{% else %}—{% endif %}</td>
+                <td>{% if church.subscription %}{{ church.subscription.get_status_display }}{% else %}—{% endif %}</td>
                 <td class="text-nowrap">
                     <a href="{% url 'sitecontrol:tenant_detail' church.pk %}" class="btn btn-sm btn-outline-primary">View</a>
                     {% if can_manage_tenants %}

@@ -50,9 +50,9 @@
                     <td>{{ account.name }}</td>
                     <td class="small text-muted">{{ account.get_account_type_display }}</td>
                     <td>
-                        <span class="chip chip--{% if account.is_active %}success{% else %}muted{% endif %}">
+                        
                             {% if account.is_active %}Active{% else %}Inactive{% endif %}
-                        </span>
+                        
                     </td>
                     {% if can_manage_accounts %}
                     <td class="text-end">

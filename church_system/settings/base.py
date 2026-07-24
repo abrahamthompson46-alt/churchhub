@@ -15,6 +15,7 @@ from church_system.env import (
     load_dotenv,
 )
 from church_system.storage import apply_s3_settings, build_storages
+from church_system.uploads import MAX_REQUEST_UPLOAD_BYTES
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -266,6 +267,14 @@ X_FRAME_OPTIONS = "DENY"
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
+
+# Align Django request/file buffering with shared upload limits (nginx is 25m).
+DATA_UPLOAD_MAX_MEMORY_SIZE = env_int(
+    "DATA_UPLOAD_MAX_MEMORY_SIZE", MAX_REQUEST_UPLOAD_BYTES
+)
+FILE_UPLOAD_MAX_MEMORY_SIZE = env_int(
+    "FILE_UPLOAD_MAX_MEMORY_SIZE", MAX_REQUEST_UPLOAD_BYTES
+)
 
 REDIS_URL = os.environ.get("REDIS_URL", "").strip()
 SESSION_REDIS = env_flag("CHURCHHUB_SESSION_REDIS", False)

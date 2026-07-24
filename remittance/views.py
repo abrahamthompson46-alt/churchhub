@@ -13,7 +13,9 @@ from permissions.checks import (
     can_disburse_welfare,
     can_manage_finances,
     can_manage_remittance_policy,
+    can_manage_settlements,
     can_manage_welfare_cases,
+    can_view_welfare,
 )
 from sitecontrol.checks import require_feature
 from remittance import repositories as repo
@@ -115,6 +117,11 @@ def policy_index(request):
         "unit_choices": unit_choices,
         "can_edit": can_manage_remittance_policy(request.user),
         "active_church": church,
+        "can_manage_settlements": can_manage_settlements(request.user),
+        "can_manage_finances": can_manage_finances(request.user),
+        "can_manage_remittance_policy": can_manage_remittance_policy(request.user),
+        "can_view_welfare": can_view_welfare(request.user),
+        "can_manage_welfare_cases": can_manage_welfare_cases(request.user),
     })
 
 

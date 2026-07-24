@@ -15,11 +15,7 @@
             <p class="auth-platform-eyebrow mb-2">Member Portal</p>
             <h2 class="auth-split-title">{{ institution_display_name|default:site_name }}</h2>
             <p class="auth-split-tagline">
-                {% if active_denomination.tagline %}
-                {{ active_denomination.tagline }}
-                {% else %}
-                View your membership, giving, and church updates in one place.
-                {% endif %}
+                Sign in with your member email. First time? Use your date of birth as the password.
             </p>
             <ul class="auth-feature-list">
                 <li><i class="bi bi-person-badge"></i> Membership profile</li>
@@ -43,38 +39,48 @@
 
         <div class="auth-card card">
             <div class="card-body p-4 p-md-5">
-                <h1 class="auth-form-title text-center">Sign in</h1>
-                <p class="text-muted small mb-4 text-center">Access your personal church portal.</p>
+                <h1 class="auth-form-title text-center">Member sign in</h1>
+                <p class="text-muted small mb-4 text-center">
+                    Email from your member record. First sign-in password is your date of birth (YYYY-MM-DD).
+                </p>
 
-                {% if form.errors %}
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger py-2 small d-flex align-items-start gap-2 mb-3">
+                    <i class="bi bi-exclamation-circle mt-1"></i>
+                    <div>{{ form.non_field_errors.0 }}</div>
+                </div>
+                {% elif form.errors %}
                 <div class="alert alert-danger py-2 small d-flex align-items-center gap-2 mb-3">
-                    <i class="bi bi-exclamation-circle"></i> Invalid username or password.
+                    <i class="bi bi-exclamation-circle"></i> Check your email and password, then try again.
                 </div>
                 {% endif %}
 
                 <form method="post" novalidate>
                     {% csrf_token %}
                     <div class="form-group">
-                        <label class="form-label" for="id_username">Username</label>
+                        <label class="form-label" for="id_username">Email</label>
                         <div class="input-icon-wrap">
-                            <i class="bi bi-person input-icon" aria-hidden="true"></i>
-                            <input type="text" name="username" id="id_username" class="form-control ps-5" autofocus required autocomplete="username" placeholder="Username">
+                            <i class="bi bi-envelope input-icon" aria-hidden="true"></i>
+                            {{ form.username }}
                         </div>
+                        {% if form.username.errors %}<div class="form-error">{{ form.username.errors.0 }}</div>{% endif %}
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="id_password">Password</label>
                         <div class="input-icon-wrap input-icon-wrap--password">
                             <i class="bi bi-lock input-icon" aria-hidden="true"></i>
-                            <input type="password" name="password" id="id_password" class="form-control ps-5" required autocomplete="current-password" placeholder="Password">
+                            {{ form.password }}
                             <button type="button" class="password-toggle" data-toggle-password="id_password" aria-label="Show password">
                                 <i class="bi bi-eye" aria-hidden="true"></i>
                             </button>
                         </div>
+                        <div class="form-hint">{{ form.password.help_text }}</div>
+                        {% if form.password.errors %}<div class="form-error">{{ form.password.errors.0 }}</div>{% endif %}
                     </div>
                     <button type="submit" class="btn btn-primary w-100 py-2 mt-2">Enter Portal</button>
                 </form>
                 <p class="text-center mt-3 mb-0 small">
-                    <a href="{% url 'password_reset' %}" class="text-muted text-decoration-none">Forgot password?</a>
+                    <a href="{% url 'portal:password_reset' %}" class="text-muted text-decoration-none">Forgot password?</a>
                 </p>
                 <p class="auth-secondary-links text-center mt-3 mb-0 small">
                     <a href="{% url 'login' %}" class="text-decoration-none">Staff sign in</a>

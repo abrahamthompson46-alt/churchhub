@@ -29,9 +29,9 @@
                             {% if can_approve_transactions %}<td><input type="checkbox" name="transaction_ids" value="{{ t.id }}" class="form-check-input" form="bulk-form"></td>{% endif %}
                             <td><a href="{% url 'transactions:transaction_detail' t.id %}" class="table-link"><code class="small">{{ t.reference }}</code></a></td>
                             <td>{{ t.date }}</td>
-                            <td><span class="chip">{{ t.transaction_type }}</span></td>
+                            <td>{{ t.transaction_type }}</td>
                             <td class="text-muted">{{ t.description|default:"—"|truncatechars:40 }}</td>
-                            <td class="text-end text-currency">₵ {{ t.receipt_total|floatformat:2|intcomma }}</td>
+                            <td class="text-end text-currency">{{ t.receipt_total|floatformat:2|intcomma }}</td>
                             <td class="text-end text-nowrap">
                                 {% if can_approve_transactions %}
                                 <form method="post" action="{% url 'transactions:approve_transaction' t.id %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-success">Approve</button></form>

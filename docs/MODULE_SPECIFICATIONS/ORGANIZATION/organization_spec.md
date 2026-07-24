@@ -53,6 +53,7 @@ erDiagram
 | `Zone` | FK conference; unique name; unique code per conference |
 | `District` | FK zone; unique name; unique code per zone |
 | `Church` | FK district; `address`, `is_active`, `financials_provisioned`; unique name/code per district; properties for zone/conference/union/GC/denomination |
+| `ChurchHistoryEntry` | Church-scoped institutional chronicle (title, body, event_date, category, location, tags); audited via `OrganizationAuditLog` |
 | `OrganizationAuditLog` | CREATE/UPDATE/DEACTIVATE/ACTIVATE/TRANSFER; polymorphic entity_type/entity_id |
 
 `Church.clean()` blocks moving to a district in another denomination (use transfer workflow).
@@ -100,6 +101,9 @@ Views → Services → Selectors → Repositories → Models
 | `set_church_active` | Toggle `is_active` |
 | `export_hierarchy_rows` | Export rows (via selectors) |
 | `reconcile_organization` | Detect unprovisioned / missing subscription / orphans |
+| `search_church_history_entries` | Scoped chronicle search (q / category / church / conference / dates) |
+| `create_church_history_entry` / `update_church_history_entry` | Chronicle writes + org audit |
+| `get_scoped_history_entry` | Manageable-church detail lookup |
 
 **File:** `organization/access.py` — scoped getters, `require_org_read` / `require_org_manage`, subtree/global manage asserts, capability flags.
 
@@ -109,7 +113,7 @@ Management: `reconcile_organization` command.
 
 ## 6. Views (Current)
 
-Hierarchy overview (+ CSV/Excel export), unit directory, CRUD for GC/Union/Conference/Zone/District/Church, `church_onboard`, `church_transfer`, `church_toggle_active` (POST).
+Hierarchy overview (+ CSV/Excel export), unit directory, CRUD for GC/Union/Conference/Zone/District/Church, `church_onboard`, `church_transfer`, `church_toggle_active` (POST), Church History list/detail/create/edit (Church Life UI).
 
 ---
 
@@ -128,18 +132,22 @@ Hierarchy overview (+ CSV/Excel export), unit directory, CRUD for GC/Union/Confe
 | `districts/…` | `district_*` |
 | `churches/onboard/` | `organization:church_onboard` |
 | `churches/add\|<uuid>\|edit\|transfer\|toggle-active/` | `church_*` |
+| `church-history/` | `church_history_list` |
+| `church-history/add/` | `church_history_create` |
+| `church-history/<uuid>/` | `church_history_detail` |
+| `church-history/<uuid>/edit/` | `church_history_edit` |
 
 ---
 
 ## 8. Templates (Current)
 
-`templates/organization/`: hierarchy, directory, `*_detail.html`, `*_form.html`, `church_onboard.html`, `church_transfer.html`, `includes/conference_tree.html`.
+`templates/organization/`: hierarchy, directory, `*_detail.html`, `*_form.html`, `church_onboard.html`, `church_transfer.html`, `church_history_*.html`, `includes/conference_tree.html`.
 
 ---
 
 ## 9. Forms (Current)
 
-`DenominationScopedFormMixin`; `GeneralConferenceForm`, `UnionForm`, `ConferenceForm`, `ZoneForm`, `DistrictForm`, `ChurchForm`; `ChurchOnboardingForm`, `FullChurchOnboardingForm`, `ChurchTransferForm`.
+`DenominationScopedFormMixin`; `GeneralConferenceForm`, `UnionForm`, `ConferenceForm`, `ZoneForm`, `DistrictForm`, `ChurchForm`; `ChurchOnboardingForm`, `FullChurchOnboardingForm`, `ChurchTransferForm`; `ChurchHistoryEntryForm`, `ChurchHistorySearchForm`.
 
 ---
 
@@ -150,6 +158,7 @@ No app-local `permissions.py`. Uses:
 - `can_view_all_churches` (read)
 - `can_manage_organization` (manage)
 - Transfer: `can_transfer_churches` (and scope rules in access)
+- Church History: `view_church_history`, `manage_church_history` (Church Life panel; church-scoped)
 - District-scoped users: restricted structure edits / onboard modes
 - Onboarding may be disabled by site flags (`institution_onboarding_allowed`)
 

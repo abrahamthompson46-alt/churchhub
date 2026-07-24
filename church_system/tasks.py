@@ -101,12 +101,33 @@ def generate_report_export_task(self, job_id):
             row_count=len(data.get("rows") or []),
             export_format=job.export_format,
         )
+        from dashboard.services import notify_user
+
+        notify_user(
+            job.user,
+            "Export ready",
+            f'Your "{job.report_key}" export is ready to download.',
+            category="SYSTEM",
+            action_url=f"/reports/exports/{job.pk}/",
+        )
         return {"status": "complete", "job_id": str(job.pk)}
     except Exception as exc:
         job.status = ReportExportJob.STATUS_FAILED
         job.error_message = str(exc)[:2000]
         repo.save_export_job(job, update_fields=["status", "error_message", "updated_at"])
         logger.exception("Report export failed for job %s", job_id)
+        try:
+            from dashboard.services import notify_user
+
+            notify_user(
+                job.user,
+                "Export failed",
+                f'Your "{job.report_key}" export could not be completed.',
+                category="SYSTEM",
+                action_url="/reports/",
+            )
+        except Exception:
+            logger.exception("Failed to notify user about export failure %s", job_id)
         raise
 
 

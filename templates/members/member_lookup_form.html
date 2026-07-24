@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — ChurchHub{% endblock %}
+
+{% block content %}
+{% include "includes/form_open.html" with form_subtitle="Administration" form_title=title wide=True %}
+<form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <div class="row g-3">
+        <div class="col-md-6">{% include "includes/form_field.html" with field=form.category %}</div>
+        <div class="col-md-6">{% include "includes/form_field.html" with field=form.code %}</div>
+        <div class="col-md-6">{% include "includes/form_field.html" with field=form.label %}</div>
+        <div class="col-md-3">{% include "includes/form_field.html" with field=form.sort_order %}</div>
+        <div class="col-md-3">{% include "includes/form_field.html" with field=form.is_active %}</div>
+    </div>
+    {% if option and option.is_system %}
+    <p class="text-muted small mt-2 mb-0">System options keep a fixed code; you can rename the label, reorder, or deactivate.</p>
+    {% endif %}
+    <div class="d-flex gap-2 pt-3">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="{% url 'members:member_lookup_list' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% include "includes/form_close.html" %}
+{% endblock %}

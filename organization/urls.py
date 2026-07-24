@@ -28,4 +28,8 @@ urlpatterns = [
     path("churches/<uuid:pk>/edit/", views.church_edit, name="church_edit"),
     path("churches/<uuid:pk>/transfer/", views.church_transfer, name="church_transfer"),
     path("churches/<uuid:pk>/toggle-active/", views.church_toggle_active, name="church_toggle_active"),
+    path("church-history/", views.church_history_list, name="church_history_list"),
+    path("church-history/add/", views.church_history_create, name="church_history_create"),
+    path("church-history/<uuid:pk>/", views.church_history_detail, name="church_history_detail"),
+    path("church-history/<uuid:pk>/edit/", views.church_history_edit, name="church_history_edit"),
 ]

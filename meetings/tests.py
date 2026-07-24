@@ -155,3 +155,40 @@ class MeetingsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Called to order.")
         self.assertContains(response, "Reports received.")
+
+    def test_create_online_service_with_zoom(self):
+        self.client.login(username="sec_m", password="pass12345")
+        response = self.client.post(reverse("meetings:create"), {
+            "title": "Sabbath Live",
+            "meeting_type": MeetingType.ONLINE_SERVICE,
+            "agenda": "Worship online",
+            "location": "",
+            "join_url": "https://zoom.us/j/123456789",
+            "join_passcode": "abc123",
+            "show_on_portal": "on",
+            "scheduled_at": timezone.now().strftime("%Y-%m-%dT%H:%M"),
+            "status": MeetingStatus.SCHEDULED,
+        })
+        self.assertEqual(response.status_code, 302)
+        meeting = Meeting.objects.get(title="Sabbath Live")
+        self.assertEqual(meeting.join_url, "https://zoom.us/j/123456789")
+        self.assertTrue(meeting.show_on_portal)
+        detail = self.client.get(reverse("meetings:detail", args=[meeting.pk]))
+        self.assertContains(detail, "Join Zoom")
+
+    def test_portal_requires_join_url_when_shown(self):
+        from meetings.forms import MeetingForm
+
+        form = MeetingForm(
+            data={
+                "title": "No Link",
+                "meeting_type": MeetingType.ONLINE_SERVICE,
+                "scheduled_at": timezone.now().strftime("%Y-%m-%dT%H:%M"),
+                "status": MeetingStatus.SCHEDULED,
+                "show_on_portal": True,
+                "join_url": "",
+            },
+            church=self.church,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("join_url", form.errors)

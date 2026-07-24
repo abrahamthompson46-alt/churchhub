@@ -69,13 +69,16 @@ def message_body(message):
 
 @register.simple_tag(takes_context=True)
 def money(context, amount, places=2):
-    """Format amount with site currency symbol from context."""
+    """Format amount as plain tabular number (no currency symbol).
+
+    Currency is shown via page context / headers when needed — not inline
+    glyphs in tables or KPI cards.
+    """
     from django.contrib.humanize.templatetags.humanize import intcomma
     from django.template.defaultfilters import floatformat
 
-    symbol = context.get("currency_symbol") or "₵"
+    del context  # reserved for future locale/currency options
     try:
-        formatted = intcomma(floatformat(amount, places))
+        return intcomma(floatformat(amount, places))
     except (TypeError, ValueError):
-        formatted = str(amount)
-    return f"{symbol}{formatted}"
+        return str(amount)

@@ -51,13 +51,13 @@
                         <td><a href="{% url 'accounts:user_detail' log.user_id %}" class="table-link">{{ log.user.username }}</a></td>
                         <td>
                             {% if log.action == "LOGIN" or log.action == "USER_ACTIVATE" or log.action == "INVITE_ACCEPTED" %}
-                            <span class="chip chip--success">{{ log.get_action_display }}</span>
+                            {{ log.get_action_display }}
                             {% elif log.action == "LOGOUT" or log.action == "PASSWORD_CHANGE" or log.action == "PROFILE_UPDATE" %}
-                            <span class="chip chip--warning">{{ log.get_action_display }}</span>
+                            {{ log.get_action_display }}
                             {% elif log.action == "USER_DEACTIVATE" or log.action == "INVITE_REVOKED" %}
-                            <span class="chip chip--danger">{{ log.get_action_display }}</span>
+                            {{ log.get_action_display }}
                             {% else %}
-                            <span class="chip chip--info">{{ log.get_action_display }}</span>
+                            {{ log.get_action_display }}
                             {% endif %}
                         </td>
                         <td class="text-muted">{{ log.performed_by.username|default:"—" }}</td>

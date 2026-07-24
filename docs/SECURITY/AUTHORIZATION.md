@@ -316,6 +316,8 @@ Domain apps also use `@require_feature(...)` from `sitecontrol.checks` and local
 
 Domain examples: transaction self-approve block, payroll dual approval, asset SoD (`assets.rbac.assert_segregation_of_duties`), minutes/announcement pending queues, welfare approve vs disburse.
 
+**Receipt auto-approve (Current exception):** Income `RECEIPT` journals within `TreasuryApprovalPolicy` / `User.max_receipt_auto_approve` limits are auto-approved by the maker (`auto_approve_receipt`). Amounts above the limit stay PENDING for a second approver. Expenses and other types keep full SoD. Audit details include `auto_approved: true`.
+
 ---
 
 ## 15. Security boundaries (Current)

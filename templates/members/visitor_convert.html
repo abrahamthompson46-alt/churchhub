@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — ChurchHub{% endblock %}
+
+{% block content %}
+{% include "includes/form_open.html" with form_subtitle="People" form_title=title form_description="Create an active member from this visitor record." wide=True %}
+<dl class="row mb-4">
+    <dt class="col-sm-3 col-md-2">Name</dt>
+    <dd class="col-sm-9 col-md-4">{{ visitor.full_name }}</dd>
+    <dt class="col-sm-3 col-md-2">Visit date</dt>
+    <dd class="col-sm-9 col-md-4">{{ visitor.visit_date }}</dd>
+    <dt class="col-sm-3 col-md-2">Phone</dt>
+    <dd class="col-sm-9 col-md-4">{{ visitor.phone|default:"—" }}</dd>
+    <dt class="col-sm-3 col-md-2">Email</dt>
+    <dd class="col-sm-9 col-md-4">{{ visitor.email|default:"—" }}</dd>
+    <dt class="col-sm-3 col-md-2">Status</dt>
+    <dd class="col-sm-9 col-md-4">{{ visitor.follow_up_status }}</dd>
+</dl>
+<p class="text-muted small mb-4">Contact details will be copied to the new member. You can complete the profile afterward.</p>
+<form method="post" novalidate>
+    {% csrf_token %}
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Convert to Member</button>
+        <a href="{% url 'members:visitor_list' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% include "includes/form_close.html" %}
+{% endblock %}

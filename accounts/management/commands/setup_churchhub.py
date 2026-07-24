@@ -187,12 +187,28 @@ class Command(BaseCommand):
         )
         ensure_default_policies_for_church(church)
         ensure_hierarchy_settlement_policies(church)
-        from sitecontrol.services import assign_subscription, ensure_default_plans, get_default_plan
+        from sitecontrol.services import (
+            assign_subscription,
+            ensure_default_payment_methods,
+            ensure_default_plans,
+            get_default_plan,
+        )
 
         ensure_default_plans()
+        ensure_default_payment_methods()
         plan = get_default_plan()
         if plan:
             assign_subscription(church, plan)
+
+        from sitecontrol.denomination_services import ensure_builtin_denominations
+        ensure_builtin_denominations()
+
+        from members.lookups import ensure_member_form_catalogs
+        ensure_member_form_catalogs(church)
+
+        from assets.services import ensure_asset_defaults_for_church
+        ensure_asset_defaults_for_church(church)
+
         return church
 
     def _ensure_platform_owner(self, no_input):

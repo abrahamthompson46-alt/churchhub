@@ -3,11 +3,17 @@
 {% block title %}{{ title }} — ChurchHub{% endblock %}
 
 {% block content %}
-{% include "includes/form_open.html" with form_subtitle="Finance" form_title=title %}
+{% include "includes/form_open.html" with form_subtitle="Finance" form_title=title wide=True %}
 {% if scope_label %}<p class="text-muted small mb-3">{{ scope_label }}</p>{% endif %}
 <form method="post" novalidate>
     {% csrf_token %}
-    {% for field in form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+    <div class="row g-3">
+        {% for field in form %}
+        <div class="col-md-6{% if 'notes' in field.name or 'description' in field.name %} col-12{% endif %}">
+            {% include "includes/form_field.html" with field=field %}
+        </div>
+        {% endfor %}
+    </div>
     <div class="d-flex gap-2 pt-3">
         <button type="submit" class="btn btn-primary">Save</button>
         <a href="{% url 'budgets:list' %}" class="btn btn-outline-secondary">Cancel</a>

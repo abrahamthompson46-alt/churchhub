@@ -410,9 +410,16 @@ def entry_confirm(request):
                 church, request.user, draft, idempotency_key=idem_key
             )
             request.session.pop(SESSION_DRAFT_KEY, None)
+            if txn.approval_status == "APPROVED":
+                flash_success(
+                    request,
+                    f"{txn.reference} recorded and auto-approved.",
+                    title="Ledger entry saved",
+                )
+                return redirect("transactions:transaction_detail", pk=txn.pk)
             flash_success(
                 request,
-                f"{txn.reference} recorded and pending approval.",
+                f"{txn.reference} recorded and pending second approval.",
                 title="Ledger entry saved",
             )
             return redirect("transactions:pending_approvals")

@@ -230,3 +230,55 @@ class BudgetServiceTests(BudgetsTestMixin, TestCase):
         meta = _variance_meta("EXPENSE", Decimal("1000"), Decimal("800"))
         self.assertTrue(meta["favorable"])
         self.assertEqual(meta["variance"], Decimal("200.00"))
+
+    def test_attach_forecast_extrapolates_ytd(self):
+        from budgets.services import attach_forecast
+        from unittest.mock import patch
+        from datetime import date
+
+        rows = [
+            {
+                "account": "Income",
+                "account_type": "INCOME",
+                "budgeted": Decimal("1200.00"),
+                "actual": Decimal("300.00"),
+                "tracks_actual": True,
+                "variance": Decimal("-900.00"),
+                "favorable": False,
+            }
+        ]
+        with patch("django.utils.timezone.localdate", return_value=date(2026, 3, 15)):
+            enriched = attach_forecast(rows, 2026)
+        # March → 3/12 progress; 300 / 0.25 = 1200
+        self.assertEqual(enriched[0]["forecast"], Decimal("1200.00"))
+
+    def test_clone_budgets_copies_lines(self):
+        from budgets.services import clone_budgets
+
+        user = User.objects.create_user(
+            username="budget_clone_user",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        Budget.objects.create(
+            church=self.church,
+            level="CHURCH",
+            year=2026,
+            account=self.income_account,
+            amount=Decimal("5000.00"),
+            notes="Source",
+        )
+        result = clone_budgets(
+            source_year=2026,
+            target_year=2027,
+            level="CHURCH",
+            church=self.church,
+            user=user,
+        )
+        self.assertEqual(result["created"], 1)
+        self.assertEqual(result["skipped"], 0)
+        clone = Budget.objects.get(
+            church=self.church, year=2027, account=self.income_account, level="CHURCH"
+        )
+        self.assertEqual(clone.amount, Decimal("5000.00"))

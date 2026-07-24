@@ -45,9 +45,9 @@
                     <td>{{ row.church }}</td>
                     <td>{{ row.district }}</td>
                     <td>{{ row.count }}</td>
-                    <td class="text-end">₵{{ row.cost|floatformat:2 }}</td>
-                    <td class="text-end">₵{{ row.accumulated|floatformat:2 }}</td>
-                    <td class="text-end">₵{{ row.nbv|floatformat:2 }}</td>
+                    <td class="text-end">{{ row.cost|floatformat:2 }}</td>
+                    <td class="text-end">{{ row.accumulated|floatformat:2 }}</td>
+                    <td class="text-end">{{ row.nbv|floatformat:2 }}</td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="6" class="text-center text-muted py-4">No active assets in scope.</td></tr>

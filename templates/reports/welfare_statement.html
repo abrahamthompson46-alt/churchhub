@@ -51,12 +51,12 @@
     </div>
 
     <div class="row g-3 mb-4">
-        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Opening</p><h5 class="mb-0">₵{{ statement.opening_balance|floatformat:2|intcomma }}</h5></div></div></div>
-        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Contributed</p><h5 class="mb-0">₵{{ summary.contributed|floatformat:2|intcomma }}</h5></div></div></div>
-        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Received</p><h5 class="mb-0">₵{{ summary.received|floatformat:2|intcomma }}</h5></div></div></div>
-        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Closing</p><h5 class="mb-0">₵{{ statement.closing_balance|floatformat:2|intcomma }}</h5></div></div></div>
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Opening</p><h5 class="mb-0">{{ statement.opening_balance|floatformat:2|intcomma }}</h5></div></div></div>
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Contributed</p><h5 class="mb-0">{{ summary.contributed|floatformat:2|intcomma }}</h5></div></div></div>
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Received</p><h5 class="mb-0">{{ summary.received|floatformat:2|intcomma }}</h5></div></div></div>
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Closing</p><h5 class="mb-0">{{ statement.closing_balance|floatformat:2|intcomma }}</h5></div></div></div>
         <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Pending Cases</p><h5 class="mb-0">{{ summary.pending_cases }}</h5></div></div></div>
-        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Approved</p><h5 class="mb-0">₵{{ summary.approved_awaiting_disbursement|floatformat:2|intcomma }}</h5></div></div></div>
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Approved</p><h5 class="mb-0">{{ summary.approved_awaiting_disbursement|floatformat:2|intcomma }}</h5></div></div></div>
     </div>
 
     <section class="dash-section">
@@ -70,7 +70,7 @@
                         <td colspan="4" class="text-muted small">Opening balance</td>
                         <td class="text-end">—</td>
                         <td class="text-end">—</td>
-                        <td class="text-end fw-semibold">₵{{ statement.opening_balance|floatformat:2 }}</td>
+                        <td class="text-end fw-semibold">{{ statement.opening_balance|floatformat:2 }}</td>
                     </tr>
                     {% endif %}
                     {% for row in statement.rows %}
@@ -79,9 +79,9 @@
                         <td>{{ row.type }}</td>
                         <td>{% if row.case_id %}<a href="{% url 'remittance:welfare_case_detail' row.case_id %}" class="table-link">{{ row.reference }}</a>{% else %}{{ row.reference|default:"—" }}{% endif %}</td>
                         <td>{{ row.description|default:"—" }}</td>
-                        <td class="text-end">{% if row.in_amount %}₵{{ row.in_amount|floatformat:2 }}{% else %}—{% endif %}</td>
-                        <td class="text-end">{% if row.out_amount %}₵{{ row.out_amount|floatformat:2 }}{% else %}—{% endif %}</td>
-                        <td class="text-end fw-semibold">₵{{ row.balance|floatformat:2 }}</td>
+                        <td class="text-end">{% if row.in_amount %}{{ row.in_amount|floatformat:2 }}{% else %}—{% endif %}</td>
+                        <td class="text-end">{% if row.out_amount %}{{ row.out_amount|floatformat:2 }}{% else %}—{% endif %}</td>
+                        <td class="text-end fw-semibold">{{ row.balance|floatformat:2 }}</td>
                     </tr>
                     {% empty %}
                     <tr><td colspan="7" class="text-muted text-center py-3">No welfare activity for this period.</td></tr>

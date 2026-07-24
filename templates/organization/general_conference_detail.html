@@ -29,7 +29,7 @@
                     {% for union in unions %}
                     <tr>
                         <td><a href="{% url 'organization:union_detail' union.id %}" class="table-link">{{ union.name }}</a></td>
-                        <td class="text-muted"><span class="chip">{{ union.code }}</span></td>
+                        <td class="text-muted">{{ union.code }}</td>
                         <td>{{ union.conference_count }}</td>
                         <td class="text-end">
                             {% if can_manage %}

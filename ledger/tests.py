@@ -143,7 +143,8 @@ class PostingTests(LedgerTestMixin, TestCase):
         cat = LedgerCategory.objects.get(church=self.church, code="REC_COMBINED_CASH")
         draft = build_entry_draft(cat, Decimal("250.00"), "Sunday combined", None)
         txn = post_ledger_entry(self.church, self.treasury, draft)
-        self.assertEqual(txn.approval_status, "PENDING")
+        self.assertEqual(txn.approval_status, "APPROVED")
+        self.assertTrue(txn.locked)
         self.assertEqual(txn.ledger_category_id, cat.pk)
         # Combined 50/50 → DR cash + CR retain + CR remit payable
         self.assertEqual(txn.lines.count(), 3)
@@ -283,7 +284,7 @@ class PageTests(LedgerTestMixin, TestCase):
     def test_entry_page_renders(self):
         response = self.client.get(reverse("ledger:entry"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Ledger Entry")
+        self.assertContains(response, "Journal Entry")
 
     def test_confirm_page_renders_with_draft(self):
         cat = LedgerCategory.objects.get(church=self.church, code="REC_INCOME_CASH")
@@ -293,7 +294,7 @@ class PageTests(LedgerTestMixin, TestCase):
         session.save()
         response = self.client.get(reverse("ledger:entry_confirm"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Confirm Ledger Entry")
+        self.assertContains(response, "Confirm Journal Entry")
         self.assertContains(response, "Debit")
 
     def test_category_detail_renders(self):

@@ -72,20 +72,18 @@
             <div class="platform-card-header">Quick Actions</div>
             <div class="platform-card-body">
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="{% url 'sitecontrol:setup' %}" class="btn btn-primary btn-sm"><i class="bi bi-list-check me-1"></i>Setup</a>
-                    <a href="{% url 'sitecontrol:tenant_provision' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-magic me-1"></i>Provision</a>
-                    <a href="{% url 'sitecontrol:tenant_list' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-building me-1"></i>Tenants</a>
-                    <a href="{% url 'sitecontrol:plan_list' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-box-seam me-1"></i>Plans</a>
-                    <a href="{% url 'sitecontrol:payment_method_list' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-wallet2 me-1"></i>Payments</a>
-                    <a href="{% url 'sitecontrol:registration_settings' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-door-open me-1"></i>Registration</a>
-                    <a href="{% url 'sitecontrol:email_settings' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-envelope-at me-1"></i>Email</a>
-                    <a href="{% url 'sitecontrol:security_settings' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-lock me-1"></i>Security</a>
-                    {% if stats.pending_applications %}
+                    {% for action in quick_actions %}
+                    <a href="{% url action.url_name %}" class="btn btn-outline-primary btn-sm">
+                        {% if action.icon %}<i class="bi {{ action.icon }} me-1"></i>{% endif %}{{ action.label }}
+                    </a>
+                    {% empty %}
+                    <span class="text-muted small">No actions available for your role.</span>
+                    {% endfor %}
+                    {% if stats.pending_applications and can_manage_applications %}
                     <a href="{% url 'sitecontrol:application_list' %}?status=PENDING" class="btn btn-warning btn-sm"><i class="bi bi-inbox me-1"></i>{{ stats.pending_applications }} pending</a>
                     {% endif %}
-                    <a href="{% url 'sitecontrol:ops_health' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-activity me-1"></i>Ops</a>
                 </div>
-                {% if churches_without_sub %}
+                {% if churches_without_sub and can_manage_subscriptions %}
                 <p class="text-muted small mt-2 mb-0">{{ churches_without_sub }} church(es) without a subscription. <a href="{% url 'sitecontrol:subscription_seed' %}">Assign default plan</a>.</p>
                 {% endif %}
             </div>
@@ -100,7 +98,7 @@
                     <tr>
                         <td class="text-muted small text-nowrap">{{ entry.created_at|date:"M j, H:i" }}</td>
                         <td>{{ entry.user.username|default:"—" }}</td>
-                        <td><span class="badge bg-secondary">{{ entry.get_action_display }}</span></td>
+                        <td>{{ entry.get_action_display }}</td>
                         <td>{{ entry.summary|truncatechars:50 }}</td>
                     </tr>
                     {% empty %}

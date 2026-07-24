@@ -36,6 +36,9 @@ class FixedAssetForm(forms.ModelForm):
             "insurance_expiry": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "warranty_expiry": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "description": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "category": forms.Select(attrs={"class": "form-select"}),
+            "depreciation_method": forms.Select(attrs={"class": "form-select"}),
+            "custodian_member": forms.Select(attrs={"class": "form-select"}),
         }
 
     def __init__(self, *args, church=None, **kwargs):

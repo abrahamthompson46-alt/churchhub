@@ -7,7 +7,7 @@
 <div class="page-container">
     {% if can_manage_ledger_entries %}
     {% url 'ledger:entry' as new_entry_url %}
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="General Ledger" page_description="Category-driven double-entry posting with automatic debit and credit accounts." action_url=new_entry_url action_label="New Entry" action_icon="bi-journal-plus" %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="General Ledger" page_description="Category-driven double-entry posting with automatic debit and credit accounts." action_url=new_entry_url action_label="Journal Entry" action_icon="bi-journal-plus" %}
     {% else %}
     {% include "includes/page_header.html" with page_subtitle="Finance" page_title="General Ledger" page_description="Category-driven double-entry posting with automatic debit and credit accounts." %}
     {% endif %}
@@ -75,8 +75,8 @@
                                 <td><a href="{% url 'transactions:transaction_detail' t.pk %}" class="table-link small">{{ t.reference }}</a></td>
                                 <td class="small"><a href="{% url 'ledger:category_detail' t.ledger_category_id %}" class="table-link">{{ t.ledger_category.name }}</a></td>
                                 <td class="small text-muted">{{ t.date|date:"M j, Y" }}</td>
-                                <td class="text-end text-currency small">₵ {{ t.receipt_total|floatformat:2|intcomma }}</td>
-                                <td><span class="chip chip--{% if t.approval_status == 'APPROVED' %}success{% elif t.approval_status == 'PENDING' %}warning{% else %}muted{% endif %}">{{ t.get_approval_status_display }}</span></td>
+                                <td class="text-end text-currency small">{{ t.receipt_total|floatformat:2|intcomma }}</td>
+                                <td>{{ t.get_approval_status_display }}</td>
                             </tr>
                             {% empty %}
                             <tr><td colspan="5">{% include "includes/empty_state.html" with icon="bi-journal" message="No ledger entries yet." action_url=new_entry_url action_label="Record first entry" %}</td></tr>
@@ -95,7 +95,7 @@
                 <div class="ledger-quick-links">
                     <a href="{% url 'ledger:entry' %}" class="ledger-quick-link">
                         <i class="bi bi-journal-plus"></i>
-                        <span>New Ledger Entry</span>
+                        <span>New Journal Entry</span>
                     </a>
                     <a href="{% url 'ledger:accounts' %}" class="ledger-quick-link">
                         <i class="bi bi-journal-bookmark"></i>

@@ -1,0 +1,16 @@
+Confirm your {{ site_name }} member portal sign-in
+
+Hello{% if member %} {{ member.first_name }}{% endif %},
+
+We received a sign-in request for your member portal account.
+If this was you, open the link below to confirm this device:
+
+{{ confirm_url }}
+
+This link expires in {{ expires_hours }} hours.
+
+If you did not try to sign in, you can ignore this email.
+{% if ip_address %}Request IP: {{ ip_address }}{% endif %}
+{% if device_hint %}Device: {{ device_hint }}{% endif %}
+
+— {{ site_name }}

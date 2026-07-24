@@ -71,9 +71,6 @@
     {% include "includes/messages.html" %}
 
     <main class="main-content {% if not user.is_authenticated %}main-content--auth{% endif %}">
-        {% if user.is_authenticated and not user.is_platform_user and user.role != "MEMBER" %}
-        {% include "includes/page_eyebrow.html" %}
-        {% endif %}
         {% block content %}{% endblock %}
     </main>
 

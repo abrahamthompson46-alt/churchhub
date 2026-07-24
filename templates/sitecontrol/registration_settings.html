@@ -45,17 +45,17 @@
                 <tr>
                     <td>Public church application (<code>/apply/</code>)</td>
                     <td>Allow church self-registration</td>
-                    <td>{% if form.instance.allow_church_self_registration %}<span class="badge bg-success">Open</span>{% else %}<span class="badge bg-secondary">Closed</span>{% endif %}</td>
+                    <td>{% if form.instance.allow_church_self_registration %}Open{% else %}Closed{% endif %}</td>
                 </tr>
                 <tr>
                     <td>Institution user invites</td>
                     <td>Allow institution user invites</td>
-                    <td>{% if form.instance.allow_institution_user_invites %}<span class="badge bg-success">Allowed</span>{% else %}<span class="badge bg-danger">Blocked</span>{% endif %}</td>
+                    <td>{% if form.instance.allow_institution_user_invites %}Allowed{% else %}Blocked{% endif %}</td>
                 </tr>
                 <tr>
                     <td>Institution church onboarding</td>
                     <td>Allow institution church onboarding</td>
-                    <td>{% if form.instance.allow_institution_church_onboarding %}<span class="badge bg-success">Allowed</span>{% else %}<span class="badge bg-danger">Blocked</span>{% endif %}</td>
+                    <td>{% if form.instance.allow_institution_church_onboarding %}Allowed{% else %}Blocked{% endif %}</td>
                 </tr>
             </tbody>
         </table>

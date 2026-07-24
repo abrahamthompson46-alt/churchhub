@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Cash & Bank Statement — ChurchHub{% endblock %}
+{% block title %}Church Financial Overview — ChurchHub{% endblock %}
 
 {% block content %}
 <div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Cash & Bank Statement" page_description="Approved cash and bank movements only. For full general ledger reports, use the Report Center." %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Church Financial Overview" page_description="Approved cash and bank movements only. For full general ledger reports, use the Report Center." %}
 
     <p class="mb-3"><a href="{% url 'reports:index' %}" class="btn btn-outline-secondary btn-sm">Open Report Center</a></p>
 
@@ -34,9 +34,9 @@
     </div>
 
     <div class="metrics-row">
-        <div class="metric-card"><span class="metric-label">Total Receipts</span><span class="metric-value text-currency">₵ {{ total_receipt|floatformat:2|intcomma }}</span></div>
-        <div class="metric-card metric-card--success"><span class="metric-label">Total Expenses</span><span class="metric-value text-currency">₵ {{ total_expense|floatformat:2|intcomma }}</span></div>
-        <div class="metric-card metric-card--danger"><span class="metric-label">Balance</span><span class="metric-value text-currency">₵ {{ final_balance|floatformat:2|intcomma }}</span></div>
+        <div class="metric-card"><span class="metric-label">Total Receipts</span><span class="metric-value text-currency">{{ total_receipt|floatformat:2|intcomma }}</span></div>
+        <div class="metric-card metric-card--success"><span class="metric-label">Total Expenses</span><span class="metric-value text-currency">{{ total_expense|floatformat:2|intcomma }}</span></div>
+        <div class="metric-card metric-card--danger"><span class="metric-label">Balance</span><span class="metric-value text-currency">{{ final_balance|floatformat:2|intcomma }}</span></div>
     </div>
 
     <div class="data-card">
@@ -50,11 +50,11 @@
                     <tr>
                         <td>{{ row.date }}</td>
                         <td><code class="small">{{ row.reference|default:"—" }}</code></td>
-                        <td><span class="chip">{{ row.type }}</span></td>
+                        <td>{{ row.type }}</td>
                         <td class="text-muted">{{ row.description|default:"—"|truncatechars:30 }}</td>
-                        <td class="text-end text-currency">{% if row.receipt %}₵ {{ row.receipt|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
-                        <td class="text-end text-currency">{% if row.expense %}₵ {{ row.expense|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
-                        <td class="text-end text-currency fw-semibold">₵ {{ row.balance|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency">{% if row.receipt %}{{ row.receipt|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                        <td class="text-end text-currency">{% if row.expense %}{{ row.expense|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                        <td class="text-end text-currency fw-semibold">{{ row.balance|floatformat:2|intcomma }}</td>
                     </tr>
                     {% empty %}
                     <tr>

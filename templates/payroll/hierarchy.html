@@ -38,9 +38,9 @@
                     <td>{{ row.church }}</td>
                     <td>{{ row.district }}</td>
                     <td class="text-end">{{ row.runs }}</td>
-                    <td class="text-end">₵{{ row.gross|floatformat:2 }}</td>
-                    <td class="text-end">₵{{ row.net|floatformat:2 }}</td>
-                    <td class="text-end">₵{{ row.employer_cost|floatformat:2 }}</td>
+                    <td class="text-end">{{ row.gross|floatformat:2 }}</td>
+                    <td class="text-end">{{ row.net|floatformat:2 }}</td>
+                    <td class="text-end">{{ row.employer_cost|floatformat:2 }}</td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="6" class="text-muted text-center py-4">No payroll data for this period.</td></tr>

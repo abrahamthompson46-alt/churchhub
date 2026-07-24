@@ -8,8 +8,8 @@
     {% include "includes/page_header.html" with page_subtitle="Welfare" page_title=case.case_number page_description=case.member.full_name %}
 
     <div class="row g-3 mb-4">
-        <div class="col-md-3"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Requested</p><h5 class="mb-0">₵{{ case.amount_requested|floatformat:2 }}</h5></div></div></div>
-        <div class="col-md-3"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Approved</p><h5 class="mb-0">{% if case.amount_approved %}₵{{ case.amount_approved|floatformat:2 }}{% else %}—{% endif %}</h5></div></div></div>
+        <div class="col-md-3"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Requested</p><h5 class="mb-0">{{ case.amount_requested|floatformat:2 }}</h5></div></div></div>
+        <div class="col-md-3"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Approved</p><h5 class="mb-0">{% if case.amount_approved %}{{ case.amount_approved|floatformat:2 }}{% else %}—{% endif %}</h5></div></div></div>
         <div class="col-md-3"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Status</p><h5 class="mb-0">{{ case.get_status_display }}</h5></div></div></div>
         <div class="col-md-3"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Priority</p><h5 class="mb-0">{{ case.get_priority_display }}</h5></div></div></div>
     </div>
@@ -45,7 +45,7 @@
                                 <td>{{ entry.get_entry_type_display }}</td>
                                 <td>{{ entry.reference|default:"—" }}</td>
                                 <td>{{ entry.description|default:"—" }}</td>
-                                <td class="text-end">{% if entry.direction == 'IN' %}+{% elif entry.direction == 'OUT' %}-{% endif %}₵{{ entry.amount|floatformat:2 }}</td>
+                                <td class="text-end">{% if entry.direction == 'IN' %}+{% elif entry.direction == 'OUT' %}-{% endif %}{{ entry.amount|floatformat:2 }}</td>
                             </tr>
                             {% empty %}
                             <tr><td colspan="5" class="text-muted text-center py-3">No ledger entries.</td></tr>
@@ -130,7 +130,7 @@
                             <option value="CASH">Cash</option>
                             <option value="BANK">Bank</option>
                         </select>
-                        <button type="submit" class="btn btn-sm btn-primary w-100">Disburse ₵{{ case.amount_approved|floatformat:2 }}</button>
+                        <button type="submit" class="btn btn-sm btn-primary w-100">Disburse {{ case.amount_approved|floatformat:2 }}</button>
                     </form>
                     {% endif %}
                 </div>

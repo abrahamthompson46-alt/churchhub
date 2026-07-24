@@ -49,7 +49,7 @@
                         <td>
                             <a href="{% url row.url_name row.pk %}" class="table-link fw-semibold">{{ row.name }}</a>
                             {% if row.badge %}
-                            <span class="chip chip--{{ row.badge }} ms-1">{{ row.extra }}</span>
+                            {{ row.extra }}
                             {% endif %}
                         </td>
                         <td class="text-muted">{{ row.code|default:"—" }}</td>

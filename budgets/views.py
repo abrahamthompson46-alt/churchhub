@@ -13,14 +13,16 @@ from permissions.checks import any_permission_required
 from reports.exporters import export_table_csv, export_table_excel, export_table_pdf
 from sitecontrol.checks import require_feature
 
-from .forms import BudgetFilterForm, BudgetForm
+from .forms import BudgetCloneForm, BudgetFilterForm, BudgetForm
 from .services import (
     BudgetServiceError,
     apply_budget_scope,
+    attach_forecast,
     available_budget_levels,
     budget_kpis,
     budget_summary,
     budgets_for_scope,
+    clone_budgets,
     delete_budget,
     export_budget_table,
     get_editable_budget,
@@ -78,6 +80,7 @@ def budget_list(request):
         district=scope["district"],
         conference=scope["conference"],
     )
+    rows = attach_forecast(rows, year)
     kpis = budget_kpis(rows)
     budgets = budgets_for_scope(
         church=scope["church"],
@@ -117,6 +120,8 @@ def budget_list(request):
             f"{slug}.pdf",
         )
 
+    clone_form = BudgetCloneForm(initial={"source_year": year, "target_year": year + 1})
+
     return render(request, "budgets/list.html", {
         "budgets": budgets,
         "rows": rows,
@@ -124,6 +129,7 @@ def budget_list(request):
         "year": year,
         "level": level,
         "form": form,
+        "clone_form": clone_form,
         "church": church,
         "scope_label": scope["scope_label"],
         "create_url": f"{reverse('budgets:create')}?level={level}",
@@ -232,3 +238,39 @@ def budget_delete(request, pk):
         return redirect(_list_redirect(year, level))
     flash_success(request, "Budget line removed.")
     return redirect(_list_redirect(year, level))
+
+
+@budget_manage_required
+@require_POST
+def budget_clone(request):
+    try:
+        level = request.POST.get("level", "CHURCH").upper()
+        scope = resolve_budget_scope(request, level=level)
+    except BudgetServiceError as exc:
+        raise PermissionDenied(str(exc)) from exc
+
+    form = BudgetCloneForm(request.POST)
+    if not form.is_valid():
+        flash_exception(request, "Choose valid source and target years.")
+        return redirect(_list_redirect(timezone.now().year, level))
+
+    try:
+        result = clone_budgets(
+            source_year=form.cleaned_data["source_year"],
+            target_year=form.cleaned_data["target_year"],
+            level=level,
+            church=scope["church"],
+            district=scope["district"],
+            conference=scope["conference"],
+            user=request.user,
+        )
+    except BudgetServiceError as exc:
+        flash_exception(request, exc)
+        return redirect(_list_redirect(form.cleaned_data["source_year"], level))
+
+    flash_success(
+        request,
+        f"Cloned {result['created']} line(s) to {form.cleaned_data['target_year']}"
+        f" ({result['skipped']} skipped as duplicates).",
+    )
+    return redirect(_list_redirect(form.cleaned_data["target_year"], level))

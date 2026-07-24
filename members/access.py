@@ -15,8 +15,11 @@ from permissions.checks import (
     can_manage_departments,
     can_manage_families,
     can_manage_leadership,
+    can_manage_member_configuration,
+    can_manage_member_lookups,
     can_manage_member_records,
     can_manage_members,
+    can_manage_occupations,
     can_manage_spiritual_gifts,
     can_process_transfers,
     can_transfer_members,
@@ -94,6 +97,26 @@ def require_manage_gifts(request):
         raise PermissionDenied
 
 
+def require_manage_configuration(request):
+    if not (
+        can_manage_member_configuration(request.user)
+        or can_manage_occupations(request.user)
+        or can_manage_member_lookups(request.user)
+        or can_manage_members(request.user)
+    ):
+        raise PermissionDenied
+
+
+def require_manage_occupations(request):
+    if not (can_manage_occupations(request.user) or can_manage_members(request.user)):
+        raise PermissionDenied
+
+
+def require_manage_member_lookups(request):
+    if not (can_manage_member_lookups(request.user) or can_manage_members(request.user)):
+        raise PermissionDenied
+
+
 def require_baptism_register(request):
     require_any(
         request,
@@ -102,3 +125,13 @@ def require_baptism_register(request):
         can_manage_baptisms,
         can_view_member_records,
     )
+
+
+def require_view_visitors(request):
+    """Visitors reuse member view permissions (no separate registry codename yet)."""
+    require_view_members(request)
+
+
+def require_manage_visitors(request):
+    """Visitors reuse member manage/add/edit permissions for now."""
+    require_any(request, can_manage_members, can_add_members, can_edit_members)

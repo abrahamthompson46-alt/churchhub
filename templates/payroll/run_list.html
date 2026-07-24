@@ -22,8 +22,8 @@
                     <td>{{ run.reference }}</td>
                     <td>{{ run.period_label }}</td>
                     <td>{{ run.get_paying_unit_type_display }}</td>
-                    <td class="text-end">₵{{ run.total_gross|floatformat:2 }}</td>
-                    <td class="text-end">₵{{ run.total_net|floatformat:2 }}</td>
+                    <td class="text-end">{{ run.total_gross|floatformat:2 }}</td>
+                    <td class="text-end">{{ run.total_net|floatformat:2 }}</td>
                     <td>{{ run.get_status_display }}</td>
                     <td><a href="{% url 'payroll:run_detail' run.pk %}" class="btn btn-sm btn-outline-secondary">Open</a></td>
                 </tr>

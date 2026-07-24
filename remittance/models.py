@@ -320,6 +320,22 @@ class WelfareCaseAttachment(models.Model):
     class Meta:
         ordering = ["-uploaded_at"]
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        from church_system.uploads import validate_upload
+
+        super().clean()
+        if not self.file:
+            return
+        try:
+            validate_upload(self.file, kind="document")
+        except ValidationError as exc:
+            raise ValidationError({"file": exc.messages}) from exc
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
 
 class WelfareMemberLedger(models.Model):
     """Authoritative per-member welfare activity ledger."""

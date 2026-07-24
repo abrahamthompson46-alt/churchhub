@@ -64,10 +64,10 @@
                         <td>{{ batch.get_from_unit_type_display }}</td>
                         <td>{{ batch.get_to_unit_type_display }}</td>
                         <td>{{ batch.period_start }} – {{ batch.period_end }}</td>
-                        <td class="text-end">₵{{ batch.gross_received|floatformat:2 }}</td>
-                        <td class="text-end">₵{{ batch.retain_amount|floatformat:2 }}</td>
-                        <td class="text-end">₵{{ batch.remit_amount|floatformat:2 }}</td>
-                        <td><span class="badge bg-secondary-subtle text-secondary">{{ batch.get_status_display }}</span></td>
+                        <td class="text-end">{{ batch.gross_received|floatformat:2 }}</td>
+                        <td class="text-end">{{ batch.retain_amount|floatformat:2 }}</td>
+                        <td class="text-end">{{ batch.remit_amount|floatformat:2 }}</td>
+                        <td>{{ batch.get_status_display }}</td>
                         {% if can_edit %}
                         <td class="text-end">
                             {% if batch.status == "DRAFT" and batch.from_unit_type == "CHURCH" %}

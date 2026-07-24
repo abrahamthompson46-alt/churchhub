@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load humanize churchhub_tags %}
 
-{% block title %}Mission Control — {{ institution_display_name|default:"ChurchHub" }}{% endblock %}
+{% block title %}Dashboard — {{ institution_display_name|default:"ChurchHub" }}{% endblock %}
 
 {% block content %}
 <div class="page-container control-center{% if is_control_center %} control-center--executive{% endif %}">
@@ -11,7 +11,7 @@
             <div class="cc-hero__main">
                 <h1>Good day{% if user.first_name %}, {{ user.first_name }}{% endif %}</h1>
                 <p class="cc-hero__meta">
-                    {% if is_control_center %}Mission Control{% else %}Operations Center{% endif %}
+                    <span class="cc-hero__badge">{% if is_control_center %}Mission Control{% else %}Operations{% endif %}</span>
                     · {{ role_label }}
                     {% if active_church %} · {{ active_church.name }}{% elif user_church %} · {{ user_church.name }}{% elif executive_kpis %} · {{ executive_kpis.church_count }} churches in scope{% endif %}
                 </p>
@@ -47,9 +47,14 @@
             </div>
             {% endif %}
         </div>
+        {% if show_this_week_pulse and this_week_pulse %}
+        {% include "dashboard/includes/this_week_pulse.html" %}
+        {% endif %}
     </header>
 
+    {% if alerts %}
     {% include "includes/alert_banners.html" %}
+    {% endif %}
 
     {% if is_control_center and executive_kpis %}
     <section class="cc-kpi-grid mb-4" aria-label="Executive KPIs">
@@ -66,17 +71,17 @@
         <a href="{% url 'reports:run' 'hierarchy_rollup' %}" class="cc-kpi-card cc-kpi-card--primary">
             <span class="cc-kpi-card__label">Tithe MTD</span>
             <span class="cc-kpi-card__value text-currency">{% money executive_kpis.mtd_tithe 0 %}</span>
-            <span class="cc-kpi-card__hint">{{ executive_kpis.period_label }}</span>
+            <span class="cc-kpi-card__hint">{{ executive_kpis.finance_scope_label }} · {{ executive_kpis.period_label }}</span>
         </a>
         <a href="{% url 'reports:run' 'hierarchy_rollup' %}" class="cc-kpi-card cc-kpi-card--accent">
             <span class="cc-kpi-card__label">Combined MTD</span>
             <span class="cc-kpi-card__value text-currency">{% money executive_kpis.mtd_combined 0 %}</span>
-            <span class="cc-kpi-card__hint">{{ executive_kpis.period_label }}</span>
+            <span class="cc-kpi-card__hint">{{ executive_kpis.finance_scope_label }} · {{ executive_kpis.period_label }}</span>
         </a>
         <a href="{% url 'dashboard:cutoff' %}" class="cc-kpi-card cc-kpi-card--warning">
             <span class="cc-kpi-card__label">Remittance Payable</span>
             <span class="cc-kpi-card__value text-currency">{% money executive_kpis.mtd_remittance_payable 0 %}</span>
-            <span class="cc-kpi-card__hint">Month to date</span>
+            <span class="cc-kpi-card__hint">{{ executive_kpis.finance_scope_label }} · MTD</span>
         </a>
         <a href="{% url 'transactions:pending_approvals' %}" class="cc-kpi-card cc-kpi-card--danger">
             <span class="cc-kpi-card__label">Action Items</span>
@@ -140,7 +145,7 @@
     {% endif %}
 
     {% if show_teller_console and teller_console %}
-    <section class="cc-panel mb-4" id="teller-console" data-currency-symbol="{{ currency_symbol }}" data-refresh-url="{% url 'dashboard:teller_console_api' %}" aria-label="Teller console">
+    <section class="cc-panel mb-4{% if primary_work == 'teller' %} cc-panel--priority{% endif %}" id="teller-console" data-currency-symbol="{{ currency_symbol }}" data-refresh-url="{% url 'dashboard:teller_console_api' %}" aria-label="Teller console">
         <div class="cc-panel__header">
             <h2 class="cc-panel__title"><i class="bi bi-person-badge"></i> Teller Console</h2>
             <div class="d-flex align-items-center gap-2">
@@ -199,8 +204,9 @@
     {% endif %}
 
     <div class="row g-4">
-        <div class="col-xl-4">
-            <section class="cc-panel cc-panel--priority mb-4">
+        <div class="{% if is_control_center %}col-xl-5{% else %}col-xl-4{% endif %}">
+            {% if show_action_queue %}
+            <section class="cc-panel{% if primary_work == 'queue' %} cc-panel--priority{% endif %} mb-4">
                 <div class="cc-panel__header">
                     <h2 class="cc-panel__title"><i class="bi bi-lightning-charge"></i> Action Queue</h2>
                     <span class="cc-panel__badge">{{ action_queue|length }}</span>
@@ -225,6 +231,7 @@
                     {% endfor %}
                 </ul>
             </section>
+            {% endif %}
 
             {% if compliance_snapshot and compliance_snapshot.overdue_remittances %}
             <section class="cc-panel mb-4">
@@ -244,16 +251,9 @@
             </section>
             {% endif %}
 
-            {% if role_focus.focus %}
-            <div class="role-focus-chips mb-4">
-                {% for item in role_focus.focus %}
-                <span class="chip chip--muted"><i class="bi bi-dot"></i>{{ item }}</span>
-                {% endfor %}
-            </div>
-            {% endif %}
         </div>
 
-        <div class="col-xl-8">
+        <div class="{% if is_control_center %}col-xl-7{% else %}col-xl-8{% endif %}">
             {% if show_leaderboard and church_leaderboard %}
             <section class="cc-panel mb-4">
                 <div class="cc-panel__header">
@@ -480,7 +480,7 @@ if (ctx) {
 
     function money(v) {
         const n = Number(v || 0);
-        return (panel.dataset.currencySymbol || '₵') + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return (panel.dataset.currencySymbol || '') + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function render(data) {

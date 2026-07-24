@@ -1,0 +1,6 @@
+<p>Hello{% if member %} {{ member.first_name }}{% endif %},</p>
+<p>We received a sign-in request for your <strong>{{ site_name }}</strong> member portal account.</p>
+<p><a href="{{ confirm_url }}">Confirm this device</a></p>
+<p>This link expires in {{ expires_hours }} hours.</p>
+<p>If you did not try to sign in, you can ignore this email.</p>
+{% if ip_address %}<p style="color:#666;font-size:12px;">Request IP: {{ ip_address }}</p>{% endif %}

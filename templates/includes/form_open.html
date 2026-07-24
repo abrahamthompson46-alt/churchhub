@@ -1,40 +1,20 @@
 <div class="page-container page-shell">
-
     <div class="form-shell{% if wide %} form-shell--wide{% endif %}">
-
         {% if breadcrumbs %}
-
         <nav aria-label="breadcrumb" class="app-breadcrumb">
-
             <ol class="breadcrumb mb-0">
-
                 {% for crumb in breadcrumbs %}
-
                 {% if crumb.url %}
-
                 <li class="breadcrumb-item"><a href="{{ crumb.url }}">{{ crumb.label }}</a></li>
-
                 {% else %}
-
                 <li class="breadcrumb-item active" aria-current="page">{{ crumb.label }}</li>
-
                 {% endif %}
-
                 {% endfor %}
-
             </ol>
-
         </nav>
-
         {% endif %}
-
         {% if form_title %}
-
         {% include "includes/page_header.html" with page_subtitle=form_subtitle page_title=form_title page_description=form_description %}
-
         {% endif %}
-
         <div class="form-card-inner card compact-form">
-
             <div class="card-body">
-

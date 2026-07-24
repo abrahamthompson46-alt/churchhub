@@ -19,13 +19,13 @@
                 <td>{{ op.email|default:"—" }}</td>
                 <td class="small">
                     {% for d in op.managed_denominations.all %}
-                    <span class="badge bg-secondary me-1">{{ d.code }}</span>
+                    {{ d.code }}
                     {% empty %}
                     <span class="text-muted">Global</span>
                     {% endfor %}
                 </td>
-                <td>{% if op.is_superuser %}<span class="badge bg-dark">Admin</span>{% else %}—{% endif %}</td>
-                <td>{% if op.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
+                <td>{% if op.is_superuser %}Admin{% else %}—{% endif %}</td>
+                <td>{% if op.is_active %}Active{% else %}Inactive{% endif %}</td>
                 <td class="text-nowrap">
                     <a href="{% url 'sitecontrol:operator_edit' op.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
                     {% if op.is_active and op.pk != user.pk %}

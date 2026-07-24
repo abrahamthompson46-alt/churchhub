@@ -55,6 +55,14 @@
                 </ul>
                 <div class="d-grid gap-2 mt-3">
                     <a href="{% url 'dashboard:home' %}?church={{ church.id }}" class="btn btn-primary btn-sm">Open Dashboard</a>
+                    {% if can_view_church_history %}
+                    <a href="{% url 'organization:church_history_list' %}?church={{ church.id }}" class="btn btn-outline-secondary btn-sm">
+                        Church History{% if history_count %} ({{ history_count }}){% endif %}
+                    </a>
+                    {% if can_manage_church_history %}
+                    <a href="{% url 'organization:church_history_create' %}?church={{ church.id }}" class="btn btn-link btn-sm px-0">Add history entry →</a>
+                    {% endif %}
+                    {% endif %}
                 </div>
             </div>
         </div>

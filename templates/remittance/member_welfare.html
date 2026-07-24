@@ -60,17 +60,17 @@
 
     <div class="row g-3 mb-4">
 
-        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Opening</p><h5 class="mb-0">₵{{ statement.opening_balance|floatformat:2|intcomma }}</h5></div></div></div>
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Opening</p><h5 class="mb-0">{{ statement.opening_balance|floatformat:2|intcomma }}</h5></div></div></div>
 
-        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Contributed</p><h5 class="mb-0">₵{{ summary.contributed|floatformat:2|intcomma }}</h5></div></div></div>
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Contributed</p><h5 class="mb-0">{{ summary.contributed|floatformat:2|intcomma }}</h5></div></div></div>
 
-        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Received</p><h5 class="mb-0">₵{{ summary.received|floatformat:2|intcomma }}</h5></div></div></div>
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Received</p><h5 class="mb-0">{{ summary.received|floatformat:2|intcomma }}</h5></div></div></div>
 
-        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Closing</p><h5 class="mb-0">₵{{ statement.closing_balance|floatformat:2|intcomma }}</h5></div></div></div>
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Closing</p><h5 class="mb-0">{{ statement.closing_balance|floatformat:2|intcomma }}</h5></div></div></div>
 
         <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Pending</p><h5 class="mb-0">{{ summary.pending_cases }}</h5></div></div></div>
 
-        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Approved</p><h5 class="mb-0">₵{{ summary.approved_awaiting_disbursement|floatformat:2|intcomma }}</h5></div></div></div>
+        <div class="col-6 col-md-2"><div class="card text-center"><div class="card-body py-3"><p class="text-muted small mb-1">Approved</p><h5 class="mb-0">{{ summary.approved_awaiting_disbursement|floatformat:2|intcomma }}</h5></div></div></div>
 
     </div>
 
@@ -98,7 +98,7 @@
 
                         <td class="text-end">—</td>
 
-                        <td class="text-end fw-semibold">₵{{ statement.opening_balance|floatformat:2 }}</td>
+                        <td class="text-end fw-semibold">{{ statement.opening_balance|floatformat:2 }}</td>
 
                     </tr>
 
@@ -116,11 +116,11 @@
 
                         <td>{{ row.description|default:"—" }}</td>
 
-                        <td class="text-end">{% if row.in_amount %}₵{{ row.in_amount|floatformat:2 }}{% else %}—{% endif %}</td>
+                        <td class="text-end">{% if row.in_amount %}{{ row.in_amount|floatformat:2 }}{% else %}—{% endif %}</td>
 
-                        <td class="text-end">{% if row.out_amount %}₵{{ row.out_amount|floatformat:2 }}{% else %}—{% endif %}</td>
+                        <td class="text-end">{% if row.out_amount %}{{ row.out_amount|floatformat:2 }}{% else %}—{% endif %}</td>
 
-                        <td class="text-end fw-semibold">₵{{ row.balance|floatformat:2 }}</td>
+                        <td class="text-end fw-semibold">{{ row.balance|floatformat:2 }}</td>
 
                     </tr>
 
@@ -162,9 +162,9 @@
 
                         <td>{{ case.get_assistance_type_display }}</td>
 
-                        <td class="text-end">₵{{ case.amount_requested|floatformat:2 }}</td>
+                        <td class="text-end">{{ case.amount_requested|floatformat:2 }}</td>
 
-                        <td class="text-end">{% if case.amount_approved %}₵{{ case.amount_approved|floatformat:2 }}{% else %}—{% endif %}</td>
+                        <td class="text-end">{% if case.amount_approved %}{{ case.amount_approved|floatformat:2 }}{% else %}—{% endif %}</td>
 
                         <td>{{ case.get_status_display }}</td>
 

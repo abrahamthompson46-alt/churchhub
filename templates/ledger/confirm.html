@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Confirm Ledger Entry — ChurchHub{% endblock %}
+{% block title %}Confirm Journal Entry — ChurchHub{% endblock %}
 
 {% block content %}
 <div class="page-container">
     {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
 
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Confirm Ledger Entry" page_description="Review the journal entry before posting to the ledger." %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Confirm Journal Entry" page_description="Review the journal entry before posting to the ledger." %}
 
     <div class="row justify-content-center">
         <div class="col-lg-7">
@@ -33,7 +33,7 @@
                     <dd class="col-sm-8">{{ draft.narration }}</dd>
 
                     <dt class="col-sm-4 text-muted">Amount</dt>
-                    <dd class="col-sm-8 text-currency fw-bold fs-5">₵ {{ draft.amount|floatformat:2|intcomma }}</dd>
+                    <dd class="col-sm-8 text-currency fw-bold fs-5">{{ draft.amount|floatformat:2|intcomma }}</dd>
                 </dl>
 
                 {% include "ledger/includes/journal_preview.html" with draft=draft %}

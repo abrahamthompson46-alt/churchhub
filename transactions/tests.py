@@ -223,7 +223,9 @@ class FinancialWorkflowIntegrationTests(FinancialServicesTests):
             tithe_amount=tithe,
             combined_amount=combined,
         )
-        self.assertEqual(txn.approval_status, "PENDING")
+        self.assertEqual(txn.approval_status, "APPROVED")
+        self.assertTrue(txn.locked)
+        # Idempotent if already auto-approved under receipt policy.
         approve_transaction(txn, self.pastor)
 
         month = timezone.now().date()
@@ -298,6 +300,14 @@ class TransactionViewTests(FinancialServicesTests):
     def test_reconciliation_list_accessible(self):
         response = self.client.get(reverse("transactions:reconciliation_list"))
         self.assertEqual(response.status_code, 200)
+
+    def test_remittance_payment_get_not_405(self):
+        session = self.client.session
+        session["current_church_id"] = str(self.church.pk)
+        session.save()
+        response = self.client.get(reverse("transactions:record_remittance"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Remittance Payment")
 
 
 class TransactionPostPermissionTests(TestCase):
@@ -450,6 +460,31 @@ class TransactionPostPermissionTests(TestCase):
             {"year": today.year, "month": today.month, "notes": ""},
         )
         self.assertEqual(response.status_code, 302)
+
+    def test_record_receipt_lands_on_confirmation_page(self):
+        from transactions.services import create_default_accounts
+
+        create_default_accounts(self.church)
+        self._login_church("perm_treasury")
+        response = self.client.post(
+            reverse("transactions:record_receipt"),
+            {
+                "idempotency_key": "confirm-receipt-key-1",
+                "tithe_amount": "0",
+                "combined_amount": "0",
+                "income_amount": "25.00",
+                "payment_account_type": "CASH",
+                "description": "Confirmation slip test",
+                "date": timezone.localdate().isoformat(),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/transactions/confirm/", response["Location"])
+        self.assertIn("new=1", response["Location"])
+        confirm = self.client.get(response["Location"])
+        self.assertEqual(confirm.status_code, 200)
+        self.assertContains(confirm, "Transaction confirmed")
+        self.assertContains(confirm, "Print confirmation")
 
     def test_pastor_retains_void_and_working_day_post_access(self):
         today = timezone.localdate()

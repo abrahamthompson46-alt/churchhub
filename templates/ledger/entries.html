@@ -8,7 +8,7 @@
     {% url 'ledger:entry' as new_entry_url %}
     {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
     {% if can_manage_ledger_entries %}
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Ledger Entries" page_description="Transactions posted through the category-driven ledger workflow." action_url=new_entry_url action_label="New Entry" action_icon="bi-journal-plus" %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Journals" page_description="Transactions posted through the category-driven ledger workflow." action_url=new_entry_url action_label="Journal Entry" action_icon="bi-journal-plus" %}
     {% else %}
     {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Ledger Entries" page_description="Transactions posted through the category-driven ledger workflow." %}
     {% endif %}
@@ -89,16 +89,16 @@
                 {% for t in entries %}
                 <tr>
                     <td><a href="{% url 'transactions:transaction_detail' t.pk %}" class="table-link small">{{ t.reference }}</a></td>
-                    <td><span class="chip chip--muted">{{ t.get_transaction_type_display }}</span></td>
+                    <td>{{ t.get_transaction_type_display }}</td>
                     <td class="small"><a href="{% url 'ledger:category_detail' t.ledger_category_id %}" class="table-link">{{ t.ledger_category.name }}</a></td>
                     <td class="small text-muted">{{ t.date|date:"M j, Y" }}</td>
                     <td class="small text-truncate" style="max-width: 12rem">{{ t.description|truncatechars:40 }}</td>
-                    <td class="text-end text-currency small">₵ {{ t.receipt_total|floatformat:2|intcomma }}</td>
+                    <td class="text-end text-currency small">{{ t.receipt_total|floatformat:2|intcomma }}</td>
                     <td>
-                        <span class="chip chip--{% if t.approval_status == 'APPROVED' %}success{% elif t.approval_status == 'PENDING' %}warning{% else %}muted{% endif %}">
+                        
                             {{ t.get_approval_status_display }}
-                        </span>
-                        {% if t.is_voided %}<span class="chip chip--danger ms-1">Voided</span>{% endif %}
+                        
+                        {% if t.is_voided %}Voided{% endif %}
                     </td>
                     <td class="text-end text-nowrap">
                         <a href="{% url 'transactions:transaction_detail' t.pk %}" class="btn btn-sm btn-outline-secondary">View</a>

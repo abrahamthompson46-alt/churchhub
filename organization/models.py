@@ -196,6 +196,73 @@ class Church(models.Model):
         return self.conference.denomination if self.conference else None
 
 
+class ChurchHistoryEntry(models.Model):
+    """Institutional chronicle entry for a local church (Church Life history panel)."""
+
+    class Category(models.TextChoices):
+        FOUNDING = "FOUNDING", "Founding"
+        BUILDING = "BUILDING", "Building / Facility"
+        PASTORATE = "PASTORATE", "Pastorate"
+        LEADERSHIP = "LEADERSHIP", "Leadership"
+        MILESTONE = "MILESTONE", "Milestone"
+        EVENT = "EVENT", "Special Event"
+        OTHER = "OTHER", "Other"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    church = models.ForeignKey(
+        Church,
+        on_delete=models.CASCADE,
+        related_name="history_entries",
+    )
+    title = models.CharField(max_length=200)
+    body = models.TextField(
+        help_text="Narrative details preserved for future reference.",
+    )
+    event_date = models.DateField(
+        help_text="When this history event occurred (or best known date).",
+    )
+    category = models.CharField(
+        max_length=20,
+        choices=Category.choices,
+        default=Category.MILESTONE,
+        db_index=True,
+    )
+    location = models.CharField(max_length=200, blank=True)
+    tags = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Optional keywords for search (comma-separated).",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="church_history_created",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="church_history_updated",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-event_date", "-created_at"]
+        verbose_name = "church history entry"
+        verbose_name_plural = "church history entries"
+        indexes = [
+            models.Index(fields=["church", "-event_date"], name="org_chhist_church_date_idx"),
+            models.Index(fields=["category", "-event_date"], name="org_chhist_cat_date_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.event_date:%Y-%m-%d} — {self.title}"
+
+
 class OrganizationAuditLog(models.Model):
     ACTION_CHOICES = [
         ("CREATE", "Create"),

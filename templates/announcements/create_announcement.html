@@ -3,38 +3,31 @@
 {% block title %}Create Announcement — ChurchHub{% endblock %}
 
 {% block content %}
-<div class="page-container">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <nav aria-label="breadcrumb" class="app-breadcrumb">
-                <ol class="breadcrumb mb-0">
-                    <li class="breadcrumb-item"><a href="{% url 'announcements:announcement_list' %}">Announcements</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Create</li>
-                </ol>
-            </nav>
-            {% include "includes/page_header.html" with page_subtitle="Communications" page_title="Create Announcement" page_description="Submit for approval. Approvers may publish immediately when posting for their church." %}
-            <div class="form-card-inner card">
-                <div class="card-body p-4 p-md-5">
-                    <form method="post" enctype="multipart/form-data" novalidate>
-                        {% csrf_token %}
-                        {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
-                        {% for field in form %}
-                            {% include "includes/form_field.html" with field=field %}
-                        {% endfor %}
-                        <hr class="my-4">
-                        <h6 class="mb-3">Images <span class="text-muted fw-normal">(optional)</span></h6>
-                        {{ formset.management_form }}
-                        {% for f in formset %}
-                            {% include "includes/form_field.html" with field=f.image %}
-                        {% endfor %}
-                        <div class="d-flex gap-2 pt-2">
-                            <button type="submit" class="btn btn-primary">Submit Announcement</button>
-                            <a href="{% url 'announcements:announcement_list' %}" class="btn btn-outline-secondary">Cancel</a>
-                        </div>
-                    </form>
-                </div>
-            </div>
+{% include "includes/form_open.html" with form_subtitle="Communications" form_title="Create Announcement" form_description="Submissions go to the approval queue (maker-checker). Optional role and department targeting limits who sees the post after approval." wide=True %}
+<form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="row g-3">
+        {% for field in form %}
+        <div class="col-md-6{% if field.field.widget.input_type == 'textarea' or field.name == 'body' or field.name == 'content' or field.name == 'message' %} col-12{% endif %}">
+            {% include "includes/form_field.html" with field=field %}
         </div>
+        {% endfor %}
     </div>
-</div>
+    <hr class="my-4">
+    <h6 class="mb-3">Images <span class="text-muted fw-normal">(optional)</span></h6>
+    {{ formset.management_form }}
+    <div class="row g-3">
+        {% for f in formset %}
+        <div class="col-md-6">
+            {% include "includes/form_field.html" with field=f.image %}
+        </div>
+        {% endfor %}
+    </div>
+    <div class="d-flex gap-2 pt-3">
+        <button type="submit" class="btn btn-primary">Submit Announcement</button>
+        <a href="{% url 'announcements:announcement_list' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% include "includes/form_close.html" %}
 {% endblock %}

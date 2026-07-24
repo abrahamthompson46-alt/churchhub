@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Church, Conference, District, GeneralConference, OrganizationAuditLog, Union, Zone
+from .models import Church, ChurchHistoryEntry, Conference, District, GeneralConference, OrganizationAuditLog, Union, Zone
 
 
 def _scoped_church_qs(request, qs):
@@ -120,6 +120,22 @@ class ChurchAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         return _scoped_church_qs(request, super().get_queryset(request))
+
+
+@admin.register(ChurchHistoryEntry)
+class ChurchHistoryEntryAdmin(admin.ModelAdmin):
+    list_display = ("event_date", "title", "category", "church", "created_at")
+    list_filter = ("category", "church__district__zone__conference")
+    search_fields = ("title", "body", "tags", "location", "church__name")
+    date_hierarchy = "event_date"
+    autocomplete_fields = ("church",)
+    raw_id_fields = ("created_by", "updated_by")
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser and not getattr(request.user, "is_platform_user", False):
+            return qs
+        return qs.filter(church_id__in=_church_ids_for_user(request))
 
 
 @admin.register(OrganizationAuditLog)

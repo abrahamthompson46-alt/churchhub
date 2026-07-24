@@ -529,3 +529,63 @@ class PurgeNotificationsCommandTests(DashboardTestMixin, TestCase):
         call_command("purge_old_notifications")
         self.assertFalse(Notification.objects.filter(pk=old_read.pk).exists())
         self.assertTrue(Notification.objects.filter(pk=fresh.pk).exists())
+
+
+class ThisWeekPulseTests(DashboardTestMixin, TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        super().setUpTestData()
+        from members.models import Visitor, VisitorFollowUpStatus
+
+        cls.secretary = User.objects.create_user(
+            username="pulse_sec",
+            password="pass12345",
+            role=UserRole.SECRETARY,
+            church=cls.church,
+        )
+        cls.treasury = User.objects.create_user(
+            username="pulse_treas",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=cls.church,
+        )
+        Visitor.objects.create(
+            church=cls.church,
+            first_name="Ada",
+            last_name="Visitor",
+            visit_date=timezone.localdate() - timedelta(days=2),
+            follow_up_status=VisitorFollowUpStatus.NEW,
+        )
+
+    def setUp(self):
+        from accounts.mfa import SESSION_MFA_VERIFIED
+
+        self.client = Client()
+        self._mfa_key = SESSION_MFA_VERIFIED
+
+    def _login(self, username):
+        self.client.login(username=username, password="pass12345")
+        session = self.client.session
+        session[self._mfa_key] = True
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+
+    def test_secretary_home_shows_this_week_pulse(self):
+        self._login("pulse_sec")
+        response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["show_this_week_pulse"])
+        self.assertIsNotNone(response.context["this_week_pulse"])
+        self.assertContains(response, "This week")
+        self.assertContains(response, "Visitors")
+        self.assertGreaterEqual(response.context["this_week_pulse"]["counts"]["visitors"], 1)
+
+    def test_treasury_without_member_focus_hides_pulse(self):
+        self._login("pulse_treas")
+        response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        # Treasury layout does not enable the pastoral pulse panel.
+        self.assertFalse(response.context.get("show_this_week_pulse"))

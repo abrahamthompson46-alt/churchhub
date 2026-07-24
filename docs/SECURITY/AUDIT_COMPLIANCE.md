@@ -211,7 +211,7 @@ flowchart TD
 
 | Domain | Entry points |
 |--------|--------------|
-| Transactions | Creator cannot approve own (except superadmin path) |
+| Transactions | Creator cannot approve own (except superadmin path); **receipt auto-approve** under church/user limit is a documented SoD exception with `auto_approved` audit detail |
 | Payroll | `approved_by` + `treasury_approved_by` before post |
 | Assets | Submit → approve/reject + SoD helpers |
 | Meeting minutes | Submit → approve/reject |
@@ -230,7 +230,7 @@ Maker-checker for budget approval/lock, role changes, bulk imports, data migrati
 
 | Capability | Status |
 |------------|--------|
-| Soft-delete (`is_deleted`) | **Absent** |
+| Soft-delete (`is_deleted`) | **Current** on members domain (`Member`, `Family`, `Department`, `Record`, `Visitor`, gifts/leadership); absent elsewhere |
 | Audit log purge jobs | **Absent** |
 | GDPR erasure framework | **Absent** |
 | Notification purge | `purge_old_notifications` (read >90d / unread >180d) |

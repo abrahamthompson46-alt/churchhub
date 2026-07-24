@@ -278,7 +278,7 @@ def _notify_minutes_decision(meeting, approved=True, reason=""):
             submitter,
             "Minutes approved",
             f'Your minutes for "{meeting.title}" were approved.',
-            category="SUCCESS",
+            category="MEETING",
             action_url=f"/meetings/{meeting.pk}/",
         )
     else:
@@ -286,7 +286,7 @@ def _notify_minutes_decision(meeting, approved=True, reason=""):
             submitter,
             "Minutes returned",
             f'"{meeting.title}" minutes need revision. {reason}'.strip(),
-            category="WARNING",
+            category="MEETING",
             action_url=f"/meetings/{meeting.pk}/",
         )
 

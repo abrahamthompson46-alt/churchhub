@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from .models import (
     Church,
+    ChurchHistoryEntry,
     Conference,
     District,
     GeneralConference,
@@ -130,3 +131,15 @@ def save_model_instance(instance, *, update_fields=None):
     else:
         instance.save()
     return instance
+
+
+def save_church_history_entry(entry, *, update_fields=None):
+    if update_fields is not None:
+        entry.save(update_fields=update_fields)
+    else:
+        entry.save()
+    return entry
+
+
+def create_church_history_entry(**fields):
+    return ChurchHistoryEntry.objects.create(**fields)

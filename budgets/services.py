@@ -131,13 +131,19 @@ def budget_summary(church, year, level="CHURCH", district=None, conference=None)
 
 
 def budget_kpis(rows):
-    """Aggregate KPIs from variance rows."""
+    """Aggregate KPIs from variance rows, split by income vs expense."""
     tracked = [r for r in rows if r.get("tracks_actual", True)]
+    income_rows = [r for r in tracked if r.get("account_type") in INCOME_ACCOUNT_TYPES]
+    expense_rows = [r for r in tracked if r.get("account_type") not in INCOME_ACCOUNT_TYPES]
     total_budgeted = sum(r["budgeted"] for r in rows)
     total_actual = sum(r["actual"] for r in tracked if r["actual"] is not None)
     total_variance = sum(
         r["variance"] for r in tracked if r["actual"] is not None
     )
+    income_budgeted = sum(r["budgeted"] for r in income_rows)
+    income_actual = sum(r["actual"] or 0 for r in income_rows)
+    expense_budgeted = sum(r["budgeted"] for r in expense_rows)
+    expense_actual = sum(r["actual"] or 0 for r in expense_rows)
     return {
         "line_count": len(rows),
         "tracked_count": len(tracked),
@@ -148,7 +154,98 @@ def budget_kpis(rows):
         "department_allocation_total": _quantize(
             sum(r["budgeted"] for r in rows if not r.get("tracks_actual", True))
         ),
+        "income_budgeted": _quantize(income_budgeted),
+        "income_actual": _quantize(income_actual),
+        "expense_budgeted": _quantize(expense_budgeted),
+        "expense_actual": _quantize(expense_actual),
     }
+
+
+def _year_progress_factor(year):
+    """Fraction of the calendar year elapsed (1/12 .. 1.0)."""
+    from django.utils import timezone
+
+    today = timezone.localdate()
+    if today.year < year:
+        return Decimal("0")
+    if today.year > year:
+        return Decimal("1")
+    month = max(today.month, 1)
+    return _quantize(Decimal(month) / Decimal("12"))
+
+
+def attach_forecast(rows, year):
+    """
+    Add projected full-year actuals (linear extrapolation from YTD).
+
+    forecast = actual / progress when progress > 0; otherwise budgeted.
+    """
+    progress = _year_progress_factor(year)
+    enriched = []
+    for row in rows:
+        item = dict(row)
+        if not row.get("tracks_actual", True) or row.get("actual") is None:
+            item["forecast"] = None
+            item["forecast_variance"] = None
+        elif progress <= 0:
+            item["forecast"] = row["budgeted"]
+            item["forecast_variance"] = Decimal("0.00")
+        else:
+            forecast = _quantize(Decimal(str(row["actual"])) / progress)
+            item["forecast"] = forecast
+            if row.get("account_type") in INCOME_ACCOUNT_TYPES:
+                item["forecast_variance"] = _quantize(forecast - row["budgeted"])
+            else:
+                item["forecast_variance"] = _quantize(row["budgeted"] - forecast)
+        enriched.append(item)
+    return enriched
+
+
+def clone_budgets(
+    *,
+    source_year,
+    target_year,
+    level,
+    church,
+    user,
+    district=None,
+    conference=None,
+):
+    """Copy budget lines from source_year to target_year. Skips duplicates."""
+    from transactions.models import Budget
+
+    if int(source_year) == int(target_year):
+        raise BudgetServiceError("Source and target years must be different.")
+    if int(target_year) < 2020 or int(target_year) > 2099:
+        raise BudgetServiceError("Target year is out of range.")
+
+    source = budgets_for_scope(
+        church=church,
+        year=int(source_year),
+        level=level,
+        district=district,
+        conference=conference,
+    )
+    created = 0
+    skipped = 0
+    for line in source:
+        clone = Budget(
+            level=line.level,
+            year=int(target_year),
+            church=line.church,
+            district=line.district,
+            conference=line.conference,
+            department=line.department,
+            account=line.account,
+            amount=line.amount,
+            notes=line.notes,
+        )
+        if duplicate_budget_exists(clone):
+            skipped += 1
+            continue
+        save_budget(clone, user, church or line.church, is_new=True)
+        created += 1
+    return {"created": created, "skipped": skipped}
 
 
 def budget_vs_actual(church, year):
@@ -169,17 +266,29 @@ def budget_vs_actual(church, year):
 
 
 def export_budget_table(rows, year, scope_label):
-    headers = ["Account", "Type", "Level", "Department", "Budgeted", "Actual", "Variance", "Status"]
+    headers = [
+        "Account",
+        "Type",
+        "Level",
+        "Department",
+        "Budgeted",
+        "Actual",
+        "Forecast",
+        "Variance",
+        "Status",
+    ]
     table_rows = []
     for row in rows:
         if row.get("tracks_actual", True) and row.get("actual") is not None:
             status = "On track" if row.get("favorable") else "Over budget"
             actual_display = row["actual"]
             variance_display = row["variance"]
+            forecast_display = row.get("forecast") if row.get("forecast") is not None else "—"
         else:
             status = "Allocation"
             actual_display = "N/A"
             variance_display = row["budgeted"]
+            forecast_display = "—"
         table_rows.append([
             row["account"],
             row.get("account_type", ""),
@@ -187,6 +296,7 @@ def export_budget_table(rows, year, scope_label):
             row.get("department", "") or "—",
             row["budgeted"],
             actual_display,
+            forecast_display,
             variance_display,
             status,
         ])

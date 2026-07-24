@@ -34,7 +34,7 @@
                     {% for church in churches %}
                     <tr>
                         <td><a href="{% url 'organization:church_detail' church.id %}" class="table-link">{{ church.name }}</a></td>
-                        <td class="text-muted"><span class="chip">{{ church.code }}</span></td>
+                        <td class="text-muted">{{ church.code }}</td>
                         <td class="text-muted small">{{ church.address|default:"—" }}</td>
                     </tr>
                     {% empty %}

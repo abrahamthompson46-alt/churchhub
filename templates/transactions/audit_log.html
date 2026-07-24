@@ -23,7 +23,7 @@
                     {% for log in logs %}
                     <tr>
                         <td class="text-muted small">{{ log.created_at|date:"Y-m-d H:i" }}</td>
-                        <td><span class="chip">{{ log.action }}</span></td>
+                        <td>{{ log.action }}</td>
                         <td>{{ log.performed_by|default:"System" }}</td>
                         <td>{% if log.transaction %}<code class="small">{{ log.transaction.reference }}</code>{% else %}—{% endif %}</td>
                         <td class="small text-muted">{{ log.details }}</td>

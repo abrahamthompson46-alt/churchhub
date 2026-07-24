@@ -22,10 +22,12 @@ from .models import (
     Member,
     MemberSpiritualGift,
     MemberTransfer,
+    Occupation,
     Record,
     RecordType,
     SpiritualGift,
     TransferStatus,
+    Visitor,
 )
 
 
@@ -224,13 +226,36 @@ def completed_transfers_from_church_count(church):
 # ---------------------------------------------------------------------------
 
 
-def records_qs(request, *, record_type=""):
+def records_qs(
+    request,
+    *,
+    record_type="",
+    status="",
+    q="",
+    date_from=None,
+    date_to=None,
+):
     qs = filter_by_church(
         Record.objects.select_related("member", "church").order_by("-event_date"),
         request,
     )
     if record_type:
         qs = qs.filter(record_type=record_type)
+    if status:
+        qs = qs.filter(status=status)
+    if q:
+        qs = qs.filter(
+            Q(member__first_name__icontains=q)
+            | Q(member__last_name__icontains=q)
+            | Q(title__icontains=q)
+            | Q(place__icontains=q)
+            | Q(description__icontains=q)
+            | Q(certificate_number__icontains=q)
+        )
+    if date_from:
+        qs = qs.filter(event_date__gte=date_from)
+    if date_to:
+        qs = qs.filter(event_date__lte=date_to)
     return qs
 
 
@@ -241,13 +266,29 @@ def record_for_request(request, pk, *, with_member=False):
     return get_object_or_404(filter_by_church(qs, request), pk=pk)
 
 
-def baptism_records_qs(request):
-    return filter_by_church(
+def baptism_records_qs(request, *, q="", date_from=None, date_to=None, status=""):
+    qs = filter_by_church(
         Record.objects.filter(record_type=RecordType.BAPTISM).select_related(
             "member", "church"
         ),
         request,
-    ).order_by("-event_date")
+    )
+    if q:
+        qs = qs.filter(
+            Q(member__first_name__icontains=q)
+            | Q(member__last_name__icontains=q)
+            | Q(title__icontains=q)
+            | Q(place__icontains=q)
+            | Q(certificate_number__icontains=q)
+            | Q(officiant__icontains=q)
+        )
+    if date_from:
+        qs = qs.filter(event_date__gte=date_from)
+    if date_to:
+        qs = qs.filter(event_date__lte=date_to)
+    if status:
+        qs = qs.filter(status=status)
+    return qs.order_by("-event_date")
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +305,14 @@ def departments_qs(request):
 
 def department_for_request(request, pk):
     return get_object_or_404(filter_by_church(Department.objects.all(), request), pk=pk)
+
+
+def occupations_qs(request):
+    return filter_by_church(Occupation.objects.all().order_by("name"), request)
+
+
+def occupation_for_request(request, pk):
+    return get_object_or_404(filter_by_church(Occupation.objects.all(), request), pk=pk)
 
 
 def families_qs(request):
@@ -365,3 +414,43 @@ def gift_assignment_for_member(member, assignment_id):
 
 def active_leadership_roles_for_department(department):
     return LeadershipRole.objects.filter(department=department, is_active=True)
+
+
+# ---------------------------------------------------------------------------
+# Visitors
+# ---------------------------------------------------------------------------
+
+
+def visitors_qs(request, *, q="", status="", date_from=None, date_to=None):
+    qs = filter_by_church(
+        Visitor.objects.select_related(
+            "church", "invited_by", "assigned_elder", "converted_member"
+        ),
+        request,
+    )
+    if q:
+        qs = qs.filter(
+            Q(first_name__icontains=q)
+            | Q(last_name__icontains=q)
+            | Q(phone__icontains=q)
+            | Q(email__icontains=q)
+        )
+    if status:
+        qs = qs.filter(follow_up_status=status)
+    if date_from:
+        qs = qs.filter(visit_date__gte=date_from)
+    if date_to:
+        qs = qs.filter(visit_date__lte=date_to)
+    return qs.order_by("-visit_date", "-created_at")
+
+
+def visitor_for_request(request, pk):
+    return get_object_or_404(
+        filter_by_church(
+            Visitor.objects.select_related(
+                "church", "invited_by", "assigned_elder", "converted_member"
+            ),
+            request,
+        ),
+        pk=pk,
+    )

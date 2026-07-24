@@ -4,7 +4,7 @@ from django.core.paginator import Paginator
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.http import require_POST
 
 from accounts.permissions import can_approve_transactions, can_manage_finances
 from announcements.services import pending_for_user
@@ -105,40 +105,52 @@ def switch_church(request):
 
 @login_required
 def notification_list(request):
-    qs = selectors.notifications_for_user(request.user)
+    unread_only = request.GET.get("unread") == "1"
+    category = (request.GET.get("category") or "").strip().upper()
+    qs = selectors.notifications_for_user(
+        request.user, unread_only=unread_only, category=category
+    )
     unread = selectors.unread_notification_count(request.user)
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get("page"))
+    from dashboard.models import Notification
+
     return render(request, "dashboard/notifications.html", {
         "notifications": page_obj,
         "page_obj": page_obj,
         "unread_count": unread,
+        "unread_only": unread_only,
+        "category": category,
+        "categories": Notification.CATEGORY_CHOICES,
     })
 
 
 @login_required
-@require_http_methods(["GET", "POST"])
+@require_POST
 def notification_mark_read(request, pk):
     notification = selectors.notification_for_user(request.user, pk)
     repo.mark_notification_read(notification)
 
-    follow = request.POST.get("follow") or request.GET.get("follow")
+    follow = request.POST.get("follow")
     if follow and notification.action_url:
         target = safe_internal_redirect(notification.action_url, None)
         if target:
             return redirect(target)
 
-    next_url = request.POST.get("next") or request.GET.get("next") or ""
+    next_url = request.POST.get("next") or ""
     safe_next = safe_internal_redirect(next_url, None)
     if safe_next:
         return redirect(safe_next)
 
-    referer = request.META.get("HTTP_REFERER") or ""
-    # Only trust referer if it is a relative path (unlikely) — otherwise inbox
-    safe_ref = safe_internal_redirect(referer, None)
-    if safe_ref:
-        return redirect(safe_ref)
+    return redirect("dashboard:notifications")
 
+
+@login_required
+@require_POST
+def notification_delete(request, pk):
+    notification = selectors.notification_for_user(request.user, pk)
+    repo.delete_notification(notification)
+    flash_success(request, "Notification removed.")
     return redirect("dashboard:notifications")
 
 

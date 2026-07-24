@@ -52,7 +52,8 @@ erDiagram
 - `EventType` on AttendanceEvent (worship/event types as coded)
 
 ### Meeting highlights
-Structured minutes fields (opening, previous, deliberations, motions, votes, adjournment), `minutes_locked`, submit/approve metadata.
+Structured minutes fields (opening, previous, deliberations, motions, votes, adjournment), `minutes_locked`, submit/approve metadata.  
+**Online / Zoom (Current):** `join_url`, `join_passcode`, `show_on_portal`; type `ONLINE_SERVICE`; member portal join at `/portal/meetings/<uuid>/`.
 
 **Managers:** none custom. Workflow helpers in `meetings/workflow.py`.
 

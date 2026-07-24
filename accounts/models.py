@@ -135,6 +135,22 @@ class User(AbstractUser):
         help_text="SHA-256 hashes of unused MFA recovery codes.",
     )
 
+    must_change_password = models.BooleanField(
+        default=False,
+        help_text="When True, member portal users must set a new password after sign-in.",
+    )
+
+    max_receipt_auto_approve = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=(
+            "Per-user override: receipts up to this amount auto-approve. "
+            "Blank = use church treasury policy. 0 = always need second approval."
+        ),
+    )
+
     class Meta:
         indexes = [
             models.Index(fields=["role", "is_active"]),

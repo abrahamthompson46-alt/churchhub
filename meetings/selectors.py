@@ -147,3 +147,41 @@ def get_meeting_attachment_or_404(*, meeting, pk):
 
 def active_users_for_church(church_id):
     return User.objects.filter(is_active=True, church_id=church_id)
+
+
+def portal_live_meetings_for_church(church, *, limit=10):
+    """Scheduled meetings exposed on the member portal with a join link."""
+    from django.utils import timezone
+
+    from .models import MeetingStatus
+
+    if church is None:
+        return Meeting.objects.none()
+    now = timezone.now()
+    return (
+        Meeting.objects.filter(
+            church=church,
+            status=MeetingStatus.SCHEDULED,
+            show_on_portal=True,
+            scheduled_at__gte=now,
+        )
+        .exclude(join_url="")
+        .select_related("department", "church")
+        .order_by("scheduled_at")[:limit]
+    )
+
+
+def portal_live_meeting_or_404(church, pk):
+    """Portal-safe meeting fetch — only portal-visible scheduled/held with join link."""
+    from .models import MeetingStatus
+
+    return get_object_or_404(
+        Meeting.objects.filter(
+            church=church,
+            show_on_portal=True,
+        )
+        .exclude(join_url="")
+        .filter(status__in=[MeetingStatus.SCHEDULED, MeetingStatus.HELD])
+        .select_related("department", "church"),
+        pk=pk,
+    )

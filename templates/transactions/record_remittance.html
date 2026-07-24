@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Remittance Payment — ChurchHub{% endblock %}
+
+{% block content %}
+{% include "includes/form_open.html" with form_subtitle="Finance" form_title="Remittance Payment" form_description="Record district remittance for the selected month. The amount comes from remittance payable cut-off totals." wide=True %}
+
+<form method="get" class="row g-3 align-items-end mb-4">
+    <div class="col-md-6">
+        <label class="form-label" for="id_month">Month</label>
+        <input type="date" name="month" id="id_month" class="form-control"
+               value="{{ month_date|date:'Y-m-d' }}" required>
+        <div class="form-text">Any day in the month; payable uses that month’s cut-off.</div>
+    </div>
+    <div class="col-md-auto">
+        <button type="submit" class="btn btn-outline-primary">Update amount</button>
+    </div>
+</form>
+
+<div class="mb-4">
+    <span class="form-label d-block">Payable amount</span>
+    <p class="fs-4 mb-0 text-currency">{{ amount|floatformat:2|intcomma }}</p>
+    {% if cutoff %}
+    <div class="form-text">
+        Tithe {{ cutoff.total_tithe|floatformat:2|intcomma }}
+        · Combined {{ cutoff.total_combined|floatformat:2|intcomma }}
+        {% if cutoff.transferred %}· Already remitted{% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="month" value="{{ month_date|date:'Y-m-d' }}">
+    <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
+    <div class="d-flex flex-wrap gap-2">
+        {% if amount > 0 and not cutoff.transferred %}
+        <button type="submit" class="btn btn-primary">Record District Remittance</button>
+        {% elif cutoff.transferred %}
+        <button type="button" class="btn btn-secondary" disabled>Already remitted</button>
+        {% else %}
+        <button type="button" class="btn btn-secondary" disabled>No payable amount</button>
+        {% endif %}
+        <a href="{% url 'dashboard:cutoff' %}" class="btn btn-outline-secondary">Monthly Cut-off</a>
+    </div>
+</form>
+{% include "includes/form_close.html" %}
+{% endblock %}

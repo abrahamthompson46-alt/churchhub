@@ -627,6 +627,15 @@ def post_ledger_entry(church, user, draft, idempotency_key=None):
             user=user,
         )
 
+    if django_type == "RECEIPT":
+        from transactions.services import (
+            auto_approve_receipt,
+            receipt_should_auto_approve,
+        )
+
+        if receipt_should_auto_approve(user, church, amount):
+            trx = auto_approve_receipt(trx, user)
+
     if idem_record:
         complete_financial_idempotency(idem_record, trx)
     return trx

@@ -49,9 +49,9 @@
                 </div>
                 {% if giving_summary %}
                 <div class="cc-mini-kpis px-3 pb-3">
-                    <div class="cc-mini-kpi"><span>Tithe</span><strong class="text-currency">₵{{ giving_summary.TITHE|default:0|floatformat:2|intcomma }}</strong></div>
-                    <div class="cc-mini-kpi"><span>Combined</span><strong class="text-currency">₵{{ giving_summary.COMBINED|default:0|floatformat:2|intcomma }}</strong></div>
-                    <div class="cc-mini-kpi"><span>Total</span><strong class="text-currency">₵{{ giving_summary.total|default:0|floatformat:2|intcomma }}</strong></div>
+                    <div class="cc-mini-kpi"><span>Tithe</span><strong class="text-currency">{{ giving_summary.TITHE|default:0|floatformat:2|intcomma }}</strong></div>
+                    <div class="cc-mini-kpi"><span>Combined</span><strong class="text-currency">{{ giving_summary.COMBINED|default:0|floatformat:2|intcomma }}</strong></div>
+                    <div class="cc-mini-kpi"><span>Total</span><strong class="text-currency">{{ giving_summary.total|default:0|floatformat:2|intcomma }}</strong></div>
                 </div>
                 {% else %}
                 <p class="text-muted small px-3 pb-3 mb-0">No giving summary available.</p>
@@ -83,7 +83,7 @@
                             <tr>
                                 <td class="small text-muted">{{ line.transaction.date|date:"M j, Y" }}</td>
                                 <td>{{ line.account.name }}</td>
-                                <td class="text-end text-currency">₵{{ line.amount|floatformat:2|intcomma }}</td>
+                                <td class="text-end text-currency">{{ line.amount|floatformat:2|intcomma }}</td>
                             </tr>
                             {% empty %}
                             <tr><td colspan="3" class="text-muted text-center py-3">No recorded giving this year.</td></tr>
@@ -94,6 +94,26 @@
             </section>
 
             <div class="row g-4">
+                <div class="col-12">
+                    <section class="cc-panel mb-0">
+                        <div class="cc-panel__header">
+                            <h2 class="cc-panel__title"><i class="bi bi-camera-video"></i> Live / online</h2>
+                        </div>
+                        <ul class="list-plain dash-panel dash-panel--flat mb-0 px-3 pb-3">
+                            {% for meeting in live_meetings %}
+                            <li class="py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <a href="{% url 'portal:meeting_live' meeting.pk %}" class="table-link">{{ meeting.title }}</a>
+                                    <div class="text-muted" style="font-size:0.75rem">{{ meeting.scheduled_at|date:"M j, g:i A" }}</div>
+                                </div>
+                                <a href="{{ meeting.join_url }}" class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer">Join Zoom</a>
+                            </li>
+                            {% empty %}
+                            <li class="text-muted text-center py-3">No live sessions scheduled.</li>
+                            {% endfor %}
+                        </ul>
+                    </section>
+                </div>
                 <div class="col-md-6">
                     <section class="cc-panel mb-0 h-100">
                         <div class="cc-panel__header">
@@ -102,7 +122,7 @@
                         <ul class="list-plain dash-panel dash-panel--flat mb-0 px-3 pb-3">
                             {% for ann in announcements %}
                             <li class="py-2">
-                                <a href="{% url 'announcements:announcement_detail' ann.pk %}" class="table-link">{{ ann.title }}</a>
+                                <a href="{% url 'portal:announcement_detail' ann.pk %}" class="table-link">{{ ann.title }}</a>
                                 <div class="text-muted" style="font-size:0.75rem">{{ ann.created_at|date:"M j, Y" }}</div>
                             </li>
                             {% empty %}

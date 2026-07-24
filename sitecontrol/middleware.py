@@ -145,7 +145,7 @@ class LoginRateLimitMiddleware:
     """Throttle failed auth POSTs: staff login, portal login, and password reset."""
 
     LOGIN_PATHS = frozenset({"/accounts/login", "/portal/login"})
-    RESET_REQUEST_PATH = "/accounts/password_reset"
+    RESET_REQUEST_PATHS = frozenset({"/accounts/password_reset", "/portal/password/reset"})
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -160,14 +160,24 @@ class LoginRateLimitMiddleware:
 
     @classmethod
     def _is_reset_path(cls, path: str) -> bool:
-        if path == cls.RESET_REQUEST_PATH:
+        if path in cls.RESET_REQUEST_PATHS:
             return True
         # Django confirm: /accounts/reset/<uidb64>/<token>
+        # Portal confirm: /portal/password/reset/<uidb64>/<token>
         parts = path.strip("/").split("/")
-        return (
+        if (
             len(parts) == 4
             and parts[0] == "accounts"
             and parts[1] == "reset"
+            and parts[3] != "done"
+        ):
+            return True
+        return (
+            len(parts) == 5
+            and parts[0] == "portal"
+            and parts[1] == "password"
+            and parts[2] == "reset"
+            and parts[4] != "complete"
             and parts[3] != "done"
         )
 
@@ -176,7 +186,12 @@ class LoginRateLimitMiddleware:
         if request.user.is_authenticated:
             return True
         # Privileged MFA: password OK, challenge pending (not yet authenticated).
-        return bool(request.session.get("mfa_pending_user_id"))
+        if request.session.get("mfa_pending_user_id"):
+            return True
+        # Portal: credentials OK, waiting for email device confirmation.
+        if request.session.get("portal_pending_email"):
+            return True
+        return False
 
     def __call__(self, request):
         if request.method != "POST":
@@ -242,6 +257,8 @@ class LoginRateLimitMiddleware:
                 f"Too many password reset attempts. Try again in "
                 f"{settings_obj.login_lockout_minutes} minutes.",
             )
+            if path.startswith("/portal/"):
+                return redirect("portal:password_reset")
             return redirect("password_reset")
 
         response = self.get_response(request)

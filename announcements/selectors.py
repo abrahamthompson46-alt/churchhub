@@ -175,17 +175,18 @@ def active_members_with_dob_for_request(request):
     )
 
 
-def scheduled_meetings_for_church_in_window(church, *, start, end, limit=50):
-    return (
-        Meeting.objects.filter(
-            church=church,
-            scheduled_at__gte=start,
-            scheduled_at__lte=end,
-            status=MeetingStatus.SCHEDULED,
-        )
-        .select_related("department")
-        .order_by("scheduled_at")[:limit]
+def scheduled_meetings_for_church_in_window(
+    church, *, start, end, limit=50, portal_visible_only=False
+):
+    qs = Meeting.objects.filter(
+        church=church,
+        scheduled_at__gte=start,
+        scheduled_at__lte=end,
+        status=MeetingStatus.SCHEDULED,
     )
+    if portal_visible_only:
+        qs = qs.filter(show_on_portal=True).exclude(join_url="")
+    return qs.select_related("department").order_by("scheduled_at")[:limit]
 
 
 def announcement_events_in_window(qs, *, start, end, limit=50):

@@ -35,6 +35,15 @@ def create_announcement_instance(**fields):
     return ann
 
 
+def set_announcement_departments(announcement, departments):
+    from .models import AnnouncementDepartment
+
+    AnnouncementDepartment.objects.filter(announcement=announcement).delete()
+    for dept in departments:
+        AnnouncementDepartment.objects.create(announcement=announcement, department=dept)
+    return announcement
+
+
 def get_or_create_announcement_view(*, user, announcement):
     return AnnouncementView.objects.get_or_create(user=user, announcement=announcement)
 

@@ -1,0 +1,53 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Member Dropdowns{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Edit record types, membership statuses, gender, and other member form lists without code changes.</p>{% endblock %}
+
+{% block content %}
+<div class="platform-card mb-3">
+    <div class="platform-card-header">
+        <span>Categories</span>
+        <a href="{% url 'sitecontrol:member_lookup_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add option</a>
+    </div>
+    <div class="p-3 d-flex flex-wrap gap-2">
+        <a href="{% url 'sitecontrol:member_lookup_list' %}" class="btn btn-sm {% if not active_category %}btn-primary{% else %}btn-outline-secondary{% endif %}">All</a>
+        {% for code, label in categories %}
+        <a href="?category={{ code }}" class="btn btn-sm {% if active_category == code %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ label }}</a>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="platform-card">
+    <div class="platform-card-header"><span>Options</span></div>
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Label</th>
+                    <th>Code</th>
+                    <th>Order</th>
+                    <th>Active</th>
+                    <th>System</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for opt in options %}
+            <tr>
+                <td>{{ opt.get_category_display }}</td>
+                <td class="fw-semibold">{{ opt.label }}</td>
+                <td><code>{{ opt.code }}</code></td>
+                <td>{{ opt.sort_order }}</td>
+                <td>{% if opt.is_active %}Yes{% else %}No{% endif %}</td>
+                <td>{% if opt.is_system %}Locked{% else %}—{% endif %}</td>
+                <td><a href="{% url 'sitecontrol:member_lookup_edit' opt.pk %}" class="btn btn-sm btn-outline-primary">Edit</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-muted">No options yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

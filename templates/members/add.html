@@ -3,10 +3,60 @@
 {% block title %}Add Member — ChurchHub{% endblock %}
 
 {% block content %}
-{% include "includes/form_open.html" with breadcrumbs=breadcrumbs form_subtitle="People" form_title="Add Member" form_description="Register a new church member in the directory." %}
+{% include "includes/form_open.html" with breadcrumbs=breadcrumbs form_subtitle="People" form_title="Add Member" form_description="Register a new church member in the directory." wide=True %}
 <form method="post" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
-    {% for field in form %}{% include "includes/form_field.html" with field=field %}{% endfor %}
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <h3 class="h6 text-uppercase mb-3" style="letter-spacing:0.04em;color:var(--ch-muted)">Identity</h3>
+            <div class="row g-3">
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.first_name %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.middle_name %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.last_name %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.preferred_name %}</div>
+                <div class="col-6 col-md-3">{% include "includes/form_field.html" with field=form.gender %}</div>
+                <div class="col-6 col-md-4">{% include "includes/form_field.html" with field=form.marital_status %}</div>
+                <div class="col-md-5">{% include "includes/form_field.html" with field=form.date_of_birth %}</div>
+                <div class="col-12">{% include "includes/form_field.html" with field=form.profile_picture %}</div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <h3 class="h6 text-uppercase mb-3" style="letter-spacing:0.04em;color:var(--ch-muted)">Membership</h3>
+            <div class="row g-3">
+                <div class="col-md-5">{% include "includes/form_field.html" with field=form.membership_status %}</div>
+                <div class="col-md-7">{% include "includes/form_field.html" with field=form.membership_number %}</div>
+                <div class="col-md-5">{% include "includes/form_field.html" with field=form.date_joined %}</div>
+                <div class="col-md-7">{% include "includes/form_field.html" with field=form.department %}</div>
+                <div class="col-md-7">{% include "includes/form_field.html" with field=form.family %}</div>
+                <div class="col-md-5">{% include "includes/form_field.html" with field=form.family_relationship %}</div>
+                <div class="col-12">{% include "includes/form_field.html" with field=form.occupation %}</div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <h3 class="h6 text-uppercase mb-3" style="letter-spacing:0.04em;color:var(--ch-muted)">Contact</h3>
+            <div class="row g-3">
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.phone %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.email %}</div>
+                <div class="col-12">{% include "includes/form_field.html" with field=form.address %}</div>
+                <div class="col-md-4">{% include "includes/form_field.html" with field=form.emergency_contact_name %}</div>
+                <div class="col-md-4">{% include "includes/form_field.html" with field=form.emergency_contact_phone %}</div>
+                <div class="col-md-4">{% include "includes/form_field.html" with field=form.emergency_contact_relation %}</div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <h3 class="h6 text-uppercase mb-3" style="letter-spacing:0.04em;color:var(--ch-muted)">Baptism</h3>
+            <div class="row g-3">
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.baptism_date %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.baptism_certificate_number %}</div>
+                <div class="col-12">{% include "includes/form_field.html" with field=form.baptism_place %}</div>
+            </div>
+        </div>
+    </div>
+
     <div class="d-flex gap-2 pt-3">
         <button type="submit" class="btn btn-primary">Save Member</button>
         <a href="{% url 'members:list' %}" class="btn btn-outline-secondary">Cancel</a>

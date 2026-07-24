@@ -4,7 +4,7 @@ from django import forms
 
 from church_system.widgets import input_attrs, select_attrs, textarea_attrs
 from members.models import Member
-from transactions.models import Account, OfferingCategory
+from transactions.models import Account, OfferingCategory, TreasuryApprovalPolicy
 
 _MONEY = lambda **extra: input_attrs(step="0.01", placeholder="0.00", **extra)
 
@@ -143,6 +143,34 @@ class PeriodLockForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs=input_attrs(placeholder="Optional note")),
     )
+
+
+class TreasuryApprovalPolicyForm(forms.ModelForm):
+    class Meta:
+        model = TreasuryApprovalPolicy
+        fields = (
+            "receipt_auto_approve_enabled",
+            "default_receipt_auto_approve_limit",
+        )
+        widgets = {
+            "receipt_auto_approve_enabled": forms.CheckboxInput(
+                attrs={"class": "form-check-input"}
+            ),
+            "default_receipt_auto_approve_limit": forms.NumberInput(
+                attrs=input_attrs(step="0.01", placeholder="Blank = unlimited")
+            ),
+        }
+        labels = {
+            "receipt_auto_approve_enabled": "Auto-approve income receipts",
+            "default_receipt_auto_approve_limit": "Default max amount for auto-approve",
+        }
+        help_texts = {
+            "default_receipt_auto_approve_limit": (
+                "Receipts up to this amount are auto-approved. "
+                "Leave blank for unlimited. Set 0 to require second approval for every receipt. "
+                "Per-user overrides are set on the user profile."
+            ),
+        }
 
 
 class WorkingDayOpenForm(forms.Form):

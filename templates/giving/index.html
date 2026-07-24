@@ -26,7 +26,7 @@
                     {% for row in leaders %}
                     <tr>
                         <td><a href="{% url 'giving:member_statement' row.member.pk %}?year={{ year }}" class="table-link">{{ row.member.full_name }}</a></td>
-                        <td class="text-end text-currency fw-semibold">₵ {{ row.total|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency fw-semibold">{{ row.total|floatformat:2|intcomma }}</td>
                         <td class="text-end"><a href="{% url 'giving:member_statement' row.member.pk %}?year={{ year }}" class="btn btn-sm btn-outline-primary">Statement</a></td>
                     </tr>
                     {% empty %}

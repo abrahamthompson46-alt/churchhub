@@ -92,7 +92,7 @@
                         </td>
                         <td class="small text-muted">{% if t.created_by %}{{ t.created_by.get_full_name|default:t.created_by.username }}{% else %}—{% endif %}</td>
                         <td class="text-muted small">{{ t.description|default:"—"|truncatechars:40 }}</td>
-                        <td class="text-end text-currency">₵ {{ t.receipt_total|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency">{{ t.receipt_total|floatformat:2|intcomma }}</td>
                     </tr>
                     {% empty %}
                     <tr>

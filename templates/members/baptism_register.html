@@ -5,12 +5,39 @@
 {% block content %}
 <div class="page-container">
     {% include "includes/page_header.html" with page_subtitle="Members" page_title="Baptism Register" page_description="Water baptism records for your church." %}
-    {% if can_export_members %}
-    <div class="d-flex gap-2 mb-3">
-        <a href="?export=csv" class="btn btn-outline-secondary btn-sm">CSV</a>
-        <a href="?export=excel" class="btn btn-outline-secondary btn-sm">Excel</a>
+
+    <div class="filter-bar filter-bar--sticky mb-3">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
+                <label class="form-label">Search</label>
+                {{ filter_form.q }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">From date</label>
+                {{ filter_form.date_from }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">To date</label>
+                {{ filter_form.date_to }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Status</label>
+                {{ filter_form.status }}
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Apply</button>
+                <a href="{% url 'members:baptism_register' %}" class="btn btn-link btn-sm">Clear</a>
+            </div>
+        </form>
+        {% if can_export_members %}
+        <span class="toolbar-spacer"></span>
+        <div class="btn-group btn-group-sm">
+            <a href="?{{ filter_qs }}{% if filter_qs %}&{% endif %}export=csv" class="btn btn-outline-secondary">CSV</a>
+            <a href="?{{ filter_qs }}{% if filter_qs %}&{% endif %}export=excel" class="btn btn-outline-secondary">Excel</a>
+        </div>
+        {% endif %}
     </div>
-    {% endif %}
+
     <div class="data-card">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
@@ -21,22 +48,22 @@
                         <td><a href="{% url 'members:detail' r.member_id %}" class="table-link">{{ r.member.full_name }}</a></td>
                         <td>{{ r.title }}</td>
                         <td>{{ r.event_date }}</td>
-                        <td class="text-muted">{{ r.place|default:"—" }}</td>
-                        <td class="text-muted">{{ r.certificate_number|default:"—" }}</td>
+                        <td>{{ r.place|default:"—" }}</td>
+                        <td>{{ r.certificate_number|default:"—" }}</td>
                         <td class="text-end"><a href="{% url 'members:record_detail' r.pk %}" class="btn btn-sm btn-outline-secondary">View</a></td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="6">{% include "includes/empty_state.html" with icon="bi-droplet" message="No baptism records yet." %}</td></tr>
+                    <tr><td colspan="6">{% include "includes/empty_state.html" with icon="bi-droplet" message="No baptism records match these filters." %}</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
         {% if page_obj.has_other_pages %}
         <div class="card-footer d-flex justify-content-between">
-            <span class="text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            <span class="small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
             <ul class="pagination pagination-sm mb-0">
-                {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>{% endif %}
-                {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>{% endif %}
+                {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?{{ filter_qs }}{% if filter_qs %}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a></li>{% endif %}
+                {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?{{ filter_qs }}{% if filter_qs %}&{% endif %}page={{ page_obj.next_page_number }}">Next</a></li>{% endif %}
             </ul>
         </div>
         {% endif %}

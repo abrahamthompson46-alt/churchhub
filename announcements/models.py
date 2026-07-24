@@ -8,15 +8,16 @@ from django.db import models
 from django.utils import timezone
 
 from organization.models import Church
+from church_system.uploads import (
+    IMAGE_CONTENT_TYPES,
+    MAX_IMAGE_BYTES,
+    validate_upload,
+)
 
+# Back-compat aliases used by forms/tests
+MAX_ANNOUNCEMENT_IMAGE_BYTES = MAX_IMAGE_BYTES
+ALLOWED_IMAGE_CONTENT_TYPES = IMAGE_CONTENT_TYPES
 MAX_PINNED_PER_CHURCH = 3
-MAX_ANNOUNCEMENT_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
-ALLOWED_IMAGE_CONTENT_TYPES = frozenset({
-    "image/jpeg",
-    "image/png",
-    "image/gif",
-    "image/webp",
-})
 
 
 class Announcement(models.Model):
@@ -107,6 +108,13 @@ class Announcement(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Empty lists / empty M2M = entire church (or general) audience within visibility.
+    target_roles = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Optional UserRole codes. Empty = all roles in scope.",
+    )
+
     class Meta:
         ordering = ["-is_pinned", "-created_at"]
         verbose_name = "Announcement"
@@ -150,6 +158,23 @@ class Announcement(models.Model):
             raise ValidationError({"church": "Church is required for church-scoped announcements."})
         if self.visibility == "general":
             self.church = None
+        if self.target_roles is None:
+            self.target_roles = []
+        if not isinstance(self.target_roles, list):
+            raise ValidationError({"target_roles": "Target roles must be a list of role codes."})
+        from permissions.roles import UserRole
+
+        valid = {c[0] for c in UserRole.CHOICES}
+        cleaned_roles = []
+        for code in self.target_roles:
+            code = str(code).strip()
+            if not code:
+                continue
+            if code not in valid:
+                raise ValidationError({"target_roles": f"Unknown role code: {code}."})
+            if code not in cleaned_roles:
+                cleaned_roles.append(code)
+        self.target_roles = cleaned_roles
 
     def save(self, *args, **kwargs):
         if self.visibility == "general":
@@ -161,6 +186,27 @@ class Announcement(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class AnnouncementDepartment(models.Model):
+    """Optional department audience for an announcement (empty = all departments)."""
+
+    announcement = models.ForeignKey(
+        Announcement,
+        on_delete=models.CASCADE,
+        related_name="target_department_links",
+    )
+    department = models.ForeignKey(
+        "members.Department",
+        on_delete=models.CASCADE,
+        related_name="announcement_targets",
+    )
+
+    class Meta:
+        unique_together = ("announcement", "department")
+
+    def __str__(self):
+        return f"{self.announcement_id} → {self.department_id}"
 
 
 class AnnouncementImage(models.Model):
@@ -176,19 +222,10 @@ class AnnouncementImage(models.Model):
         super().clean()
         if not self.image:
             return
-        f = self.image
-        size = getattr(f, "size", None)
-        if size is not None and size > MAX_ANNOUNCEMENT_IMAGE_BYTES:
-            raise ValidationError(
-                {"image": f"Image must be {MAX_ANNOUNCEMENT_IMAGE_BYTES // (1024 * 1024)} MB or smaller."}
-            )
-        content_type = getattr(getattr(f, "file", None), "content_type", None) or getattr(
-            f, "content_type", None
-        )
-        if content_type and content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
-            raise ValidationError(
-                {"image": "Only JPEG, PNG, GIF, or WebP images are allowed."}
-            )
+        try:
+            validate_upload(self.image, kind="image")
+        except ValidationError as exc:
+            raise ValidationError({"image": exc.messages}) from exc
 
     def save(self, *args, **kwargs):
         self.full_clean()

@@ -93,6 +93,7 @@ class AnnouncementsLayerTests(TestCase):
             content="For A only",
             visibility="church",
             church=self.church_a,
+            auto_approve=True,
         )
         self.assertTrue(ann_a.is_approved)
         visible_b = visible_announcements(self.sec_b)

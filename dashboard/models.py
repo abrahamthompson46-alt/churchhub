@@ -7,8 +7,10 @@ class Notification(models.Model):
         ("INFO", "Info"),
         ("FINANCE", "Finance"),
         ("MEMBER", "Member"),
+        ("MEETING", "Meeting"),
         ("SYSTEM", "System"),
     ]
+    VALID_CATEGORIES = frozenset(c[0] for c in CATEGORY_CHOICES)
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -27,6 +29,7 @@ class Notification(models.Model):
         indexes = [
             models.Index(fields=["user", "-created_at"]),
             models.Index(fields=["user", "read"]),
+            models.Index(fields=["user", "category", "read"]),
         ]
 
     def __str__(self):

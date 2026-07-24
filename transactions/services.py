@@ -23,6 +23,7 @@ from .models import (
     MonthlyCutoff,
     Transaction,
     TransactionLine,
+    TreasuryApprovalPolicy,
     WorkingDay,
 )
 
@@ -368,6 +369,99 @@ def create_default_offering_categories(church):
 
 
 # ==========================================
+# RECEIPT AUTO-APPROVAL (income SoD exception)
+# ==========================================
+
+def get_or_create_treasury_approval_policy(church):
+    """Church policy defaults: auto-approve enabled, unlimited limit."""
+    policy, _ = TreasuryApprovalPolicy.objects.get_or_create(church=church)
+    return policy
+
+
+def effective_receipt_auto_approve_limit(user, church):
+    """
+    Return (enabled, limit).
+
+    limit is None when unlimited; Decimal when capped (inclusive).
+    User.max_receipt_auto_approve overrides the church default when set.
+    """
+    try:
+        policy = church.treasury_approval_policy
+        enabled = bool(policy.receipt_auto_approve_enabled)
+        church_limit = policy.default_receipt_auto_approve_limit
+    except TreasuryApprovalPolicy.DoesNotExist:
+        enabled = True
+        church_limit = None
+
+    user_limit = getattr(user, "max_receipt_auto_approve", None)
+    if user_limit is not None:
+        return enabled, Decimal(str(user_limit))
+    if church_limit is not None:
+        return enabled, Decimal(str(church_limit))
+    return enabled, None
+
+
+def receipt_should_auto_approve(user, church, amount):
+    """True when income may be auto-approved under church/user policy."""
+    enabled, limit = effective_receipt_auto_approve_limit(user, church)
+    if not enabled:
+        return False
+    amount = Decimal(str(amount))
+    if limit is None:
+        return True
+    return amount <= limit
+
+
+@db_transaction.atomic
+def auto_approve_receipt(transaction, user):
+    """
+    Approve a RECEIPT as the maker when within policy limit.
+
+    Documented maker-checker exception for income; audit details mark auto_approved.
+    """
+    if transaction.transaction_type != "RECEIPT":
+        raise ValueError("Only receipts can be auto-approved.")
+    if transaction.locked:
+        raise ValueError("Transaction is already locked.")
+    if transaction.approval_status != "PENDING":
+        raise ValueError("Transaction is not pending approval.")
+
+    assert_period_open(transaction.church, transaction.date)
+    validate_transaction_balance(transaction)
+    transaction.approval_status = "APPROVED"
+    transaction.locked = True
+    transaction.approved_by = user
+    transaction.approved_at = timezone.now()
+    repo.save_transaction(
+        transaction,
+        update_fields=["approval_status", "locked", "approved_by", "approved_at"],
+    )
+    _log_audit(
+        transaction.church,
+        "APPROVE",
+        user,
+        transaction=transaction,
+        details={
+            "reference": transaction.reference,
+            "auto_approved": True,
+            "sod_exception": "receipt_auto_approve",
+        },
+    )
+    _mark_cutoff_transferred_for_remittance(transaction)
+    try:
+        from church_system.perf_cache import invalidate_church_finance_caches
+
+        invalidate_church_finance_caches(
+            transaction.church_id,
+            year=transaction.date.year,
+            month=transaction.date.month,
+        )
+    except Exception:
+        pass
+    return transaction
+
+
+# ==========================================
 # RECORD RECEIPT (balanced double-entry)
 # ==========================================
 
@@ -388,6 +482,9 @@ def record_receipt(
     Post a balanced receipt:
       DR Cash/Bank (+total)
       CR Tithe / Combined / Income / Special offerings (-amounts)
+
+    Receipts within the church/user auto-approve limit are approved immediately
+    (maker-checker exception for income). Larger amounts stay PENDING.
     """
     special_offerings = special_offerings or {}
     special_total = sum(Decimal(str(v)) for v in special_offerings.values())
@@ -452,6 +549,8 @@ def record_receipt(
         transaction=trx,
         details={"type": "RECEIPT", "total": str(total_received)},
     )
+    if receipt_should_auto_approve(created_by, church, total_received):
+        trx = auto_approve_receipt(trx, created_by)
     return trx
 
 
@@ -693,6 +792,8 @@ def approve_module_journal(transaction, *checker_candidates):
 
 @db_transaction.atomic
 def approve_transaction(transaction, user):
+    if transaction.approval_status == "APPROVED" and transaction.locked:
+        return transaction
     if transaction.locked:
         raise ValueError("Transaction is already locked.")
     if transaction.created_by_id == user.id and not is_superadmin(user):

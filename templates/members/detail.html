@@ -6,7 +6,7 @@
 {% block content %}
 <div class="page-container">
     {% url 'members:edit' member.id as edit_url %}
-    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="People" page_title=member.full_name page_description=member.church.name %}
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Members" page_title=member.full_name page_description=member.church.name %}
 
     <div class="member-hero member-hero--profile">
         <div class="member-hero-photo">
@@ -151,11 +151,11 @@
                     <div class="row g-2 text-center small">
                         <div class="col-4">
                             <p class="text-muted mb-0">Contributed</p>
-                            <p class="fw-semibold mb-0">₵{{ welfare_summary.contributed|floatformat:2|intcomma }}</p>
+                            <p class="fw-semibold mb-0">{{ welfare_summary.contributed|floatformat:2|intcomma }}</p>
                         </div>
                         <div class="col-4">
                             <p class="text-muted mb-0">Received</p>
-                            <p class="fw-semibold mb-0">₵{{ welfare_summary.received|floatformat:2|intcomma }}</p>
+                            <p class="fw-semibold mb-0">{{ welfare_summary.received|floatformat:2|intcomma }}</p>
                         </div>
                         <div class="col-4">
                             <p class="text-muted mb-0">Open</p>

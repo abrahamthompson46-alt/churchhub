@@ -46,6 +46,14 @@ def mark_all_notifications_read(user):
     return updated
 
 
+def delete_notification(notification):
+    from church_system.perf_cache import invalidate_unread_notifications
+
+    user_id = notification.user_id
+    notification.delete()
+    invalidate_unread_notifications(user_id)
+
+
 def delete_old_read_notifications(*, older_than_days=90):
     cutoff = timezone.now() - timedelta(days=older_than_days)
     deleted, _ = Notification.objects.filter(read=True, created_at__lt=cutoff).delete()

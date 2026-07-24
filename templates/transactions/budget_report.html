@@ -38,9 +38,9 @@
                     {% for row in rows %}
                     <tr>
                         <td>{{ row.account }}</td>
-                        <td class="text-end text-currency">₵ {{ row.budgeted|floatformat:2|intcomma }}</td>
-                        <td class="text-end text-currency">₵ {{ row.actual|floatformat:2|intcomma }}</td>
-                        <td class="text-end text-currency fw-semibold {% if row.variance < 0 %}text-danger{% else %}text-success{% endif %}">₵ {{ row.variance|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency">{{ row.budgeted|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency">{{ row.actual|floatformat:2|intcomma }}</td>
+                        <td class="text-end text-currency fw-semibold {% if row.variance < 0 %}text-danger{% else %}text-success{% endif %}">{{ row.variance|floatformat:2|intcomma }}</td>
                     </tr>
                     {% empty %}
                     <tr>

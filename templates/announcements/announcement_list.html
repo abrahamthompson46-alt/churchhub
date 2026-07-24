@@ -7,9 +7,9 @@
 <div class="page-container">
     {% if can_create_announcements %}
     {% url 'announcements:create_announcement' as create_url %}
-    {% include "includes/page_header.html" with page_subtitle="Communications" page_title="Announcements" page_description="Approved announcements for your church and hierarchy." action_url=create_url action_label="Create Announcement" %}
+    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="Announcements" page_description="Approved announcements for your church and hierarchy." action_url=create_url action_label="Create Announcement" %}
     {% else %}
-    {% include "includes/page_header.html" with page_subtitle="Communications" page_title="Announcements" page_description="Approved announcements for your church and hierarchy." %}
+    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="Announcements" page_description="Approved announcements for your church and hierarchy." %}
     {% endif %}
 
     <div class="filter-bar">

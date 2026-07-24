@@ -13,6 +13,7 @@ from decimal import Decimal
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from church_system.church_scope import filter_by_church
 from church_system.denomination_scope import get_user_denomination
@@ -36,8 +37,13 @@ def manageable_church_by_pk(user, pk):
     return get_manageable_churches(user).filter(pk=pk).first()
 
 
-def notifications_for_user(user):
-    return Notification.objects.filter(user=user).order_by("-created_at")
+def notifications_for_user(user, *, unread_only=False, category=""):
+    qs = Notification.objects.filter(user=user).order_by("-created_at")
+    if unread_only:
+        qs = qs.filter(read=False)
+    if category:
+        qs = qs.filter(category=category)
+    return qs
 
 
 def unread_notification_count(user):
@@ -360,4 +366,73 @@ def open_working_day_church_ids(church_ids):
             church_id__in=list(church_ids),
             status=WorkingDay.STATUS_OPEN,
         ).values_list("church_id", flat=True)
+    )
+
+
+def open_visitors_for_church(church, *, limit=8):
+    """Visitors still needing pastoral follow-up (not converted/closed)."""
+    from members.models import Visitor, VisitorFollowUpStatus
+
+    if not church:
+        return Visitor.objects.none()
+    open_statuses = (
+        VisitorFollowUpStatus.NEW,
+        VisitorFollowUpStatus.CONTACTED,
+        VisitorFollowUpStatus.IN_PROGRESS,
+    )
+    return (
+        Visitor.objects.filter(
+            church=church,
+            follow_up_status__in=open_statuses,
+            is_deleted=False,
+        )
+        .select_related("assigned_elder")
+        .order_by("-visit_date", "-created_at")[:limit]
+    )
+
+
+def open_visitors_count_for_church(church):
+    from members.models import Visitor, VisitorFollowUpStatus
+
+    if not church:
+        return 0
+    return Visitor.objects.filter(
+        church=church,
+        follow_up_status__in=(
+            VisitorFollowUpStatus.NEW,
+            VisitorFollowUpStatus.CONTACTED,
+            VisitorFollowUpStatus.IN_PROGRESS,
+        ),
+        is_deleted=False,
+    ).count()
+
+
+def meetings_this_week_for_church(church, *, now=None, limit=5):
+    from datetime import timedelta
+
+    from meetings.models import Meeting, MeetingStatus
+
+    if not church:
+        return Meeting.objects.none()
+    now = now or timezone.now()
+    end = now + timedelta(days=7)
+    return (
+        Meeting.objects.filter(
+            church=church,
+            scheduled_at__gte=now,
+            scheduled_at__lte=end,
+            status=MeetingStatus.SCHEDULED,
+        )
+        .select_related("department")
+        .order_by("scheduled_at")[:limit]
+    )
+
+
+def pending_transfers_preview_for_church(church, *, limit=5):
+    if not church:
+        return MemberTransfer.objects.none()
+    return (
+        pending_transfers_for_church(church)
+        .select_related("member", "from_church", "to_church")
+        .order_by("-created_at")[:limit]
     )

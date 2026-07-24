@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — ChurchHub{% endblock %}
+
+{% block content %}
+{% include "includes/form_open.html" with form_subtitle="People" form_title=title form_description="Record a guest visit and follow-up plan." wide=True %}
+<form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <h3 class="h6 text-uppercase mb-3" style="letter-spacing:0.04em;color:var(--ch-muted)">Guest</h3>
+            <div class="row g-3">
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.first_name %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.last_name %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.phone %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.email %}</div>
+                <div class="col-12">{% include "includes/form_field.html" with field=form.address %}</div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <h3 class="h6 text-uppercase mb-3" style="letter-spacing:0.04em;color:var(--ch-muted)">Visit &amp; follow-up</h3>
+            <div class="row g-3">
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.visit_date %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.follow_up_status %}</div>
+                <div class="col-12">{% include "includes/form_field.html" with field=form.interests %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.invited_by %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.assigned_elder %}</div>
+                <div class="col-12">{% include "includes/form_field.html" with field=form.notes %}</div>
+            </div>
+        </div>
+    </div>
+    <div class="d-flex gap-2 pt-3">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="{% url 'members:visitor_list' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% include "includes/form_close.html" %}
+{% endblock %}

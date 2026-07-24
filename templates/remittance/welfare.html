@@ -23,7 +23,7 @@
             <div class="card text-center h-100">
                 <div class="card-body py-3">
                     <p class="text-muted small mb-1">Fund Balance</p>
-                    <h4 class="mb-0">₵{{ dashboard.fund_balance|floatformat:2|intcomma }}</h4>
+                    <h4 class="mb-0">{{ dashboard.fund_balance|floatformat:2|intcomma }}</h4>
                 </div>
             </div>
         </div>
@@ -31,7 +31,7 @@
             <div class="card text-center h-100">
                 <div class="card-body py-3">
                     <p class="text-muted small mb-1">Contributions {{ year }}</p>
-                    <h4 class="mb-0">₵{{ dashboard.contributions_ytd|floatformat:2|intcomma }}</h4>
+                    <h4 class="mb-0">{{ dashboard.contributions_ytd|floatformat:2|intcomma }}</h4>
                 </div>
             </div>
         </div>
@@ -39,7 +39,7 @@
             <div class="card text-center h-100">
                 <div class="card-body py-3">
                     <p class="text-muted small mb-1">Disbursed {{ year }}</p>
-                    <h4 class="mb-0">₵{{ dashboard.disbursed_ytd|floatformat:2|intcomma }}</h4>
+                    <h4 class="mb-0">{{ dashboard.disbursed_ytd|floatformat:2|intcomma }}</h4>
                 </div>
             </div>
         </div>
@@ -158,7 +158,7 @@
                                 <a href="{% url 'remittance:member_welfare' row.member_id %}" class="table-link">{{ row.member.full_name }}</a>
                                 {% else %}<span class="text-muted">Anonymous</span>{% endif %}
                             </td>
-                            <td class="text-end">₵{{ row.amount|floatformat:2 }}</td>
+                            <td class="text-end">{{ row.amount|floatformat:2 }}</td>
                             <td>{{ row.notes|default:"—" }}</td>
                         </tr>
                         {% empty %}
@@ -192,9 +192,9 @@
                             <td><a href="{% url 'remittance:welfare_case_detail' case.pk %}" class="table-link fw-semibold">{{ case.case_number|default:case.pk }}</a></td>
                             <td><a href="{% url 'remittance:member_welfare' case.member_id %}" class="table-link">{{ case.member.full_name }}</a></td>
                             <td>{{ case.get_assistance_type_display }}</td>
-                            <td class="text-end">₵{{ case.amount_requested|floatformat:2 }}</td>
-                            <td class="text-end">{% if case.amount_approved %}₵{{ case.amount_approved|floatformat:2 }}{% else %}—{% endif %}</td>
-                            <td><span class="chip chip--{% if case.status == 'DISBURSED' %}success{% elif case.status == 'REJECTED' or case.status == 'CANCELLED' %}warning{% elif case.status == 'APPROVED' %}info{% else %}secondary{% endif %}">{{ case.get_status_display }}</span></td>
+                            <td class="text-end">{{ case.amount_requested|floatformat:2 }}</td>
+                            <td class="text-end">{% if case.amount_approved %}{{ case.amount_approved|floatformat:2 }}{% else %}—{% endif %}</td>
+                            <td>{{ case.get_status_display }}</td>
                             <td class="text-end"><a href="{% url 'remittance:welfare_case_detail' case.pk %}" class="btn btn-sm btn-outline-secondary">Open</a></td>
                         </tr>
                         {% empty %}

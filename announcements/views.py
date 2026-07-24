@@ -16,6 +16,8 @@ from church_system.flash import flash_exception, flash_info, flash_success
 from permissions.checks import (
     can_approve_announcements,
     can_create_announcements,
+    can_export_announcements,
+    can_view_announcements,
     permission_required,
 )
 from reports.exporters import export_table_csv, export_table_excel
@@ -73,6 +75,26 @@ def approve_required(view_func):
     return _wrapped
 
 
+def view_required(view_func):
+    @login_required
+    @permission_required("view_announcements")
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
+
+def archive_required(view_func):
+    @login_required
+    @permission_required("archive_announcements")
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
+
 @create_required
 def create_announcement_view(request):
     if request.method == "POST":
@@ -89,6 +111,8 @@ def create_announcement_view(request):
                     event_date=form.cleaned_data.get("event_date"),
                     publish_at=form.cleaned_data.get("publish_at"),
                     auto_expire=form.cleaned_data.get("auto_expire", True),
+                    target_roles=form.cleaned_data.get("target_roles") or [],
+                    target_departments=list(form.cleaned_data.get("target_departments") or []),
                 )
                 formset.instance = announcement
                 repo.save_image_formset(formset)
@@ -116,14 +140,16 @@ def create_announcement_view(request):
     })
 
 
-@login_required
+@view_required
 def announcement_list(request):
     q = (request.GET.get("q") or "").strip()
     pinned_only = request.GET.get("pinned") == "1"
     qs = get_announcement_list_queryset(request.user, q=q, pinned_only=pinned_only)
 
     export_fmt = request.GET.get("export", "")
-    if export_fmt in ("csv", "excel") and can_approve_announcements(request.user):
+    if export_fmt in ("csv", "excel"):
+        if not can_export_announcements(request.user):
+            raise PermissionDenied
         payload = export_announcements_table(qs)
         repo.create_audit_log(
             announcement=None,
@@ -158,12 +184,12 @@ def announcement_list(request):
         "viewed_ids": viewed_ids,
         "q": q,
         "pinned_only": pinned_only,
-        "can_export": can_approve_announcements(request.user),
+        "can_export": can_export_announcements(request.user),
         "can_create": can_create_announcements(request.user),
     })
 
 
-@login_required
+@view_required
 def announcement_detail(request, pk):
     announcement = selectors.get_announcement_detail_or_404(pk)
     # Allow creator / approver to see pending/rejected; others only visible published
@@ -186,6 +212,7 @@ def announcement_detail(request, pk):
 
 
 @login_required
+@permission_required("create_announcements")
 def my_announcements(request):
     status = request.GET.get("status", "")
     qs = get_my_announcements_queryset(request.user, status=status)
@@ -257,6 +284,7 @@ def reject_announcement_view(request, pk):
 
 
 @login_required
+@permission_required("create_announcements")
 def edit_announcement(request, pk):
     announcement = selectors.get_announcement_or_404(pk)
     if not can_edit_announcement(request.user, announcement):
@@ -279,6 +307,8 @@ def edit_announcement(request, pk):
                     is_pinned=form.cleaned_data.get("is_pinned")
                     if "is_pinned" in form.cleaned_data
                     else None,
+                    target_roles=form.cleaned_data.get("target_roles") or [],
+                    target_departments=list(form.cleaned_data.get("target_departments") or []),
                 )
                 repo.save_image_formset(formset)
                 flash_success(request, "Announcement updated.")
@@ -315,7 +345,7 @@ def archive_announcement_view(request, pk):
     return redirect("announcements:announcement_list")
 
 
-@login_required
+@view_required
 def track_view(request, pk):
     announcement = selectors.get_from_queryset_or_404(
         visible_announcements(request.user), pk
@@ -330,7 +360,7 @@ def _attach_calendar_urls(items):
     return attach_calendar_urls(items)
 
 
-@login_required
+@view_required
 def upcoming_calendar(request):
     from datetime import timedelta
 

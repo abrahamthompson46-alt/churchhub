@@ -707,3 +707,43 @@ class FinancialIdempotencyKey(models.Model):
 
     def __str__(self):
         return f"{self.action} — {self.idempotency_key[:12]}…"
+
+
+class TreasuryApprovalPolicy(models.Model):
+    """
+    Church policy for receipt auto-approval.
+
+    Receipts at or below the effective limit are auto-approved (maker-checker
+    exception for income). Amounts above the limit stay PENDING for a second approver.
+    Blank default limit means unlimited auto-approve when enabled.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    church = models.OneToOneField(
+        "organization.Church",
+        on_delete=models.CASCADE,
+        related_name="treasury_approval_policy",
+    )
+    receipt_auto_approve_enabled = models.BooleanField(
+        default=True,
+        help_text="When enabled, income/receipts within the limit are auto-approved.",
+    )
+    default_receipt_auto_approve_limit = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=(
+            "Church default: receipts up to this amount auto-approve. "
+            "Leave blank for unlimited (all receipts auto-approve). "
+            "Set 0 to require second approval for every receipt."
+        ),
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Treasury approval policy"
+        verbose_name_plural = "Treasury approval policies"
+
+    def __str__(self):
+        return f"Treasury policy — {self.church}"

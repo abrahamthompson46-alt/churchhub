@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Member Lists — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container page-shell">
+    {% url 'members:member_lookup_add' as add_url %}
+    {% include "includes/page_header.html" with page_subtitle="Administration" page_title="Member Lists" page_description="Update dropdown values used on member and record forms." action_url=add_url action_label="Add option" action_icon="bi-plus-lg" %}
+
+    <div class="filter-bar mb-3">
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'members:member_lookup_list' %}" class="btn btn-sm {% if not active_category %}btn-primary{% else %}btn-outline-secondary{% endif %}">All</a>
+            {% for code, label in categories %}
+            <a href="?category={{ code }}" class="btn btn-sm {% if active_category == code %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ label }}</a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Label</th>
+                        <th>Code</th>
+                        <th>Order</th>
+                        <th>Active</th>
+                        <th>System</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for opt in options %}
+                    <tr>
+                        <td>{{ opt.get_category_display }}</td>
+                        <td>{{ opt.label }}</td>
+                        <td><code>{{ opt.code }}</code></td>
+                        <td>{{ opt.sort_order }}</td>
+                        <td>{% if opt.is_active %}Yes{% else %}No{% endif %}</td>
+                        <td>{% if opt.is_system %}Locked{% else %}—{% endif %}</td>
+                        <td class="text-end">
+                            <a href="{% url 'members:member_lookup_edit' opt.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="text-muted">No options yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

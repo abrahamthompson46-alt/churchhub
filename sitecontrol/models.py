@@ -402,6 +402,7 @@ class PlatformAuditLog(models.Model):
         ("SETTINGS_UPDATE", "Settings Updated"),
         ("PLAN_UPDATE", "Plan Updated"),
         ("SUBSCRIPTION_UPDATE", "Subscription Updated"),
+        ("SUBSCRIPTION_PAYMENT", "Subscription Payment Recorded"),
         ("TENANT_UPDATE", "Tenant Updated"),
         ("TENANT_SUSPEND", "Tenant Suspended"),
         ("TENANT_REACTIVATE", "Tenant Reactivated"),

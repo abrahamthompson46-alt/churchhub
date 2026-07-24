@@ -31,6 +31,8 @@ from organization.access import (
 )
 from organization.forms import (
     ChurchForm,
+    ChurchHistoryEntryForm,
+    ChurchHistorySearchForm,
     ChurchOnboardingForm,
     ChurchTransferForm,
     ConferenceForm,
@@ -42,16 +44,26 @@ from organization.forms import (
 )
 from organization.services import (
     create_church,
+    create_church_history_entry,
     export_hierarchy_rows,
     get_client_ip,
+    get_scoped_history_entry,
     log_org_audit,
     onboard_full_hierarchy,
+    search_church_history_entries,
     set_church_active,
     transfer_church,
     update_church,
+    update_church_history_entry,
 )
-from permissions.checks import can_manage_organization
-
+from permissions.checks import (
+    any_permission_required,
+    can_manage_church_history,
+    can_manage_organization,
+    can_view_church_history,
+    permission_required,
+)
+from permissions.scoping import get_manageable_churches
 
 @login_required
 def hierarchy_overview(request):
@@ -230,9 +242,18 @@ def conference_detail(request, pk):
     conference = get_scoped_conference(request, pk)
     conference = selectors.conference_for_detail(conference.pk)
     zones = selectors.zones_for_conference(conference)
+    manageable_ids = list(get_manageable_churches(request.user).values_list("pk", flat=True))
+    history_count = 0
+    if can_view_church_history(request.user):
+        history_count = selectors.church_history_count_for_conference(
+            conference, church_ids=manageable_ids
+        )
     return render(request, "organization/conference_detail.html", {
         "conference": conference,
         "zones": zones,
+        "history_count": history_count,
+        "can_view_church_history": can_view_church_history(request.user),
+        "can_manage_church_history": can_manage_church_history(request.user),
         **org_capability_flags(request.user),
         "can_manage": (
             can_manage_organization(request.user)
@@ -397,11 +418,17 @@ def church_detail(request, pk):
     require_org_read(request)
     church = get_scoped_church(request, pk)
     member_count = selectors.active_member_count(church)
+    history_count = 0
+    if can_view_church_history(request.user):
+        history_count = selectors.church_history_count_for_church(church)
     return render(request, "organization/church_detail.html", {
         "church": church,
         "member_count": member_count,
         "account_count": selectors.church_account_count(church),
         "txn_count": selectors.church_transaction_count(church),
+        "history_count": history_count,
+        "can_view_church_history": can_view_church_history(request.user),
+        "can_manage_church_history": can_manage_church_history(request.user),
         **org_capability_flags(request.user),
     })
 
@@ -716,4 +743,215 @@ def union_edit(request, pk):
         "form": form,
         "title": "Edit Union",
         "object": union,
+    })
+
+
+def _history_scope_churches(user):
+    return get_manageable_churches(user).select_related(
+        "district__zone__conference"
+    ).order_by("name")
+
+
+def _history_scope_conferences(user):
+    from organization.models import Conference
+
+    church_ids = get_manageable_churches(user).values_list("pk", flat=True)
+    return Conference.objects.filter(
+        zones__districts__churches__in=church_ids
+    ).distinct().order_by("name")
+
+
+def _history_search_context(request, *, page_obj, search_form, scope_label, scope_chips):
+    return {
+        "entries": page_obj,
+        "search_form": search_form,
+        "result_count": page_obj.paginator.count,
+        "scope_label": scope_label,
+        "scope_chips": scope_chips,
+        "can_manage_church_history": can_manage_church_history(request.user),
+        "can_view_church_history": True,
+    }
+
+
+@login_required
+@any_permission_required("view_church_history", "manage_church_history")
+def church_history_list(request):
+    churches = _history_scope_churches(request.user)
+    conferences = _history_scope_conferences(request.user)
+    search_form = ChurchHistorySearchForm(
+        request.GET or None,
+        churches=churches,
+        conferences=conferences,
+    )
+
+    church_id = None
+    conference_id = None
+    category = ""
+    q = ""
+    date_from = None
+    date_to = None
+    if search_form.is_valid():
+        cleaned = search_form.cleaned_data
+        q = cleaned.get("q") or ""
+        category = cleaned.get("category") or ""
+        date_from = cleaned.get("date_from")
+        date_to = cleaned.get("date_to")
+        church_obj = cleaned.get("church")
+        conference_obj = cleaned.get("conference")
+        if church_obj:
+            church_id = church_obj.pk
+        if conference_obj:
+            conference_id = conference_obj.pk
+
+    # Deep-link query params take precedence when form widgets are hidden.
+    if request.GET.get("church") and not church_id:
+        church_id = request.GET.get("church")
+    if request.GET.get("conference") and not conference_id:
+        conference_id = request.GET.get("conference")
+
+    active_church = get_active_church(request)
+    entries = search_church_history_entries(
+        request.user,
+        q=q,
+        category=category,
+        church_id=church_id,
+        conference_id=conference_id,
+        date_from=date_from,
+        date_to=date_to,
+        active_church=None if (church_id or conference_id) else active_church,
+    )
+
+    page_obj = Paginator(entries, 25).get_page(request.GET.get("page"))
+    params = request.GET.copy()
+    params.pop("page", None)
+
+    scope_chips = []
+    scope_label = "Your accessible churches"
+    if church_id:
+        church = churches.filter(pk=church_id).first()
+        if church:
+            scope_label = f"Church: {church.name}"
+            scope_chips.append({"label": church.name, "kind": "church"})
+    elif conference_id:
+        conference = conferences.filter(pk=conference_id).first()
+        if conference:
+            scope_label = f"Conference: {conference.name}"
+            scope_chips.append({"label": conference.name, "kind": "conference"})
+    elif active_church:
+        scope_label = f"Active church: {active_church.name}"
+        scope_chips.append({"label": active_church.name, "kind": "church"})
+
+    if category:
+        from organization.models import ChurchHistoryEntry
+
+        scope_chips.append({
+            "label": dict(ChurchHistoryEntry.Category.choices).get(category, category),
+            "kind": "category",
+        })
+    if q:
+        scope_chips.append({"label": f"“{q}”", "kind": "search"})
+    if date_from or date_to:
+        span = " – ".join(
+            filter(None, [
+                date_from.isoformat() if date_from else None,
+                date_to.isoformat() if date_to else None,
+            ])
+        )
+        scope_chips.append({"label": span, "kind": "dates"})
+
+    return render(request, "organization/church_history_list.html", {
+        **_history_search_context(
+            request,
+            page_obj=page_obj,
+            search_form=search_form,
+            scope_label=scope_label,
+            scope_chips=scope_chips,
+        ),
+        "page_obj": page_obj,
+        "querystring": params.urlencode(),
+    })
+
+
+@login_required
+@any_permission_required("view_church_history", "manage_church_history")
+def church_history_detail(request, pk):
+    entry = get_scoped_history_entry(request.user, pk)
+    return render(request, "organization/church_history_detail.html", {
+        "entry": entry,
+        "can_manage_church_history": can_manage_church_history(request.user),
+    })
+
+
+@login_required
+@permission_required("manage_church_history")
+def church_history_create(request):
+    churches = _history_scope_churches(request.user)
+    if not churches.exists():
+        raise PermissionDenied("No church is available to record history.")
+    default_church = get_active_church(request)
+    preset_church = None
+    church_param = request.GET.get("church") or request.POST.get("church")
+    if church_param:
+        preset_church = churches.filter(pk=church_param).first()
+    if default_church and default_church.pk not in churches.values_list("pk", flat=True):
+        default_church = None
+    form = ChurchHistoryEntryForm(
+        request.POST or None,
+        churches=churches,
+        default_church=preset_church or default_church,
+    )
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data
+        entry = create_church_history_entry(
+            church=data["church"],
+            title=data["title"],
+            body=data["body"],
+            event_date=data["event_date"],
+            category=data["category"],
+            location=data.get("location") or "",
+            tags=data.get("tags") or "",
+            performed_by=request.user,
+            ip_address=get_client_ip(request),
+        )
+        flash_success(request, "Church history entry saved.")
+        return redirect("organization:church_history_detail", pk=entry.pk)
+    return render(request, "organization/church_history_form.html", {
+        "form": form,
+        "title": "Add Church History",
+        "cancel_url": "organization:church_history_list",
+    })
+
+
+@login_required
+@permission_required("manage_church_history")
+def church_history_edit(request, pk):
+    entry = get_scoped_history_entry(request.user, pk)
+    churches = _history_scope_churches(request.user)
+    form = ChurchHistoryEntryForm(
+        request.POST or None,
+        instance=entry,
+        churches=churches,
+    )
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data
+        update_church_history_entry(
+            entry,
+            title=data["title"],
+            body=data["body"],
+            event_date=data["event_date"],
+            category=data["category"],
+            location=data.get("location") or "",
+            tags=data.get("tags") or "",
+            church=data["church"],
+            performed_by=request.user,
+            ip_address=get_client_ip(request),
+        )
+        flash_success(request, "Church history entry updated.")
+        return redirect("organization:church_history_detail", pk=entry.pk)
+    return render(request, "organization/church_history_form.html", {
+        "form": form,
+        "title": "Edit Church History",
+        "object": entry,
+        "cancel_url": "organization:church_history_detail",
+        "cancel_pk": entry.pk,
     })

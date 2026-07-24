@@ -50,10 +50,9 @@ def navigation_context(request):
 
     unread_notifications = 0
     if request.user.is_authenticated:
-        from dashboard.models import Notification
-        unread_notifications = Notification.objects.filter(
-            user=request.user, read=False
-        ).count()
+        from dashboard.selectors import unread_notification_count
+
+        unread_notifications = unread_notification_count(request.user)
 
     report_key = ""
     if resolver and resolver.namespace == "reports" and resolver.url_name == "run":

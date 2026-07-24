@@ -63,7 +63,7 @@ SoR: `transactions.models.Budget` (levels CHURCH / DEPARTMENT / DISTRICT / CONFE
 |--------|------|
 | `selectors.py` | Scoped budget lists, detail-by-pk, church rollups for actuals, duplicate checks, form Account/Department querysets |
 | `repositories.py` | `save_budget`, `delete_budget`, audit via `transactions.repositories.create_audit_log` |
-| `services.py` | Scope resolution, variance polarity, KPIs, export rows, duplicate validation, delete-when-actuals guard |
+| `services.py` | Scope resolution, variance polarity, KPIs (income/expense split), YTD forecast, year clone, export rows, duplicate validation, delete-when-actuals guard |
 
 `tests_layers.py` characterizes selector reads, repository writes, church isolation, variance, and delete blocked when approved actuals exist.
 
@@ -71,8 +71,10 @@ SoR: `transactions.models.Budget` (levels CHURCH / DEPARTMENT / DISTRICT / CONFE
 
 ## 6. Views / URLs (Current)
 
-`app_name=budgets` under `/budgets/`: list, create, edit, delete.  
+`app_name=budgets` under `/budgets/`: list, create, clone, edit, delete.  
 Gates: feature `budgets` + `view_budgets` / `manage_budgets` / `manage_finances`.
+
+List UI uses plain numeric amounts (no currency symbols/badges), Budget vs Actual with **Forecast** (linear YTD extrapolation), and **Clone budget year** for managers.
 
 Legacy `transactions:budget_report` redirects here.
 

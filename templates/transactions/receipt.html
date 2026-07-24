@@ -1,59 +1,120 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Receipt {{ transaction.reference }}{% endblock %}
+{% block title %}{% if just_recorded %}Confirmed{% else %}Confirmation{% endif %} {{ transaction.reference }} — ChurchHub{% endblock %}
+
+{% block extra_css %}
+<style>
+@media print {
+    .no-print, .app-breadcrumb, .page-header, .module-tabs, .navbar, .flash-messages { display: none !important; }
+    .receipt-card { box-shadow: none !important; border: 1px solid #ccc !important; }
+}
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Transaction Receipt" page_description=transaction.reference %}
+    <nav aria-label="breadcrumb" class="app-breadcrumb no-print">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'transactions:transaction_list' %}">Transactions</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'transactions:transaction_detail' transaction.pk %}">{{ transaction.reference }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Confirmation</li>
+        </ol>
+    </nav>
+
+    {% if just_recorded %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Transaction confirmed" page_description="Review the slip below, print if needed, then continue." %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Transaction confirmation" page_description=transaction.reference %}
+    {% endif %}
+
+    {% if just_recorded %}
+    <div class="alert {% if transaction.approval_status == 'APPROVED' %}alert-success{% else %}alert-warning{% endif %} no-print" role="status">
+        {% if transaction.approval_status == 'APPROVED' %}
+        <strong>{{ transaction.reference }}</strong> was recorded and approved. You can print this confirmation for your records.
+        {% else %}
+        <strong>{{ transaction.reference }}</strong> was recorded and is <strong>pending approval</strong>. Share or print this slip; it will appear in the pending queue for a checker.
+        {% endif %}
+    </div>
+    {% endif %}
 
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="receipt-card panel">
                 <div class="panel-body p-4 p-md-5">
                     <div class="text-center mb-4 pb-3 border-bottom">
-                        <div class="brand-icon mx-auto mb-2"><i class="bi bi-building"></i></div>
-                        <h2 class="h5 mb-1">ChurchHub</h2>
-                        <p class="text-muted small mb-0">Transaction Receipt</p>
+                        <div class="brand-icon mx-auto mb-2"><i class="bi bi-receipt"></i></div>
+                        <h2 class="h5 mb-1">{{ transaction.church.name }}</h2>
+                        <p class="text-muted small mb-0">
+                            {% if transaction.transaction_type == 'RECEIPT' %}Receipt confirmation
+                            {% elif transaction.transaction_type == 'EXPENSE' %}Expense confirmation
+                            {% else %}Transaction confirmation{% endif %}
+                        </p>
+                    </div>
+
+                    <div class="text-center mb-4">
+                        <div class="text-muted small text-uppercase">Amount</div>
+                        <div class="display-6 fw-semibold text-currency">{{ display_total|floatformat:2|intcomma }}</div>
+                        <div class="mt-2">
+                            <span class="badge {% if transaction.approval_status == 'APPROVED' %}bg-success{% elif transaction.approval_status == 'REJECTED' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ transaction.approval_status }}</span>
+                            <span class="chip ms-1">{{ transaction.transaction_type }}</span>
+                            {% if transaction.is_voided %}<span class="badge bg-dark ms-1">VOIDED</span>{% endif %}
+                        </div>
                     </div>
 
                     <dl class="row mb-0">
                         <dt class="col-5 text-muted">Reference</dt><dd class="col-7 fw-semibold">{{ transaction.reference }}</dd>
-                        <dt class="col-5 text-muted">Date</dt><dd class="col-7">{{ transaction.date }}</dd>
-                        <dt class="col-5 text-muted">Type</dt><dd class="col-7"><span class="chip">{{ transaction.transaction_type }}</span></dd>
-                        <dt class="col-5 text-muted">Status</dt>
-                        <dd class="col-7">
-                            <span class="badge {% if transaction.approval_status == 'APPROVED' %}bg-success{% elif transaction.approval_status == 'REJECTED' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ transaction.approval_status }}</span>
-                        </dd>
+                        <dt class="col-5 text-muted">Business date</dt><dd class="col-7">{{ transaction.date|date:"M j, Y" }}</dd>
                         {% if transaction.member %}
                         <dt class="col-5 text-muted">Member</dt><dd class="col-7">{{ transaction.member }}</dd>
                         {% endif %}
                         {% if transaction.description %}
                         <dt class="col-5 text-muted">Description</dt><dd class="col-7">{{ transaction.description }}</dd>
                         {% endif %}
+                        <dt class="col-5 text-muted">Recorded by</dt><dd class="col-7">{{ transaction.created_by|default:"—" }}</dd>
+                        {% if transaction.approved_by %}
+                        <dt class="col-5 text-muted">Approved by</dt><dd class="col-7">{{ transaction.approved_by }}{% if transaction.approved_at %} · {{ transaction.approved_at|date:"M j, Y g:i A" }}{% endif %}</dd>
+                        {% endif %}
                     </dl>
 
                     <div class="data-card mt-4">
                         <div class="table-responsive">
                             <table class="table table-sm mb-0">
-                                <thead><tr><th>Account</th><th class="text-end">Amount (₵)</th></tr></thead>
+                                <thead>
+                                    <tr>
+                                        <th>Account</th>
+                                        <th class="text-muted">Type</th>
+                                        <th class="text-end">Amount</th>
+                                    </tr>
+                                </thead>
                                 <tbody>
                                     {% for line in transaction.lines.all %}
                                     <tr>
                                         <td>{{ line.account.name }}</td>
-                                        <td class="text-end text-currency">{{ line.amount|floatformat:2|intcomma }}</td>
+                                        <td class="text-muted small">{{ line.account.account_type }}</td>
+                                        <td class="text-end text-currency {% if line.amount < 0 %}text-danger{% else %}text-success{% endif %}">{{ line.amount|floatformat:2|intcomma }}</td>
                                     </tr>
+                                    {% empty %}
+                                    <tr><td colspan="3" class="text-muted">No journal lines.</td></tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-center gap-2 mt-4 pt-3 border-top">
-                        <button type="button" onclick="window.print()" class="btn btn-outline-primary btn-sm">
-                            <i class="bi bi-printer me-1"></i>Print
+                    <div class="d-flex flex-wrap justify-content-center gap-2 mt-4 pt-3 border-top no-print">
+                        <button type="button" onclick="window.print()" class="btn btn-primary btn-sm">
+                            <i class="bi bi-printer me-1"></i>Print confirmation
                         </button>
-                        <a href="{% url 'transactions:pending_approvals' %}" class="btn btn-secondary btn-sm">Back</a>
+                        {% if transaction.transaction_type == 'RECEIPT' %}
+                        <a href="{% url 'transactions:record_receipt' %}" class="btn btn-outline-primary btn-sm">Record another receipt</a>
+                        {% elif transaction.transaction_type == 'EXPENSE' %}
+                        <a href="{% url 'transactions:record_expense' %}" class="btn btn-outline-primary btn-sm">Record another expense</a>
+                        {% endif %}
+                        <a href="{% url 'transactions:transaction_detail' transaction.pk %}" class="btn btn-outline-secondary btn-sm">Full details</a>
+                        {% if transaction.approval_status == 'PENDING' %}
+                        <a href="{% url 'transactions:pending_approvals' %}" class="btn btn-outline-secondary btn-sm">Pending queue</a>
+                        {% endif %}
                     </div>
                 </div>
             </div>

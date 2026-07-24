@@ -18,7 +18,7 @@
                 <td class="fw-semibold">{{ method.name }}</td>
                 <td>{{ method.get_method_type_display }}</td>
                 <td>{% if method.is_default %}<i class="bi bi-check-circle text-success"></i>{% else %}—{% endif %}</td>
-                <td>{% if method.is_active %}<span class="badge bg-success">Yes</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
+                <td>{% if method.is_active %}Yes{% else %}No{% endif %}</td>
                 <td>{{ method.sort_order }}</td>
                 <td><a href="{% url 'sitecontrol:payment_method_edit' method.pk %}" class="btn btn-sm btn-outline-primary">Edit</a></td>
             </tr>

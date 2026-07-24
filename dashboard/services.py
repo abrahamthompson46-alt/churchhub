@@ -16,12 +16,20 @@ from permissions.checks import (
     can_approve_minutes,
     can_approve_transactions,
     can_create_announcements,
+    can_manage_expenses,
     can_manage_finances,
+    can_manage_ledger_entries,
     can_manage_meetings,
     can_manage_members,
+    can_manage_receipts,
     can_manage_users,
+    can_run_cutoff,
+    can_transfer_members,
     can_view_all_churches,
+    can_view_dashboard_finance,
+    can_view_meetings,
     can_view_members,
+    can_view_pending_approvals,
     can_view_transactions,
 )
 from permissions.scoping import get_manageable_churches
@@ -34,6 +42,10 @@ def notify_user(user, title, message, category="INFO", action_url=""):
     """Create an in-app notification for a user."""
     if not user or not user.is_active:
         return None
+    from dashboard.models import Notification
+
+    if category not in Notification.VALID_CATEGORIES:
+        category = "INFO"
     return repo.create_notification(
         user=user,
         title=title,
@@ -41,6 +53,20 @@ def notify_user(user, title, message, category="INFO", action_url=""):
         category=category,
         action_url=action_url,
     )
+
+
+def notify_users(users, title, message, category="INFO", action_url=""):
+    """Fan-out helper; skips inactive / missing users."""
+    created = []
+    seen = set()
+    for user in users:
+        if not user or getattr(user, "pk", None) in seen:
+            continue
+        seen.add(user.pk)
+        note = notify_user(user, title, message, category=category, action_url=action_url)
+        if note:
+            created.append(note)
+    return created
 
 
 def get_dashboard_role(user):
@@ -260,14 +286,22 @@ def get_quick_actions(user):
         actions.append(item)
 
     if role == "treasury":
-        _add(_item("Ledger Entry", "ledger:entry", "bi-journal-plus"))
-        _add(_item("Monthly Cut-off", "dashboard:cutoff", "bi-calendar-check"))
-        _add(_item("Pending Approvals", "transactions:pending_approvals", "bi-hourglass-split"))
-        if user.church_id and church_has_feature(user.church, "remittance"):
+        if can_manage_receipts(user):
+            _add(_item("Record Receipt", "transactions:record_receipt", "bi-plus-circle"))
+        if can_manage_ledger_entries(user):
+            _add(_item("Journal Entry", "ledger:entry", "bi-journal-plus"))
+        if can_view_pending_approvals(user) or can_approve_transactions(user):
+            _add(_item("Pending Approvals", "transactions:pending_approvals", "bi-hourglass-split"))
+        if (
+            user.church_id
+            and church_has_feature(user.church, "remittance")
+            and (can_manage_expenses(user) or can_manage_receipts(user) or can_manage_finances(user))
+        ):
             _add(_item("Remittance", "transactions:record_remittance", "bi-send"))
     elif role == "secretary":
         if can_manage_members(user):
             _add(_item("Add Member", "members:add", "bi-person-plus"))
+        if can_transfer_members(user):
             _add(_item("Transfers", "members:transfer_list", "bi-arrow-left-right"))
         if can_manage_meetings(user):
             _add(_item("Schedule Meeting", "meetings:create", "bi-calendar-plus"))
@@ -279,14 +313,17 @@ def get_quick_actions(user):
         if can_create_announcements(user) or can_approve_announcements(user):
             _add(_item("Announcements", "announcements:announcement_list", "bi-newspaper"))
         if can_view_members(user) or can_manage_members(user):
-            _add(_item("Members", "members:list", "bi-people"))
+            _add(_item("Member Directory", "members:list", "bi-people"))
     elif role in ("overseer", "district_overseer", "admin"):
-        _add(_item("Organization", "organization:hierarchy", "bi-diagram-3"))
-        _add(_item("Roll-up Report", report_key="hierarchy_rollup", icon="bi-bar-chart-steps"))
-        _add(_item("Cut-off", "dashboard:cutoff", "bi-calendar-check"))
+        if can_view_all_churches(user):
+            _add(_item("Organization", "organization:hierarchy", "bi-diagram-3"))
+            _add(_item("Roll-up Report", report_key="hierarchy_rollup", icon="bi-bar-chart-steps"))
+        if can_run_cutoff(user) or can_view_dashboard_finance(user):
+            _add(_item("Cut-off", "dashboard:cutoff", "bi-calendar-check"))
     else:
-        if can_manage_finances(user):
-            _add(_item("Ledger Entry", "ledger:entry", "bi-journal-plus"))
+        if can_manage_finances(user) or can_manage_ledger_entries(user):
+            _add(_item("Journal Entry", "ledger:entry", "bi-journal-plus"))
+        if can_view_pending_approvals(user) or can_approve_transactions(user):
             _add(_item("Pending Approvals", "transactions:pending_approvals", "bi-hourglass-split"))
         if can_manage_members(user):
             _add(_item("Add Member", "members:add", "bi-person-plus"))
@@ -297,7 +334,7 @@ def get_quick_actions(user):
             if "Pending Approvals" not in seen_labels:
                 _add(_item("Approvals", "transactions:pending_approvals", "bi-check2-circle"))
         if can_approve_announcements(user):
-            _add(_item("News Queue", "announcements:pending_approvals", "bi-megaphone"))
+            _add(_item("Pending Announcements", "announcements:pending_approvals", "bi-megaphone"))
         if can_manage_users(user):
             _add(_item("Invite User", "accounts:invite_user", "bi-envelope-plus"))
         if can_view_all_churches(user):
@@ -309,7 +346,7 @@ def get_quick_actions(user):
     if not actions and not can_manage_finances(user) and not can_view_members(user):
         _add(_item("Announcements", "announcements:announcement_list", "bi-newspaper"))
 
-    # Keep hero to primary CTAs; calendar lives under Communications.
+    # Keep hero to primary CTAs; calendar lives under Church Life.
     if role in ("member", "members") and len(actions) < 3:
         _add(_item("Upcoming", "announcements:upcoming_calendar", "bi-calendar-heart"))
     return actions[:6]
@@ -522,8 +559,22 @@ def get_compliance_snapshot(request, user, *, church_ids=None, manageable=None):
     }
 
 
-def get_executive_kpis(request, user, *, church_ids=None, manageable=None, compliance=None):
-    """Organization-wide KPIs for CEO / overseer control center."""
+def get_executive_kpis(
+    request,
+    user,
+    *,
+    church_ids=None,
+    manageable=None,
+    compliance=None,
+    active_church=None,
+):
+    """
+    Organization KPIs for Mission Control.
+
+    Churches / members / action items stay hierarchy-wide.
+    Finance MTD figures follow the toolbar church when one is selected
+    (same numbers as Church Finance MTD); otherwise they roll up the full scope.
+    """
     if manageable is None:
         manageable = get_manageable_churches(user)
     if church_ids is None:
@@ -535,7 +586,16 @@ def get_executive_kpis(request, user, *, church_ids=None, manageable=None, compl
 
     now, _, month_start_date = _month_bounds()
 
-    mtd_lines = selectors.mtd_lines_for_churches(church_ids, month_start_date)
+    if active_church is not None and active_church.pk in set(church_ids):
+        finance_church_ids = [active_church.pk]
+        finance_scope_label = active_church.name
+        finance_scope = "church"
+    else:
+        finance_church_ids = church_ids
+        finance_scope_label = f"{len(church_ids)} churches"
+        finance_scope = "scope"
+
+    mtd_lines = selectors.mtd_lines_for_churches(finance_church_ids, month_start_date)
     mtd_totals = selectors.sum_line_amounts_by_types(
         mtd_lines, ("TITHE", "COMBINED", "INCOME", "EXPENSE") + REMIT_PAYABLE_TYPES
     )
@@ -546,6 +606,12 @@ def get_executive_kpis(request, user, *, church_ids=None, manageable=None, compl
     mtd_remit = mtd_totals.get("TITHE_REMIT_PAYABLE", Decimal("0")) + mtd_totals.get(
         "COMBINED_REMIT_PAYABLE", Decimal("0")
     )
+    if active_church is not None and active_church.pk in set(church_ids):
+        existing = selectors.monthly_cutoff_for_church_month(active_church, month_start_date)
+        if existing:
+            mtd_remit = existing.total_payable
+        else:
+            _, _, mtd_remit = _compute_remittance_payable_mtd(active_church, month_start_date)
 
     pending_txn = selectors.pending_transactions_for_churches_count(church_ids)
     member_count = selectors.active_member_count_for_churches(church_ids)
@@ -556,6 +622,8 @@ def get_executive_kpis(request, user, *, church_ids=None, manageable=None, compl
 
     return {
         "period_label": now.strftime("%B %Y"),
+        "finance_scope": finance_scope,
+        "finance_scope_label": finance_scope_label,
         "church_count": len(church_ids),
         "district_count": manageable.values("district_id").distinct().count(),
         "member_count": member_count,
@@ -625,7 +693,7 @@ def get_action_queue(request, user):
             _add(
                 "medium",
                 "Announcement approvals",
-                "Communications awaiting review",
+                "Church Life items awaiting review",
                 count=pending_ann,
                 url_name="announcements:pending_approvals",
                 icon="bi-megaphone",
@@ -777,6 +845,109 @@ def get_secretary_summary(request):
     }
 
 
+def get_this_week_pulse(request):
+    """
+    Pastoral 'This Week Pulse' — who needs care in the next 7 days.
+
+    Open visitor follow-ups, birthdays, pending transfers, and meetings.
+    Requires an active church and member-view permission.
+    """
+    from datetime import timedelta
+
+    from announcements.calendar_services import attach_calendar_urls, get_upcoming_birthdays
+    from django.urls import reverse
+
+    user = request.user
+    church = get_active_church(request)
+    if not church:
+        return None
+    if not (can_view_members(user) or can_manage_members(user)):
+        return None
+
+    today = timezone.localdate()
+    week_end = today + timedelta(days=6)
+    now = timezone.now()
+
+    visitors_qs = selectors.open_visitors_for_church(church, limit=5)
+    visitor_count = selectors.open_visitors_count_for_church(church)
+    visitors = [
+        {
+            "title": f"{v.first_name} {v.last_name}".strip(),
+            "subtitle": f"{v.follow_up_status} · visited {v.visit_date.strftime('%b %d').replace(' 0', ' ')}",
+            "url": reverse("members:visitor_edit", kwargs={"pk": v.pk}),
+            "status": v.follow_up_status,
+        }
+        for v in visitors_qs
+    ]
+
+    birthdays_raw = get_upcoming_birthdays(request, days=7, limit=8)
+    birthdays_raw = attach_calendar_urls(birthdays_raw)
+    birthdays = [
+        {
+            "title": item["title"],
+            "subtitle": item.get("subtitle") or "",
+            "url": item.get("url") or "",
+            "date": item.get("date"),
+        }
+        for item in birthdays_raw
+    ]
+
+    transfers_qs = selectors.pending_transfers_preview_for_church(church, limit=5)
+    transfer_count = selectors.pending_transfers_for_church(church).count()
+    transfers = []
+    for t in transfers_qs:
+        direction = "in" if t.to_church_id == church.pk else "out"
+        other = t.from_church.name if direction == "in" else t.to_church.name
+        transfers.append({
+            "title": str(t.member),
+            "subtitle": f"{'From' if direction == 'in' else 'To'} {other}",
+            "url": reverse("members:transfer_list"),
+            "direction": direction,
+        })
+
+    meetings = []
+    meeting_count = 0
+    if can_view_meetings(user) or can_manage_meetings(user):
+        meetings_qs = selectors.meetings_this_week_for_church(church, now=now, limit=5)
+        meetings = [
+            {
+                "title": m.title,
+                "subtitle": timezone.localtime(m.scheduled_at).strftime("%a %b %d · %I:%M %p"),
+                "url": reverse("meetings:detail", kwargs={"pk": m.pk}),
+                "when": m.scheduled_at,
+            }
+            for m in meetings_qs
+        ]
+        from meetings.models import Meeting, MeetingStatus
+
+        meeting_count = Meeting.objects.filter(
+            church=church,
+            scheduled_at__gte=now,
+            scheduled_at__lte=now + timedelta(days=7),
+            status=MeetingStatus.SCHEDULED,
+        ).count()
+
+    counts = {
+        "visitors": visitor_count,
+        "birthdays": len(birthdays),
+        "transfers": transfer_count,
+        "meetings": meeting_count,
+    }
+    has_items = any(counts.values())
+
+    return {
+        "week_label": f"{today:%b %d} – {week_end:%b %d}".replace(" 0", " "),
+        "church_name": church.name,
+        "counts": counts,
+        "visitors": visitors,
+        "birthdays": birthdays,
+        "transfers": transfers,
+        "meetings": meetings,
+        "has_items": has_items,
+        "total_open": sum(counts.values()),
+    }
+
+
 def build_home_context(request):
     """Assemble full dashboard context for the home view."""
     user = request.user
@@ -795,13 +966,26 @@ def build_home_context(request):
     )
     # Role-density: hide panels that duplicate or clutter for a given role.
     show_church_finance_kpis = (
-        not is_control_center and show_finance and role in ("treasury", "finance", "leadership", "admin")
+        not is_control_center and show_finance and role in ("treasury", "finance")
     )
     show_member_kpis = show_members and role in ("secretary", "members", "member", "leadership")
-    show_upcoming_panel = role in ("secretary", "leadership", "members", "member", "admin")
-    show_announcements_panel = role != "treasury"
+    show_upcoming_panel = role in ("secretary", "leadership", "members", "member")
+    show_announcements_panel = role not in ("treasury",)
+    show_this_week_pulse = show_members and role in (
+        "secretary", "leadership", "members", "admin", "overseer", "district_overseer",
+    )
     # Avoid repeating Tithe/Combined when the KPI strip already shows them.
     show_finance_mini_kpis = show_finance_charts and is_control_center
+
+    # One primary work surface: teller for treasury ops, otherwise action queue.
+    show_teller = False
+    if show_treasury_ops:
+        church = get_active_church(request)
+        show_teller = bool(church) and role == "treasury"
+    primary_work = "teller" if show_teller else "queue"
+    show_action_queue = True
+    # Treasury: teller leads; queue stays but does not compete for first attention.
+    show_action_queue_sidebar = primary_work == "teller"
 
     context = {
         "dashboard_role": role,
@@ -820,12 +1004,17 @@ def build_home_context(request):
         "show_member_kpis": show_member_kpis,
         "show_upcoming_panel": show_upcoming_panel,
         "show_announcements_panel": show_announcements_panel,
+        "show_this_week_pulse": show_this_week_pulse,
         "show_leaderboard": is_control_center,
         "show_members": show_members,
         "show_admin": show_admin,
         "show_hierarchy": show_hierarchy,
         "is_control_center": is_control_center,
         "emphasize_approvals": role == "leadership",
+        "primary_work": primary_work,
+        "show_action_queue": show_action_queue,
+        "show_action_queue_sidebar": show_action_queue_sidebar,
+        "show_role_focus_chips": False,
     }
 
     if is_control_center:
@@ -834,12 +1023,14 @@ def build_home_context(request):
         compliance = get_compliance_snapshot(
             request, user, church_ids=church_ids, manageable=manageable
         )
+        active_church = get_active_church(request)
         executive_kpis = get_executive_kpis(
             request,
             user,
             church_ids=church_ids,
             manageable=manageable,
             compliance=compliance,
+            active_church=active_church,
         )
         context["executive_kpis"] = executive_kpis
         context["compliance_snapshot"] = compliance
@@ -875,6 +1066,11 @@ def build_home_context(request):
 
     if show_members:
         context.update(get_member_summary(request))
+
+    if show_this_week_pulse:
+        context["this_week_pulse"] = get_this_week_pulse(request)
+    else:
+        context["this_week_pulse"] = None
 
     if show_admin:
         context.update(get_admin_summary(user))

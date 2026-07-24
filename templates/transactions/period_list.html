@@ -148,9 +148,9 @@
 
                     <td>
                         {% if day.status == "OPEN" %}
-                        <span class="chip chip--success">Open</span>
+                        Open
                         {% else %}
-                        <span class="chip chip--warning">Closed</span>
+                        Closed
                         {% endif %}
                     </td>
 
@@ -218,11 +218,11 @@
 
                                 {% if m.is_locked %}
 
-                                <span class="badge bg-danger"><i class="bi bi-lock-fill me-1"></i>Locked</span>
+                                <i class="bi bi-lock-fill me-1"></i>Locked
 
                                 {% else %}
 
-                                <span class="badge bg-success">Open</span>
+                                Open
 
                                 {% endif %}
 
@@ -313,6 +313,36 @@
         {% endif %}
 
     </div>
+
+    {% if can_edit_approval_policy %}
+    <div id="receipt-approval" class="panel mb-4">
+        <div class="panel-header">Receipt auto-approval</div>
+        <div class="panel-body">
+            <p class="mb-3">
+                Income receipts at or below the limit are approved immediately.
+                Larger amounts need a second approver. Per-user limits can override
+                this default on each user profile.
+            </p>
+            <form method="post" action="{% url 'transactions:treasury_approval_policy' %}">
+                {% csrf_token %}
+                <div class="form-check mb-3">
+                    {{ approval_form.receipt_auto_approve_enabled }}
+                    <label class="form-check-label" for="{{ approval_form.receipt_auto_approve_enabled.id_for_label }}">
+                        {{ approval_form.receipt_auto_approve_enabled.label }}
+                    </label>
+                </div>
+                <div class="mb-3" style="max-width: 20rem;">
+                    <label class="form-label" for="{{ approval_form.default_receipt_auto_approve_limit.id_for_label }}">
+                        {{ approval_form.default_receipt_auto_approve_limit.label }}
+                    </label>
+                    {{ approval_form.default_receipt_auto_approve_limit }}
+                    <div class="form-text">{{ approval_form.default_receipt_auto_approve_limit.help_text }}</div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Save policy</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
 
 </div>
 

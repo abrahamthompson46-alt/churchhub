@@ -1,23 +1,58 @@
 {% extends "base.html" %}
 
-{% block title %}{{ title }}{% endblock %}
+{% block title %}{{ title }} — ChurchHub{% endblock %}
 
 {% block content %}
-<div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Fixed Assets" page_title=title %}
-    <form method="post" class="card border-0 shadow-sm">
-        <div class="card-body">
-            {% csrf_token %}
-            {% for field in form %}
-            <div class="mb-3">
-                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+{% include "includes/form_open.html" with form_subtitle="Fixed Assets" form_title=title form_description="Register a capital asset for this church." wide=True %}
+<form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <h3 class="h6 text-uppercase mb-3" style="letter-spacing:0.04em;color:var(--ch-muted)">Identity</h3>
+            <div class="row g-3">
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.category %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.name %}</div>
+                <div class="col-12">{% include "includes/form_field.html" with field=form.description %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.location %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.serial_number %}</div>
             </div>
-            {% endfor %}
-            <button type="submit" class="btn btn-primary">Save</button>
-            <a href="{% url 'assets:asset_list' %}" class="btn btn-outline-secondary">Cancel</a>
         </div>
-    </form>
-</div>
+        <div class="col-lg-6">
+            <h3 class="h6 text-uppercase mb-3" style="letter-spacing:0.04em;color:var(--ch-muted)">Acquisition</h3>
+            <div class="row g-3">
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.purchase_date %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.acquisition_cost %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.salvage_value %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.useful_life_months %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.depreciation_method %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.supplier_name %}</div>
+                <div class="col-12">{% include "includes/form_field.html" with field=form.invoice_reference %}</div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <h3 class="h6 text-uppercase mb-3" style="letter-spacing:0.04em;color:var(--ch-muted)">Custody</h3>
+            <div class="row g-3">
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.custodian_member %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.custodian_name %}</div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <h3 class="h6 text-uppercase mb-3" style="letter-spacing:0.04em;color:var(--ch-muted)">Coverage</h3>
+            <div class="row g-3">
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.insurance_expiry %}</div>
+                <div class="col-md-6">{% include "includes/form_field.html" with field=form.warranty_expiry %}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 pt-3">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="{% url 'assets:asset_list' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% include "includes/form_close.html" %}
 {% endblock %}

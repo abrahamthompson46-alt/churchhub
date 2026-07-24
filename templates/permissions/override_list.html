@@ -36,17 +36,17 @@
                         <td>{{ o.permission.name }}</td>
                         <td>
                             {% if o.granted %}
-                            <span class="chip chip--success">Grant</span>
+                            Grant
                             {% else %}
-                            <span class="chip chip--danger">Deny</span>
+                            Deny
                             {% endif %}
                         </td>
                         <td>{{ o.expires_at|date:"M j, Y H:i"|default:"—" }}</td>
                         <td>
                             {% if o.is_effective %}
-                            <span class="chip chip--success">Active</span>
+                            Active
                             {% else %}
-                            <span class="chip chip--muted">Inactive</span>
+                            Inactive
                             {% endif %}
                         </td>
                         <td class="text-end text-nowrap">

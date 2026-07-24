@@ -1,0 +1,27 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="platform-card" style="max-width: 36rem;">
+    <div class="platform-card-header"><span>{{ title }}</span></div>
+    <div class="p-4">
+        {% if option and option.is_system %}
+        <p class="small mb-3">System options keep a fixed code (used in reports and workflows). You can change the display label, order, or deactivate.</p>
+        {% endif %}
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% for field in form %}
+            <div class="mb-3">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                {% if field.errors %}<div class="text-danger small">{{ field.errors.0 }}</div>{% endif %}
+            </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a href="{% url 'sitecontrol:member_lookup_list' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

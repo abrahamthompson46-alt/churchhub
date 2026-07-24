@@ -125,7 +125,7 @@ erDiagram
 
 ## 10. Views (Current)
 
-Pending approvals; approve/reject/bulk; receipt/expense/remittance record; transaction list/detail/void; financial dashboard + exports; audit log; periods + working day open/close; reconciliations; `budget_report` redirects to `/budgets/`.
+Pending approvals; approve/reject/bulk; receipt/expense/remittance record; **post-record confirmation slip** (`transaction_confirm` / `transaction_receipt`); transaction list/detail/void; financial dashboard + exports; audit log; periods + working day open/close; reconciliations; `budget_report` redirects to `/budgets/`.
 
 Decorator `_finance_required`: login + view/manage finances or receipts/expenses.
 
@@ -140,7 +140,8 @@ Under `/transactions/` (`app_name=transactions`):
 | `pending/` | `pending_approvals` |
 | `transactions/`, `<uuid>/`, `<uuid>/void/` | list/detail/void |
 | `approve/<uuid>/`, `reject/<uuid>/`, `bulk-approve/` | approval |
-| `receipt/<uuid>/` | `transaction_receipt` |
+| `receipt/<uuid>/` | `transaction_receipt` (printable confirmation) |
+| `confirm/<uuid>/` | `transaction_confirm` (same view; used after record receipt/expense) |
 | `financial-dashboard/` | `financial_dashboard` |
 | `record/receipt/`, `record/expense/`, `remittance/` | posting |
 | `budget/` | redirect to budgets |
@@ -176,6 +177,7 @@ Under `/transactions/` (`app_name=transactions`):
 | Working day matches date | `assert_working_day_allows_posting` |
 | No self-approve (except superadmin) | `approve_transaction` |
 | Module posters use PENDING + checker | `approve_module_journal` |
+| Receipt/income auto-approve under limit | `TreasuryApprovalPolicy` + `User.max_receipt_auto_approve`; `auto_approve_receipt` (documented SoD exception; audit `auto_approved`) |
 | Approve → APPROVED + locked | `approve_transaction` |
 | Void only APPROVED non-reversal → reversal | `void_transaction` |
 | Locked lines immutable | `TransactionLine.save` |

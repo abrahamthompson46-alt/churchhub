@@ -68,6 +68,7 @@ Agents must check the model before writing FK types.
 | `Zone` | UUID; FK → `Conference`; unique name/code per conference |
 | `District` | UUID; FK → `Zone`; unique name/code per zone |
 | `Church` | UUID; FK → `District`; `address`; `is_active`; `financials_provisioned`; unique name/code per district |
+| `ChurchHistoryEntry` | UUID; FK → `Church`; title/body/event_date/category/location/tags; created_by/updated_by |
 | `OrganizationAuditLog` | Org change audit |
 
 Church properties (not columns): `zone`, `conference`, `union`, `general_conference`, `denomination`.

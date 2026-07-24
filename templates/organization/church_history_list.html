@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Church History — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% if can_manage_church_history %}
+    {% url 'organization:church_history_create' as create_url %}
+    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="Church History" page_description="Institutional milestones and events preserved for future reference." action_url=create_url action_label="Add Entry" action_icon="bi-plus-lg" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="Church History" page_description="Institutional milestones and events preserved for future reference." %}
+    {% endif %}
+
+    <form method="get" class="filter-bar mb-3" role="search" aria-label="Search church history">
+        <div class="row g-2 align-items-end">
+            <div class="col-lg-4">
+                <label class="form-label small text-muted mb-1" for="{{ search_form.q.id_for_label }}">Search</label>
+                {{ search_form.q }}
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1" for="{{ search_form.category.id_for_label }}">Category</label>
+                {{ search_form.category }}
+            </div>
+            {% if not search_form.church.is_hidden %}
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1" for="{{ search_form.church.id_for_label }}">Church</label>
+                {{ search_form.church }}
+            </div>
+            {% else %}
+            {{ search_form.church }}
+            {% endif %}
+            {% if not search_form.conference.is_hidden %}
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1" for="{{ search_form.conference.id_for_label }}">Conference</label>
+                {{ search_form.conference }}
+            </div>
+            {% else %}
+            {{ search_form.conference }}
+            {% endif %}
+            <div class="col-md-1">
+                <label class="form-label small text-muted mb-1" for="{{ search_form.date_from.id_for_label }}">From</label>
+                {{ search_form.date_from }}
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small text-muted mb-1" for="{{ search_form.date_to.id_for_label }}">To</label>
+                {{ search_form.date_to }}
+            </div>
+            <div class="col-md-auto d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                <a href="{% url 'organization:church_history_list' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+            </div>
+        </div>
+        {% if search_form.non_field_errors %}
+        <div class="text-danger small mt-2">{{ search_form.non_field_errors.0 }}</div>
+        {% endif %}
+        {% if search_form.date_to.errors %}
+        <div class="text-danger small mt-2">{{ search_form.date_to.errors.0 }}</div>
+        {% endif %}
+    </form>
+
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <span class="text-muted small">Showing <strong>{{ page_obj.paginator.count }}</strong> · {{ scope_label }}</span>
+        {% for chip in scope_chips %}
+        <span class="chip">{{ chip.label }}</span>
+        {% endfor %}
+    </div>
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">Title</th>
+                        <th scope="col">Category</th>
+                        <th scope="col">Church</th>
+                        <th scope="col">Location</th>
+                        <th scope="col" class="text-end"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in page_obj %}
+                    <tr>
+                        <td class="text-nowrap">{{ entry.event_date|date:"M j, Y" }}</td>
+                        <td>
+                            <a href="{% url 'organization:church_history_detail' entry.pk %}" class="table-link fw-semibold">{{ entry.title }}</a>
+                            {% if entry.tags %}<div class="small text-muted">{{ entry.tags }}</div>{% endif %}
+                        </td>
+                        <td><span class="chip">{{ entry.get_category_display }}</span></td>
+                        <td>
+                            <a href="{% url 'organization:church_detail' entry.church_id %}" class="table-link">{{ entry.church.name }}</a>
+                        </td>
+                        <td class="text-muted">{{ entry.location|default:"—" }}</td>
+                        <td class="text-end">
+                            <a href="{% url 'organization:church_history_detail' entry.pk %}" class="btn btn-sm btn-outline-primary">Open</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            {% if can_manage_church_history %}
+                            {% url 'organization:church_history_create' as create_url %}
+                            {% include "includes/empty_state.html" with icon="bi-journal-richtext" message="No church history matches this search." action_url=create_url action_label="Add history entry" %}
+                            {% else %}
+                            {% include "includes/empty_state.html" with icon="bi-journal-richtext" message="No church history matches this search." %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="mt-3" aria-label="Church history pagination">
+        <ul class="pagination pagination-sm justify-content-center mb-0">
+            {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&{{ querystring }}">Previous</a></li>
+            {% endif %}
+            <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+            {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&{{ querystring }}">Next</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

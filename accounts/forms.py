@@ -267,6 +267,7 @@ class UserManageForm(forms.ModelForm):
             "scope_level",
             "church",
             "member",
+            "max_receipt_auto_approve",
         )
         widgets = {
             "first_name": forms.TextInput(attrs=input_attrs()),
@@ -276,6 +277,9 @@ class UserManageForm(forms.ModelForm):
             "role": forms.Select(attrs=select_attrs(**{"class": "scope-role-select"})),
             "scope_level": forms.Select(attrs=select_attrs(**{"class": "scope-level-select"})),
             "church": forms.Select(attrs=select_attrs()),
+            "max_receipt_auto_approve": forms.NumberInput(
+                attrs=input_attrs(step="0.01", placeholder="Blank = church default")
+            ),
         }
 
     def __init__(self, *args, manager=None, **kwargs):

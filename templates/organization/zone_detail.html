@@ -30,7 +30,7 @@
                     {% for district in districts %}
                     <tr>
                         <td><a href="{% url 'organization:district_detail' district.id %}" class="table-link">{{ district.name }}</a></td>
-                        <td class="text-muted"><span class="chip">{{ district.code }}</span></td>
+                        <td class="text-muted">{{ district.code }}</td>
                         <td>{{ district.church_count }}</td>
                         <td class="text-end">
                             {% if can_manage %}

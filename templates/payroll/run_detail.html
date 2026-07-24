@@ -8,15 +8,15 @@
 
     <div class="dash-inline-stats mb-4">
         <div class="dash-inline-stat"><span class="dash-inline-stat__label">Status</span><span class="dash-inline-stat__value">{{ run.get_status_display }}</span></div>
-        <div class="dash-inline-stat"><span class="dash-inline-stat__label">Gross</span><span class="dash-inline-stat__value">₵{{ run.total_gross|floatformat:2 }}</span></div>
-        <div class="dash-inline-stat"><span class="dash-inline-stat__label">Net</span><span class="dash-inline-stat__value">₵{{ run.total_net|floatformat:2 }}</span></div>
-        <div class="dash-inline-stat"><span class="dash-inline-stat__label">Employer Cost</span><span class="dash-inline-stat__value">₵{{ run.total_employer_cost|floatformat:2 }}</span></div>
+        <div class="dash-inline-stat"><span class="dash-inline-stat__label">Gross</span><span class="dash-inline-stat__value">{{ run.total_gross|floatformat:2 }}</span></div>
+        <div class="dash-inline-stat"><span class="dash-inline-stat__label">Net</span><span class="dash-inline-stat__value">{{ run.total_net|floatformat:2 }}</span></div>
+        <div class="dash-inline-stat"><span class="dash-inline-stat__label">Employer Cost</span><span class="dash-inline-stat__value">{{ run.total_employer_cost|floatformat:2 }}</span></div>
     </div>
 
     {% if run.budget_warning.over_budget %}
     <div class="alert alert-warning py-2 small mb-3">{{ run.budget_warning.message }}</div>
     {% elif run.budget_warning.has_budget %}
-    <div class="alert alert-success py-2 small mb-3">Within salary budget — projected ₵{{ run.budget_warning.projected }} of ₵{{ run.budget_warning.budgeted }}.</div>
+    <div class="alert alert-success py-2 small mb-3">Within salary budget — projected {{ run.budget_warning.projected }} of {{ run.budget_warning.budgeted }}.</div>
     {% endif %}
     {% if run.budget_warning.skipped_count %}
     <div class="alert alert-warning py-2 small mb-3">{{ run.budget_warning.skipped_count }} employee(s) were skipped during calculation. Review compensation and loan balances.</div>
@@ -92,9 +92,9 @@
     <section class="dash-section mb-4">
         <div class="dash-section__header"><h2 class="dash-section__title">Statutory Filing Totals</h2></div>
         <div class="dash-inline-stats">
-            <div class="dash-inline-stat"><span class="dash-inline-stat__label">PAYE</span><span class="dash-inline-stat__value">₵{{ statutory.paye|floatformat:2 }}</span></div>
-            <div class="dash-inline-stat"><span class="dash-inline-stat__label">SSNIT (EE)</span><span class="dash-inline-stat__value">₵{{ statutory.ssnit_employee|floatformat:2 }}</span></div>
-            <div class="dash-inline-stat"><span class="dash-inline-stat__label">SSNIT (ER)</span><span class="dash-inline-stat__value">₵{{ statutory.ssnit_employer|floatformat:2 }}</span></div>
+            <div class="dash-inline-stat"><span class="dash-inline-stat__label">PAYE</span><span class="dash-inline-stat__value">{{ statutory.paye|floatformat:2 }}</span></div>
+            <div class="dash-inline-stat"><span class="dash-inline-stat__label">SSNIT (EE)</span><span class="dash-inline-stat__value">{{ statutory.ssnit_employee|floatformat:2 }}</span></div>
+            <div class="dash-inline-stat"><span class="dash-inline-stat__label">SSNIT (ER)</span><span class="dash-inline-stat__value">{{ statutory.ssnit_employer|floatformat:2 }}</span></div>
         </div>
         {% if statutory_liabilities %}
         <p class="small text-muted mt-2 mb-0">{{ statutory_liabilities.remittance_hint }}</p>
@@ -113,9 +113,9 @@
                     <tr>
                         <td>{{ row.department }}</td>
                         <td>{{ row.count }}</td>
-                        <td class="text-end">₵{{ row.gross|floatformat:2 }}</td>
-                        <td class="text-end">₵{{ row.net|floatformat:2 }}</td>
-                        <td class="text-end">₵{{ row.employer_cost|floatformat:2 }}</td>
+                        <td class="text-end">{{ row.gross|floatformat:2 }}</td>
+                        <td class="text-end">{{ row.net|floatformat:2 }}</td>
+                        <td class="text-end">{{ row.employer_cost|floatformat:2 }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -136,9 +136,9 @@
                     <tr>
                         <td>{{ row.name }} <span class="text-muted small">({{ row.employee_number }})</span></td>
                         <td>{{ row.department }}</td>
-                        <td class="text-end">₵{{ row.gross|floatformat:2 }}</td>
-                        <td class="text-end">₵{{ row.deductions|floatformat:2 }}</td>
-                        <td class="text-end">₵{{ row.net|floatformat:2 }}</td>
+                        <td class="text-end">{{ row.gross|floatformat:2 }}</td>
+                        <td class="text-end">{{ row.deductions|floatformat:2 }}</td>
+                        <td class="text-end">{{ row.net|floatformat:2 }}</td>
                         <td class="text-end">
                             {% if row.line_pk %}
                             <a href="{% url 'payroll:payslip_pdf' row.line_pk %}" class="btn btn-sm btn-outline-secondary" target="_blank">Payslip</a>

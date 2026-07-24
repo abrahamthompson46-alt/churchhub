@@ -153,7 +153,8 @@ class LedgerLayerTests(TestCase):
         self.assertIsInstance(trx, Transaction)
         self.assertEqual(trx.church_id, self.church_a.pk)
         self.assertEqual(trx.ledger_category_id, cat.pk)
-        self.assertEqual(trx.approval_status, "PENDING")
+        self.assertEqual(trx.approval_status, "APPROVED")
+        self.assertTrue(trx.locked)
         self.assertTrue(
             selectors.ledger_entries_qs(self.church_a, category=cat)
             .filter(pk=trx.pk)

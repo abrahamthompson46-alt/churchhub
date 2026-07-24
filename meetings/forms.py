@@ -24,6 +24,9 @@ class MeetingForm(forms.ModelForm):
             "department",
             "agenda",
             "location",
+            "join_url",
+            "join_passcode",
+            "show_on_portal",
             "chair_person",
             "secretary_name",
             "scheduled_at",
@@ -35,6 +38,9 @@ class MeetingForm(forms.ModelForm):
             "department": forms.Select(attrs=select_attrs()),
             "agenda": forms.Textarea(attrs=textarea_attrs(rows=4)),
             "location": forms.TextInput(attrs=input_attrs()),
+            "join_url": forms.URLInput(attrs={**input_attrs(), "placeholder": "https://zoom.us/j/…"}),
+            "join_passcode": forms.TextInput(attrs={**input_attrs(), "autocomplete": "off"}),
+            "show_on_portal": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "chair_person": forms.TextInput(attrs=input_attrs()),
             "secretary_name": forms.TextInput(attrs=input_attrs()),
             "scheduled_at": forms.DateTimeInput(attrs={**input_attrs(), "type": "datetime-local"}),
@@ -45,6 +51,18 @@ class MeetingForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if church:
             self.fields["department"].queryset = selectors.departments_for_church(church)
+        self.fields["join_url"].label = "Zoom join link"
+        self.fields["join_passcode"].label = "Zoom passcode"
+        self.fields["show_on_portal"].label = "Show on member portal"
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("show_on_portal") and not (cleaned.get("join_url") or "").strip():
+            self.add_error(
+                "join_url",
+                "A Zoom join link is required when showing this meeting on the member portal.",
+            )
+        return cleaned
 
 
 class MeetingFilterForm(forms.Form):
@@ -110,6 +128,13 @@ class MeetingAttachmentForm(forms.ModelForm):
             "label": forms.TextInput(attrs={**input_attrs(), "placeholder": "e.g. Agenda PDF, Signed minutes"}),
             "file": forms.ClearableFileInput(attrs={"class": "form-control form-control-sm"}),
         }
+
+    def clean_file(self):
+        from church_system.uploads import validate_upload
+
+        uploaded = self.cleaned_data.get("file")
+        validate_upload(uploaded, kind="document")
+        return uploaded
 
 
 class MinutesRejectForm(forms.Form):

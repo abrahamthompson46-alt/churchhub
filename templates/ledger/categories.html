@@ -24,7 +24,7 @@
         {% if can_manage_categories %}
         <a href="{% url 'ledger:category_add' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Category</a>
         {% endif %}
-        <a href="{% url 'ledger:entry' %}" class="btn btn-primary btn-sm"><i class="bi bi-journal-plus me-1"></i>New Entry</a>
+        <a href="{% url 'ledger:entry' %}" class="btn btn-primary btn-sm"><i class="bi bi-journal-plus me-1"></i>Journal Entry</a>
     </div>
 
     {% if categories %}

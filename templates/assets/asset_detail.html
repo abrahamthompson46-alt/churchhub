@@ -50,10 +50,10 @@
                 <div class="card-header bg-white fw-semibold">Financial Summary</div>
                 <div class="card-body">
                     <dl class="row mb-0">
-                        <dt class="col-sm-6">Acquisition Cost</dt><dd class="col-sm-6 text-end">₵{{ asset.acquisition_cost|floatformat:2 }}</dd>
-                        <dt class="col-sm-6">Salvage Value</dt><dd class="col-sm-6 text-end">₵{{ asset.salvage_value|floatformat:2 }}</dd>
-                        <dt class="col-sm-6">Accumulated Depreciation</dt><dd class="col-sm-6 text-end">₵{{ asset.accumulated_depreciation|floatformat:2 }}</dd>
-                        <dt class="col-sm-6 fw-semibold">Net Book Value</dt><dd class="col-sm-6 text-end fw-semibold">₵{{ asset.net_book_value|floatformat:2 }}</dd>
+                        <dt class="col-sm-6">Acquisition Cost</dt><dd class="col-sm-6 text-end">{{ asset.acquisition_cost|floatformat:2 }}</dd>
+                        <dt class="col-sm-6">Salvage Value</dt><dd class="col-sm-6 text-end">{{ asset.salvage_value|floatformat:2 }}</dd>
+                        <dt class="col-sm-6">Accumulated Depreciation</dt><dd class="col-sm-6 text-end">{{ asset.accumulated_depreciation|floatformat:2 }}</dd>
+                        <dt class="col-sm-6 fw-semibold">Net Book Value</dt><dd class="col-sm-6 text-end fw-semibold">{{ asset.net_book_value|floatformat:2 }}</dd>
                         <dt class="col-sm-6">Useful Life</dt><dd class="col-sm-6 text-end">{{ asset.useful_life_months }} months</dd>
                         <dt class="col-sm-6">Depreciation Method</dt><dd class="col-sm-6 text-end">{{ asset.get_depreciation_method_display }}</dd>
                     </dl>
@@ -103,7 +103,7 @@
                         {% for entry in depreciation_entries %}
                         <tr>
                             <td>{{ entry.period_year }}-{{ entry.period_month|stringformat:"02d" }}</td>
-                            <td class="text-end">₵{{ entry.amount|floatformat:2 }}</td>
+                            <td class="text-end">{{ entry.amount|floatformat:2 }}</td>
                             <td>{{ entry.method_used }}</td>
                         </tr>
                         {% empty %}
@@ -139,7 +139,7 @@
                         <tr>
                             <td>{{ log.service_date }}</td>
                             <td>{{ log.description|truncatechars:60 }}</td>
-                            <td class="text-end">₵{{ log.cost|floatformat:2 }}</td>
+                            <td class="text-end">{{ log.cost|floatformat:2 }}</td>
                         </tr>
                         {% empty %}
                         <tr><td colspan="3" class="text-muted text-center py-3">No maintenance records.</td></tr>

@@ -32,6 +32,7 @@ from sitecontrol.forms import (
     PlatformOperatorForm,
     PlatformPaymentMethodForm,
     PlatformTenantSetupForm,
+    RecordSubscriptionPaymentForm,
     SecuritySettingsForm,
     SiteSettingsForm,
     SubscriptionPlanForm,
@@ -49,6 +50,7 @@ from sitecontrol.rbac import (
     CAP_EXPORT_AUDIT,
     CAP_IMPERSONATE,
     CAP_MANAGE_ANNOUNCEMENTS,
+    CAP_MANAGE_APPLICATIONS,
     CAP_MANAGE_EMAIL,
     CAP_MANAGE_FEATURES,
     CAP_MANAGE_OPERATORS,
@@ -76,6 +78,7 @@ from sitecontrol.services import (
     organization_tree_summary,
     platform_stats,
     reactivate_tenant,
+    record_subscription_payment,
     suspend_tenant,
     tenant_detail_stats,
     tenant_health_alerts,
@@ -120,6 +123,26 @@ def dashboard(request):
     ).count()
     settings_obj = get_site_settings()
     setup = build_platform_setup_checklist()
+    from sitecontrol.navigation import get_platform_navigation
+
+    quick_actions = []
+    for section in get_platform_navigation(request.user):
+        for item in section["items"]:
+            url_name = item.get("url_name")
+            if url_name in {
+                "sitecontrol:setup",
+                "sitecontrol:tenant_provision",
+                "sitecontrol:tenant_list",
+                "sitecontrol:plan_list",
+                "sitecontrol:payment_method_list",
+                "sitecontrol:registration_settings",
+                "sitecontrol:email_settings",
+                "sitecontrol:security_settings",
+                "sitecontrol:ops_health",
+                "sitecontrol:application_list",
+                "sitecontrol:subscription_list",
+            }:
+                quick_actions.append(item)
     return render(request, "sitecontrol/dashboard.html", {
         "stats": stats,
         "alerts": alerts,
@@ -129,7 +152,10 @@ def dashboard(request):
         "audit_24h": audit_24h,
         "maintenance_mode": settings_obj.maintenance_mode,
         "can_breakglass_admin": can_access_django_admin(request.user),
+        "can_manage_subscriptions": operator_has_capability(request.user, CAP_MANAGE_SUBSCRIPTIONS),
+        "can_manage_applications": operator_has_capability(request.user, CAP_MANAGE_APPLICATIONS),
         "setup": setup,
+        "quick_actions": quick_actions,
         "breadcrumbs": _breadcrumbs(("Control Room",)),
     })
 
@@ -510,6 +536,51 @@ def subscription_edit(request, pk=None):
         "subscription": sub,
         "title": "Edit Subscription" if sub else "Assign Subscription",
         "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Subscriptions", "/platform/subscriptions/"), ("Edit" if sub else "Assign",)),
+    })
+
+
+@platform_required
+@require_platform_capability(CAP_MANAGE_SUBSCRIPTIONS)
+def subscription_record_payment(request, pk):
+    sub = selectors.get_subscription_or_404(pk)
+    _require_tenant_access(request, sub.church)
+    form = RecordSubscriptionPaymentForm(
+        request.POST or None,
+        subscription=sub,
+    )
+    if request.method == "POST" and form.is_valid():
+        record_subscription_payment(
+            sub,
+            user=request.user,
+            payment_method=form.cleaned_data.get("payment_method"),
+            payment_reference=form.cleaned_data.get("payment_reference") or "",
+            paid_at=form.cleaned_data.get("paid_at"),
+            reactivate=form.cleaned_data.get("reactivate", True),
+            notes=form.cleaned_data.get("notes") or "",
+        )
+        log_platform_action(
+            request,
+            "SUBSCRIPTION_PAYMENT",
+            f"Payment recorded for {sub.church.name}",
+            target_model="TenantSubscription",
+            target_id=sub.pk,
+            details={
+                "reference": sub.payment_reference,
+                "next_billing_at": str(sub.next_billing_at) if sub.next_billing_at else "",
+                "expires_at": str(sub.expires_at) if sub.expires_at else "",
+            },
+        )
+        flash_success(request, f"Payment recorded for {sub.church.name}.")
+        return redirect("sitecontrol:subscription_list")
+    return render(request, "sitecontrol/subscription_payment_form.html", {
+        "form": form,
+        "subscription": sub,
+        "title": "Record Payment",
+        "breadcrumbs": _breadcrumbs(
+            ("Platform", "/platform/"),
+            ("Subscriptions", "/platform/subscriptions/"),
+            ("Record Payment",),
+        ),
     })
 
 
@@ -926,6 +997,65 @@ def payment_method_edit(request, pk=None):
             ("Platform", "/platform/"),
             ("Payment Methods", "/platform/payment-methods/"),
             ("Edit" if method else "New",),
+        ),
+    })
+
+
+@platform_required
+@require_platform_capability(CAP_MANAGE_SETTINGS)
+def member_lookup_list(request):
+    from members.lookups import ensure_default_member_lookups
+    from members.models import LookupCategory, MemberLookupOption
+
+    ensure_default_member_lookups()
+    category = request.GET.get("category", "")
+    qs = MemberLookupOption.objects.all().order_by("category", "sort_order", "label")
+    if category:
+        qs = qs.filter(category=category)
+    return render(request, "sitecontrol/member_lookup_list.html", {
+        "options": qs,
+        "categories": LookupCategory.choices,
+        "active_category": category,
+        "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Member Dropdowns",)),
+    })
+
+
+@platform_required
+@require_platform_capability(CAP_MANAGE_SETTINGS)
+def member_lookup_edit(request, pk=None):
+    from members.forms import MemberLookupOptionForm
+    from members.lookups import ensure_default_member_lookups
+    from members.models import MemberLookupOption
+
+    ensure_default_member_lookups()
+    option = get_object_or_404(MemberLookupOption, pk=pk) if pk else None
+    form = MemberLookupOptionForm(request.POST or None, instance=option)
+    if request.method == "POST" and form.is_valid():
+        obj = form.save(commit=False)
+        if option and option.is_system:
+            obj.category = option.category
+            obj.code = option.code
+            obj.is_system = True
+        elif not option:
+            obj.is_system = False
+        obj.save()
+        log_platform_action(
+            request,
+            "MEMBER_LOOKUP_UPDATE",
+            f"Member lookup '{obj.label}' ({obj.category}) saved",
+            target_model="MemberLookupOption",
+            target_id=obj.pk,
+        )
+        flash_success(request, f"Saved “{obj.label}”.")
+        return redirect("sitecontrol:member_lookup_list")
+    return render(request, "sitecontrol/member_lookup_form.html", {
+        "form": form,
+        "option": option,
+        "title": "Edit Dropdown Option" if option else "Add Dropdown Option",
+        "breadcrumbs": _breadcrumbs(
+            ("Platform", "/platform/"),
+            ("Member Dropdowns", "/platform/settings/member-lookups/"),
+            ("Edit" if option else "New",),
         ),
     })
 

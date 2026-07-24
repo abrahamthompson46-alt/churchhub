@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+# UI amounts are plain numbers (no inline currency glyphs in tables/KPIs).
+# Keep ISO fallback for unknown codes when a symbol is still requested.
 CURRENCY_SYMBOLS = {
-    "GHS": "₵",
-    "USD": "$",
-    "EUR": "€",
-    "GBP": "£",
-    "NGN": "₦",
-    "KES": "KSh\u00a0",
-    "ZAR": "R",
-    "CAD": "C$",
-    "AUD": "A$",
+    "GHS": "",
+    "USD": "",
+    "EUR": "",
+    "GBP": "",
+    "NGN": "",
+    "KES": "",
+    "ZAR": "",
+    "CAD": "",
+    "AUD": "",
 }
 
 

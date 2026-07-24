@@ -51,6 +51,7 @@ PLATFORM_NAV = [
             {"label": "Email", "url_name": "sitecontrol:email_settings", "icon": "bi-envelope-at"},
             {"label": "Security", "url_name": "sitecontrol:security_settings", "icon": "bi-lock"},
             {"label": "Feature Registry", "url_name": "sitecontrol:features", "icon": "bi-toggles"},
+            {"label": "Member Dropdowns", "url_name": "sitecontrol:member_lookup_list", "icon": "bi-list-ul"},
             {"label": "Billing", "url_name": "sitecontrol:billing_settings", "icon": "bi-currency-exchange"},
         ],
     },

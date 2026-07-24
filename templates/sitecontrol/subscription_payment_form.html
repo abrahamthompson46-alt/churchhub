@@ -1,0 +1,43 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="platform-card" style="max-width:36rem;">
+    <div class="platform-card-header">
+        <span>Record payment — {{ subscription.church.name }}</span>
+        <a href="{% url 'sitecontrol:subscription_list' %}" class="small">Back</a>
+    </div>
+    <div class="platform-card-body">
+        <p class="small text-muted mb-3">
+            Plan: <strong>{{ subscription.plan.name }}</strong>
+            · Status: {{ subscription.get_status_display }}
+            · Interval: {{ subscription.get_billing_interval_display }}
+            {% if subscription.next_billing_at %} · Next bill: {{ subscription.next_billing_at }}{% endif %}
+            {% if subscription.expires_at %} · Expires: {{ subscription.expires_at }}{% endif %}
+        </p>
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+            {% for field in form %}
+            <div class="mb-3 {% if field.field.widget.input_type == 'checkbox' %}form-check{% endif %}">
+                {% if field.field.widget.input_type == 'checkbox' %}
+                {{ field }} <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {% else %}
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% endif %}
+                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                {% if field.errors %}<div class="text-danger small">{{ field.errors.0 }}</div>{% endif %}
+            </div>
+            {% endfor %}
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">Record Payment</button>
+                <a href="{% url 'sitecontrol:subscription_edit' subscription.pk %}" class="btn btn-outline-secondary btn-sm">Edit subscription</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

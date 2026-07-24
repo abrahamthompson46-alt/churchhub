@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}{{ entry.title }} — Church History — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'organization:church_history_list' %}">Church History</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ entry.title }}</li>
+        </ol>
+    </nav>
+
+    {% if can_manage_church_history %}
+    {% url 'organization:church_history_edit' entry.pk as edit_url %}
+    {% include "includes/page_header.html" with page_subtitle="Church History" page_title=entry.title page_description=entry.get_category_display action_url=edit_url action_label="Edit" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Church History" page_title=entry.title page_description=entry.get_category_display %}
+    {% endif %}
+
+    <div class="detail-grid">
+        <div class="panel">
+            <div class="panel-header">Record</div>
+            <div class="panel-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Event date</dt>
+                    <dd class="col-sm-8">{{ entry.event_date|date:"F j, Y" }}</dd>
+                    <dt class="col-sm-4">Category</dt>
+                    <dd class="col-sm-8"><span class="chip">{{ entry.get_category_display }}</span></dd>
+                    <dt class="col-sm-4">Church</dt>
+                    <dd class="col-sm-8">
+                        <a href="{% url 'organization:church_detail' entry.church_id %}" class="table-link">{{ entry.church.name }}</a>
+                    </dd>
+                    <dt class="col-sm-4">Conference</dt>
+                    <dd class="col-sm-8">
+                        <a href="{% url 'organization:conference_detail' entry.church.district.zone.conference_id %}" class="table-link">{{ entry.church.district.zone.conference.name }}</a>
+                    </dd>
+                    <dt class="col-sm-4">Location</dt>
+                    <dd class="col-sm-8">{{ entry.location|default:"—" }}</dd>
+                    <dt class="col-sm-4">Tags</dt>
+                    <dd class="col-sm-8">{{ entry.tags|default:"—" }}</dd>
+                </dl>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header">Related</div>
+            <div class="panel-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'organization:church_history_list' %}?church={{ entry.church_id }}" class="btn btn-outline-primary btn-sm">
+                        All history for {{ entry.church.name }}
+                    </a>
+                    <a href="{% url 'organization:church_history_list' %}?conference={{ entry.church.district.zone.conference_id }}" class="btn btn-outline-secondary btn-sm">
+                        Conference history
+                    </a>
+                    <a href="{% url 'organization:church_detail' entry.church_id %}" class="btn btn-link btn-sm px-0">Open church profile →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel mt-4">
+        <div class="panel-header">History details</div>
+        <div class="panel-body">
+            <div class="content-prose">{{ entry.body|linebreaks }}</div>
+            <p class="small text-muted mt-3 mb-0">
+                Recorded {% if entry.created_by %}by {{ entry.created_by.get_full_name|default:entry.created_by.username }} {% endif %}
+                on {{ entry.created_at|date:"M j, Y g:i A" }}
+                {% if entry.updated_at != entry.created_at %}
+                · Updated {{ entry.updated_at|date:"M j, Y g:i A" }}
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

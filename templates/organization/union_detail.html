@@ -30,7 +30,7 @@
                     {% for conference in conferences %}
                     <tr>
                         <td><a href="{% url 'organization:conference_detail' conference.id %}" class="table-link">{{ conference.name }}</a></td>
-                        <td class="text-muted"><span class="chip">{{ conference.code }}</span></td>
+                        <td class="text-muted">{{ conference.code }}</td>
                         <td>{{ conference.zone_count }}</td>
                         <td class="text-end">
                             {% if can_manage %}

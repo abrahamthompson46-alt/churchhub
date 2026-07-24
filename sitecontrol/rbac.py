@@ -110,6 +110,7 @@ NAV_ITEM_CAPABILITIES = {
     # Tenant browse is available to all operators with CAP_VIEW; mutations stay gated.
     "sitecontrol:tenant_list": CAP_VIEW,
     "sitecontrol:subscription_list": CAP_MANAGE_SUBSCRIPTIONS,
+    "sitecontrol:subscription_record_payment": CAP_MANAGE_SUBSCRIPTIONS,
     "sitecontrol:plan_list": CAP_MANAGE_PLANS,
     "sitecontrol:payment_method_list": CAP_MANAGE_PLANS,
     "sitecontrol:billing_settings": CAP_MANAGE_PLANS,
@@ -125,6 +126,7 @@ NAV_ITEM_CAPABILITIES = {
     "sitecontrol:email_settings": CAP_MANAGE_EMAIL,
     "sitecontrol:security_settings": CAP_MANAGE_SECURITY,
     "sitecontrol:features": CAP_MANAGE_FEATURES,
+    "sitecontrol:member_lookup_list": CAP_MANAGE_SETTINGS,
 }
 
 

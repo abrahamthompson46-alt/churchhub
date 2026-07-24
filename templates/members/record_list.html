@@ -11,6 +11,35 @@
     {% include "includes/page_header.html" with page_subtitle="Members" page_title="Member Records" page_description="Baptism, marriage, transfers, and other spiritual records." %}
     {% endif %}
 
+    <div class="filter-bar filter-bar--sticky mb-3">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
+                <label class="form-label">Search</label>
+                {{ filter_form.q }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Type</label>
+                {{ filter_form.type }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">Status</label>
+                {{ filter_form.status }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">From date</label>
+                {{ filter_form.date_from }}
+            </div>
+            <div class="filter-field">
+                <label class="form-label">To date</label>
+                {{ filter_form.date_to }}
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Apply</button>
+                <a href="{% url 'members:record_list' %}" class="btn btn-link btn-sm">Clear</a>
+            </div>
+        </form>
+    </div>
+
     <div class="data-card">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
@@ -18,25 +47,34 @@
                 <tbody>
                     {% for record in records %}
                     <tr>
-                        <td class="text-muted text-nowrap">{{ record.event_date }}</td>
+                        <td class="text-nowrap">{{ record.event_date }}</td>
                         <td><a href="{% url 'members:detail' record.member_id %}" class="table-link">{{ record.member }}</a></td>
-                        <td><span class="chip">{{ record.record_type }}</span></td>
+                        <td>{{ record.record_type }}</td>
                         <td><a href="{% url 'members:record_detail' record.pk %}" class="table-link">{{ record.title }}</a></td>
-                        <td class="text-muted small">{{ record.status }}</td>
+                        <td>{{ record.status }}</td>
                     </tr>
                     {% empty %}
                     <tr><td colspan="5">
                         {% if can_manage_member_records %}
                         {% url 'members:record_add' as record_url %}
-                        {% include "includes/empty_state.html" with icon="bi-journal-text" message="No records found." action_url=record_url action_label="Add record" %}
+                        {% include "includes/empty_state.html" with icon="bi-journal-text" message="No records match these filters." action_url=record_url action_label="Add record" %}
                         {% else %}
-                        {% include "includes/empty_state.html" with icon="bi-journal-text" message="No records found." %}
+                        {% include "includes/empty_state.html" with icon="bi-journal-text" message="No records match these filters." %}
                         {% endif %}
                     </td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        {% if page_obj.has_other_pages %}
+        <div class="card-footer d-flex justify-content-between">
+            <span class="small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?{{ filter_qs }}{% if filter_qs %}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a></li>{% endif %}
+                {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?{{ filter_qs }}{% if filter_qs %}&{% endif %}page={{ page_obj.next_page_number }}">Next</a></li>{% endif %}
+            </ul>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

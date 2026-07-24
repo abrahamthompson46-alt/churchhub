@@ -15,6 +15,7 @@ from .models import (
     MemberAuditLog,
     MemberSpiritualGift,
     MemberTransfer,
+    Occupation,
     Record,
     SpiritualGift,
 )
@@ -100,6 +101,16 @@ def save_department(department):
 
 def delete_department(department):
     department.delete()
+
+
+def save_occupation(occupation):
+    occupation.full_clean()
+    occupation.save()
+    return occupation
+
+
+def delete_occupation(occupation):
+    occupation.delete()
 
 
 def create_family(*, church, **fields):

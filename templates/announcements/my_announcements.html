@@ -7,9 +7,9 @@
 <div class="page-container">
     {% if can_create_announcements %}
     {% url 'announcements:create_announcement' as create_url %}
-    {% include "includes/page_header.html" with page_subtitle="Communications" page_title="My Submissions" page_description="Track announcements you have submitted." action_url=create_url action_label="New Announcement" %}
+    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="My Submissions" page_description="Track announcements you have submitted." action_url=create_url action_label="New Announcement" %}
     {% else %}
-    {% include "includes/page_header.html" with page_subtitle="Communications" page_title="My Submissions" page_description="Track announcements you have submitted." %}
+    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="My Submissions" page_description="Track announcements you have submitted." %}
     {% endif %}
 
     <div class="filter-bar filter-bar--tabs">
@@ -41,13 +41,13 @@
                         <td>{% if a.church %}{{ a.church.name }}{% else %}General{% endif %}</td>
                         <td>
                             {% if a.is_archived %}
-                            <span class="badge bg-secondary">Archived</span>
+                            Archived
                             {% elif a.is_rejected %}
-                            <span class="badge bg-danger">Rejected</span>
+                            Rejected
                             {% elif a.is_approved %}
-                            <span class="badge bg-success">Published</span>
+                            Published
                             {% else %}
-                            <span class="badge bg-warning text-dark">Pending</span>
+                            Pending
                             {% endif %}
                         </td>
                         <td>{{ a.created_at|date:"M j, Y" }}</td>

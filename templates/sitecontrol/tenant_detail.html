@@ -75,7 +75,7 @@
                             <td>{{ inv.get_role_display }}</td>
                             <td>
                                 {% if inv.is_expired %}
-                                <span class="badge bg-danger">Expired</span>
+                                Expired
                                 {% else %}
                                 {{ inv.expires_at|date:"j M Y H:i" }}
                                 {% endif %}

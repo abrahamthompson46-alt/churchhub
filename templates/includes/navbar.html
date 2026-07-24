@@ -38,10 +38,10 @@
                     </form>
                     {% endif %}
 
-                    <a href="{% url 'dashboard:notifications' %}" class="tool-btn" title="Notifications">
-                        <i class="bi bi-bell"></i>
+                    <a href="{% url 'dashboard:notifications' %}" class="tool-btn" title="Notifications" aria-label="{% if unread_notification_count %}Notifications, {{ unread_notification_count }} unread{% else %}Notifications{% endif %}">
+                        <i class="bi bi-bell" aria-hidden="true"></i>
                         {% if unread_notification_count %}
-                        <span class="tool-badge">{{ unread_notification_count }}</span>
+                        <span class="tool-badge" aria-hidden="true">{{ unread_notification_count }}</span>
                         {% endif %}
                     </a>
 
@@ -79,7 +79,7 @@
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <a class="dropdown-item" href="{% url 'portal:home' %}">
-                                    <i class="bi bi-people"></i>Member portal
+                                    <i class="bi bi-people"></i>My Member Portal
                                 </a>
                             </li>
                             {% endif %}

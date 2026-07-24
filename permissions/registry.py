@@ -36,7 +36,29 @@ PERMISSION_REGISTRY = {
             "transfer_members", "process_transfers", "manage_baptisms",
             "manage_departments", "manage_families", "manage_leadership",
             "manage_spiritual_gifts", "view_member_records", "manage_member_records",
+            "manage_member_configuration", "manage_occupations", "manage_member_lookups",
         ],
+    },
+    "manage_member_configuration": {
+        "name": "Manage Member Configuration",
+        "category": "Members",
+        "description": "Open the Administration configuration hub for occupations and form lists.",
+        "default_roles": _ROLE_LEADERSHIP | {"SECRETARY"},
+        "implies": ["view_members", "manage_occupations", "manage_member_lookups"],
+    },
+    "manage_occupations": {
+        "name": "Manage Occupations",
+        "category": "Members",
+        "description": "Create and edit church occupation lists used on member profiles.",
+        "default_roles": _ROLE_LEADERSHIP | {"SECRETARY"},
+        "implies": ["view_members"],
+    },
+    "manage_member_lookups": {
+        "name": "Manage Member Lists",
+        "category": "Members",
+        "description": "Update membership status, gender, marital status, and record type dropdowns.",
+        "default_roles": _ROLE_LEADERSHIP | {"SECRETARY"},
+        "implies": ["view_members"],
     },
     "add_members": {
         "name": "Add Members",
@@ -589,6 +611,21 @@ PERMISSION_REGISTRY = {
         "description": "Export announcement archives.",
         "default_roles": _ROLE_LEADERSHIP | {"SECRETARY"},
         "implies": ["view_announcements"],
+    },
+
+    # ── Church History (2) ────────────────────────────────────────
+    "view_church_history": {
+        "name": "View Church History",
+        "category": "Church History",
+        "description": "Browse institutional church history and milestones.",
+        "default_roles": _ROLE_READ,
+    },
+    "manage_church_history": {
+        "name": "Manage Church History",
+        "category": "Church History",
+        "description": "Create and edit church history chronicle entries.",
+        "default_roles": _ROLE_LEADERSHIP | {"SECRETARY"},
+        "implies": ["view_church_history"],
     },
 
     # ── Reports (8) ───────────────────────────────────────────────

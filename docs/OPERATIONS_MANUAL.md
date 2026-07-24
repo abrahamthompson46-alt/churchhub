@@ -182,10 +182,13 @@ Plan in budgets app; actuals from transactions for variance reports.
 
 | Event | Channel |
 |-------|---------|
-| In-app | Dashboard notifications bell |
+| In-app | Dashboard notifications bell (cached unread count) |
 | Invite | Email (SMTP) |
 | Password reset | Email |
-| Async export ready | Notification + optional email |
+| Async export ready / failed | In-app `SYSTEM` notification (email optional / Recommended) |
+| Transaction approve/reject | In-app `FINANCE` |
+| Announcement approve/reject | In-app `INFO` |
+| Meeting minutes workflow | In-app `MEETING` |
 
 Purge: old read notifications removed by scheduled task (90+ days configurable via command).
 

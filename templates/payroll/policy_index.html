@@ -27,8 +27,8 @@
                     <tbody>
                         {% for band in table.bands.all %}
                         <tr>
-                            <td>₵{{ band.lower_limit|floatformat:2 }}</td>
-                            <td>{% if band.upper_limit %}₵{{ band.upper_limit|floatformat:2 }}{% else %}—{% endif %}</td>
+                            <td>{{ band.lower_limit|floatformat:2 }}</td>
+                            <td>{% if band.upper_limit %}{{ band.upper_limit|floatformat:2 }}{% else %}—{% endif %}</td>
                             <td class="text-end">{{ band.rate_percent }}%</td>
                         </tr>
                         {% endfor %}

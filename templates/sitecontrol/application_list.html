@@ -28,7 +28,7 @@
                 <td class="fw-semibold">{{ app.church_name }} <code class="small">{{ app.church_code }}</code></td>
                 <td>{{ app.contact_name }}<br><small class="text-muted">{{ app.contact_email }}</small></td>
                 <td>{{ app.get_application_type_display }}</td>
-                <td><span class="badge bg-{% if app.status == 'PENDING' %}warning text-dark{% elif app.status == 'APPROVED' %}success{% elif app.status == 'REJECTED' %}danger{% else %}secondary{% endif %}">{{ app.get_status_display }}</span></td>
+                <td>{{ app.get_status_display }}</td>
                 <td><a href="{% url 'sitecontrol:application_detail' app.pk %}" class="btn btn-sm btn-outline-primary">Review</a></td>
             </tr>
             {% empty %}

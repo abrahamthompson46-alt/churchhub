@@ -46,6 +46,9 @@ def can_manage_leadership(user): return _p(user, "manage_leadership")
 def can_manage_spiritual_gifts(user): return _p(user, "manage_spiritual_gifts")
 def can_view_member_records(user): return _p(user, "view_member_records")
 def can_manage_member_records(user): return _p(user, "manage_member_records")
+def can_manage_member_configuration(user): return _p(user, "manage_member_configuration")
+def can_manage_occupations(user): return _p(user, "manage_occupations")
+def can_manage_member_lookups(user): return _p(user, "manage_member_lookups")
 
 # ── Meetings ──────────────────────────────────────────────────────
 def can_view_meetings(user): return _p(user, "view_meetings")
@@ -123,6 +126,8 @@ def can_export_giving(user): return _p(user, "export_giving")
 
 # ── Announcements ─────────────────────────────────────────────────
 def can_view_announcements(user): return _p(user, "view_announcements")
+def can_view_church_history(user): return _p(user, "view_church_history")
+def can_manage_church_history(user): return _p(user, "manage_church_history")
 def can_create_announcements(user): return _p(user, "create_announcements")
 def can_approve_announcements(user): return _p(user, "approve_announcements")
 def can_archive_announcements(user): return _p(user, "archive_announcements")

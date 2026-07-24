@@ -13,19 +13,33 @@
     </div>
     <div class="table-responsive">
         <table class="platform-table mb-0">
-            <thead><tr><th>Church</th><th>Plan</th><th>Status</th><th>Users Limit</th><th>Expires</th><th></th></tr></thead>
+            <thead>
+                <tr>
+                    <th>Church</th>
+                    <th>Plan</th>
+                    <th>Status</th>
+                    <th>Users Limit</th>
+                    <th>Next bill</th>
+                    <th>Expires</th>
+                    <th></th>
+                </tr>
+            </thead>
             <tbody>
             {% for sub in subscriptions %}
             <tr>
                 <td class="fw-semibold"><a href="{% url 'sitecontrol:tenant_detail' sub.church.pk %}">{{ sub.church.name }}</a></td>
                 <td>{{ sub.plan.name }}</td>
-                <td><span class="badge bg-{% if sub.status == 'ACTIVE' %}success{% elif sub.status == 'SUSPENDED' %}danger{% else %}secondary{% endif %}">{{ sub.get_status_display }}</span></td>
+                <td>{{ sub.get_status_display }}</td>
                 <td>{{ sub.effective_max_users }}</td>
+                <td>{{ sub.next_billing_at|default:"—" }}</td>
                 <td>{{ sub.expires_at|default:"—" }}</td>
-                <td><a href="{% url 'sitecontrol:subscription_edit' sub.pk %}" class="btn btn-sm btn-outline-primary">Edit</a></td>
+                <td class="text-nowrap">
+                    <a href="{% url 'sitecontrol:subscription_record_payment' sub.pk %}" class="btn btn-sm btn-outline-success">Payment</a>
+                    <a href="{% url 'sitecontrol:subscription_edit' sub.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                </td>
             </tr>
             {% empty %}
-            <tr><td colspan="6" class="text-muted">No subscriptions.</td></tr>
+            <tr><td colspan="7" class="text-muted">No subscriptions.</td></tr>
             {% endfor %}
             </tbody>
         </table>

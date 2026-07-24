@@ -346,3 +346,153 @@ def reconcile_organization(denomination=None):
             "conference_id": str(conf.pk),
         })
     return issues
+
+
+def _manageable_church_ids(user):
+    from permissions.scoping import get_manageable_churches
+
+    return list(get_manageable_churches(user).values_list("pk", flat=True))
+
+
+def church_history_queryset_for_user(user, *, church_id=None, conference_id=None):
+    """
+    Base history queryset limited to churches the user may manage.
+
+    When neither church nor conference is supplied, callers may further
+    narrow to the active church context in the view layer.
+    """
+    church_ids = _manageable_church_ids(user)
+    if not church_ids:
+        return selectors.church_history_base_queryset().none()
+    qs = selectors.church_history_for_churches(church_ids)
+    if church_id:
+        qs = qs.filter(church_id=church_id)
+    elif conference_id:
+        qs = qs.filter(church__district__zone__conference_id=conference_id)
+    return qs
+
+
+def search_church_history_entries(
+    user,
+    *,
+    q="",
+    category="",
+    church_id=None,
+    conference_id=None,
+    date_from=None,
+    date_to=None,
+    active_church=None,
+):
+    """
+    Search church history with explicit scope precedence:
+
+    1. church_id (exact church) if provided and manageable
+    2. else conference_id (all manageable churches in that conference)
+    3. else active_church when set (local church context)
+    4. else all manageable churches
+    """
+    scope_church = church_id
+    scope_conference = conference_id
+    if not scope_church and not scope_conference and active_church is not None:
+        scope_church = active_church.pk
+
+    qs = church_history_queryset_for_user(
+        user,
+        church_id=scope_church,
+        conference_id=None if scope_church else scope_conference,
+    )
+    return selectors.search_church_history(
+        qs,
+        q=q,
+        category=category,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+
+def get_scoped_history_entry(user, pk):
+    church_ids = _manageable_church_ids(user)
+    return selectors.church_history_entry_or_404(church_ids, pk)
+
+
+@db_transaction.atomic
+def create_church_history_entry(
+    *,
+    church,
+    title,
+    body,
+    event_date,
+    category,
+    location="",
+    tags="",
+    performed_by=None,
+    ip_address=None,
+):
+    entry = repo.create_church_history_entry(
+        church=church,
+        title=title,
+        body=body,
+        event_date=event_date,
+        category=category,
+        location=location or "",
+        tags=tags or "",
+        created_by=performed_by,
+        updated_by=performed_by,
+    )
+    log_org_audit(
+        "CREATE",
+        entry,
+        performed_by=performed_by,
+        ip_address=ip_address,
+        details={
+            "church_id": str(church.pk),
+            "event_date": str(event_date),
+            "category": category,
+        },
+    )
+    return entry
+
+
+@db_transaction.atomic
+def update_church_history_entry(
+    entry,
+    *,
+    title,
+    body,
+    event_date,
+    category,
+    location="",
+    tags="",
+    church=None,
+    performed_by=None,
+    ip_address=None,
+):
+    before = {
+        "title": entry.title,
+        "event_date": str(entry.event_date),
+        "category": entry.category,
+        "church_id": str(entry.church_id),
+    }
+    entry.title = title
+    entry.body = body
+    entry.event_date = event_date
+    entry.category = category
+    entry.location = location or ""
+    entry.tags = tags or ""
+    if church is not None and church.pk != entry.church_id:
+        entry.church = church
+    entry.updated_by = performed_by
+    repo.save_church_history_entry(entry)
+    log_org_audit(
+        "UPDATE",
+        entry,
+        performed_by=performed_by,
+        ip_address=ip_address,
+        details={"before": before, "after": {
+            "title": entry.title,
+            "event_date": str(entry.event_date),
+            "category": entry.category,
+            "church_id": str(entry.church_id),
+        }},
+    )
+    return entry

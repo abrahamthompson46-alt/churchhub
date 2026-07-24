@@ -20,6 +20,7 @@ from .models import (
     OfferingCategory,
     Transaction,
     TransactionLine,
+    TreasuryApprovalPolicy,
     WorkingDay,
 )
 from .services import (
@@ -397,3 +398,15 @@ class FinancialPeriodAdmin(admin.ModelAdmin):
         if hasattr(request.user, "church") and request.user.church:
             return qs.filter(church=request.user.church)
         return qs.none()
+
+
+@admin.register(TreasuryApprovalPolicy)
+class TreasuryApprovalPolicyAdmin(admin.ModelAdmin):
+    list_display = (
+        "church",
+        "receipt_auto_approve_enabled",
+        "default_receipt_auto_approve_limit",
+        "updated_at",
+    )
+    list_filter = ("receipt_auto_approve_enabled",)
+    search_fields = ("church__name", "church__code")

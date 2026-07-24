@@ -91,3 +91,26 @@ class BudgetFilterForm(forms.Form):
         ],
         widget=forms.Select(attrs={**select_attrs(), "class": "form-select form-select-sm field-w-sm"}),
     )
+
+
+class BudgetCloneForm(forms.Form):
+    source_year = forms.IntegerField(
+        min_value=2020,
+        max_value=2099,
+        widget=forms.NumberInput(attrs=input_attrs(min=2020, max=2099)),
+        label="From year",
+    )
+    target_year = forms.IntegerField(
+        min_value=2020,
+        max_value=2099,
+        widget=forms.NumberInput(attrs=input_attrs(min=2020, max=2099)),
+        label="To year",
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        source = cleaned.get("source_year")
+        target = cleaned.get("target_year")
+        if source is not None and target is not None and source == target:
+            raise ValidationError("Choose a different target year.")
+        return cleaned

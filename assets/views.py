@@ -12,6 +12,7 @@ from church_system.church_scope import get_active_church, require_church
 from church_system.flash import flash_exception, flash_success, flash_warning
 from permissions.checks import (
     can_approve_assets,
+    can_export_assets,
     can_manage_asset_policy,
     can_manage_assets,
     can_view_all_churches,
@@ -110,6 +111,7 @@ def asset_list(request):
         "status_choices": FixedAsset.STATUS_CHOICES,
         "can_manage": can_manage_assets(request.user),
         "can_approve": can_approve_assets(request.user),
+        "can_export": can_export_assets(request.user),
     })
 
 
@@ -234,8 +236,10 @@ def asset_dispose(request, pk):
     return redirect("assets:asset_detail", pk=asset.pk)
 
 
-@_assets_access
+@_assets_read_access
 def asset_export_csv(request):
+    if not can_export_assets(request.user):
+        raise PermissionDenied
     church = require_church(request)
     csv_data = asset_register_csv(church)
     response = HttpResponse(csv_data, content_type="text/csv")

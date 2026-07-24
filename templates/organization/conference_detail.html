@@ -17,6 +17,17 @@
     <div class="d-flex flex-wrap gap-2 mb-4">
         <a href="{% url 'organization:zone_create' %}?conference={{ conference.id }}" class="btn btn-primary btn-sm">Add Zone</a>
         <a href="{% url 'organization:conference_edit' conference.id %}" class="btn btn-outline-secondary btn-sm">Edit</a>
+        {% if can_view_church_history %}
+        <a href="{% url 'organization:church_history_list' %}?conference={{ conference.id }}" class="btn btn-outline-secondary btn-sm">
+            Church History{% if history_count %} ({{ history_count }}){% endif %}
+        </a>
+        {% endif %}
+    </div>
+    {% elif can_view_church_history %}
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{% url 'organization:church_history_list' %}?conference={{ conference.id }}" class="btn btn-outline-secondary btn-sm">
+            Church History{% if history_count %} ({{ history_count }}){% endif %}
+        </a>
     </div>
     {% endif %}
 
@@ -29,7 +40,7 @@
                     {% for zone in zones %}
                     <tr>
                         <td><a href="{% url 'organization:zone_detail' zone.id %}" class="table-link">{{ zone.name }}</a></td>
-                        <td class="text-muted"><span class="chip">{{ zone.code }}</span></td>
+                        <td class="text-muted">{{ zone.code }}</td>
                         <td>{{ zone.district_count }}</td>
                         <td class="text-end">
                             {% if can_manage %}

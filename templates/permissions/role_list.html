@@ -29,7 +29,7 @@
                     <tr>
                         <td class="fw-medium">{{ r.label }}</td>
                         <td>
-                            <span class="chip">{{ r.granted_count }} / {{ r.total }}</span>
+                            {{ r.granted_count }} / {{ r.total }}
                         </td>
                         <td class="text-end">
                             <a href="{% url 'permissions:role_detail' r.role %}" class="btn btn-sm btn-outline-primary">View</a>

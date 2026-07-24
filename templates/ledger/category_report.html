@@ -46,7 +46,7 @@
                     <td><code class="small">{{ row.category.code }}</code></td>
                     <td class="small">{{ row.category.get_transaction_type_display }}</td>
                     <td class="text-end">{{ row.count }}</td>
-                    <td class="text-end text-currency">₵ {{ row.volume|floatformat:2|intcomma }}</td>
+                    <td class="text-end text-currency">{{ row.volume|floatformat:2|intcomma }}</td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="5" class="text-muted text-center py-3">No approved ledger entries in this range.</td></tr>

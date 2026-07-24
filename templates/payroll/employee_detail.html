@@ -13,11 +13,11 @@
         </div>
         <div class="dash-inline-stat">
             <span class="dash-inline-stat__label">YTD Gross ({{ ytd.year }})</span>
-            <span class="dash-inline-stat__value">₵{{ ytd.gross|floatformat:2 }}</span>
+            <span class="dash-inline-stat__value">{{ ytd.gross|floatformat:2 }}</span>
         </div>
         <div class="dash-inline-stat">
             <span class="dash-inline-stat__label">YTD PAYE</span>
-            <span class="dash-inline-stat__value">₵{{ ytd.paye|floatformat:2 }}</span>
+            <span class="dash-inline-stat__value">{{ ytd.paye|floatformat:2 }}</span>
         </div>
     </div>
 
@@ -46,7 +46,7 @@
                         <td>{% if comp.is_active %}Yes{% else %}No{% endif %}</td>
                         <td>
                             {% for line in comp.lines.all %}
-                                {% if line.line_type == "EARNING" %}{{ line.pay_component.name }}: ₵{{ line.amount|floatformat:2 }}{% if not forloop.last %}; {% endif %}{% endif %}
+                                {% if line.line_type == "EARNING" %}{{ line.pay_component.name }}: {{ line.amount|floatformat:2 }}{% if not forloop.last %}; {% endif %}{% endif %}
                             {% endfor %}
                         </td>
                     </tr>
@@ -68,8 +68,8 @@
                     {% for loan in loans %}
                     <tr>
                         <td>{{ loan.description|default:"Loan" }}</td>
-                        <td class="text-end">₵{{ loan.balance|floatformat:2 }}</td>
-                        <td class="text-end">₵{{ loan.monthly_recovery|floatformat:2 }}</td>
+                        <td class="text-end">{{ loan.balance|floatformat:2 }}</td>
+                        <td class="text-end">{{ loan.monthly_recovery|floatformat:2 }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

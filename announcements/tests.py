@@ -156,13 +156,26 @@ class ServiceTests(AnnouncementTestMixin, TestCase):
         self.assertFalse(ann.is_approved)
         self.assertEqual(ann.status, Announcement.STATUS_PENDING)
 
-    def test_create_service_auto_approves_pastor(self):
+    def test_create_service_stays_pending_for_pastor_sod(self):
+        """Maker-checker: even approvers submit to the pending queue by default."""
         ann = create_announcement(
             self.pastor,
             title="Pastor Post",
             content="Body",
             visibility="church",
             church=self.church,
+        )
+        self.assertFalse(ann.is_approved)
+        self.assertEqual(ann.status, Announcement.STATUS_PENDING)
+
+    def test_create_service_explicit_auto_approve(self):
+        ann = create_announcement(
+            self.pastor,
+            title="Immediate",
+            content="Body",
+            visibility="church",
+            church=self.church,
+            auto_approve=True,
         )
         self.assertTrue(ann.is_approved)
         self.assertEqual(ann.approved_by, self.pastor)

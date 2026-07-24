@@ -19,6 +19,8 @@ MFA_EXEMPT_PREFIXES = (
     "/accounts/invite/accept",
     "/accounts/mfa/",
     "/portal/login",
+    "/portal/confirm",
+    "/portal/password",
     "/admin/login",
     "/static/",
     "/media/",

@@ -5,13 +5,13 @@ Usage: {% include "includes/form_field.html" with field=form.field_name %}
 {% endcomment %}
 {% with wt=field.field.widget.input_type field_name=field.name %}
 {% if field.is_hidden %}
-    {% if field_name == "member" or field_name == "head" %}
+    {% if field_name == "member" or field_name == "head" or field_name == "invited_by" or field_name == "assigned_elder" %}
     <div class="form-group form-group--wide">
         <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="text-danger ms-1">*</span>{% endif %}</label>
         {% if field.value.pk %}
-        {% include "includes/member_picker.html" with input_id=field.id_for_label field_name=field.html_name value=field.value.pk initial_member=field.value required=field.field.required placeholder="Search member by name or phone…" %}
+        {% include "includes/member_picker.html" with input_id=field.id_for_label field_name=field.html_name value=field.value.pk initial_member=field.value required=field.field.required placeholder="Search member by name or phone…" detail=detail %}
         {% else %}
-        {% include "includes/member_picker.html" with input_id=field.id_for_label field_name=field.html_name value=field.value required=field.field.required placeholder="Search member by name or phone…" %}
+        {% include "includes/member_picker.html" with input_id=field.id_for_label field_name=field.html_name value=field.value required=field.field.required placeholder="Search member by name or phone…" detail=detail %}
         {% endif %}
         {% if field.help_text %}<div class="form-hint">{{ field.help_text }}</div>{% endif %}
         {% if field.errors %}<div class="form-error">{{ field.errors.0 }}</div>{% endif %}
@@ -20,7 +20,7 @@ Usage: {% include "includes/form_field.html" with field=form.field_name %}
     {{ field }}
     {% endif %}
 {% else %}
-<div class="form-group{% if wt == 'checkbox' %} form-group--check{% elif wt == 'textarea' %} form-group--wide{% elif wt == 'file' %} form-group--full{% elif 'description' in field_name or 'notes' in field_name or 'message' in field_name or 'reason' in field_name %} form-group--wide{% elif wt == 'number' or wt == 'date' %} form-group--short{% elif wt == 'email' or 'phone' in field_name %} form-group--medium{% endif %}">
+<div class="form-group{% if wt == 'checkbox' %} form-group--check{% elif wt == 'textarea' %} form-group--wide{% elif wt == 'file' %} form-group--full{% elif 'description' in field_name or 'notes' in field_name or 'message' in field_name or 'reason' in field_name or 'address' in field_name or 'content' in field_name %} form-group--wide{% elif field_name == 'gender' or field_name == 'family_relationship' or field_name == 'status' or wt == 'number' or wt == 'date' %} form-group--short{% elif field_name == 'marital_status' or field_name == 'membership_status' or wt == 'email' or 'phone' in field_name or field_name == 'membership_number' or field_name == 'category' %} form-group--medium{% endif %}">
     {% if wt == 'checkbox' %}
         <div class="form-check">
             {{ field }}

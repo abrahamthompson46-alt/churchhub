@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Occupations — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container page-shell">
+    {% url 'members:occupation_add' as add_url %}
+    {% include "includes/page_header.html" with page_subtitle="Administration" page_title="Occupations" page_description=church.name action_url=add_url action_label="Add Occupation" action_icon="bi-plus-lg" %}
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for occupation in occupations %}
+                    <tr>
+                        <td>{{ occupation.name }}</td>
+                        <td class="text-end text-nowrap">
+                            <a href="{% url 'members:occupation_edit' occupation.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <a href="{% url 'members:occupation_delete' occupation.pk %}" class="btn btn-sm btn-outline-secondary">Delete</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="2">
+                            {% include "includes/empty_state.html" with icon="bi-briefcase" message="No occupations yet." action_url=add_url action_label="Add occupation" %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

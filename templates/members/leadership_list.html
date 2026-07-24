@@ -22,7 +22,7 @@
                         <td><a href="{% url 'members:detail' r.member_id %}" class="table-link">{{ r.member.full_name }}</a></td>
                         <td>{{ r.department.name|default:"—" }}</td>
                         <td>{{ r.start_date }}</td>
-                        <td>{% if r.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Ended</span>{% endif %}</td>
+                        <td>{% if r.is_active %}Active{% else %}Ended{% endif %}</td>
                         <td class="text-end">
                             {% if can_manage_leadership and r.is_active %}
                             <a href="{% url 'members:leadership_end' r.pk %}" class="btn btn-sm btn-outline-secondary">End</a>

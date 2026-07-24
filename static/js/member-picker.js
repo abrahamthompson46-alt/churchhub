@@ -39,6 +39,13 @@
 
         if (!searchInput || !results || !searchUrl) return;
 
+        function withDetail(url) {
+            if (root.dataset.detail === "1") {
+                return url + (url.indexOf("?") >= 0 ? "&" : "?") + "detail=1";
+            }
+            return url;
+        }
+
         function showSelected(item) {
             hidden.value = item.id;
             nameEl.textContent = item.name;
@@ -81,7 +88,7 @@
         function fetchResults(query) {
             results.innerHTML = '<div class="member-picker__empty">Searching…</div>';
             results.classList.remove("d-none");
-            fetch(searchUrl + "?q=" + encodeURIComponent(query), {
+            fetch(withDetail(searchUrl + "?q=" + encodeURIComponent(query)), {
                 headers: { "X-Requested-With": "XMLHttpRequest", "Accept": "application/json" },
                 credentials: "same-origin",
             })
@@ -112,7 +119,7 @@
                     .toUpperCase(),
             });
         } else if (hidden.value) {
-            fetch(searchUrl + "?id=" + encodeURIComponent(hidden.value), {
+            fetch(withDetail(searchUrl + "?id=" + encodeURIComponent(hidden.value)), {
                 headers: { "X-Requested-With": "XMLHttpRequest", "Accept": "application/json" },
                 credentials: "same-origin",
             })

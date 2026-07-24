@@ -34,6 +34,7 @@ from transactions.forms import (
     ExpenseForm,
     PeriodLockForm,
     ReceiptForm,
+    TreasuryApprovalPolicyForm,
     VoidTransactionForm,
     WorkingDayCloseForm,
     WorkingDayOpenForm,
@@ -61,6 +62,7 @@ from transactions.services import (
     generate_monthly_cutoff,
     get_active_working_day,
     get_financial_periods,
+    get_or_create_treasury_approval_policy,
     get_recent_working_days,
     get_working_day_status,
     lock_financial_period,
@@ -134,6 +136,16 @@ def reject_transaction_view(request, pk):
     try:
         svc_reject(transaction, request.user)
         flash_success(request, f"{transaction.reference} rejected.")
+        if transaction.created_by_id and transaction.created_by_id != request.user.id:
+            from dashboard.services import notify_user
+
+            notify_user(
+                transaction.created_by,
+                title="Transaction Rejected",
+                message=f"{transaction.reference} was rejected.",
+                category="FINANCE",
+                action_url=f"/transactions/transactions/{transaction.pk}/",
+            )
     except ValueError as exc:
         flash_exception(request, str(exc))
     return redirect("transactions:pending_approvals")
@@ -148,12 +160,27 @@ def bulk_approve(request):
     qs = selectors.pending_transactions_by_ids_qs(request, ids)
     count = 0
     skipped = 0
+    notified = set()
     for txn in qs:
         try:
             svc_approve(txn, request.user)
             count += 1
+            if txn.created_by_id and txn.created_by_id != request.user.id:
+                notified.add(txn.created_by_id)
         except ValueError:
             skipped += 1
+    if notified:
+        from accounts.models import User
+        from dashboard.services import notify_users
+
+        creators = User.objects.filter(pk__in=notified, is_active=True)
+        notify_users(
+            creators,
+            "Transactions approved",
+            f"{count} transaction(s) you submitted were approved in a bulk review.",
+            category="FINANCE",
+            action_url="/transactions/pending/",
+        )
     if skipped:
         flash_warning(request, f"{skipped} transaction(s) could not be approved.")
     flash_success(request, f"{count} transaction(s) approved.")
@@ -162,8 +189,26 @@ def bulk_approve(request):
 
 @_finance_required
 def transaction_receipt(request, pk):
-    transaction = selectors.transaction_for_request(request, pk)
-    return render(request, "transactions/receipt.html", {"transaction": transaction})
+    """Printable treasurer confirmation / receipt slip for a recorded transaction."""
+    transaction = selectors.transaction_for_request(request, pk, detail=True)
+    lines = list(transaction.lines.all())
+    if transaction.transaction_type == "RECEIPT":
+        display_total = transaction.receipt_total
+    else:
+        cash_bank = [
+            abs(line.amount)
+            for line in lines
+            if line.account.account_type in ("CASH", "BANK")
+        ]
+        if cash_bank:
+            display_total = cash_bank[0]
+        else:
+            display_total = abs(sum(line.amount for line in lines if line.amount > 0))
+    return render(request, "transactions/receipt.html", {
+        "transaction": transaction,
+        "just_recorded": request.GET.get("new") == "1",
+        "display_total": display_total,
+    })
 
 
 @_finance_required
@@ -264,14 +309,28 @@ def record_receipt_view(request):
                 date=form.cleaned_data.get("date"),
             )
             complete_financial_idempotency(idem_record, txn)
-            flash_success(request, f"Receipt {txn.reference} recorded and pending approval.")
-            return redirect("transactions:pending_approvals")
+            if txn.approval_status == "APPROVED":
+                flash_success(
+                    request,
+                    f"Receipt {txn.reference} recorded and auto-approved.",
+                )
+            else:
+                flash_success(
+                    request,
+                    f"Receipt {txn.reference} recorded and pending second approval "
+                    f"(amount exceeds auto-approve limit).",
+                )
+            return redirect(
+                f"{reverse('transactions:transaction_confirm', kwargs={'pk': txn.pk})}?new=1"
+            )
         except IdempotencyReplay as exc:
             flash_warning(
                 request,
                 f"Duplicate submission ignored. Existing receipt {exc.existing_transaction.reference}.",
             )
-            return redirect("transactions:pending_approvals")
+            return redirect(
+                f"{reverse('transactions:transaction_confirm', kwargs={'pk': exc.existing_transaction.pk})}?new=1"
+            )
         except MissingIdempotencyKey as exc:
             flash_error(request, str(exc))
         except (PeriodLockedError, WorkingDayClosedError) as exc:
@@ -307,13 +366,17 @@ def record_expense_view(request):
             )
             complete_financial_idempotency(idem_record, txn)
             flash_success(request, f"Expense {txn.reference} recorded and pending approval.")
-            return redirect("transactions:pending_approvals")
+            return redirect(
+                f"{reverse('transactions:transaction_confirm', kwargs={'pk': txn.pk})}?new=1"
+            )
         except IdempotencyReplay as exc:
             flash_warning(
                 request,
                 f"Duplicate submission ignored. Existing expense {exc.existing_transaction.reference}.",
             )
-            return redirect("transactions:pending_approvals")
+            return redirect(
+                f"{reverse('transactions:transaction_confirm', kwargs={'pk': exc.existing_transaction.pk})}?new=1"
+            )
         except MissingIdempotencyKey as exc:
             flash_error(request, str(exc))
         except (PeriodLockedError, WorkingDayClosedError) as exc:
@@ -330,16 +393,26 @@ def audit_log(request):
 
 
 @_finance_required
-@require_POST
 def record_remittance_view(request):
+    """GET: remittance payment form. POST: record district remittance (also used from cut-off)."""
     church = require_church(request)
-    month_str = request.POST.get("month")
+    month_str = request.POST.get("month") if request.method == "POST" else request.GET.get("month")
     month_date = parse_date(month_str) if month_str else timezone.now().date()
     cutoff = generate_monthly_cutoff(church, month_date)
     amount = cutoff.total_payable
+    context = {
+        "cutoff": cutoff,
+        "month_date": month_date,
+        "amount": amount,
+        "idempotency_key": f"remit-{church.pk}-{month_date.strftime('%Y-%m')}",
+    }
+
+    if request.method != "POST":
+        return render(request, "transactions/record_remittance.html", context)
+
     if amount <= 0:
         flash_warning(request, "No payable amount for this period.")
-        return redirect("dashboard:cutoff")
+        return redirect("transactions:record_remittance")
     idem_key = request.POST.get("idempotency_key") or f"remit-{church.pk}-{month_str}"
     try:
         idem_record = claim_financial_idempotency(
@@ -364,8 +437,11 @@ def record_remittance_view(request):
         return redirect("dashboard:cutoff")
     except (MissingIdempotencyKey, ValueError) as exc:
         flash_error(request, str(exc))
-        return redirect("dashboard:cutoff")
-    flash_success(request, f"District remittance of ₵{amount} recorded and pending approval.")
+        return redirect("transactions:record_remittance")
+    flash_success(
+        request,
+        f"District remittance of {amount} recorded and pending approval.",
+    )
     return redirect("dashboard:cutoff")
 
 
@@ -503,6 +579,8 @@ def period_list(request):
     active_day = get_active_working_day(church)
     open_form = WorkingDayOpenForm(initial={"date": timezone.localdate()})
     close_form = WorkingDayCloseForm()
+    policy = get_or_create_treasury_approval_policy(church)
+    approval_form = TreasuryApprovalPolicyForm(instance=policy)
     return render(request, "transactions/period_list.html", {
         "months": months,
         "year": year,
@@ -516,7 +594,25 @@ def period_list(request):
         "close_form": close_form,
         "recent_working_days": get_recent_working_days(church),
         "can_manage_working_day": can_manage_working_day(request.user),
+        "approval_form": approval_form,
+        "can_edit_approval_policy": can_manage_finances(request.user),
     })
+
+
+@login_required
+@require_POST
+def treasury_approval_policy_save(request):
+    if not can_manage_finances(request.user):
+        raise PermissionDenied
+    church = require_church(request)
+    policy = get_or_create_treasury_approval_policy(church)
+    form = TreasuryApprovalPolicyForm(request.POST, instance=policy)
+    if form.is_valid():
+        form.save()
+        flash_success(request, "Receipt auto-approval policy saved.")
+    else:
+        flash_error(request, "Could not save approval policy. Check the amounts.")
+    return redirect(reverse("transactions:period_list") + "#receipt-approval")
 
 
 @login_required

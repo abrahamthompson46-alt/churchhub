@@ -20,30 +20,34 @@
         {% endfor %}
     </ul>
 
-    <div class="row g-3 mb-4">
-        <div class="col-md-3 col-6">
-            <div class="stat-card">
-                <div class="stat-label">Total Budgeted</div>
-                <div class="stat-value text-currency">₵ {{ kpis.total_budgeted|floatformat:2|intcomma }}</div>
-            </div>
+    <div class="metrics-row">
+        <div class="metric-card metric-card--success">
+            <span class="metric-label">Income budgeted</span>
+            <span class="metric-value">{{ kpis.income_budgeted|floatformat:2|intcomma }}</span>
         </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card">
-                <div class="stat-label">Total Actual</div>
-                <div class="stat-value text-currency">₵ {{ kpis.total_actual|floatformat:2|intcomma }}</div>
-            </div>
+        <div class="metric-card">
+            <span class="metric-label">Income actual (YTD)</span>
+            <span class="metric-value">{{ kpis.income_actual|floatformat:2|intcomma }}</span>
         </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card">
-                <div class="stat-label">Net Variance</div>
-                <div class="stat-value text-currency {% if kpis.total_variance < 0 %}text-danger{% else %}text-success{% endif %}">₵ {{ kpis.total_variance|floatformat:2|intcomma }}</div>
-            </div>
+        <div class="metric-card metric-card--warning">
+            <span class="metric-label">Expense budgeted</span>
+            <span class="metric-value">{{ kpis.expense_budgeted|floatformat:2|intcomma }}</span>
         </div>
-        <div class="col-md-3 col-6">
-            <div class="stat-card">
-                <div class="stat-label">Lines / Over Budget</div>
-                <div class="stat-value">{{ kpis.line_count }} <span class="text-muted fs-6">/ {{ kpis.over_budget_count }} alert</span></div>
-            </div>
+        <div class="metric-card">
+            <span class="metric-label">Expense actual (YTD)</span>
+            <span class="metric-value">{{ kpis.expense_actual|floatformat:2|intcomma }}</span>
+        </div>
+        <div class="metric-card {% if kpis.total_variance < 0 %}metric-card--danger{% else %}metric-card--success{% endif %}">
+            <span class="metric-label">Net variance</span>
+            <span class="metric-value">{{ kpis.total_variance|floatformat:2|intcomma }}</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Budget lines</span>
+            <span class="metric-value">{{ kpis.line_count }}</span>
+        </div>
+        <div class="metric-card {% if kpis.over_budget_count %}metric-card--danger{% endif %}">
+            <span class="metric-label">Over budget</span>
+            <span class="metric-value">{{ kpis.over_budget_count }}</span>
         </div>
     </div>
 
@@ -66,18 +70,45 @@
             <a href="?year={{ year }}&level={{ level }}&export=pdf" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
         </div>
         {% endif %}
-        {% if church %}<span class="chip ms-2"><i class="bi bi-building"></i> {{ church.name }}</span>{% endif %}
+        {% if church %}<span class="ms-2 small">{{ church.name }}</span>{% endif %}
     </div>
 
-    {% include "includes/table_open.html" with table_title="Budget vs Actual" table_icon="bi-pie-chart" %}
-            <table class="table mb-0">
+    {% if can_manage_budgets %}
+    <div class="panel mb-4">
+        <div class="panel-header">Clone budget year</div>
+        <div class="panel-body">
+            <form method="post" action="{% url 'budgets:clone' %}" class="row g-3 align-items-end">
+                {% csrf_token %}
+                <input type="hidden" name="level" value="{{ level }}">
+                <div class="col-auto">
+                    <label class="form-label" for="id_source_year">From year</label>
+                    {{ clone_form.source_year }}
+                </div>
+                <div class="col-auto">
+                    <label class="form-label" for="id_target_year">To year</label>
+                    {{ clone_form.target_year }}
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary btn-sm">Clone lines</button>
+                </div>
+                <div class="col-12">
+                    <p class="small mb-0">Copies all lines for this scope into the target year. Existing matching lines are skipped.</p>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    {% include "includes/table_open.html" with table_title="Budget vs Actual & Forecast" table_icon="bi-pie-chart" %}
+            <table class="table table-bordered mb-0">
                 <thead>
                     <tr>
                         <th>Account</th>
                         {% if level == "DEPARTMENT" %}<th>Department</th>{% endif %}
                         <th>Type</th>
                         <th class="text-end">Budgeted</th>
-                        <th class="text-end">Actual</th>
+                        <th class="text-end">Actual YTD</th>
+                        <th class="text-end">Forecast</th>
                         <th class="text-end">Variance</th>
                         <th>Status</th>
                     </tr>
@@ -87,26 +118,29 @@
                     <tr>
                         <td>{{ row.account }}</td>
                         {% if level == "DEPARTMENT" %}<td>{{ row.department|default:"—" }}</td>{% endif %}
-                        <td><span class="chip chip-sm">{{ row.account_type }}</span></td>
-                        <td class="text-end text-currency">₵ {{ row.budgeted|floatformat:2|intcomma }}</td>
-                        <td class="text-end text-currency">
-                            {% if row.tracks_actual %}₵ {{ row.actual|floatformat:2|intcomma }}{% else %}<span class="text-muted">Allocation</span>{% endif %}
+                        <td>{{ row.account_type }}</td>
+                        <td class="text-end">{{ row.budgeted|floatformat:2|intcomma }}</td>
+                        <td class="text-end">
+                            {% if row.tracks_actual %}{{ row.actual|floatformat:2|intcomma }}{% else %}Allocation{% endif %}
                         </td>
-                        <td class="text-end text-currency {% if row.favorable %}text-success{% else %}text-danger{% endif %}">
-                            {% if row.tracks_actual %}₵ {{ row.variance|floatformat:2|intcomma }}{% else %}—{% endif %}
+                        <td class="text-end">
+                            {% if row.forecast != None %}{{ row.forecast|floatformat:2|intcomma }}{% else %}—{% endif %}
+                        </td>
+                        <td class="text-end {% if row.favorable %}text-success{% else %}text-danger{% endif %}">
+                            {% if row.tracks_actual %}{{ row.variance|floatformat:2|intcomma }}{% else %}—{% endif %}
                         </td>
                         <td>
                             {% if not row.tracks_actual %}
-                            <span class="badge text-bg-secondary">Planned</span>
+                            Planned
                             {% elif row.favorable %}
-                            <span class="badge text-bg-success">On track</span>
+                            On track
                             {% else %}
-                            <span class="badge text-bg-danger">Over budget</span>
+                            <span class="text-danger">Over budget</span>
                             {% endif %}
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="7">
+                    <tr><td colspan="8">
                         {% if can_manage_budgets %}
                         {% include "includes/empty_state.html" with icon="bi-calculator" message="No budget lines for this year and scope." action_url=create_url action_label="Add budget line" %}
                         {% else %}
@@ -120,7 +154,7 @@
 
     <div class="mt-4">
     {% include "includes/table_open.html" with table_title="Budget Lines" table_icon="bi-list-ul" %}
-            <table class="table mb-0">
+            <table class="table table-bordered mb-0">
                 <thead>
                     <tr>
                         <th>Account</th>
@@ -136,9 +170,9 @@
                     <tr>
                         <td class="fw-semibold">{{ b.account.name }}</td>
                         {% if level == "DEPARTMENT" %}<td>{{ b.department.name|default:"—" }}</td>{% endif %}
-                        <td><span class="chip">{{ b.get_level_display }}</span></td>
-                        <td class="text-end text-currency">₵ {{ b.amount|floatformat:2|intcomma }}</td>
-                        <td class="text-muted small">{{ b.notes|default:"—" }}</td>
+                        <td>{{ b.get_level_display }}</td>
+                        <td class="text-end">{{ b.amount|floatformat:2|intcomma }}</td>
+                        <td>{{ b.notes|default:"—" }}</td>
                         <td class="text-end text-nowrap">
                             {% if can_manage_budgets %}
                             <a href="{% url 'budgets:edit' b.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
@@ -149,7 +183,7 @@
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="6" class="text-muted">No lines defined.</td></tr>
+                    <tr><td colspan="6">No lines defined.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

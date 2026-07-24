@@ -238,3 +238,10 @@ class WelfareCaseAttachmentForm(forms.Form):
         widget=forms.TextInput(attrs=input_attrs()),
     )
     file = forms.FileField()
+
+    def clean_file(self):
+        from church_system.uploads import validate_upload
+
+        uploaded = self.cleaned_data.get("file")
+        validate_upload(uploaded, kind="document")
+        return uploaded

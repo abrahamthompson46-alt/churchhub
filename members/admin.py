@@ -13,11 +13,13 @@ from .models import (
     LeadershipRole,
     Member,
     MemberAuditLog,
+    MemberLookupOption,
     MemberTransfer,
     Occupation,
     Record,
     RecordImage,
     SpiritualGift,
+    Visitor,
 )
 
 
@@ -287,3 +289,16 @@ class HistoryAdmin(admin.ModelAdmin):
             if not obj.church_id and request.user.church_id:
                 obj.church = request.user.church
         super().save_model(request, obj, form, change)
+
+@admin.register(MemberLookupOption)
+class MemberLookupOptionAdmin(admin.ModelAdmin):
+    list_display = ("category", "label", "code", "sort_order", "is_active", "is_system")
+    list_filter = ("category", "is_active", "is_system")
+    search_fields = ("label", "code")
+    ordering = ("category", "sort_order", "label")
+
+@admin.register(Visitor)
+class VisitorAdmin(admin.ModelAdmin):
+    list_display = ("first_name", "last_name", "church", "visit_date", "follow_up_status", "is_deleted")
+    list_filter = ("follow_up_status", "church", "is_deleted")
+    search_fields = ("first_name", "last_name", "phone", "email")

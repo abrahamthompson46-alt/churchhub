@@ -1,7 +1,19 @@
-{% if empty_title or empty_message %}
+{% comment %}
+Unified empty state. Accepts either naming style:
+  icon / message  (callers)  OR  empty_icon / empty_title / empty_message
+Optional CTA: action_url + action_label
+{% endcomment %}
+{% with es_icon=empty_icon|default:icon es_title=empty_title es_message=empty_message|default:message %}
+{% if es_title or es_message %}
 <div class="ch-empty-state{% if compact %} ch-empty-state--compact{% endif %}">
-    {% if empty_icon %}<i class="bi {{ empty_icon }} ch-empty-state__icon" aria-hidden="true"></i>{% endif %}
-    {% if empty_title %}<p class="ch-empty-state__title">{{ empty_title }}</p>{% endif %}
-    {% if empty_message %}<p class="ch-empty-state__message text-muted mb-0">{{ empty_message }}</p>{% endif %}
+    {% if es_icon %}<i class="bi {{ es_icon }} ch-empty-state__icon" aria-hidden="true"></i>{% endif %}
+    {% if es_title %}<p class="ch-empty-state__title">{{ es_title }}</p>{% endif %}
+    {% if es_message %}<p class="ch-empty-state__message text-muted mb-0">{{ es_message }}</p>{% endif %}
+    {% if action_url and action_label %}
+    <div class="ch-empty-state__actions mt-3">
+        <a href="{{ action_url }}" class="btn btn-primary btn-sm">{{ action_label }}</a>
+    </div>
+    {% endif %}
 </div>
 {% endif %}
+{% endwith %}

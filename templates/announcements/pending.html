@@ -5,7 +5,7 @@
 
 {% block content %}
 <div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Communications" page_title="Pending Approvals" page_description="Review and publish submitted announcements." %}
+    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="Pending Approvals" page_description="Review and publish submitted announcements." %}
 
     <div class="data-card">
         <div class="table-responsive">
@@ -25,9 +25,9 @@
                         <td><a href="{% url 'announcements:announcement_detail' a.pk %}" class="table-link">{{ a.title|truncatechars:50 }}</a></td>
                         <td>
                             {% if a.visibility == "general" %}
-                            <span class="chip">General</span>
+                            General
                             {% else %}
-                            <span class="chip">{{ a.church.name|default:"Church" }}</span>
+                            {{ a.church.name|default:"Church" }}
                             {% endif %}
                         </td>
                         <td class="text-muted">{{ a.created_by.get_full_name|default:a.created_by.username }}</td>

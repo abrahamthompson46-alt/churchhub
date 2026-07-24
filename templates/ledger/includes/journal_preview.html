@@ -15,23 +15,23 @@
                     <tr>
                         <td><span class="ledger-journal-account" title="{{ line.account_name }}">{{ line.account_name }}</span></td>
                         <td class="text-end {% if line.debit %}text-currency fw-medium{% else %}text-muted{% endif %}">
-                            {% if line.debit %}₵ {{ line.debit|floatformat:2|intcomma }}{% else %}—{% endif %}
+                            {% if line.debit %}{{ line.debit|floatformat:2|intcomma }}{% else %}—{% endif %}
                         </td>
                         <td class="text-end {% if line.credit %}text-currency fw-medium{% else %}text-muted{% endif %}">
-                            {% if line.credit %}₵ {{ line.credit|floatformat:2|intcomma }}{% else %}—{% endif %}
+                            {% if line.credit %}{{ line.credit|floatformat:2|intcomma }}{% else %}—{% endif %}
                         </td>
                     </tr>
                     {% endfor %}
                 {% else %}
                 <tr>
                     <td><span class="ledger-journal-account" title="{{ draft.debit_account_name }}">{{ draft.debit_account_name }}</span></td>
-                    <td class="text-end text-currency fw-medium">₵ {{ draft.amount|floatformat:2|intcomma }}</td>
+                    <td class="text-end text-currency fw-medium">{{ draft.amount|floatformat:2|intcomma }}</td>
                     <td class="text-end text-muted">—</td>
                 </tr>
                 <tr>
                     <td><span class="ledger-journal-account" title="{{ draft.credit_account_name }}">{{ draft.credit_account_name }}</span></td>
                     <td class="text-end text-muted">—</td>
-                    <td class="text-end text-currency fw-medium">₵ {{ draft.amount|floatformat:2|intcomma }}</td>
+                    <td class="text-end text-currency fw-medium">{{ draft.amount|floatformat:2|intcomma }}</td>
                 </tr>
                 {% endif %}
             </tbody>
@@ -42,8 +42,8 @@
 <p class="text-muted small mb-0">
     Remittance policy applied for <strong>{{ draft.offering_type }}</strong>
     {% if draft.retain_amount or draft.remit_amount %}
-    (retain ₵ {{ draft.retain_amount|default:"0"|floatformat:2|intcomma }},
-    remit ₵ {{ draft.remit_amount|default:"0"|floatformat:2|intcomma }}).
+    (retain {{ draft.retain_amount|default:"0"|floatformat:2|intcomma }},
+    remit {{ draft.remit_amount|default:"0"|floatformat:2|intcomma }}).
     {% endif %}
 </p>
 {% endif %}

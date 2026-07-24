@@ -32,7 +32,7 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <div class="text-muted small">Total Cost (GHS)</div>
-                    <div class="fs-5 fw-semibold">₵{{ total_cost|floatformat:2 }}</div>
+                    <div class="fs-5 fw-semibold">{{ total_cost|floatformat:2 }}</div>
                 </div>
             </div>
         </div>
@@ -40,7 +40,7 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <div class="text-muted small">Net Book Value (GHS)</div>
-                    <div class="fs-5 fw-semibold">₵{{ total_nbv|floatformat:2 }}</div>
+                    <div class="fs-5 fw-semibold">{{ total_nbv|floatformat:2 }}</div>
                 </div>
             </div>
         </div>
@@ -75,9 +75,9 @@
                 <tr>
                     <td><a href="{% url 'assets:asset_detail' alert.asset.pk %}">{{ alert.asset.asset_code }}</a></td>
                     <td>
-                        <span class="badge {% if alert.severity == 'danger' %}text-bg-danger{% else %}text-bg-warning{% endif %}">
+                        
                             {{ alert.type }}
-                        </span>
+                        
                     </td>
                     <td>{{ alert.expiry }}</td>
                     <td>{{ alert.days_left }}</td>

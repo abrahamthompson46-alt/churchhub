@@ -7,9 +7,9 @@
 <div class="page-container page-shell">
     {% if can_add_members %}
     {% url 'members:add' as add_url %}
-    {% include "includes/page_header.html" with page_subtitle="People" page_title="Member Directory" page_description=church.name action_url=add_url action_label="Add Member" action_icon="bi-person-plus" %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Member Directory" page_description=church.name action_url=add_url action_label="Add Member" action_icon="bi-person-plus" %}
     {% else %}
-    {% include "includes/page_header.html" with page_subtitle="People" page_title="Member Directory" page_description=church.name %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Member Directory" page_description=church.name %}
     {% endif %}
 
     {% if show_multi_church_banner %}
@@ -86,11 +86,11 @@
                                 {% endif %}
                                 <span>{{ member.first_name }} {{ member.last_name }}</span>
                             </a>
-                            {% if not member.is_active %}<span class="badge bg-secondary ms-1">Inactive</span>{% endif %}
+                            {% if not member.is_active %}<span class="text-muted small ms-1">Inactive</span>{% endif %}
                         </td>
                         <td class="text-muted">{{ member.department|default:"—" }}</td>
                         <td>{{ member.gender }}</td>
-                        <td><span class="chip">{{ member.membership_status }}</span></td>
+                        <td>{{ member.membership_status }}</td>
                         <td class="text-muted">{{ member.phone|default:"—" }}</td>
                         <td class="text-end text-nowrap">
                             <a href="{% url 'members:timeline' member.id %}" class="btn btn-sm btn-outline-secondary">Timeline</a>

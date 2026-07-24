@@ -68,7 +68,7 @@
                             <a href="{% url 'accounts:user_detail' u.pk %}" class="table-link">{{ u.get_full_name|default:u.username }}</a>
                             <br><span class="text-muted small">@{{ u.username }}</span>
                         </td>
-                        <td><span class="chip">{{ u.get_role_display }}</span></td>
+                        <td>{{ u.get_role_display }}</td>
                         <td>
                             <div class="scope-cell">
                                 <span class="scope-pill scope-pill--{{ u.effective_scope_level|lower }}">{{ u.scope_summary.level_label }}</span>

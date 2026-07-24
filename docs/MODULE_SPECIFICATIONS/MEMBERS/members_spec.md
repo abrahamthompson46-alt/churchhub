@@ -28,6 +28,8 @@ Own **local church membership**: directory, member CRUD, families/departments, p
 | Member audit log | Giving statements UI (→ `giving` reads transactions) |
 | JSON search picker API | Visitors CRM (not implemented) |
 | Baptism register | Attendance events (→ `meetings`; optional summary on detail) |
+| Visitors CRM | Convert visitors → members |
+| Soft-delete (`is_deleted`) on member domain entities | Hard purge tooling |
 
 ---
 
@@ -43,7 +45,8 @@ Own **local church membership**: directory, member CRUD, families/departments, p
 | `MaritalStatus` | Single, Married, Widowed, Divorced |
 | `MembershipStatus` | **Active, Inactive, Transferred, Deceased** |
 | `TransferStatus` | Pending, Completed, Rejected |
-| `RecordType` | Baptism, Marriage, Funeral, Meeting, Transfer, Other |
+| `RecordType` | Baptism, Marriage, Funeral, Meeting, Transfer, Other (seeded; editable via platform Member Dropdowns) |
+| `MemberLookupOption` | Platform catalog for record type, status, gender, marital status, membership status |
 | `RecordStatus` | Active, Archived |
 
 ### Model inventory
@@ -53,7 +56,7 @@ Own **local church membership**: directory, member CRUD, families/departments, p
 | `Department` | UUID; FK church; unique `(church, name)` |
 | `Family` | UUID; FK church; optional head Member; unique `(church, name)` |
 | `Occupation` | BigAuto PK; FK church; unique `(church, name)` |
-| `Member` | UUID; church + optional dept/family/occupation; demographics; baptism fields; phone/membership_number partial uniques; `is_active` synced from status |
+| `Member` | UUID; church + optional dept/family/occupation; demographics; baptism fields; phone/membership_number partial uniques; **unique non-blank email** (case-insensitive, active records); email implies required DOB (portal); `is_active` synced from status |
 | `MemberTransfer` | from/to church; status; reason/notes; requested/processed by |
 | `Record` / `RecordImage` | Pastoral records + M2M images |
 | `History` / `HistoryImage` | History events + images |
@@ -117,6 +120,7 @@ Management: `export_member_data`.
 | `transfer_*` | Transfer list/create/detail (+ complete/reject) |
 | `baptism_register` | Baptism list/export |
 | Leadership / spiritual gift views | Roles and gifts |
+| `configuration_hub` / `occupation_*` / `member_lookup_*` | Administration → Configuration (occupations + form lists) |
 
 ---
 
@@ -137,6 +141,9 @@ Management: `export_member_data`.
 | `baptisms/` | `baptism_register` |
 | `leadership/…` | `leadership_*` |
 | `spiritual-gifts/…`, assign/remove gift | gift routes |
+| `configuration/` | `members:configuration` |
+| `configuration/occupations/…` | `occupation_*` (church-scoped) |
+| `configuration/lists/…` | `member_lookup_*` (shared dropdown catalog; permission-gated) |
 
 ---
 
@@ -256,6 +263,7 @@ flowchart LR
 - Search returns limited fields for picker — still PII; keep permissioned.  
 - Department delete allowed only when no members, active leadership, or budget lines reference the row; writes `MemberAuditLog` `DEPARTMENT_DELETE`. Spiritual-gift unassign writes `GIFT_UNASSIGN` audit before delete.
 - No member hard-delete view; status/`is_active` used instead.
+- **Portal eligibility:** unique non-blank email + date of birth required together. Clerks should capture both accurately so members can self-serve at `/portal/login/` without staff creating user accounts.
 
 ---
 

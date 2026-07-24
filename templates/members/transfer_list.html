@@ -22,7 +22,7 @@
                         <td class="text-muted small">{{ t.from_church.name }}</td>
                         <td class="text-muted small">{{ t.to_church.name }}</td>
                         <td>{{ t.transfer_date }}</td>
-                        <td><span class="chip">{{ t.status }}</span></td>
+                        <td>{{ t.status }}</td>
                         <td class="text-end"><a href="{% url 'members:transfer_detail' t.pk %}" class="table-link">View</a></td>
                     </tr>
                     {% empty %}

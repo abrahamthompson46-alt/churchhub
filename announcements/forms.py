@@ -3,16 +3,17 @@ from django.core.exceptions import ValidationError
 from django.forms.models import inlineformset_factory
 
 from church_system.widgets import input_attrs, select_attrs, textarea_attrs
+from members.models import Department
 from permissions.checks import can_approve_announcements
+from permissions.roles import UserRole
 from permissions.scoping import get_manageable_churches
 from permissions.scoping_checks import is_top_level_approver
 
 from .models import (
-    ALLOWED_IMAGE_CONTENT_TYPES,
-    MAX_ANNOUNCEMENT_IMAGE_BYTES,
     Announcement,
     AnnouncementImage,
 )
+from church_system.uploads import validate_upload
 
 _WIDGETS = {
     "title": forms.TextInput(attrs=input_attrs(placeholder="Enter announcement title")),
@@ -28,6 +29,19 @@ _WIDGETS = {
 
 class AnnouncementForm(forms.ModelForm):
     """Create form — approval status is never set by the submitter."""
+
+    target_roles = forms.MultipleChoiceField(
+        choices=UserRole.CHOICES,
+        required=False,
+        widget=forms.SelectMultiple(attrs=select_attrs()),
+        help_text="Leave empty to reach all roles in scope.",
+    )
+    target_departments = forms.ModelMultipleChoiceField(
+        queryset=Department.objects.none(),
+        required=False,
+        widget=forms.SelectMultiple(attrs=select_attrs()),
+        help_text="Leave empty to reach all departments.",
+    )
 
     class Meta:
         model = Announcement
@@ -51,10 +65,12 @@ class AnnouncementForm(forms.ModelForm):
                 self.fields["church"].queryset = churches
                 self.fields["church"].required = False
             if not (is_top_level_approver(user) or can_approve_announcements(user)):
-                # Non-approvers: church-only visibility
                 self.fields["visibility"].choices = [
                     c for c in Announcement.VISIBILITY_CHOICES if c[0] == "church"
                 ]
+            self.fields["target_departments"].queryset = Department.objects.filter(
+                church__in=churches
+            ).order_by("name")
         self.fields["publish_at"].required = False
         self.fields["publish_at"].help_text = "Optional. Hide until this date/time after approval."
 
@@ -76,6 +92,19 @@ class AnnouncementForm(forms.ModelForm):
 
 class AnnouncementEditForm(forms.ModelForm):
     """Edit form — approvers may pin; creators edit pending submissions only."""
+
+    target_roles = forms.MultipleChoiceField(
+        choices=UserRole.CHOICES,
+        required=False,
+        widget=forms.SelectMultiple(attrs=select_attrs()),
+        help_text="Leave empty to reach all roles in scope.",
+    )
+    target_departments = forms.ModelMultipleChoiceField(
+        queryset=Department.objects.none(),
+        required=False,
+        widget=forms.SelectMultiple(attrs=select_attrs()),
+        help_text="Leave empty to reach all departments.",
+    )
 
     class Meta:
         model = Announcement
@@ -99,15 +128,26 @@ class AnnouncementEditForm(forms.ModelForm):
             if "church" in self.fields:
                 self.fields["church"].queryset = churches
                 self.fields["church"].required = False
+            self.fields["target_departments"].queryset = Department.objects.filter(
+                church__in=churches
+            ).order_by("name")
         if user and not can_approve_announcements(user):
             self.fields.pop("is_pinned", None)
         self.fields["publish_at"].required = False
+        if self.instance and self.instance.pk:
+            self.fields["target_roles"].initial = list(self.instance.target_roles or [])
+            self.fields["target_departments"].initial = [
+                link.department_id
+                for link in self.instance.target_department_links.select_related("department")
+            ]
 
 
 class AnnouncementRejectForm(forms.Form):
     reason = forms.CharField(
         label="Rejection reason",
-        widget=forms.Textarea(attrs=textarea_attrs(rows=3, placeholder="Explain why this was not approved…")),
+        widget=forms.Textarea(
+            attrs=textarea_attrs(rows=3, placeholder="Explain why this was not approved…")
+        ),
         min_length=3,
         max_length=2000,
     )
@@ -116,14 +156,7 @@ class AnnouncementRejectForm(forms.Form):
 def _validate_image_file(image):
     if not image:
         return
-    size = getattr(image, "size", None)
-    if size is not None and size > MAX_ANNOUNCEMENT_IMAGE_BYTES:
-        raise ValidationError(
-            f"Image must be {MAX_ANNOUNCEMENT_IMAGE_BYTES // (1024 * 1024)} MB or smaller."
-        )
-    content_type = getattr(image, "content_type", None)
-    if content_type and content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
-        raise ValidationError("Only JPEG, PNG, GIF, or WebP images are allowed.")
+    validate_upload(image, kind="image")
 
 
 class AnnouncementImageForm(forms.ModelForm):

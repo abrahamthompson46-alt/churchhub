@@ -374,6 +374,22 @@ class BrandingSettingsForm(forms.ModelForm):
             "footer_text": "Shown in the application footer when signed in.",
         }
 
+    def clean_logo(self):
+        from church_system.uploads import validate_upload
+
+        logo = self.cleaned_data.get("logo")
+        if logo:
+            validate_upload(logo, kind="branding")
+        return logo
+
+    def clean_favicon(self):
+        from church_system.uploads import validate_upload
+
+        favicon = self.cleaned_data.get("favicon")
+        if favicon:
+            validate_upload(favicon, kind="branding")
+        return favicon
+
 
 class EmailSettingsForm(forms.ModelForm):
     class Meta:
@@ -626,6 +642,49 @@ class TenantSubscriptionForm(forms.ModelForm):
         return instance
 
 
+class RecordSubscriptionPaymentForm(forms.Form):
+    """Record a SaaS subscription payment and advance billing dates."""
+
+    payment_method = forms.ModelChoiceField(
+        queryset=selectors.empty_payment_methods(),
+        required=False,
+        widget=forms.Select(attrs=select_attrs()),
+    )
+    payment_reference = forms.CharField(
+        required=False,
+        max_length=120,
+        widget=forms.TextInput(attrs=input_attrs()),
+        label="Payment reference",
+        help_text="Bank transfer reference, receipt number, or gateway ID.",
+    )
+    paid_at = forms.DateTimeField(
+        required=False,
+        widget=forms.DateTimeInput(attrs=input_attrs(type="datetime-local")),
+        label="Paid at",
+        help_text="Defaults to now if left blank.",
+    )
+    reactivate = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs=checkbox_attrs()),
+        label="Reactivate if expired or suspended",
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs=textarea_attrs(rows=2)),
+        help_text="Optional note appended to subscription lifecycle notes.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        subscription = kwargs.pop("subscription", None)
+        super().__init__(*args, **kwargs)
+        self.fields["payment_method"].queryset = selectors.active_payment_methods_ordered()
+        if subscription and subscription.payment_method_id:
+            self.fields["payment_method"].initial = subscription.payment_method_id
+        if subscription and subscription.payment_reference:
+            self.fields["payment_reference"].initial = subscription.payment_reference
+
+
 class TenantChurchForm(forms.ModelForm):
     class Meta:
         model = Church
@@ -830,3 +889,11 @@ class DenominationForm(forms.ModelForm):
         self.fields["default_plan"].queryset = selectors.active_plans_ordered()
         self.fields["default_plan"].required = False
         self.fields["default_role"].choices = UserRole.CHOICES
+
+    def clean_logo(self):
+        from church_system.uploads import validate_upload
+
+        logo = self.cleaned_data.get("logo")
+        if logo:
+            validate_upload(logo, kind="branding")
+        return logo

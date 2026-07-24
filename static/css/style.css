@@ -3375,13 +3375,14 @@ main .page-container,
 
 /* ── Mission Control / CEO Dashboard ── */
 .control-center--executive .cc-hero {
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1.25rem;
 }
 
 .cc-hero__grid {
     display: grid;
     gap: 1.25rem;
-    align-items: start;
+    align-items: center;
 }
 
 @media (min-width: 992px) {
@@ -3393,7 +3394,57 @@ main .page-container,
     }
     .cc-hero__main { grid-area: main; }
     .cc-hero__health { grid-area: health; justify-self: end; }
-    .cc-hero__actions { grid-area: actions; }
+    
+    /* Align actions container to the right */
+    .cc-hero__actions { 
+        grid-area: actions; 
+        justify-self: end;
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+    }
+}
+
+/* Improved Greetings & Typography */
+.cc-hero__main h1 {
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    margin: 0 0 0.5rem;
+    line-height: 1.1;
+    color: #fff;
+}
+
+.cc-hero__meta {
+    margin-bottom: 0.75rem;
+    opacity: 0.9;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.cc-hero__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.6rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.dashboard-role-focus {
+    font-size: 0.95rem;
+    opacity: 0.85;
+    margin-top: 0.5rem;
+    font-weight: 400;
+    max-width: 60ch;
+    line-height: 1.5;
 }
 
 .cc-eyebrow {
@@ -3403,17 +3454,6 @@ main .page-container,
     text-transform: uppercase;
     color: rgba(255, 255, 255, 0.62);
     margin-bottom: 0.35rem;
-}
-
-.cc-hero__meta {
-    margin-bottom: 0.5rem;
-    opacity: 0.85;
-}
-
-.cc-hero__badge {
-    display: inline;
-    font-weight: 600;
-    letter-spacing: 0.01em;
 }
 
 .cc-health-pill {
@@ -3457,10 +3497,63 @@ main .page-container,
 
 .cc-health-stat--danger { color: #fecaca; }
 
+/* ── This Week Pulse Bar (Moved out of Hero for cleanliness) ── */
+.cc-pulse-bar {
+    background: #fff;
+    border: 1px solid var(--ch-border);
+    border-radius: var(--ch-radius-sm);
+    padding: 0.75rem 1.25rem;
+    box-shadow: var(--ch-shadow-sm);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.cc-pulse-bar .cc-pulse-hero {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.cc-pulse-bar .cc-pulse-hero__label {
+    color: var(--ch-navy);
+    font-weight: 700;
+    font-size: 0.75rem;
+}
+
+.cc-pulse-bar .cc-pulse-hero__dates {
+    color: var(--ch-muted);
+    font-weight: 500;
+}
+
+.cc-pulse-bar .cc-pulse-hero__chip {
+    background: var(--ch-surface);
+    border-color: var(--ch-border);
+    font-size: 0.75rem;
+    padding: 0.3rem 0.7rem;
+}
+
+.cc-pulse-bar .cc-pulse-hero__chip:hover {
+    background: #fff;
+    border-color: var(--ch-primary);
+    transform: translateY(-1px);
+}
+
+.cc-pulse-bar .cc-pulse-hero__chip strong {
+    font-size: 0.95rem;
+}
+
+/* ── KPI Grid ── */
 .cc-kpi-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.85rem;
+    margin-bottom: 1.5rem;
 }
 
 @media (min-width: 768px) {
@@ -3715,6 +3808,258 @@ main .page-container,
 .cc-mini-kpi strong {
     font-size: 1rem;
 }
+
+/* ── Quick Actions (Updated for Right Alignment & Neatness) ── */
+.quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    justify-content: flex-end; /* Aligns buttons to the right */
+}
+
+@media (max-width: 991px) {
+    .quick-actions {
+        justify-content: flex-start; /* Reset to left on mobile if preferred */
+    }
+}
+
+.quick-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem; /* Smaller padding for neatness */
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px; /* Cleaner look than full pill */
+    font-size: 0.75rem; /* Smaller font */
+    font-weight: 600;
+    color: #fff !important; /* Pure white */
+    text-decoration: none;
+    transition: all var(--ch-transition);
+    box-shadow: none;
+}
+
+.quick-action-btn:hover {
+    background: #000; /* Black hover */
+    border-color: #000;
+    color: #fff !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.quick-action-btn i {
+    font-size: 0.85rem;
+    opacity: 0.9;
+}
+
+
+/* ── Refined KPI Cards (Cleaner Look) ── */
+.cc-kpi-card {
+    /* Remove the colored top borders for a cleaner look */
+    border-top: none; 
+    border: 1px solid var(--ch-border);
+    background: #fff;
+}
+
+.cc-kpi-card:hover {
+    border-color: var(--ch-primary); /* Subtle highlight on hover */
+}
+
+/* Optional: Add a very subtle icon background if you want visual cues without color bars */
+.cc-kpi-card--primary .cc-kpi-card__label::before,
+.cc-kpi-card--accent .cc-kpi-card__label::before,
+.cc-kpi-card--warning .cc-kpi-card__label::before,
+.cc-kpi-card--danger .cc-kpi-card__label::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+
+.cc-kpi-card--primary .cc-kpi-card__label::before { background: var(--ch-primary); }
+.cc-kpi-card--accent .cc-kpi-card__label::before { background: var(--ch-accent); }
+.cc-kpi-card--warning .cc-kpi-card__label::before { background: var(--ch-warning); }
+.cc-kpi-card--danger .cc-kpi-card__label::before { background: var(--ch-danger); }
+
+/* ── Compact Tables (District Roll-up & Leaderboard) ── */
+.cc-panel .table tbody td {
+    padding: 0.5rem 0.75rem; /* Even tighter rows */
+    font-size: 0.8rem;
+}
+
+.cc-panel .table thead th {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.65rem;
+}
+
+/* ── Professional Footer Timestamp ── */
+.cc-hero__footer {
+    margin-top: 1rem;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Action Queue Refinement ── */
+.cc-action-queue { 
+    padding: 0.5rem; 
+}
+
+.cc-action-item { 
+    margin-bottom: 0.5rem;
+    border-radius: var(--ch-radius-xs);
+    border: 1px solid transparent;
+    transition: all var(--ch-transition);
+}
+
+.cc-action-item:last-child {
+    margin-bottom: 0;
+}
+
+.cc-action-item__link {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.65rem 0.75rem;
+    text-decoration: none;
+    color: inherit;
+    border-radius: inherit;
+    background: #fff;
+    border: 1px solid var(--ch-border);
+    transition: all var(--ch-transition);
+}
+
+.cc-action-item__link:hover { 
+    background: #fff;
+    border-color: var(--ch-primary);
+    box-shadow: 0 4px 12px rgba(15, 41, 66, 0.08);
+    transform: translateY(-1px);
+}
+
+.cc-action-item__icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--ch-surface);
+    color: var(--ch-navy);
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    border: 1px solid var(--ch-border);
+}
+
+/* Priority Styling via Icon Color */
+.cc-action-item--critical .cc-action-item__icon { 
+    background: #fef2f2; 
+    color: #b91c1c; 
+    border-color: #fecaca;
+}
+.cc-action-item--high .cc-action-item__icon { 
+    background: #fffbeb; 
+    color: #b45309; 
+    border-color: #fde68a;
+}
+.cc-action-item--normal .cc-action-item__icon {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+
+.cc-action-item__body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.cc-action-item__title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--ch-text);
+}
+
+.cc-action-item__subtitle {
+    font-size: 0.72rem;
+    color: var(--ch-muted);
+    margin-top: 0.1rem;
+}
+
+.cc-action-item__count {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--ch-primary);
+    background: var(--ch-primary-soft);
+    border-radius: 4px;
+    padding: 0.15rem 0.5rem;
+    min-width: 1.5rem;
+    text-align: center;
+}
+
+.cc-action-empty {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    color: var(--ch-muted);
+    background: var(--ch-surface);
+    border-radius: var(--ch-radius-xs);
+    border: 1px dashed var(--ch-border);
+}
+
+.cc-action-empty i {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+    display: block;
+    color: var(--ch-success);
+}
+
+
+/* ── Teller Console Refinement ── */
+#teller-console .table thead th {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    /* Restored Dark Navy Header */
+    background: var(--ch-table-head-bg); 
+    color: var(--ch-table-head-text);
+    border-bottom: none;
+    padding: 0.5rem 0.75rem;
+}
+
+#teller-console .table tbody td {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.8rem;
+    vertical-align: middle;
+}
+
+#teller-console .table tfoot tr {
+    background: var(--ch-surface-2);
+    font-weight: 700;
+}
+
+#teller-console .table tfoot td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    border-top: 2px solid var(--ch-border-strong);
+}
+
+/* Highlight the 'New Receipt' button in the header */
+#teller-console .btn-primary {
+    background: var(--ch-navy);
+    border-color: var(--ch-navy);
+    font-size: 0.72rem;
+    padding: 0.25rem 0.6rem;
+}
+
+#teller-console .btn-primary:hover {
+    background: #000;
+    border-color: #000;
+}
+
 
 /* ── Workspace status bar (below module tabs) ── */
 .workspace-status-bar {

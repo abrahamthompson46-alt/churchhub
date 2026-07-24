@@ -47,13 +47,21 @@
             </div>
             {% endif %}
         </div>
-        {% if show_this_week_pulse and this_week_pulse %}
-        {% include "dashboard/includes/this_week_pulse.html" %}
-        {% endif %}
-    </header>
+		   
+        <!-- New Timestamp Footer -->
+        <div class="cc-hero__footer">
+            Data updated: {% now "j M Y, g:i A" %}
+        </div>
+           </header>
 
     {% if alerts %}
     {% include "includes/alert_banners.html" %}
+    {% endif %}
+
+    {% if show_this_week_pulse and this_week_pulse %}
+    <section class="cc-pulse-bar">
+        {% include "dashboard/includes/this_week_pulse.html" %}
+    </section>
     {% endif %}
 
     {% if is_control_center and executive_kpis %}

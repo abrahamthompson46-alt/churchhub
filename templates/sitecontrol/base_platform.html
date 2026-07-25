@@ -130,7 +130,8 @@
     var body = document.body;
     var toggle = document.querySelector("[data-platform-nav-toggle]");
     var closers = document.querySelectorAll("[data-platform-nav-close]");
-    var links = document.querySelectorAll("[data-platform-nav-link]");
+    // Select ALL links inside the sidebar, including Logout
+    var sidebarLinks = document.querySelectorAll(".platform-sidebar a"); 
 
     function setOpen(open) {
         body.classList.toggle("platform-nav-open", open);
@@ -144,14 +145,18 @@
             setOpen(!body.classList.contains("platform-nav-open"));
         });
     }
+    
     closers.forEach(function (el) {
         el.addEventListener("click", function () { setOpen(false); });
     });
-    links.forEach(function (el) {
+
+    // Close sidebar when ANY link inside it is clicked (including Logout)
+    sidebarLinks.forEach(function (el) {
         el.addEventListener("click", function () {
             if (window.innerWidth < 992) setOpen(false);
         });
     });
+
     window.addEventListener("resize", function () {
         if (window.innerWidth >= 992) setOpen(false);
     });

@@ -130,3 +130,42 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const body = document.body;
+    const navToggle = document.querySelector('.platform-nav-toggle');
+    const navClose = document.querySelector('.platform-nav-close');
+    const backdrop = document.querySelector('.platform-nav-backdrop');
+    
+    // Function to open sidebar
+    function openNav() {
+        body.classList.add('platform-nav-open');
+        if (backdrop) backdrop.hidden = false;
+    }
+
+    // Function to close sidebar
+    function closeNav() {
+        body.classList.remove('platform-nav-open');
+        if (backdrop) backdrop.hidden = true;
+    }
+
+    // Event Listeners
+    if (navToggle) navToggle.addEventListener('click', openNav);
+    if (navClose) navClose.addEventListener('click', closeNav);
+    if (backdrop) backdrop.addEventListener('click', closeNav);
+
+    // Fix for Logout/Links on Mobile: 
+    // If a link inside the sidebar is clicked, close the sidebar first
+    const sidebarLinks = document.querySelectorAll('.platform-sidebar a');
+    sidebarLinks.forEach(link => {
+        link.addEventListener('click', function() {
+            if (body.classList.contains('platform-nav-open')) {
+                closeNav();
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

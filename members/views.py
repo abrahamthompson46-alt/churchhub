@@ -170,6 +170,11 @@ class MemberListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         manageable_count = get_manageable_churches(self.request.user).count()
         context["show_multi_church_banner"] = church is None and manageable_count > 1
         context["manageable_church_count"] = manageable_count
+        context["members_elsewhere_count"] = (
+            selectors.members_hidden_outside_active_church_count(self.request, church)
+            if church
+            else 0
+        )
         return context
 
 

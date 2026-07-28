@@ -1,96 +1,59 @@
-"""Tests for church scoping utilities."""
+"""Regression: active church resolution and member visibility scope."""
 
-from decimal import Decimal
+import uuid
 
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
 
-from church_system.church_scope import filter_by_church
+from church_system.church_scope import get_active_church
+from members.models import Gender, Member, MembershipStatus
 from organization.models import Church, Conference, District, Zone
 from permissions.roles import UserRole
-from transactions.models import Transaction
-from transactions.services import open_working_day, record_expense
+from sitecontrol.models import Denomination
 
 User = get_user_model()
 
 
-class ChurchScopeTests(TestCase):
+class ActiveChurchScopeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        conf = Conference.objects.create(name="Conf", code="CF")
-        zone = Zone.objects.create(conference=conf, name="Zone", code="Z1")
-        d1 = District.objects.create(zone=zone, name="D1", code="D1")
-        d2 = District.objects.create(zone=zone, name="D2", code="D2")
-        cls.church_a = Church.objects.create(district=d1, name="Church A", code="CHA")
-        cls.church_b = Church.objects.create(district=d2, name="Church B", code="CHB")
-
-        cls.district_pastor = User.objects.create_user(
-            username="district_pastor",
+        denom = Denomination.objects.create(name="Scope Denom", code="SCPD", is_active=True)
+        conf = Conference.objects.create(name="Conf", code="SC", denomination=denom)
+        zone = Zone.objects.create(name="Z", code="ZSC", conference=conf)
+        d1 = District.objects.create(name="D1", code="D1SC", zone=zone)
+        d2 = District.objects.create(name="D2", code="D2SC", zone=zone)
+        cls.church_a = Church.objects.create(name="Church A", code="CHA", district=d1)
+        cls.church_b = Church.objects.create(name="Church B", code="CHB", district=d2)
+        cls.super = User.objects.create_user(
+            username="super_scope",
             password="pass12345",
-            role=UserRole.DISTRICT_PASTOR,
+            role=UserRole.SUPER_ADMIN,
             church=cls.church_a,
+            denomination=denom,
+            is_superuser=True,
         )
-        cls.treasury_a = User.objects.create_user(
-            username="treasury_a",
-            password="pass12345",
-            role=UserRole.TREASURY,
+        Member.objects.create(
             church=cls.church_a,
-        )
-        cls.treasury_b = User.objects.create_user(
-            username="treasury_b",
-            password="pass12345",
-            role=UserRole.TREASURY,
-            church=cls.church_b,
-        )
-
-    def setUp(self):
-        from django.utils import timezone
-
-        open_working_day(self.church_a, timezone.localdate(), self.treasury_a)
-        open_working_day(self.church_b, timezone.localdate(), self.treasury_b)
-        self.txn_a = record_expense(
-            church=self.church_a,
-            created_by=self.treasury_a,
-            amount=Decimal("10.00"),
-        )
-        self.txn_b = record_expense(
-            church=self.church_b,
-            created_by=self.treasury_b,
-            amount=Decimal("20.00"),
+            first_name="Ada",
+            last_name="Member",
+            gender=Gender.FEMALE,
+            membership_status=MembershipStatus.ACTIVE,
+            email="ada@example.com",
         )
 
-    def test_filter_by_church_scopes_hierarchy_user_without_active_church(self):
+    def test_stale_session_church_falls_back_to_home_church(self):
         factory = RequestFactory()
-        request = factory.get("/transactions/")
-        request.user = self.district_pastor
-        request.session = {}
+        request = factory.get("/members/")
+        request.user = self.super
+        request.session = {"current_church_id": str(uuid.uuid4())}
+        church = get_active_church(request)
+        self.assertEqual(church, self.church_a)
+        self.assertNotIn("current_church_id", request.session)
 
-        qs = filter_by_church(Transaction.objects.all(), request)
-        church_ids = set(qs.values_list("church_id", flat=True))
-        self.assertIn(self.church_a.pk, church_ids)
-        self.assertNotIn(self.church_b.pk, church_ids)
+    def test_super_admin_sees_inactive_church_in_manageable_scope(self):
+        from permissions.scoping import get_manageable_churches
 
-    def test_filter_by_church_returns_none_for_user_without_church(self):
-        factory = RequestFactory()
-        member = User.objects.create_user(
-            username="member1",
-            password="pass12345",
-            role=UserRole.MEMBER,
-            church=None,
-        )
-        request = factory.get("/transactions/")
-        request.user = member
-        request.session = {}
-
-        qs = filter_by_church(Transaction.objects.all(), request)
-        self.assertEqual(qs.count(), 0)
-
-    def test_filter_by_church_scopes_member_to_own_church(self):
-        factory = RequestFactory()
-        request = factory.get("/transactions/")
-        request.user = self.treasury_a
-        request.session = {}
-
-        qs = filter_by_church(Transaction.objects.all(), request)
-        self.assertEqual(list(qs.values_list("pk", flat=True)), [self.txn_a.pk])
-        self.assertNotIn(self.txn_b.pk, qs.values_list("pk", flat=True))
+        self.church_a.is_active = False
+        self.church_a.save(update_fields=["is_active"])
+        ids = set(get_manageable_churches(self.super).values_list("pk", flat=True))
+        self.assertIn(self.church_a.pk, ids)

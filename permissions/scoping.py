@@ -9,9 +9,17 @@ from permissions.superadmin import is_superadmin
 
 
 def get_manageable_churches(user):
-    """Churches inside the user's organization subtree (active only)."""
+    """Churches inside the user's organization subtree (active only, except super-admins)."""
     if not user or not getattr(user, "is_authenticated", False):
         return selectors.empty_churches()
+
+    # Institution super-admins see every church in their denomination (incl. inactive).
+    if is_superadmin(user):
+        qs = selectors.all_churches_base_qs()
+        user_denom = get_user_denomination(user)
+        if user_denom:
+            return selectors.churches_for_denomination(qs, user_denom)
+        return qs
 
     qs = selectors.active_churches_base_qs()
 

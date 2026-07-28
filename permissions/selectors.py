@@ -181,6 +181,15 @@ def active_churches_base_qs():
     )
 
 
+def all_churches_base_qs():
+    """All churches (including inactive) for super-admin scope."""
+    from organization.models import Church
+
+    return Church.objects.select_related(
+        "district__zone__conference__denomination"
+    ).order_by("name")
+
+
 def churches_for_denomination(qs, denomination):
     return qs.filter(district__zone__conference__denomination=denomination)
 

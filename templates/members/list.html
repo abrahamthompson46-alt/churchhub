@@ -17,6 +17,13 @@
         Showing members across <strong>{{ manageable_church_count }}</strong> churches in your organization tree.
         Select an active church in the workspace bar to narrow the directory.
     </div>
+    {% elif members_elsewhere_count %}
+    <div class="alert alert-warning mb-3" role="status">
+        No members for <strong>{{ church.name }}</strong>, but
+        <strong>{{ members_elsewhere_count }}</strong> member{{ members_elsewhere_count|pluralize }}
+        exist under other churches in your scope (data is not deleted).
+        Use the church selector in the top bar and choose <strong>All churches</strong>, or pick the church where they were registered.
+    </div>
     {% endif %}
 
     <div class="metrics-row">

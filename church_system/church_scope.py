@@ -31,19 +31,18 @@ def get_active_church(request):
 
     manageable = get_manageable_churches(request.user)
     church_id = request.GET.get("church")
-    if not church_id:
-        session = getattr(request, "session", None)
-        if session is not None:
-            church_id = session.get("current_church_id")
+    session = getattr(request, "session", None)
+    if not church_id and session is not None:
+        church_id = session.get("current_church_id")
 
     if church_id:
         church = _church_from_id(church_id, manageable)
         if church:
             assert_church_in_active_denomination(request, church)
             return church
-        # Invalid or out-of-scope church ids must not fall through to an unscoped lookup.
-        # (Previously DISTRICT_PASTOR / view_all_churches could open any church via ?church=.)
-        return None
+        if session is not None and str(session.get("current_church_id") or "") == str(church_id):
+            session.pop("current_church_id", None)
+        # Do not stop here — fall through so home church / single-church / all-churches can resolve.
 
     user_church = get_user_church(request.user)
     if user_church and manageable.filter(pk=user_church.pk).exists():

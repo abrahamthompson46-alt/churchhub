@@ -73,6 +73,26 @@ def apply_age_group_filter(qs, age_group):
 # ---------------------------------------------------------------------------
 
 
+def members_hidden_outside_active_church_count(request, active_church):
+    """Members elsewhere in scope when a single church is selected (UI hint)."""
+    if not active_church:
+        return 0
+    from permissions.checks import can_view_all_churches
+
+    if not can_view_all_churches(request.user):
+        return 0
+    church_ids = list(
+        get_manageable_churches(request.user).values_list("pk", flat=True)
+    )
+    if not church_ids:
+        return 0
+    return (
+        Member.objects.filter(church_id__in=church_ids)
+        .exclude(church_id=active_church.pk)
+        .count()
+    )
+
+
 def members_directory_base_qs(request):
     return filter_by_church(
         Member.objects.select_related("church", "occupation", "department", "family"),

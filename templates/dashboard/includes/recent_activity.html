@@ -1,0 +1,20 @@
+{% if recent_activity %}
+<section class="cc-panel mb-4" aria-label="Recent financial activity">
+    <div class="cc-panel__header">
+        <h2 class="cc-panel__title"><i class="bi bi-clock-history"></i> Recent activity</h2>
+    </div>
+    <ul class="list-plain cc-activity-list mb-0 px-3 pb-3">
+        {% for row in recent_activity %}
+        <li class="cc-activity-item py-2">
+            {% if row.url_name %}
+            <a href="{% url row.url_name pk=row.url_kwargs.pk %}" class="table-link">{{ row.action }}</a>
+            {% else %}
+            <span class="fw-medium">{{ row.action }}</span>
+            {% endif %}
+            <span class="text-muted small d-block">{{ row.church }}{% if row.reference %} · {{ row.reference }}{% endif %} · {{ row.user }}</span>
+            <span class="text-muted small">{{ row.when|timesince }} ago</span>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}

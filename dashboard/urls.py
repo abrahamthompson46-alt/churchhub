@@ -14,6 +14,7 @@ urlpatterns = [
     path("notifications/count/", views.notification_count, name="notification_count"),
     path("notifications/pending/", views.pending_announcements_ajax, name="pending_announcements_count"),
     path("teller-console/", views.teller_console_api, name="teller_console_api"),
+    path("pin-action/", views.pin_quick_action, name="pin_quick_action"),
     path("cutoff/", views.cutoff, name="cutoff"),
     path("logout/", views.custom_logout, name="logout"),
 ]

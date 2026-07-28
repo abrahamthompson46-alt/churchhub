@@ -1,0 +1,26 @@
+{% if notification_inbox.items %}
+<section class="cc-panel mb-4" aria-label="Notification inbox">
+    <div class="cc-panel__header">
+        <h2 class="cc-panel__title"><i class="bi bi-inbox"></i> Inbox</h2>
+        {% if notification_inbox.unread_count %}
+        <span class="cc-panel__badge">{{ notification_inbox.unread_count }} unread</span>
+        {% endif %}
+        <a href="{% url 'dashboard:notifications' %}" class="dash-section__link ms-auto">All →</a>
+    </div>
+    <ul class="list-plain cc-inbox-list mb-0">
+        {% for note in notification_inbox.items %}
+        <li class="cc-inbox-item{% if not note.read %} cc-inbox-item--unread{% endif %}">
+            {% if note.action_url %}
+            <a href="{{ note.action_url }}" class="cc-inbox-item__link">
+            {% else %}
+            <a href="{% url 'dashboard:notifications' %}" class="cc-inbox-item__link">
+            {% endif %}
+                <span class="fw-medium">{{ note.title }}</span>
+                <span class="text-muted small d-block">{{ note.message|truncatewords:18 }}</span>
+                <span class="text-muted small">{{ note.created_at|timesince }} ago</span>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}

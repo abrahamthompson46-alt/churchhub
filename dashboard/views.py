@@ -15,6 +15,7 @@ from dashboard import selectors
 from dashboard.services import (
     _compute_remittance_payable_mtd,
     build_home_context,
+    get_quick_actions,
 )
 from dashboard.utils import safe_internal_redirect
 from transactions.models import MonthlyCutoff
@@ -95,6 +96,24 @@ def home(request):
 
     context = build_home_context(request)
     return render(request, "dashboard/home.html", context)
+
+
+@login_required
+@require_POST
+def pin_quick_action(request):
+    """Pin or unpin a quick-action label in session (max 3)."""
+    label = (request.POST.get("label") or "").strip()
+    actions = get_quick_actions(request.user)
+    valid = {a.get("label") for a in actions if a.get("label")}
+    pinned = list(request.session.get("dashboard_pinned_labels") or [])
+    if label in valid:
+        if label in pinned:
+            pinned = [entry for entry in pinned if entry != label]
+        else:
+            pinned = [label] + [entry for entry in pinned if entry != label]
+            pinned = pinned[:3]
+        request.session["dashboard_pinned_labels"] = pinned
+    return redirect("dashboard:home")
 
 
 @login_required

@@ -458,6 +458,144 @@ def meetings_this_week_for_church(church, *, now=None, limit=5):
     )
 
 
+def lines_for_churches_calendar_month(church_ids, month_start_date):
+    """Approved lines within a single calendar month (for prior-period KPI compare)."""
+    if not church_ids:
+        return TransactionLine.objects.none()
+    return TransactionLine.objects.filter(
+        transaction__church_id__in=list(church_ids),
+        transaction__date__year=month_start_date.year,
+        transaction__date__month=month_start_date.month,
+        transaction__approval_status="APPROVED",
+        transaction__is_voided=False,
+    )
+
+
+def worship_attendance_snapshot_for_church(church):
+    """Latest worship/Sabbath school event present count vs previous event."""
+    from meetings.models import AttendanceEvent
+
+    if not church:
+        return None
+    events = list(
+        AttendanceEvent.objects.filter(
+            church=church,
+            event_type__in=("WORSHIP", "SABBATH_SCHOOL"),
+        )
+        .order_by("-event_date", "-created_at")[:2]
+    )
+    if not events:
+        return None
+    latest = events[0]
+    present = latest.records.filter(is_present=True).count()
+    total = latest.records.count()
+    prev_present = None
+    if len(events) > 1:
+        prev_present = events[1].records.filter(is_present=True).count()
+    delta = None
+    if prev_present is not None:
+        delta = present - prev_present
+    return {
+        "event_date": latest.event_date,
+        "event_type": latest.get_event_type_display(),
+        "present": present,
+        "total": total,
+        "prev_present": prev_present,
+        "delta": delta,
+        "url_name": "meetings:attendance_detail",
+        "url_kwargs": {"pk": latest.pk},
+    }
+
+
+def visitor_funnel_counts_for_church(church, *, stale_days=30):
+    from datetime import timedelta
+
+    from members.models import Visitor, VisitorFollowUpStatus
+
+    if not church:
+        return {}
+    today = timezone.localdate()
+    stale_before = today - timedelta(days=stale_days)
+    base = Visitor.objects.filter(church=church, is_deleted=False)
+    open_statuses = (
+        VisitorFollowUpStatus.NEW,
+        VisitorFollowUpStatus.CONTACTED,
+        VisitorFollowUpStatus.IN_PROGRESS,
+    )
+    return {
+        "new": base.filter(follow_up_status=VisitorFollowUpStatus.NEW).count(),
+        "contacted": base.filter(follow_up_status=VisitorFollowUpStatus.CONTACTED).count(),
+        "in_progress": base.filter(follow_up_status=VisitorFollowUpStatus.IN_PROGRESS).count(),
+        "stale": base.filter(
+            follow_up_status__in=open_statuses,
+            visit_date__lte=stale_before,
+        ).count(),
+        "open_total": base.filter(follow_up_status__in=open_statuses).count(),
+    }
+
+
+def remittance_scope_strip_counts(church_ids, prior_month):
+    """Cut-off transfer posture for churches in scope."""
+    if not church_ids:
+        return {}
+    from remittance.models import SettlementBatch
+
+    overdue = overdue_cutoff_count(church_ids, prior_month)
+    transferred = MonthlyCutoff.objects.filter(
+        church_id__in=church_ids,
+        month=prior_month,
+        transferred=True,
+    ).count()
+    pending_transfer = MonthlyCutoff.objects.filter(
+        church_id__in=church_ids,
+        month=prior_month,
+        transferred=False,
+    ).count()
+    church_settlement_draft = SettlementBatch.objects.filter(
+        from_unit_type="CHURCH",
+        from_unit_id__in=list(church_ids),
+        status="DRAFT",
+    ).count()
+    return {
+        "overdue": overdue,
+        "transferred": transferred,
+        "pending_transfer": pending_transfer,
+        "settlement_drafts": church_settlement_draft,
+        "church_count": len(church_ids),
+    }
+
+
+def recent_financial_activity(church_ids, *, limit=8):
+    from transactions.models import FinancialAuditLog
+
+    if not church_ids:
+        return []
+    rows = (
+        FinancialAuditLog.objects.filter(church_id__in=list(church_ids))
+        .select_related("transaction", "performed_by", "church")
+        .order_by("-created_at")[:limit]
+    )
+    out = []
+    for row in rows:
+        user = row.performed_by
+        out.append({
+            "when": row.created_at,
+            "action": row.get_action_display(),
+            "user": user.get_full_name() or user.username if user else "System",
+            "church": row.church.name if row.church_id else "—",
+            "reference": getattr(row.transaction, "reference_number", "") if row.transaction_id else "",
+            "url_name": "transactions:transaction_detail" if row.transaction_id else "",
+            "url_kwargs": {"pk": row.transaction_id} if row.transaction_id else {},
+        })
+    return out
+
+
+def recent_notifications_for_user(user, *, limit=5):
+    return list(
+        Notification.objects.filter(user=user).order_by("-created_at")[:limit]
+    )
+
+
 def pending_transfers_preview_for_church(church, *, limit=5):
     if not church:
         return MemberTransfer.objects.none()

@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from accounts.models import UserRole
 from dashboard.models import Notification
+from dashboard.metrics import pct_change
 from dashboard.services import (
     filter_action_queue_for_control_center,
     get_action_queue,
@@ -453,7 +454,7 @@ class ViewTests(DashboardTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "District Roll-up")
         self.assertContains(response, "Mission Control")
-        self.assertContains(response, "Action Queue")
+        self.assertContains(response, "Action queue")
 
     def test_executive_kpis_for_overseer(self):
         from sitecontrol.denomination_services import ensure_builtin_denominations
@@ -490,6 +491,10 @@ class ViewTests(DashboardTestMixin, TestCase):
         request.session = {"current_church_id": str(self.church.id)}
         queue = get_action_queue(request, treasury)
         self.assertIsInstance(queue, list)
+
+    def test_pct_change_handles_zero_prior(self):
+        self.assertIsNone(pct_change(Decimal("0"), Decimal("0")))
+        self.assertEqual(pct_change(Decimal("10"), Decimal("0")), 100.0)
 
     def test_control_center_filters_duplicate_queue_items(self):
         raw = [

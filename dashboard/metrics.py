@@ -48,6 +48,51 @@ def aggregate_member_count(church_ids) -> int:
     return selectors.active_member_count_for_churches(list(church_ids))
 
 
+def aggregate_giving_calendar_month(finance_church_ids, month_start_date):
+    """Full calendar month totals (prior-month KPI comparison)."""
+    if not finance_church_ids:
+        zeros = Decimal("0")
+        return {
+            "mtd_tithe": zeros,
+            "mtd_combined": zeros,
+            "mtd_income": zeros,
+            "mtd_expense": zeros,
+            "mtd_net": zeros,
+        }
+    lines = selectors.lines_for_churches_calendar_month(list(finance_church_ids), month_start_date)
+    mtd_tithe, mtd_combined = selectors.sum_tithe_combined_mtd(lines)
+    mtd_totals = selectors.sum_line_amounts_by_types(lines, ("INCOME", "EXPENSE"))
+    mtd_income = mtd_totals["INCOME"]
+    mtd_expense = mtd_totals["EXPENSE"]
+    return {
+        "mtd_tithe": mtd_tithe,
+        "mtd_combined": mtd_combined,
+        "mtd_income": mtd_income,
+        "mtd_expense": mtd_expense,
+        "mtd_net": mtd_income - mtd_expense,
+    }
+
+
+def pct_change(current: Decimal, previous: Decimal):
+    if previous == 0:
+        if current == 0:
+            return None
+        return 100.0
+    return float((current - previous) / previous * 100)
+
+
+def attach_finance_deltas(bundle, finance_church_ids, month_start_date):
+    """Add vs-prior-month % deltas on key money KPIs."""
+    if not finance_church_ids:
+        return bundle
+    prior_start = (month_start_date - relativedelta(months=1)).replace(day=1)
+    prior = aggregate_giving_calendar_month(finance_church_ids, prior_start)
+    for key in ("mtd_tithe", "mtd_combined", "mtd_income", "mtd_expense"):
+        bundle[f"{key}_delta_pct"] = pct_change(bundle[key], prior[key])
+    bundle["compare_label"] = prior_start.strftime("%b %Y")
+    return bundle
+
+
 def build_executive_finance_bundle(
     *,
     church_ids,
@@ -64,7 +109,7 @@ def build_executive_finance_bundle(
     mtd_remit = aggregate_remittance_mtd(manageable, finance_church_ids, month_start_date)
     pending_txn = selectors.pending_transactions_for_churches_count(list(church_ids))
     member_count = aggregate_member_count(church_ids)
-    return {
+    result = {
         "period_label": period_label,
         "finance_scope": finance_scope,
         "finance_scope_label": finance_scope_label,
@@ -82,6 +127,7 @@ def build_executive_finance_bundle(
         "locked_periods": compliance.get("locked_periods", 0),
         "action_items": pending_txn + compliance.get("overdue_count", 0),
     }
+    return attach_finance_deltas(result, finance_church_ids, month_start_date)
 
 
 def income_expense_trend_chart(finance_church_ids, now=None, months=6):

@@ -81,6 +81,8 @@ def _money_widget(
     url_name,
     card_class="",
     report_key="",
+    delta_pct=None,
+    compare_label="",
 ):
     return {
         "id": widget_id,
@@ -92,6 +94,8 @@ def _money_widget(
         "url_name": url_name,
         "report_key": report_key,
         "card_class": card_class,
+        "delta_pct": delta_pct,
+        "compare_label": compare_label,
     }
 
 
@@ -174,7 +178,13 @@ def build_kpi_widgets(
         and "mtd_tithe" in finance_bundle
     )
 
+    compare = finance_bundle.get("compare_label", "prior month") if finance_bundle else ""
+
     if finance_ready:
+
+        def _delta(key):
+            return finance_bundle.get(f"{key}_delta_pct")
+
         widgets["mtd_tithe"] = _money_widget(
             "mtd_tithe",
             "Tithe MTD",
@@ -183,6 +193,8 @@ def build_kpi_widgets(
             "reports:run",
             card_class="cc-kpi-card--primary",
             report_key="hierarchy_rollup" if is_control_center else "tithe_report",
+            delta_pct=_delta("mtd_tithe"),
+            compare_label=compare,
         )
         widgets["mtd_combined"] = _money_widget(
             "mtd_combined",
@@ -192,6 +204,8 @@ def build_kpi_widgets(
             "reports:run",
             card_class="cc-kpi-card--accent",
             report_key="hierarchy_rollup" if is_control_center else "financial_summary",
+            delta_pct=_delta("mtd_combined"),
+            compare_label=compare,
         )
         widgets["income_mtd"] = _money_widget(
             "income_mtd",
@@ -200,6 +214,8 @@ def build_kpi_widgets(
             "All receipts",
             "transactions:transaction_list",
             card_class="cc-kpi-card--success",
+            delta_pct=_delta("mtd_income"),
+            compare_label=compare,
         )
         widgets["expense_mtd"] = _money_widget(
             "expense_mtd",
@@ -208,6 +224,8 @@ def build_kpi_widgets(
             period,
             "transactions:transaction_list",
             card_class="cc-kpi-card--danger",
+            delta_pct=_delta("mtd_expense"),
+            compare_label=compare,
         )
         widgets["remittance_payable"] = _money_widget(
             "remittance_payable",

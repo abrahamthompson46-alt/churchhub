@@ -4,7 +4,7 @@
 {% block title %}Dashboard — {{ institution_display_name|default:"ChurchHub" }}{% endblock %}
 
 {% block content %}
-<div class="page-container control-center{% if is_control_center %} control-center--executive{% endif %}">
+<div class="page-container control-center control-center--home{% if is_control_center %} control-center--executive{% endif %}">
 
     <header class="cc-hero dashboard-welcome dashboard-welcome--{{ dashboard_role }}">
         <div class="cc-hero__grid">
@@ -45,6 +45,20 @@
                 </a>
                 {% endfor %}
             </div>
+            {% if quick_actions_all|length > 3 %}
+            <details class="cc-pin-actions mt-2">
+                <summary class="small text-muted">Pin shortcuts</summary>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    {% for action in quick_actions_all %}
+                    <form method="post" action="{% url 'dashboard:pin_quick_action' %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="label" value="{{ action.label }}">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">{{ action.label }}</button>
+                    </form>
+                    {% endfor %}
+                </div>
+            </details>
+            {% endif %}
             {% endif %}
         </div>
 		   
@@ -68,6 +82,10 @@
     <div class="alert-banner alert-info mb-4" role="status">{{ scope_banner }}</div>
     {% endif %}
 
+    {% if settlement_strip %}
+    {% include "dashboard/includes/settlement_strip.html" %}
+    {% endif %}
+
     {% if dashboard_kpi_widgets %}
     <section class="cc-kpi-grid mb-4" aria-label="Dashboard KPIs">
         {% for widget in dashboard_kpi_widgets %}
@@ -78,10 +96,19 @@
             {% else %}
             <span class="cc-kpi-card__value">{{ widget.value|intcomma }}</span>
             {% endif %}
+            {% if widget.delta_pct is not None %}
+            <span class="cc-kpi-card__delta{% if widget.delta_pct >= 0 %} cc-kpi-card__delta--up{% else %} cc-kpi-card__delta--down{% endif %}">
+                {% if widget.delta_pct >= 0 %}+{% endif %}{{ widget.delta_pct|floatformat:1 }}% vs {{ widget.compare_label|default:"prior month" }}
+            </span>
+            {% endif %}
             <span class="cc-kpi-card__hint">{{ widget.hint }}</span>
         </a>
         {% endfor %}
     </section>
+    {% endif %}
+
+    {% if member_role_extras %}
+    {% include "dashboard/includes/member_extras.html" %}
     {% endif %}
 
     {% if show_teller_console and teller_console %}
@@ -161,7 +188,7 @@
             {% if show_action_queue %}
             <section class="cc-panel{% if primary_work == 'queue' %} cc-panel--priority{% endif %} mb-4">
                 <div class="cc-panel__header">
-                    <h2 class="cc-panel__title"><i class="bi bi-lightning-charge"></i> Action Queue</h2>
+                    <h2 class="cc-panel__title"><i class="bi bi-lightning-charge"></i> {% if is_control_center %}Action queue{% else %}My tasks{% endif %}</h2>
                     <span class="cc-panel__badge">{{ action_queue|length }}</span>
                 </div>
                 <ul class="cc-action-queue list-plain mb-0">
@@ -179,12 +206,30 @@
                     {% empty %}
                     <li class="cc-action-empty">
                         <i class="bi bi-check-circle text-success"></i>
-                        <p class="mb-0">All clear — no pending actions in your queue.</p>
+                        <p class="mb-2">All clear — no pending actions in your queue.</p>
+                        {% for hint in dashboard_coaching %}
+                        <p class="mb-1 small"><a href="{% url hint.url_name %}">{{ hint.text }}</a></p>
+                        {% endfor %}
                     </li>
                     {% endfor %}
                 </ul>
+                {% if action_queue_scope %}
+                <details class="cc-panel__footer px-3 pb-3">
+                    <summary class="small fw-semibold">All scope items ({{ action_queue_scope|length }})</summary>
+                    <ul class="list-plain mt-2 mb-0">
+                        {% for item in action_queue_scope %}
+                        <li class="small py-1"><a href="{% if item.url_name %}{% url item.url_name %}{{ item.url_suffix|default:'' }}{% else %}#{% endif %}">{{ item.title }}{% if item.count %} ({{ item.count }}){% endif %}</a></li>
+                        {% endfor %}
+                    </ul>
+                </details>
+                {% endif %}
             </section>
             {% endif %}
+
+            {% include "dashboard/includes/notification_inbox.html" %}
+            {% include "dashboard/includes/attendance_panel.html" %}
+            {% include "dashboard/includes/visitor_funnel.html" %}
+            {% include "dashboard/includes/budget_glance.html" %}
 
             {% if compliance_snapshot and compliance_snapshot.overdue_remittances %}
             <section class="cc-panel mb-4">
@@ -228,7 +273,7 @@
                             {% for row in church_leaderboard %}
                             <tr>
                                 <td class="text-muted">{{ forloop.counter }}</td>
-                                <td class="fw-medium">{{ row.church }}</td>
+                                <td class="fw-medium"><a href="{{ row.focus_url }}" class="table-link">{{ row.church }}</a></td>
                                 <td class="text-muted small">{{ row.district }}</td>
                                 <td class="text-end">{{ row.members|intcomma }}</td>
                                 <td class="text-end text-currency fw-semibold">{% money row.mtd_giving 0 %}</td>
@@ -295,6 +340,8 @@
                 <span>Select a church from the toolbar to view financial charts.</span>
             </div>
             {% endif %}
+
+            {% include "dashboard/includes/recent_activity.html" %}
 
             {% if show_upcoming_panel and upcoming_preview %}
             <section class="cc-panel mb-4">

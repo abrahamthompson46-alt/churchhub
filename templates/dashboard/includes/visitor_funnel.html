@@ -1,0 +1,16 @@
+{% if visitor_funnel %}
+<section class="cc-panel mb-4 cc-panel--compact" aria-label="Visitor follow-up funnel">
+    <div class="cc-panel__header">
+        <h2 class="cc-panel__title"><i class="bi bi-person-plus"></i> Visitor follow-up</h2>
+        <a href="{% url 'members:visitor_list' %}" class="dash-section__link">Directory →</a>
+    </div>
+    <div class="cc-funnel-metrics px-3 pb-3">
+        <span class="cc-funnel-metric"><strong>{{ visitor_funnel.new }}</strong> New</span>
+        <span class="cc-funnel-metric"><strong>{{ visitor_funnel.contacted }}</strong> Contacted</span>
+        <span class="cc-funnel-metric"><strong>{{ visitor_funnel.in_progress }}</strong> In progress</span>
+        {% if visitor_funnel.stale %}
+        <span class="cc-funnel-metric cc-funnel-metric--warn"><strong>{{ visitor_funnel.stale }}</strong> Stale 30d+</span>
+        {% endif %}
+    </div>
+</section>
+{% endif %}

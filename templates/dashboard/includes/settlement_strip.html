@@ -1,0 +1,18 @@
+{% if settlement_strip %}
+<section class="cc-settlement-strip mb-4" aria-label="Remittance and settlement status">
+    <div class="cc-settlement-strip__label">Remittance · {{ settlement_strip.period_label }}</div>
+    <div class="cc-settlement-strip__metrics">
+        <a href="{% url 'dashboard:cutoff' %}" class="cc-settlement-strip__chip{% if settlement_strip.overdue %} cc-settlement-strip__chip--danger{% endif %}">
+            <strong>{{ settlement_strip.overdue }}</strong> overdue
+        </a>
+        <span class="cc-settlement-strip__chip"><strong>{{ settlement_strip.transferred }}</strong> transferred</span>
+        <span class="cc-settlement-strip__chip"><strong>{{ settlement_strip.pending_transfer }}</strong> pending</span>
+        {% if settlement_strip.settlement_drafts %}
+        <span class="cc-settlement-strip__chip cc-settlement-strip__chip--warn"><strong>{{ settlement_strip.settlement_drafts }}</strong> settlement drafts</span>
+        {% endif %}
+        {% if settlement_strip.settlements_url %}
+        <a href="{{ settlement_strip.settlements_url }}" class="cc-settlement-strip__link">Settlements →</a>
+        {% endif %}
+    </div>
+</section>
+{% endif %}

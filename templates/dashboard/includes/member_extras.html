@@ -1,0 +1,21 @@
+{% if member_role_extras %}
+<section class="cc-panel mb-4 cc-panel--compact" aria-label="Your church">
+    <div class="cc-panel__header">
+        <h2 class="cc-panel__title"><i class="bi bi-house-heart"></i> {{ member_role_extras.church_name }}</h2>
+    </div>
+    <div class="px-3 pb-3">
+        {% if member_role_extras.next_meeting %}
+        <p class="mb-2"><span class="text-muted small text-uppercase">Next gathering</span><br>
+        <a href="{% url member_role_extras.next_meeting.url_name pk=member_role_extras.next_meeting.url_kwargs.pk %}" class="table-link">{{ member_role_extras.next_meeting.title }}</a><br>
+        <span class="text-muted small">{{ member_role_extras.next_meeting.when|date:"l, j M · g:i A" }}</span></p>
+        {% endif %}
+        <p class="mb-2">
+            <a href="{% url 'announcements:upcoming_calendar' %}" class="btn btn-sm btn-outline-primary me-1">Calendar</a>
+            <a href="{{ member_role_extras.portal_url }}" class="btn btn-sm btn-outline-secondary">Member portal</a>
+        </p>
+        {% if member_role_extras.church_phone or member_role_extras.church_email %}
+        <p class="text-muted small mb-0">{% if member_role_extras.church_phone %}{{ member_role_extras.church_phone }}{% endif %}{% if member_role_extras.church_phone and member_role_extras.church_email %} · {% endif %}{% if member_role_extras.church_email %}{{ member_role_extras.church_email }}{% endif %}</p>
+        {% endif %}
+    </div>
+</section>
+{% endif %}

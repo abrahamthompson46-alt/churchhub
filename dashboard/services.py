@@ -373,6 +373,23 @@ def get_quick_actions(user):
     return actions[:6]
 
 
+def apply_pinned_quick_actions(request, actions):
+    """Reorder quick actions using session-pinned labels (max 3)."""
+    pinned = request.session.get("dashboard_pinned_labels") or []
+    if not pinned or not actions:
+        return actions
+    by_label = {a.get("label"): a for a in actions}
+    ordered = []
+    for label in pinned:
+        item = by_label.get(label)
+        if item and item not in ordered:
+            ordered.append(item)
+    for item in actions:
+        if item not in ordered:
+            ordered.append(item)
+    return ordered[:6]
+
+
 def get_nav_badges(request):
     """Lightweight badge counts for primary nav menus (mobile + desktop)."""
     user = request.user
@@ -774,11 +791,25 @@ def get_action_queue(request, user):
 
 
 CONTROL_CENTER_QUEUE_OMIT = frozenset({"transaction_approvals", "overdue_remittances"})
+MY_ACTION_QUEUE_KINDS = frozenset({
+    "transaction_approvals",
+    "announcement_approvals",
+    "meeting_minutes",
+    "working_day_closed",
+    "church_assignment_missing",
+    "member_transfers",
+    "asset_approvals",
+})
 
 
 def filter_action_queue_for_control_center(queue):
     """Drop items already surfaced in Mission Control KPIs and compliance panel."""
     return [item for item in queue if item.get("kind") not in CONTROL_CENTER_QUEUE_OMIT]
+
+
+def filter_action_queue_mine(queue):
+    """Items the signed-in user is most likely responsible for."""
+    return [item for item in queue if item.get("kind") in MY_ACTION_QUEUE_KINDS]
 
 
 def user_has_asset_approval(user):
@@ -789,6 +820,8 @@ def user_has_asset_approval(user):
 
 def get_church_leaderboard(request, user, limit=8):
     """Rank churches in scope by MTD giving performance."""
+    from django.urls import reverse
+
     manageable = get_manageable_churches(user).select_related("district")
     if not manageable.exists():
         return []
@@ -803,33 +836,45 @@ def get_church_leaderboard(request, user, limit=8):
     for church in manageable:
         mtd = totals.get(church.id, Decimal("0"))
         rows.append({
+            "church_id": church.id,
             "church": church.name,
             "district": church.district.name if church.district_id else "—",
             "members": member_counts.get(church.id, 0),
             "mtd_giving": mtd,
+            "focus_url": f"{reverse('dashboard:home')}?church={church.id}",
         })
 
     rows.sort(key=lambda r: r["mtd_giving"], reverse=True)
     return rows[:limit]
 
 
-def get_organization_health(request, user, *, compliance=None, kpis=None):
+def get_organization_health(request, user, *, compliance=None, kpis=None, pastoral=None):
     """Traffic-light health summary for mission control header."""
     if compliance is None:
         compliance = get_compliance_snapshot(request, user)
     if kpis is None:
         kpis = get_executive_kpis(request, user) or {}
+    pastoral = pastoral or {}
     overdue = compliance.get("overdue_count", 0)
     pending = kpis.get("pending_transactions", 0)
     locked = compliance.get("locked_periods", 0)
     working = compliance.get("working_day_issues", 0)
+    visitor_stale = pastoral.get("visitor_stale", 0)
+    open_transfers = pastoral.get("open_transfers", 0)
+    attendance_delta = pastoral.get("attendance_delta")
 
     if overdue > 0:
         overall = "critical"
         label = "Attention required"
-    elif pending > 5 or working > 0:
+    elif pending > 5 or working > 0 or visitor_stale > 3:
         overall = "warning"
         label = "Items pending"
+    elif attendance_delta is not None and attendance_delta < -5:
+        overall = "warning"
+        label = "Attendance dip"
+    elif open_transfers > 5:
+        overall = "warning"
+        label = "Transfer backlog"
     else:
         overall = "healthy"
         label = "Operating normally"
@@ -841,6 +886,8 @@ def get_organization_health(request, user, *, compliance=None, kpis=None):
         "pending_approvals": pending,
         "locked_periods": locked,
         "working_day_issues": working,
+        "visitor_stale": visitor_stale,
+        "open_transfers": open_transfers,
     }
 
 
@@ -982,7 +1029,7 @@ def build_home_context(request):
     scope = resolve_dashboard_scope(request)
     scope_banner = scope_selection_banner(scope, user)
 
-    actions = get_quick_actions(user)
+    actions = apply_pinned_quick_actions(request, get_quick_actions(user))
     alerts = get_alerts(request, user)
     show_finance_charts = show_finance and role in (
         "treasury",
@@ -1010,9 +1057,14 @@ def build_home_context(request):
     # Treasury: teller leads; queue stays but does not compete for first attention.
     show_action_queue_sidebar = primary_work == "teller"
 
-    action_queue = get_action_queue(request, user)
+    action_queue_full = get_action_queue(request, user)
     if is_control_center:
-        action_queue = filter_action_queue_for_control_center(action_queue)
+        action_queue = filter_action_queue_for_control_center(action_queue_full)
+        action_queue_scope = []
+    else:
+        mine = filter_action_queue_mine(action_queue_full)
+        action_queue = mine if mine else action_queue_full
+        action_queue_scope = action_queue_full if len(action_queue_full) > len(action_queue) else []
 
     context = {
         "dashboard_role": role,
@@ -1024,6 +1076,8 @@ def build_home_context(request):
         "alerts": alerts[:3],
         "alerts_extra_count": max(0, len(alerts) - 3),
         "action_queue": action_queue,
+        "action_queue_scope": action_queue_scope,
+        "quick_actions_all": actions,
         "show_finance": show_finance,
         "show_finance_charts": show_finance_charts,
         "show_member_kpis": show_member_kpis,
@@ -1184,5 +1238,39 @@ def build_home_context(request):
         context["has_active_church"] = True
     elif context.get("has_active_church") is None:
         context["has_active_church"] = bool(get_active_church(request))
+
+    from dashboard import home_panels
+
+    context["notification_inbox"] = home_panels.get_notification_inbox(user)
+    context["attendance_panel"] = home_panels.get_attendance_panel(request)
+    context["visitor_funnel"] = home_panels.get_visitor_funnel_panel(request)
+    context["settlement_strip"] = home_panels.get_settlement_strip(request, list(scope.church_ids))
+    context["budget_glance"] = home_panels.get_budget_glance(request)
+    context["recent_activity"] = home_panels.get_recent_activity_panel(
+        request, list(scope.finance_church_ids or scope.church_ids)
+    )
+    if role in ("member", "members", "leadership"):
+        context["member_role_extras"] = home_panels.get_member_role_extras(request)
+    else:
+        context["member_role_extras"] = None
+    context["dashboard_coaching"] = home_panels.get_dashboard_coaching_hints(context)
+
+    if is_control_center and context.get("org_health") is not None:
+        pastoral = {}
+        church_ref = scope.primary_church or get_active_church(request)
+        if church_ref and show_members:
+            funnel = selectors.visitor_funnel_counts_for_church(church_ref)
+            pastoral["visitor_stale"] = funnel.get("stale", 0)
+            pastoral["open_transfers"] = context.get("pending_transfers") or 0
+            snap = selectors.worship_attendance_snapshot_for_church(church_ref)
+            if snap and not snap.get("empty") and snap.get("delta") is not None:
+                pastoral["attendance_delta"] = snap["delta"]
+        context["org_health"] = get_organization_health(
+            request,
+            user,
+            compliance=context.get("compliance_snapshot"),
+            kpis=context.get("executive_kpis") or {},
+            pastoral=pastoral,
+        )
 
     return context

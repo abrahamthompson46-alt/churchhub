@@ -1,0 +1,17 @@
+{% load churchhub_tags %}
+{% if budget_glance %}
+<section class="cc-panel mb-4 cc-panel--compact" aria-label="Budget glance">
+    <div class="cc-panel__header">
+        <h2 class="cc-panel__title"><i class="bi bi-pie-chart"></i> Budget {{ budget_glance.year }}</h2>
+        <a href="{% url 'budgets:list' %}" class="dash-section__link">Plans →</a>
+    </div>
+    <div class="px-3 pb-3">
+        <p class="mb-1">Expenses YTD: <strong class="text-currency">{% money budget_glance.expense_actual 0 %}</strong> / {% money budget_glance.expense_budgeted 0 %} budgeted</p>
+        {% if budget_glance.over_budget_count %}
+        <p class="text-danger small mb-0">{{ budget_glance.over_budget_count }} line(s) over budget</p>
+        {% else %}
+        <p class="text-muted small mb-0">On track against approved plan</p>
+        {% endif %}
+    </div>
+</section>
+{% endif %}

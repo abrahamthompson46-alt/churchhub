@@ -1,0 +1,19 @@
+{% if attendance_panel %}
+<section class="cc-panel mb-4 cc-panel--compact" aria-label="Worship attendance">
+    <div class="cc-panel__header">
+        <h2 class="cc-panel__title"><i class="bi bi-people-fill"></i> Worship attendance</h2>
+        {% if not attendance_panel.empty %}
+        <a href="{% url attendance_panel.url_name pk=attendance_panel.url_kwargs.pk %}" class="dash-section__link">Details →</a>
+        {% endif %}
+    </div>
+    <div class="px-3 pb-3">
+        {% if attendance_panel.empty %}
+        <p class="text-muted mb-2">{{ attendance_panel.hint }}</p>
+        <a href="{% url attendance_panel.url_name %}" class="btn btn-sm btn-outline-primary">Record attendance</a>
+        {% else %}
+        <p class="mb-1"><strong>{{ attendance_panel.present }}</strong> present{% if attendance_panel.total %} of {{ attendance_panel.total }} recorded{% endif %}</p>
+        <p class="text-muted small mb-0">{{ attendance_panel.event_type }} · {{ attendance_panel.event_date|date:"j M Y" }}{% if attendance_panel.delta is not None %} · {% if attendance_panel.delta >= 0 %}+{% endif %}{{ attendance_panel.delta }} vs prior{% endif %}</p>
+        {% endif %}
+    </div>
+</section>
+{% endif %}

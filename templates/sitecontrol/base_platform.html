@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{% static 'vendor/fonts/plus-jakarta-sans/plus-jakarta-sans.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/font/bootstrap-icons.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/platform.css' %}?v=20260728a">
+    <link rel="stylesheet" href="{% static 'css/platform.css' %}?v=20260728b">
     {% block extra_css %}{% endblock %}
 </head>
 <body class="platform-body">
@@ -112,9 +112,9 @@
                     <span class="platform-user-avatar">{{ user.get_full_name|default:user.username|slice:":1"|upper }}</span>
                     <span class="d-none d-sm-inline">{{ user.get_full_name|default:user.username }}</span>
                 </div>
-                <a href="{% url 'dashboard:logout' %}" class="btn btn-outline-danger btn-sm d-inline-flex align-items-center" title="Sign out">
-                    <i class="bi bi-box-arrow-right"></i>
-                    <span class="d-none d-lg-inline ms-1">Sign out</span>
+                <a href="{% url 'dashboard:logout' %}" class="btn btn-outline-danger btn-sm platform-topbar-logout d-inline-flex align-items-center flex-shrink-0" title="Sign out" aria-label="Sign out">
+                    <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
+                    <span class="platform-topbar-logout-label ms-1">Sign out</span>
                 </a>
             </div>
         </header>

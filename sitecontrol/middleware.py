@@ -14,6 +14,7 @@ SHARED_EXEMPT_PREFIXES = (
     "/accounts/login",
     "/accounts/logout",
     "/accounts/password",
+    "/dashboard/logout",
     "/apply/",
     "/static/",
     "/media/",

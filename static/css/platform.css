@@ -232,6 +232,50 @@ body.platform-body {
     font-weight: 600;
 }
 
+.platform-topbar-logout {
+    min-height: 2.5rem;
+    min-width: 2.5rem;
+    padding-inline: 0.65rem;
+}
+
+.platform-topbar-logout-label {
+    display: none;
+}
+
+@media (min-width: 992px) {
+    .platform-topbar-logout-label {
+        display: inline;
+    }
+}
+
+@media (max-width: 991px) {
+    .platform-topbar-logout-label {
+        display: inline;
+        font-size: 0.8125rem;
+    }
+
+    .platform-user-chip {
+        display: none;
+    }
+
+    .platform-topbar-actions {
+        flex-wrap: nowrap;
+        gap: 0.35rem;
+    }
+
+    .platform-topbar-actions .dropdown {
+        max-width: 55%;
+        min-width: 0;
+    }
+
+    .platform-topbar-actions .dropdown-toggle {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
 .platform-user-avatar {
     width: 28px;
     height: 28px;
@@ -534,7 +578,8 @@ body.platform-body {
     .platform-topbar-actions {
         width: 100%;
         justify-content: flex-end;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        align-items: center;
     }
     .platform-content {
         padding: 1rem;

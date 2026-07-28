@@ -642,8 +642,9 @@ def get_action_queue(request, user):
     manageable = get_manageable_churches(user)
     church_ids = list(manageable.values_list("id", flat=True)) if manageable.exists() else []
 
-    def _add(priority, title, subtitle, *, count=0, url_name="", icon="bi-circle", report_key="", url_suffix=""):
+    def _add(priority, title, subtitle, *, kind="", count=0, url_name="", icon="bi-circle", report_key="", url_suffix=""):
         queue.append({
+            "kind": kind,
             "priority": priority,
             "priority_score": {"critical": 4, "high": 3, "medium": 2, "low": 1}.get(priority, 0),
             "title": title,
@@ -662,6 +663,7 @@ def get_action_queue(request, user):
                 "high",
                 "Transaction approvals",
                 "Awaiting pastor or treasury sign-off",
+                kind="transaction_approvals",
                 count=pending,
                 url_name="transactions:pending_approvals",
                 icon="bi-check2-circle",
@@ -675,6 +677,7 @@ def get_action_queue(request, user):
                 "critical",
                 "Overdue remittances",
                 f"{prior_month.strftime('%B %Y')} district remittance not transferred",
+                kind="overdue_remittances",
                 count=overdue,
                 url_name="dashboard:cutoff",
                 icon="bi-exclamation-octagon",
@@ -689,6 +692,7 @@ def get_action_queue(request, user):
                 "medium",
                 "Announcement approvals",
                 "Church Life items awaiting review",
+                kind="announcement_approvals",
                 count=pending_ann,
                 url_name="announcements:pending_approvals",
                 icon="bi-megaphone",
@@ -703,6 +707,7 @@ def get_action_queue(request, user):
                 "medium",
                 "Meeting minutes",
                 "Minutes pending pastoral approval",
+                kind="meeting_minutes",
                 count=pending_mins,
                 url_name="meetings:pending_minutes",
                 icon="bi-journal-text",
@@ -715,6 +720,7 @@ def get_action_queue(request, user):
                 "medium",
                 "Fixed asset approvals",
                 "Capital acquisitions awaiting activation",
+                kind="asset_approvals",
                 count=pending_assets,
                 url_name="assets:asset_list",
                 url_suffix="?status=PENDING_APPROVAL",
@@ -734,6 +740,7 @@ def get_action_queue(request, user):
                 "low",
                 "Member transfers",
                 "Membership moves awaiting processing",
+                kind="member_transfers",
                 count=transfer_count,
                 url_name="members:transfer_list",
                 icon="bi-arrow-left-right",
@@ -747,6 +754,7 @@ def get_action_queue(request, user):
                 "high",
                 "Working day closed",
                 "Open the business day before recording transactions",
+                kind="working_day_closed",
                 url_name="transactions:period_list",
                 icon="bi-calendar-x",
             )
@@ -756,12 +764,21 @@ def get_action_queue(request, user):
             "critical",
             "Church assignment missing",
             "Contact an administrator to assign your account",
+            kind="church_assignment_missing",
             url_name="accounts:profile",
             icon="bi-person-exclamation",
         )
 
     queue.sort(key=lambda item: item["priority_score"], reverse=True)
     return queue[:12]
+
+
+CONTROL_CENTER_QUEUE_OMIT = frozenset({"transaction_approvals", "overdue_remittances"})
+
+
+def filter_action_queue_for_control_center(queue):
+    """Drop items already surfaced in Mission Control KPIs and compliance panel."""
+    return [item for item in queue if item.get("kind") not in CONTROL_CENTER_QUEUE_OMIT]
 
 
 def user_has_asset_approval(user):
@@ -993,6 +1010,10 @@ def build_home_context(request):
     # Treasury: teller leads; queue stays but does not compete for first attention.
     show_action_queue_sidebar = primary_work == "teller"
 
+    action_queue = get_action_queue(request, user)
+    if is_control_center:
+        action_queue = filter_action_queue_for_control_center(action_queue)
+
     context = {
         "dashboard_role": role,
         "role_label": user.get_role_display(),
@@ -1002,7 +1023,7 @@ def build_home_context(request):
         "quick_actions_more": [],
         "alerts": alerts[:3],
         "alerts_extra_count": max(0, len(alerts) - 3),
-        "action_queue": get_action_queue(request, user),
+        "action_queue": action_queue,
         "show_finance": show_finance,
         "show_finance_charts": show_finance_charts,
         "show_member_kpis": show_member_kpis,

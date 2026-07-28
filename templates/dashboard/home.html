@@ -166,6 +166,19 @@
                 {% endif %}
             </div>
         </div>
+        {% if cash_position %}
+        <div class="teller-console-liquidity px-3 pt-2 pb-1 d-flex flex-wrap align-items-center gap-3 border-bottom">
+            <span class="small text-muted text-uppercase fw-semibold">Book balance</span>
+            <span class="small">Cash <strong class="text-currency" data-cash-field="cash">{% money cash_position.cash 2 %}</strong></span>
+            <span class="small">Bank <strong class="text-currency" data-cash-field="bank">{% money cash_position.bank 2 %}</strong></span>
+            {% if cash_position.petty_cash %}
+            <span class="small">Petty <strong class="text-currency" data-cash-field="petty_cash">{% money cash_position.petty_cash 2 %}</strong></span>
+            {% endif %}
+        </div>
+        <p class="small text-muted px-3 pt-2 mb-0">
+            Approved ledger only. Settlement/ledger remittance reclass does not change cash; district <a href="{% url 'transactions:record_remittance' %}">remittance payment</a> does, once approved.
+        </p>
+        {% endif %}
         <div class="table-responsive table-in-card">
             <table class="table table-sm table-hover mb-0 align-middle" id="teller-console-table">
                 <thead>
@@ -334,7 +347,7 @@
 
             {% if show_finance_charts and has_active_church %}
             <div class="row g-4 mb-4">
-                <div class="{% if show_finance_mini_kpis %}col-lg-7{% else %}col-12{% endif %}">
+                <div class="col-12">
                     <section class="cc-panel mb-0">
                         <div class="cc-panel__header">
                             <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Income vs Expense — 6 months</h2>
@@ -344,21 +357,6 @@
                         </div>
                     </section>
                 </div>
-                {% if show_finance_mini_kpis %}
-                <div class="col-lg-5">
-                    <section class="cc-panel mb-0 h-100">
-                        <div class="cc-panel__header">
-                            <h2 class="cc-panel__title">Church Finance MTD</h2>
-                        </div>
-                        <div class="cc-mini-kpis">
-                            <div class="cc-mini-kpi"><span>Tithe</span><strong class="text-currency">{% money tithe_total 0 %}</strong></div>
-                            <div class="cc-mini-kpi"><span>Combined</span><strong class="text-currency">{% money combined_total 0 %}</strong></div>
-                            <div class="cc-mini-kpi"><span>Remittance payable</span><strong class="text-currency">{% money monthly_cutoff_total 0 %}</strong></div>
-                            <div class="cc-mini-kpi"><span>Net balance</span><strong class="text-currency">{% money net_balance 0 %}</strong></div>
-                        </div>
-                    </section>
-                </div>
-                {% endif %}
             </div>
             {% elif show_finance and not has_active_church %}
             <div class="alert-banner alert-warning mb-4">
@@ -532,6 +530,10 @@ if (ctx) {
                 }
             });
         }
+        if (data.totals && data.totals.transfers != null) {
+            const tt = document.getElementById('teller-total-transfers');
+            if (tt) tt.textContent = money(data.totals.transfers);
+        }
     }
 
     function refresh() {
@@ -541,6 +543,7 @@ if (ctx) {
             .catch(function () {});
     }
 
+    refresh();
     setInterval(refresh, 20000);
 })();
 </script>

@@ -6,7 +6,8 @@ Remittance workflow (enterprise):
   2. TRANSFER TRF_*_REMIT / settlement post → clear remit payable into
      District/Conference/Union remittance clearing accounts (not Main Bank)
   3. Bank remittance payment (record_district_remittance / cutoff) →
-     debit remit payable (or clearing) and credit Bank/Cash when cash leaves
+     debit district clearing (if settlement posted) and/or remit payable;
+     credit Bank/Cash when cash leaves
 """
 
 from __future__ import annotations

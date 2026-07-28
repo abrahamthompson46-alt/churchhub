@@ -8,13 +8,15 @@
     {% include "includes/auth_platform_panel.html" %}
     <section class="auth-split-form">
         <div class="auth-mobile-brand d-lg-none">
-            {% if site_logo %}
-            <img src="{{ site_logo.url }}" alt="{{ platform_name|default:site_settings.site_name|default:site_name }}" class="auth-platform-logo-sm">
-            {% else %}
-            <span class="brand-mark auth-platform-mark-sm" aria-hidden="true"><i class="bi bi-grid-1x2-fill"></i></span>
-            {% endif %}
-            <div>
-                <p class="auth-platform-eyebrow mb-0">Platform</p>
+            <div class="auth-mobile-brand__logo">
+                {% if site_logo %}
+                <img src="{{ site_logo.url }}" alt="{{ platform_name|default:site_settings.site_name|default:site_name }}" class="auth-platform-logo-sm">
+                {% else %}
+                <span class="brand-mark auth-platform-mark-sm" aria-hidden="true"><i class="bi bi-grid-1x2-fill"></i></span>
+                {% endif %}
+            </div>
+            <div class="auth-mobile-brand__text">
+                <p class="auth-platform-eyebrow mb-0">Church management</p>
                 <p class="auth-mobile-brand__name mb-0">{{ platform_name|default:site_settings.site_name|default:site_name }}</p>
             </div>
         </div>

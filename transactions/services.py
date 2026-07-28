@@ -670,19 +670,20 @@ def record_district_remittance(
       1. Receipts credit Tithe/Combined Remittance Payable (policy split)
       2. TRF_*_REMIT / settlement moves liability to hierarchy clearing accounts
       3. This function pays district from Bank/Cash:
-           DR Tithe / Combined Remittance Payable
+           DR district clearing (if settlement posted) and/or remit payable
            CR Bank/Cash
 
-    Prefer ledger transfer categories for hierarchy clearing (district/conference/
-    union remittance accounts). Use this when cash actually leaves the church.
+    Use this when cash actually leaves the church.
     """
+    from remittance.services import (
+        build_remittance_payment_debits,
+        outstanding_district_remittance_parts,
+    )
+
     month_date = month_date.replace(day=1) if month_date else None
     cutoff = generate_monthly_cutoff(church, month_date) if month_date else None
 
     if cutoff:
-        from remittance.cross_path import assert_bank_remit_not_blocked_by_settlement
-
-        assert_bank_remit_not_blocked_by_settlement(church, month_date)
         if cutoff.transferred:
             raise ValueError(
                 f"District remittance for {month_date.strftime('%B %Y')} has already been transferred."
@@ -703,10 +704,11 @@ def record_district_remittance(
                 f"A remittance for {month_date.strftime('%B %Y')} is already recorded or pending approval."
             )
 
+    outstanding = outstanding_district_remittance_parts(church)
     if cutoff:
-        tithe_part = cutoff.total_tithe
-        combined_part = cutoff.total_combined
-        amount = tithe_part + combined_part
+        tithe_part = outstanding["tithe"]
+        combined_part = outstanding["combined"]
+        amount = outstanding["total"]
     else:
         amount = Decimal(str(amount))
         tithe_part = amount
@@ -727,10 +729,19 @@ def record_district_remittance(
         date=posting_date,
     )
 
-    if tithe_part > 0:
-        _post_line(trx, _get_account(church, "TITHE_REMIT_PAYABLE"), tithe_part, fund="TITHE_TRUST")
-    if combined_part > 0:
-        _post_line(trx, _get_account(church, "COMBINED_REMIT_PAYABLE"), combined_part, fund="COMBINED_TRUST")
+    fund_by_offering = {"TITHE": "TITHE_TRUST", "COMBINED": "COMBINED_TRUST"}
+    for offering_type, part in (("TITHE", tithe_part), ("COMBINED", combined_part)):
+        if part <= 0:
+            continue
+        for account, debit_amount in build_remittance_payment_debits(
+            church, offering_type, part
+        ):
+            _post_line(
+                trx,
+                account,
+                debit_amount,
+                fund=fund_by_offering[offering_type],
+            )
 
     _post_line(trx, _get_account(church, payment_account_type), -amount)
 
@@ -817,6 +828,12 @@ def approve_transaction(transaction, user):
         details={"reference": transaction.reference},
     )
     _mark_cutoff_transferred_for_remittance(transaction)
+    try:
+        from remittance.notifications import notify_district_remittance_payment_approved
+
+        notify_district_remittance_payment_approved(transaction, approved_by=user)
+    except Exception:
+        pass
     try:
         from church_system.perf_cache import invalidate_church_finance_caches
 

@@ -120,8 +120,20 @@ class ServiceTests(DashboardTestMixin, TestCase):
         summary = get_financial_summary(request)
         # Tithe remittance payable 100 + combined remittance payable 25 (50% of 50)
         self.assertEqual(summary["monthly_cutoff_total"], Decimal("125.00"))
+        self.assertEqual(summary["tithe_total"], Decimal("100.00"))
+        self.assertEqual(summary["combined_total"], Decimal("50.00"))
         self.assertEqual(summary["kpi_period_label"], "Month to date")
         self.assertEqual(summary["cutoff_metric_label"], "Remittance payable (MTD)")
+
+        kpis = get_executive_kpis(
+            request,
+            treasury,
+            church_ids=[self.church.id],
+            active_church=self.church,
+        )
+        self.assertEqual(kpis["mtd_remittance_payable"], summary["monthly_cutoff_total"])
+        self.assertEqual(kpis["mtd_tithe"], summary["tithe_total"])
+        self.assertEqual(kpis["mtd_combined"], summary["combined_total"])
 
     def test_quick_actions_capped_and_no_duplicate_org(self):
         admin = User.objects.create_user(
@@ -303,7 +315,7 @@ class ViewTests(DashboardTestMixin, TestCase):
         response = self.client.get(reverse("dashboard:home"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Good day")
-        self.assertTrue(response.context["suppress_workspace_cash"])
+        self.assertFalse(response.context["suppress_workspace_cash"])
         self.assertLessEqual(len(response.context["quick_actions"]), 3)
         self.assertEqual(response.context["quick_actions_more"], [])
 

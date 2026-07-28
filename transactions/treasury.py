@@ -110,6 +110,7 @@ def get_teller_daily_summary(church, business_date=None):
         "entries": sum(t["entries"] for t in tellers),
         "receipts": sum((t["receipts"] for t in tellers), Decimal("0.00")),
         "expenses": sum((t["expenses"] for t in tellers), Decimal("0.00")),
+        "transfers": sum((t["transfers"] for t in tellers), Decimal("0.00")),
         "pending": sum(t["pending"] for t in tellers),
     }
     return {

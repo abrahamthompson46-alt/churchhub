@@ -45,7 +45,7 @@ body.platform-body {
     left: 0;
     bottom: 0;
     z-index: 1040;
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 .platform-sidebar-brand {
@@ -95,6 +95,8 @@ body.platform-body {
 
 .platform-nav {
     flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     padding: 0.75rem 0.65rem 1.5rem;
 }
 
@@ -143,6 +145,7 @@ body.platform-body {
 }
 
 .platform-sidebar-footer {
+    flex-shrink: 0;
     padding: 1rem 1.25rem;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
     font-size: 0.75rem;

@@ -3,9 +3,11 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.db.models import Sum
 from django.test import TestCase
 from django.utils import timezone
 
+from accounts.models import UserRole
 from members.models import Gender, Member
 from organization.models import Church, Conference, District, Zone
 from remittance.models import RemittancePolicy
@@ -18,9 +20,11 @@ from remittance.services import (
     disburse_welfare_case,
     ensure_hierarchy_settlement_policies,
     get_church_collection_policy,
+    outstanding_district_remittance_parts,
     post_offering_credit_lines,
     post_settlement_batch,
 )
+from transactions.treasury import get_cash_position
 from transactions.models import Account, Transaction, TransactionLine
 from transactions.services import (
     approve_transaction,
@@ -297,11 +301,13 @@ class RemittancePolicyTests(TestCase):
             )
         self.assertIn("monthly cut-off", str(ctx.exception).lower())
 
-    def test_bank_remittance_blocked_after_posted_settlement(self):
+    def test_bank_remittance_after_posted_settlement_moves_bank(self):
+        """Settlement reclasses payable; bank remittance clears clearing and cash."""
         txn = record_receipt(
             church=self.church,
             created_by=self.treasurer,
             tithe_amount=Decimal("80.00"),
+            payment_account_type="BANK",
         )
         approve_transaction(txn, self.pastor)
         today = timezone.now().date()
@@ -315,14 +321,57 @@ class RemittancePolicyTests(TestCase):
             church=self.church,
         )
         post_settlement_batch(batch, self.pastor)
-        with self.assertRaises(ValueError) as ctx:
-            record_district_remittance(
-                church=self.church,
-                created_by=self.pastor,
-                amount=Decimal("0.00"),
-                month_date=today,
-            )
-        self.assertIn("settlement batch", str(ctx.exception).lower())
+        self.assertEqual(outstanding_district_remittance_parts(self.church)["tithe"], Decimal("80.00"))
+        bank_before = get_cash_position(self.church)["bank"]
+        remit = record_district_remittance(
+            church=self.church,
+            created_by=self.pastor,
+            amount=Decimal("0.00"),
+            payment_account_type="BANK",
+            month_date=today,
+        )
+        approve_transaction(remit, self.treasurer)
+        bank_after = get_cash_position(self.church)["bank"]
+        self.assertEqual(bank_before - bank_after, Decimal("80.00"))
+        clearing = Account.objects.get(church=self.church, code="DISTRICT_TITHE_REMIT")
+        self.assertEqual(
+            remit.lines.filter(account=clearing).aggregate(t=Sum("amount"))["t"],
+            Decimal("80.00"),
+        )
+        self.assertFalse(remit.lines.filter(account__account_type="TITHE_REMIT_PAYABLE").exists())
+        self.assertEqual(outstanding_district_remittance_parts(self.church)["total"], Decimal("0.00"))
+
+    def test_remittance_payment_notifies_district_recipients(self):
+        from dashboard.models import Notification
+
+        district_officer = User.objects.create_user(
+            username="district_t",
+            password="pass12345",
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+        )
+        txn = record_receipt(
+            church=self.church,
+            created_by=self.treasurer,
+            tithe_amount=Decimal("50.00"),
+            payment_account_type="BANK",
+        )
+        approve_transaction(txn, self.pastor)
+        today = timezone.now().date()
+        remit = record_district_remittance(
+            church=self.church,
+            created_by=self.pastor,
+            amount=Decimal("0.00"),
+            payment_account_type="BANK",
+            month_date=today,
+        )
+        approve_transaction(remit, self.treasurer)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=district_officer,
+                title__icontains="Remittance received",
+            ).exists()
+        )
 
     def test_draft_settlement_does_not_block_bank_remittance(self):
         txn = record_receipt(

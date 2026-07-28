@@ -74,6 +74,7 @@ def teller_console_api(request):
             "entries": summary["totals"].get("entries", 0),
             "receipts": _dec(summary["totals"].get("receipts", 0)),
             "expenses": _dec(summary["totals"].get("expenses", 0)),
+            "transfers": _dec(summary["totals"].get("transfers", 0)),
             "pending": summary["totals"].get("pending", 0),
         },
         "cash_position": {

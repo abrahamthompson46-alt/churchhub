@@ -46,7 +46,8 @@ def get_active_church(request):
         return None
 
     user_church = get_user_church(request.user)
-    if user_church:
+    if user_church and manageable.filter(pk=user_church.pk).exists():
+        assert_church_in_active_denomination(request, user_church)
         return user_church
 
     if manageable.count() == 1:

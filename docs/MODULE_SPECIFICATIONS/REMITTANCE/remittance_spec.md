@@ -83,7 +83,7 @@ Views no longer call remittance model managers / `filter_by_church` directly; jo
 1. Retain% + remit% = 100 (model `clean`).  
 2. `post_offering_credit_lines` splits gross per church collection policy into retention + remit payable accounts.  
 3. Settlement draft computes remit payable / received-from-below; `post_settlement_batch` posts church-level balanced TRANSFER journals via PENDING + `approve_module_journal` (maker-checker) and marks POSTED. District+ batches with an amount raise `RemittancePolicyError` and stay **DRAFT** until higher-unit GL posting exists (never POSTED without a journal).  
-3a. **Cross-path hard-gate (P0-4):** church TITHE/COMBINED settlement draft/post is refused when MonthlyCutoff bank remittance already covers an overlapping calendar month; bank remittance is refused when a POSTED church settlement overlaps that month (`remittance.cross_path`).  
+     3. **Cross-path (Current):** settlement reclassifies payable → district clearing; bank remittance may follow for the same month and debits clearing first, then payable. Double cash payout blocked by `cutoff.transferred` / REMIT audit — not by settlement alone.  
 4. Welfare disbursement requires sufficient WELFARE_FUND balance; posts via unlocked journal lines then `approve_module_journal` (case row locked with `select_for_update`); links `disbursement_transaction`; rejects duplicate disbursements with audit.  
 5. Voiding a transaction can call `void_welfare_for_transaction`.  
 6. Feature gate: `remittance` (and welfare UI checks `welfare_module_enabled`).
@@ -125,7 +125,7 @@ Views also accept `manage_finances` on some finance/policy gates.
 |------|------|
 | `` | `index` (policies) |
 | `policies/add/`, `policies/<uuid>/edit/` | policy CRUD |
-| `settlements/`, `settlements/<uuid>/post/` | settlements |
+| `settlements/`, `settlements/<uuid>/post/` | settlements + hierarchy Settlement Desk |
 | `welfare/`, `welfare/member/<uuid>/` | welfare index / member statement |
 | `welfare/cases/<uuid>/`, `…/action/` | case detail / actions |
 
@@ -133,11 +133,11 @@ Views also accept `manage_finances` on some finance/policy gates.
 
 ## 7. Forms / Views / Templates
 
-**Forms:** `RemittancePolicyForm`, `SettlementDraftForm`, welfare case/approve/reject/review/disburse/contribution/attachment forms.
+**Forms:** `RemittancePolicyForm`, `SettlementDraftForm`, `HierarchySettlementDraftForm`, welfare forms.
 
-**Views:** policy index/create/edit; settlement list/post; welfare index, case detail/action, member statement.
+**Views:** policy index/create/edit; settlement list/post (`remittance/settlement_desk.py` org scope); welfare views.
 
-**Templates:** under `templates/remittance/`.
+**Templates:** `templates/remittance/` (`settlements.html` — desk KPIs, tabs, filters).
 
 ---
 
@@ -151,7 +151,7 @@ Views also accept `manage_finances` on some finance/policy gates.
 
 - Auth + CSRF (global).  
 - `DenominationContextMiddleware` / `UserScopeMiddleware` for tenant wall and church scope.  
-- `require_feature("remittance")` on module views (via view decorators).  
+- `require_feature("remittance")` on most module views; **settlements** allow hierarchy overseers with `manage_settlements` / `manage_finances` even without an active church context (desk is org-scoped, not client-filtered).  
 - `LoginRateLimitMiddleware` / maintenance — platform-wide only.
 
 ---
@@ -176,7 +176,7 @@ flowchart LR
 - Creates/updates GL lines on collection (payables/retention/welfare).  
 - Settlement posting creates hierarchy transfer journals.  
 - Disbursement debits welfare fund; must remain balanced via txn services.  
-- **Dual path (mitigated):** MonthlyCutoff bank remit and SettlementBatch UIs both exist; cross-path hard-gate blocks double-clearing the same church/month remit payable.
+- **Dual path (Current):** MonthlyCutoff bank remit and SettlementBatch UIs coexist; settlement reclassifies liability, bank remittance moves cash and clears clearing/payable (`remittance.services.build_remittance_payment_debits`).
 
 ---
 
@@ -192,7 +192,7 @@ flowchart LR
 
 ## 13. Known architectural gaps
 
-- Dual remittance UIs remain (MonthlyCutoff bank remit vs SettlementBatch); **cross-path hard-gate** prevents double-clearing remit payable for the same church/month.  
+- Dual remittance UIs remain (MonthlyCutoff bank remit vs SettlementBatch); **sequential workflow** settlement → bank payment is supported; bank remit alone still clears payable directly.
 - District+ settlement ledger posting not implemented (POST refused; batch stays DRAFT).  
 - Thin wrappers in `services.py` over `welfare_services.py`.  
 - Some welfare paths still import legacy `accounts.permissions.can_manage_finances`.  

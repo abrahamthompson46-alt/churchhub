@@ -230,6 +230,12 @@ def working_day_context(request):
 
         cash_position = get_cash_position(church)
 
+    workspace_finance_mtd = None
+    if show_finance:
+        from dashboard.services import get_workspace_finance_mtd
+
+        workspace_finance_mtd = get_workspace_finance_mtd(request)
+
     return {
         "system_date": status["system_date"],
         "working_day_status": status,
@@ -240,4 +246,5 @@ def working_day_context(request):
         "can_manage_working_day": can_manage_working_day(request.user),
         "show_cash_position": show_finance,
         "cash_position": cash_position,
+        "workspace_finance_mtd": workspace_finance_mtd,
     }

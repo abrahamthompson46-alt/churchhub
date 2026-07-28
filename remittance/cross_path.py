@@ -1,8 +1,12 @@
-"""Guards against dual church→district remittance paths (cutoff bank vs settlement).
+"""Guards against double-clearing church→district remittance.
 
-Both paths debit TITHE_REMIT_PAYABLE / COMBINED_REMIT_PAYABLE. Running both for the
-same church and overlapping calendar month over-clears liability. These helpers
-hard-gate the second path without removing either UI.
+Workflow (Current):
+  1. Receipts build remittance payable.
+  2. Optional settlement reclassifies payable → district clearing (no cash movement).
+  3. Bank remittance pays clearing and/or payable and credits Bank/Cash.
+
+Settlement and bank payment may both run for the same month; step 3 debits clearing
+when step 2 was used. Block only when step 3 already completed (cutoff transferred / REMIT audit).
 """
 
 from calendar import monthrange
@@ -94,10 +98,10 @@ def assert_settlement_not_blocked_by_bank_remit(
 
 
 def assert_bank_remit_not_blocked_by_settlement(church, month_date):
-    """Refuse bank remittance when a posted church settlement overlaps the month."""
-    if posted_church_settlement_overlaps_month(church, month_date):
-        label = month_start(month_date).strftime("%B %Y")
-        raise ValueError(
-            f"Cannot record bank remittance: a settlement batch is already posted "
-            f"for this church covering {label}."
-        )
+    """
+    Legacy hook — settlement no longer blocks bank remittance.
+
+    Bank payment clears district clearing accounts created by settlement posts.
+    Double payment is prevented by cutoff.transferred / REMIT audit guards.
+    """
+    del church, month_date

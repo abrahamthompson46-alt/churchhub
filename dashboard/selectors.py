@@ -25,7 +25,10 @@ from transactions.models import FinancialPeriod, MonthlyCutoff, Transaction, Tra
 from .models import Notification
 
 REMIT_PAYABLE_TYPES = ("TITHE_REMIT_PAYABLE", "COMBINED_REMIT_PAYABLE")
-INCOME_REMIT_TYPES = ("TITHE", "COMBINED")
+# Gross offering MTD: retain + remit portions (remittance posting uses split accounts).
+TITHE_GIVING_TYPES = ("TITHE", "TITHE_REMIT_PAYABLE")
+COMBINED_GIVING_TYPES = ("COMBINED", "COMBINED_RETENTION", "COMBINED_REMIT_PAYABLE")
+INCOME_REMIT_TYPES = TITHE_GIVING_TYPES + COMBINED_GIVING_TYPES
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +110,14 @@ def sum_line_amount_for_types(lines_qs, acc_types):
     return abs(
         lines_qs.filter(account__account_type__in=acc_types).aggregate(t=Sum("amount"))["t"]
         or Decimal("0")
+    )
+
+
+def sum_tithe_combined_mtd(lines_qs):
+    """Gross tithe and combined offering MTD from split GL lines."""
+    return (
+        sum_line_amount_for_types(lines_qs, TITHE_GIVING_TYPES),
+        sum_line_amount_for_types(lines_qs, COMBINED_GIVING_TYPES),
     )
 
 

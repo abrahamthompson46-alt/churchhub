@@ -1,15 +1,155 @@
 {% extends "base.html" %}
 
-{% block title %}Settlement Batches — ChurchHub{% endblock %}
+{% block title %}Settlement Desk — ChurchHub{% endblock %}
 
 {% block content %}
 <div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Settlement Batches" page_description="Hierarchy settlements between church, district, conference, union, and general conference." %}
+    {% if hierarchy_mode and desk %}
+    {% include "includes/page_header.html" with page_subtitle="Finance · Hierarchy" page_title="Settlement Desk" page_description=desk.label %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Settlement Batches" page_description="Church settlements to district and remittance workflow." %}
+    {% endif %}
+
+    {% if hierarchy_mode and desk %}
+    <div class="row g-3 mb-4">
+        {% if desk_choices|length > 1 %}
+        <div class="col-12">
+            <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+                <label class="small text-muted mb-0">Desk</label>
+                <select name="desk" class="form-select form-select-sm" style="max-width: 18rem;" onchange="this.form.submit()">
+                    {% for ut, uid, label in desk_choices %}
+                    <option value="{{ ut }}:{{ uid }}" {% if desk.unit_type == ut and desk.unit_id|stringformat:"s" == uid %}selected{% endif %}>{{ label }} ({{ ut|title }})</option>
+                    {% endfor %}
+                </select>
+                {% if tab %}<input type="hidden" name="tab" value="{{ tab }}">{% endif %}
+            </form>
+        </div>
+        {% endif %}
+        {% if desk_summary %}
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body py-3">
+                    <div class="small text-muted">Incoming (posted)</div>
+                    <div class="fs-5 fw-semibold">{{ desk_summary.incoming_posted }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body py-3">
+                    <div class="small text-muted">Your unit drafts</div>
+                    <div class="fs-5 fw-semibold">{{ desk_summary.outgoing_draft }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body py-3">
+                    <div class="small text-muted">Church drafts in scope</div>
+                    <div class="fs-5 fw-semibold">{{ desk_summary.church_draft }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body py-3">
+                    <div class="small text-muted">Churches posted MTD</div>
+                    <div class="fs-5 fw-semibold">{{ desk_summary.church_posted_mtd_gross|floatformat:2 }}</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <ul class="nav nav-pills mb-3 flex-wrap gap-1">
+        <li class="nav-item">
+            <a class="nav-link {% if tab == 'all' %}active{% endif %}" href="?{% if desk_choices|length > 1 %}desk={{ desk.unit_type }}:{{ desk.unit_id }}&{% else %}desk_type={{ desk.unit_type }}&desk_id={{ desk.unit_id }}&{% endif %}tab=all">All in scope</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if tab == 'incoming' %}active{% endif %}" href="?{% if desk_choices|length > 1 %}desk={{ desk.unit_type }}:{{ desk.unit_id }}&{% else %}desk_type={{ desk.unit_type }}&desk_id={{ desk.unit_id }}&{% endif %}tab=incoming">Incoming</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if tab == 'outgoing' %}active{% endif %}" href="?{% if desk_choices|length > 1 %}desk={{ desk.unit_type }}:{{ desk.unit_id }}&{% else %}desk_type={{ desk.unit_type }}&desk_id={{ desk.unit_id }}&{% endif %}tab=outgoing">Outgoing</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if tab == 'churches' %}active{% endif %}" href="?{% if desk_choices|length > 1 %}desk={{ desk.unit_type }}:{{ desk.unit_id }}&{% else %}desk_type={{ desk.unit_type }}&desk_id={{ desk.unit_id }}&{% endif %}tab=churches">Churches</a>
+        </li>
+        {% if show_local_church %}
+        <li class="nav-item">
+            <a class="nav-link {% if tab == 'local' %}active{% endif %}" href="?{% if desk_choices|length > 1 %}desk={{ desk.unit_type }}:{{ desk.unit_id }}&{% else %}desk_type={{ desk.unit_type }}&desk_id={{ desk.unit_id }}&{% endif %}tab=local">Local church</a>
+        </li>
+        {% endif %}
+    </ul>
+
+    <form method="get" class="row g-2 align-items-end mb-4">
+        <input type="hidden" name="desk_type" value="{{ desk.unit_type }}">
+        <input type="hidden" name="desk_id" value="{{ desk.unit_id }}">
+        <input type="hidden" name="tab" value="{{ tab }}">
+        <div class="col-auto">
+            <label class="form-label small text-muted mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
+                <option value="">Any</option>
+                <option value="DRAFT" {% if status_filter == "DRAFT" %}selected{% endif %}>Draft</option>
+                <option value="POSTED" {% if status_filter == "POSTED" %}selected{% endif %}>Posted</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small text-muted mb-1">Offering</label>
+            <select name="offering" class="form-select form-select-sm">
+                <option value="">Any</option>
+                <option value="TITHE" {% if offering_filter == "TITHE" %}selected{% endif %}>Tithe</option>
+                <option value="COMBINED" {% if offering_filter == "COMBINED" %}selected{% endif %}>Combined</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Filter</button>
+        </div>
+    </form>
+    {% endif %}
+
+    {% if can_hierarchy_edit %}
+    <section class="dash-section mb-4">
+        <div class="dash-section__header">
+            <h2 class="dash-section__title">Hierarchy draft</h2>
+        </div>
+        <div class="form-card-inner card">
+            <div class="card-body p-4">
+                <form method="post" class="row g-3 align-items-end">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_draft">
+                    <input type="hidden" name="draft_scope" value="hierarchy">
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">From unit</label>
+                        {{ hierarchy_draft_form.from_unit }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small text-muted mb-1">Offering</label>
+                        {{ hierarchy_draft_form.offering_type }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small text-muted mb-1">Period start</label>
+                        {{ hierarchy_draft_form.period_start }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small text-muted mb-1">Period end</label>
+                        {{ hierarchy_draft_form.period_end }}
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">
+                            <i class="bi bi-plus-lg me-1"></i>Create hierarchy draft
+                        </button>
+                    </div>
+                </form>
+                <p class="small text-muted mb-0 mt-2">District-and-higher drafts roll up posted child settlements. Ledger posting for non-church batches is not yet enabled — drafts support review and policy alignment until GL is extended.</p>
+            </div>
+        </div>
+    </section>
+    {% endif %}
 
     {% if can_edit %}
     <section class="dash-section mb-4">
         <div class="dash-section__header">
-            <h2 class="dash-section__title">Create Draft</h2>
+            <h2 class="dash-section__title">Church draft{% if active_church %} · {{ active_church.name }}{% endif %}</h2>
         </div>
         <div class="form-card-inner card">
             <div class="card-body p-4">
@@ -30,18 +170,59 @@
                     </div>
                     <div class="col-md-3">
                         <button type="submit" class="btn btn-primary btn-sm w-100">
-                            <i class="bi bi-plus-lg me-1"></i>Create Draft
+                            <i class="bi bi-plus-lg me-1"></i>Create church draft
                         </button>
                     </div>
                 </form>
-                <p class="small text-muted mb-0 mt-2">Church drafts use approved remittance payable balances for the period. Higher levels apply settlement policies configured in Remittance Policies.</p>
+                <p class="small text-muted mb-0 mt-2">Church drafts use approved remittance payable balances for the period. Posting reclassifies payable to district clearing — record a <a href="{% url 'transactions:record_remittance' %}">bank remittance payment</a> afterward to move cash/bank.</p>
             </div>
         </div>
     </section>
     {% endif %}
 
+    {% if incoming_rows %}
+    <div class="table-wrap table-wrap--center table-wrap--compact mb-4" id="incoming-settlements">
+        {% if hierarchy_mode and desk %}
+        {% include "includes/table_open.html" with table_title="Incoming to desk (posted)" table_icon="bi-inbox" %}
+        <p class="small text-muted px-3 pt-2 mb-0">Units below {{ desk.label }} that posted settlements. Cash movement follows approved <strong>remittance payments</strong> from churches; notifications are sent in-app.</p>
+        {% else %}
+        {% include "includes/table_open.html" with table_title="Incoming to district (posted)" table_icon="bi-inbox" %}
+        <p class="small text-muted px-3 pt-2 mb-0">Churches in your district that posted settlements. Cash arrives when they complete an approved <strong>remittance payment</strong>.</p>
+        {% endif %}
+        <div class="table-responsive table-in-card">
+            <table class="table table-hover table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>From</th>
+                        <th>Offering</th>
+                        <th>Period</th>
+                        <th class="text-end">Gross</th>
+                        <th>Posted</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in incoming_rows %}
+                    <tr>
+                        <td class="fw-medium">{{ row.from_label }}</td>
+                        <td>{{ row.batch.get_offering_type_display }}</td>
+                        <td>{{ row.batch.period_start }} – {{ row.batch.period_end }}</td>
+                        <td class="text-end">{{ row.batch.gross_received|floatformat:2 }}</td>
+                        <td>{{ row.batch.posted_at|date:"j M Y" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "includes/table_close.html" %}
+    </div>
+    {% endif %}
+
     <div class="table-wrap table-wrap--center table-wrap--compact">
-        {% include "includes/table_open.html" with table_title="Recent Batches" table_icon="bi-arrow-up-right-circle" %}
+        {% if hierarchy_mode %}
+        {% include "includes/table_open.html" with table_title="Settlement batches" table_icon="bi-arrow-up-right-circle" %}
+        {% else %}
+        {% include "includes/table_open.html" with table_title="Recent batches" table_icon="bi-arrow-up-right-circle" %}
+        {% endif %}
         <div class="table-responsive table-in-card">
             <table class="table table-hover table-sm mb-0">
                 <thead>
@@ -58,20 +239,25 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for batch in batches %}
+                    {% for row in batch_rows %}
                     <tr>
-                        <td>{{ batch.get_offering_type_display }}</td>
-                        <td>{{ batch.get_from_unit_type_display }}</td>
-                        <td>{{ batch.get_to_unit_type_display }}</td>
-                        <td>{{ batch.period_start }} – {{ batch.period_end }}</td>
-                        <td class="text-end">{{ batch.gross_received|floatformat:2 }}</td>
-                        <td class="text-end">{{ batch.retain_amount|floatformat:2 }}</td>
-                        <td class="text-end">{{ batch.remit_amount|floatformat:2 }}</td>
-                        <td>{{ batch.get_status_display }}</td>
+                        <td>{{ row.batch.get_offering_type_display }}</td>
+                        <td>{{ row.from_label }}</td>
+                        <td>{{ row.to_label }}</td>
+                        <td>{{ row.batch.period_start }} – {{ row.batch.period_end }}</td>
+                        <td class="text-end">{{ row.batch.gross_received|floatformat:2 }}</td>
+                        <td class="text-end">{{ row.batch.retain_amount|floatformat:2 }}</td>
+                        <td class="text-end">{{ row.batch.remit_amount|floatformat:2 }}</td>
+                        <td>
+                            {{ row.batch.get_status_display }}
+                            {% if row.batch.status == "DRAFT" and row.batch.from_unit_type != "CHURCH" %}
+                            <span class="badge bg-secondary-subtle text-secondary ms-1" title="GL post not yet available">Review</span>
+                            {% endif %}
+                        </td>
                         {% if can_edit %}
                         <td class="text-end">
-                            {% if batch.status == "DRAFT" and batch.from_unit_type == "CHURCH" %}
-                            <form method="post" action="{% url 'remittance:settlement_post' batch.pk %}" class="d-inline">
+                            {% if row.can_post %}
+                            <form method="post" action="{% url 'remittance:settlement_post' row.batch.pk %}" class="d-inline">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-sm btn-outline-primary">Post</button>
                             </form>
@@ -81,7 +267,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="{% if can_edit %}9{% else %}8{% endif %}" class="text-muted text-center py-4">No settlement batches recorded yet.</td>
+                        <td colspan="{% if can_edit %}9{% else %}8{% endif %}" class="text-muted text-center py-4">No settlement batches in this view.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -90,6 +276,8 @@
         {% include "includes/table_close.html" %}
     </div>
 
-    <a href="{% url 'remittance:index' %}" class="btn btn-outline-secondary btn-sm mt-3">Back to Policies</a>
+    {% if can_manage_remittance_policy %}
+    <a href="{% url 'remittance:index' %}" class="btn btn-outline-secondary btn-sm mt-3">Remittance policies</a>
+    {% endif %}
 </div>
 {% endblock %}

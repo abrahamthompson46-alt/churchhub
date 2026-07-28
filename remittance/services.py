@@ -2,6 +2,7 @@
 
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.db.models import Sum
 from django.db import transaction as db_transaction
 from django.utils import timezone
 
@@ -440,6 +441,97 @@ REMIT_PAYABLE_ACCOUNT = {
     "COMBINED": "COMBINED_REMIT_PAYABLE",
 }
 
+
+def _approved_line_balance(church, account) -> Decimal:
+    from transactions.models import TransactionLine
+
+    total = (
+        TransactionLine.objects.filter(
+            transaction__church=church,
+            transaction__approval_status="APPROVED",
+            transaction__is_voided=False,
+            account=account,
+        ).aggregate(t=Sum("amount"))["t"]
+        or Decimal("0")
+    )
+    return total
+
+
+def remittance_outstanding_on_account(church, account) -> Decimal:
+    """
+    Positive amount still to pay via bank for remittance payable or district clearing.
+    Obligations sit on net credit balances (negative line sum).
+    """
+    total = _approved_line_balance(church, account)
+    if total < 0:
+        return abs(total)
+    return Decimal("0.00")
+
+
+def outstanding_district_remittance_parts(church):
+    """Tithe/combined still owed to district (payable bucket + clearing bucket)."""
+    from ledger.services import seed_ledger_accounts
+    from transactions.account_codes import get_remit_clearing_account
+    from transactions.services import _get_account
+
+    seed_ledger_accounts(church)
+    breakdown = {}
+    for offering in ("TITHE", "COMBINED"):
+        payable = _get_account(church, REMIT_PAYABLE_ACCOUNT[offering])
+        clearing = get_remit_clearing_account(church, offering, "DISTRICT")
+        payable_out = remittance_outstanding_on_account(church, payable)
+        clearing_out = remittance_outstanding_on_account(church, clearing)
+        breakdown[offering] = {
+            "payable": payable_out,
+            "clearing": clearing_out,
+            "total": payable_out + clearing_out,
+        }
+    tithe = breakdown["TITHE"]["total"]
+    combined = breakdown["COMBINED"]["total"]
+    return {
+        "tithe": tithe,
+        "combined": combined,
+        "total": tithe + combined,
+        "breakdown": breakdown,
+    }
+
+
+def build_remittance_payment_debits(church, offering_type, amount):
+    """Allocate bank remittance debits: district clearing first, then payable."""
+    from ledger.services import seed_ledger_accounts
+    from transactions.account_codes import get_remit_clearing_account
+    from transactions.services import _get_account
+
+    amount = Decimal(str(amount))
+    if amount <= 0:
+        return []
+    seed_ledger_accounts(church)
+    payable = _get_account(church, REMIT_PAYABLE_ACCOUNT[offering_type])
+    clearing = get_remit_clearing_account(church, offering_type, "DISTRICT")
+    clearing_out = remittance_outstanding_on_account(church, clearing)
+    payable_out = remittance_outstanding_on_account(church, payable)
+    available = clearing_out + payable_out
+    if amount > available + Decimal("0.01"):
+        raise ValueError(
+            f"Remittance amount {amount} exceeds outstanding {offering_type} balance ({available})."
+        )
+    debits = []
+    remaining = amount
+    if clearing_out > 0:
+        take = min(remaining, clearing_out)
+        debits.append((clearing, take))
+        remaining -= take
+    if remaining > 0 and payable_out > 0:
+        take = min(remaining, payable_out)
+        debits.append((payable, take))
+        remaining -= take
+    if remaining > Decimal("0.01"):
+        raise ValueError(
+            f"Could not allocate {offering_type} remittance debits ({remaining} unallocated)."
+        )
+    return debits
+
+
 HIERARCHY_PARENT = {
     "CHURCH": ("DISTRICT", lambda church: church.district),
     "DISTRICT": ("CONFERENCE", lambda district: district.zone.conference),
@@ -664,6 +756,14 @@ def post_settlement_batch(batch, user):
     batch.status = "POSTED"
     batch.posted_at = timezone.now()
     repo.save_settlement_batch(batch, update_fields=["status", "posted_at"])
+    if batch.from_unit_type == "CHURCH":
+        church = selectors.church_by_pk(batch.from_unit_id)
+        try:
+            from remittance.notifications import notify_district_settlement_posted
+
+            notify_district_settlement_posted(batch, church=church)
+        except Exception:
+            pass
     return batch
 
 

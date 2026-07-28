@@ -111,6 +111,43 @@ def _compute_remittance_payable_mtd(church, month_start_date):
     return selectors.remittance_payable_mtd_amounts(church, month_start_date)
 
 
+def _sum_remittance_payable_mtd_for_churches(churches, month_start_date):
+    """Per-church cut-off or GL compute, summed — matches the cut-off page and church KPIs."""
+    total = Decimal("0")
+    for church in churches:
+        existing = selectors.monthly_cutoff_for_church_month(church, month_start_date)
+        if existing:
+            total += existing.total_payable
+        else:
+            _, _, amount = _compute_remittance_payable_mtd(church, month_start_date)
+            total += amount
+    return total
+
+
+def get_workspace_finance_mtd(request):
+    """MTD finance snapshot for the workspace status bar (active church)."""
+    from accounts.permissions import can_view_dashboard_finance
+
+    if not request.user.is_authenticated or not can_view_dashboard_finance(request.user):
+        return None
+
+    church = get_active_church(request)
+    if not church:
+        return None
+
+    _, _, month_start_date = _month_bounds()
+    mtd_lines = selectors.mtd_lines_for_churches([church.pk], month_start_date)
+    mtd_tithe, mtd_combined = selectors.sum_tithe_combined_mtd(mtd_lines)
+    ie = selectors.sum_line_amounts_by_types(mtd_lines, ("INCOME", "EXPENSE"))
+    mtd_remit = _sum_remittance_payable_mtd_for_churches([church], month_start_date)
+    return {
+        "mtd_tithe": mtd_tithe,
+        "mtd_combined": mtd_combined,
+        "mtd_remittance_payable": mtd_remit,
+        "mtd_net": ie["INCOME"] - ie["EXPENSE"],
+    }
+
+
 def get_financial_summary(request):
     """Core financial KPIs for finance dashboards (MTD primary)."""
     now, month_start, month_start_date = _month_bounds()
@@ -120,25 +157,19 @@ def get_financial_summary(request):
     mtd_lines = selectors.lines_for_transactions(mtd_approved)
     all_time_lines = selectors.lines_for_transactions(approved)
 
-    mtd_totals = selectors.sum_line_amounts_by_types(
-        mtd_lines, ("TITHE", "COMBINED", "INCOME", "EXPENSE")
-    )
-    tithe_total = mtd_totals["TITHE"]
-    combined_total = mtd_totals["COMBINED"]
+    tithe_total, combined_total = selectors.sum_tithe_combined_mtd(mtd_lines)
+    mtd_totals = selectors.sum_line_amounts_by_types(mtd_lines, ("INCOME", "EXPENSE"))
     income_total = mtd_totals["INCOME"]
     expense_total = mtd_totals["EXPENSE"]
 
     church = get_active_church(request)
-    monthly_cutoff_total = Decimal("0")
     if church:
-        existing = selectors.monthly_cutoff_for_church_month(church, month_start_date)
-        if existing:
-            monthly_cutoff_total = existing.total_payable
-        else:
-            _, _, monthly_cutoff_total = _compute_remittance_payable_mtd(church, month_start_date)
+        monthly_cutoff_total = _sum_remittance_payable_mtd_for_churches(
+            [church], month_start_date
+        )
     else:
-        monthly_cutoff_total = selectors.sum_line_amount_for_types(
-            mtd_lines, REMIT_PAYABLE_TYPES
+        monthly_cutoff_total = _sum_remittance_payable_mtd_for_churches(
+            list(get_manageable_churches(request.user)), month_start_date
         )
 
     six_months_ago = (now - relativedelta(months=5)).replace(day=1)
@@ -166,9 +197,7 @@ def get_financial_summary(request):
     income_data = [trend_dict[m]["INCOME"] for m in trend_labels]
     expense_data = [trend_dict[m]["EXPENSE"] for m in trend_labels]
 
-    all_time_totals = selectors.sum_line_amounts_by_types(
-        all_time_lines, ("TITHE", "COMBINED")
-    )
+    all_time_tithe, all_time_combined = selectors.sum_tithe_combined_mtd(all_time_lines)
 
     return {
         "kpi_period_label": "Month to date",
@@ -179,8 +208,8 @@ def get_financial_summary(request):
         "expense_total": expense_total,
         "net_balance": income_total - expense_total,
         "monthly_cutoff_total": monthly_cutoff_total,
-        "tithe_total_all_time": all_time_totals["TITHE"],
-        "combined_total_all_time": all_time_totals["COMBINED"],
+        "tithe_total_all_time": all_time_tithe,
+        "combined_total_all_time": all_time_combined,
         "pending_count": selectors.pending_transactions_count(transactions),
         "recent_transactions": selectors.recent_approved_transactions(approved),
         "trend_labels": json.dumps(trend_labels),
@@ -495,9 +524,9 @@ def get_hierarchy_rollup(request, user):
             continue
         amount = abs(row["total"] or Decimal("0"))
         acc = row["account__account_type"]
-        if acc == "TITHE":
+        if acc in selectors.TITHE_GIVING_TYPES:
             by_district[did]["tithe"] += amount
-        elif acc == "COMBINED":
+        elif acc in selectors.COMBINED_GIVING_TYPES:
             by_district[did]["combined"] += amount
         elif acc in REMIT_PAYABLE_TYPES:
             by_district[did]["remittance_payable"] += amount
@@ -572,8 +601,8 @@ def get_executive_kpis(
     Organization KPIs for Mission Control.
 
     Churches / members / action items stay hierarchy-wide.
-    Finance MTD figures follow the toolbar church when one is selected
-    (same numbers as Church Finance MTD); otherwise they roll up the full scope.
+    Finance MTD figures follow the toolbar church when one is selected; otherwise they roll up the full scope.
+    Remittance payable uses the same per-church cut-off logic as the cut-off page.
     """
     if manageable is None:
         manageable = get_manageable_churches(user)
@@ -596,22 +625,12 @@ def get_executive_kpis(
         finance_scope = "scope"
 
     mtd_lines = selectors.mtd_lines_for_churches(finance_church_ids, month_start_date)
-    mtd_totals = selectors.sum_line_amounts_by_types(
-        mtd_lines, ("TITHE", "COMBINED", "INCOME", "EXPENSE") + REMIT_PAYABLE_TYPES
-    )
-    mtd_tithe = mtd_totals["TITHE"]
-    mtd_combined = mtd_totals["COMBINED"]
+    mtd_tithe, mtd_combined = selectors.sum_tithe_combined_mtd(mtd_lines)
+    mtd_totals = selectors.sum_line_amounts_by_types(mtd_lines, ("INCOME", "EXPENSE"))
     mtd_income = mtd_totals["INCOME"]
     mtd_expense = mtd_totals["EXPENSE"]
-    mtd_remit = mtd_totals.get("TITHE_REMIT_PAYABLE", Decimal("0")) + mtd_totals.get(
-        "COMBINED_REMIT_PAYABLE", Decimal("0")
-    )
-    if active_church is not None and active_church.pk in set(church_ids):
-        existing = selectors.monthly_cutoff_for_church_month(active_church, month_start_date)
-        if existing:
-            mtd_remit = existing.total_payable
-        else:
-            _, _, mtd_remit = _compute_remittance_payable_mtd(active_church, month_start_date)
+    finance_churches = list(manageable.filter(pk__in=finance_church_ids))
+    mtd_remit = _sum_remittance_payable_mtd_for_churches(finance_churches, month_start_date)
 
     pending_txn = selectors.pending_transactions_for_churches_count(church_ids)
     member_count = selectors.active_member_count_for_churches(church_ids)
@@ -974,8 +993,7 @@ def build_home_context(request):
     show_this_week_pulse = show_members and role in (
         "secretary", "leadership", "members", "admin", "overseer", "district_overseer",
     )
-    # Avoid repeating Tithe/Combined when the KPI strip already shows them.
-    show_finance_mini_kpis = show_finance_charts and is_control_center
+    # Mission Control finance KPIs live in the top strip; net MTD is on the workspace bar.
 
     # One primary work surface: teller for treasury ops, otherwise action queue.
     show_teller = False
@@ -999,7 +1017,6 @@ def build_home_context(request):
         "action_queue": get_action_queue(request, user),
         "show_finance": show_finance,
         "show_finance_charts": show_finance_charts,
-        "show_finance_mini_kpis": show_finance_mini_kpis,
         "show_church_finance_kpis": show_church_finance_kpis,
         "show_member_kpis": show_member_kpis,
         "show_upcoming_panel": show_upcoming_panel,
@@ -1048,6 +1065,15 @@ def build_home_context(request):
     if show_finance:
         context.update(get_financial_summary(request))
 
+    if is_control_center and context.get("executive_kpis"):
+        ek = context["executive_kpis"]
+        context["tithe_total"] = ek["mtd_tithe"]
+        context["combined_total"] = ek["mtd_combined"]
+        context["monthly_cutoff_total"] = ek["mtd_remittance_payable"]
+        context["church_income_total"] = ek["mtd_income"]
+        context["expense_total"] = ek["mtd_expense"]
+        context["net_balance"] = ek["mtd_net"]
+
     if show_treasury_ops:
         church = get_active_church(request)
         if church:
@@ -1056,7 +1082,7 @@ def build_home_context(request):
             context["cash_position"] = get_cash_position(church)
             context["teller_console"] = get_teller_daily_summary(church)
             context["show_teller_console"] = True
-            context["suppress_workspace_cash"] = True
+            context["suppress_workspace_cash"] = False
         else:
             context["show_teller_console"] = False
             context["suppress_workspace_cash"] = False

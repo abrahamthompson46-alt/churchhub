@@ -85,6 +85,149 @@ def settlements_for_church(church, limit=50):
     ).order_by("-period_end", "-created_at")[:limit]
 
 
+def settlements_incoming_to_unit(
+    unit_type,
+    unit_id,
+    limit=50,
+    *,
+    status="POSTED",
+    offering_type=None,
+):
+    """Settlement batches received by a hierarchy unit (default: posted only)."""
+    if not unit_id:
+        return SettlementBatch.objects.none()
+    qs = SettlementBatch.objects.filter(
+        to_unit_type=unit_type,
+        to_unit_id=unit_id,
+    )
+    if status:
+        qs = qs.filter(status=status)
+    if offering_type:
+        qs = qs.filter(offering_type=offering_type)
+    return qs.order_by("-posted_at", "-period_end", "-created_at")[:limit]
+
+
+def settlements_outgoing_from_unit(
+    unit_type,
+    unit_id,
+    limit=50,
+    *,
+    status=None,
+    offering_type=None,
+):
+    if not unit_id:
+        return SettlementBatch.objects.none()
+    qs = SettlementBatch.objects.filter(
+        from_unit_type=unit_type,
+        from_unit_id=unit_id,
+    )
+    if status:
+        qs = qs.filter(status=status)
+    if offering_type:
+        qs = qs.filter(offering_type=offering_type)
+    return qs.order_by("-period_end", "-created_at")[:limit]
+
+
+def settlements_for_churches(church_ids, limit=100, *, status=None):
+    if not church_ids:
+        return SettlementBatch.objects.none()
+    qs = SettlementBatch.objects.filter(
+        from_unit_type="CHURCH",
+        from_unit_id__in=list(church_ids),
+    )
+    if status:
+        qs = qs.filter(status=status)
+    return qs.order_by("-period_end", "-created_at")[:limit]
+
+
+def settlement_desk_batches(
+    *,
+    desk_type,
+    desk_id,
+    church_ids,
+    tab="all",
+    status=None,
+    offering_type=None,
+    limit=100,
+):
+    """
+    Scoped settlement list for a hierarchy desk.
+
+    tab: incoming | outgoing | churches | all
+    """
+    if not desk_id:
+        return SettlementBatch.objects.none()
+
+    incoming_q = Q(to_unit_type=desk_type, to_unit_id=desk_id)
+    outgoing_q = Q(from_unit_type=desk_type, from_unit_id=desk_id)
+    church_q = Q()
+    if church_ids:
+        church_q = Q(from_unit_type="CHURCH", from_unit_id__in=list(church_ids))
+
+    if tab == "incoming":
+        base = incoming_q
+    elif tab == "outgoing":
+        base = outgoing_q
+    elif tab == "churches":
+        base = church_q if church_ids else Q(pk__in=[])
+    else:
+        base = incoming_q | outgoing_q | church_q
+
+    qs = SettlementBatch.objects.filter(base)
+    if status:
+        qs = qs.filter(status=status)
+    if offering_type:
+        qs = qs.filter(offering_type=offering_type)
+    return qs.order_by("-period_end", "-created_at").distinct()[:limit]
+
+
+def settlement_desk_summary(desk_type, desk_id, church_ids):
+    """Light KPI counts for the desk header."""
+    if not desk_id:
+        return {
+            "incoming_posted": 0,
+            "outgoing_draft": 0,
+            "church_draft": 0,
+            "church_posted_mtd_gross": Decimal("0.00"),
+        }
+    incoming_posted = SettlementBatch.objects.filter(
+        to_unit_type=desk_type,
+        to_unit_id=desk_id,
+        status="POSTED",
+    ).count()
+    outgoing_draft = SettlementBatch.objects.filter(
+        from_unit_type=desk_type,
+        from_unit_id=desk_id,
+        status="DRAFT",
+    ).count()
+    church_draft = 0
+    church_posted_mtd_gross = Decimal("0.00")
+    if church_ids:
+        church_draft = SettlementBatch.objects.filter(
+            from_unit_type="CHURCH",
+            from_unit_id__in=list(church_ids),
+            status="DRAFT",
+        ).count()
+        from django.utils import timezone
+
+        month_start = timezone.now().date().replace(day=1)
+        church_posted_mtd_gross = (
+            SettlementBatch.objects.filter(
+                from_unit_type="CHURCH",
+                from_unit_id__in=list(church_ids),
+                status="POSTED",
+                period_end__gte=month_start,
+            ).aggregate(total=Sum("gross_received"))["total"]
+            or Decimal("0.00")
+        )
+    return {
+        "incoming_posted": incoming_posted,
+        "outgoing_draft": outgoing_draft,
+        "church_draft": church_draft,
+        "church_posted_mtd_gross": church_posted_mtd_gross,
+    }
+
+
 def settlement_by_pk(pk):
     return get_object_or_404(SettlementBatch, pk=pk)
 

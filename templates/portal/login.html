@@ -26,12 +26,14 @@
     </aside>
     <section class="auth-split-form">
         <div class="auth-mobile-brand d-lg-none">
-            {% if denomination_logo or tenant_logo or site_logo %}
-            <img src="{% if denomination_logo %}{{ denomination_logo.url }}{% elif tenant_logo %}{{ tenant_logo.url }}{% else %}{{ site_logo.url }}{% endif %}" alt="{{ institution_display_name|default:site_name }}" class="auth-platform-logo-sm">
-            {% else %}
-            <span class="brand-mark auth-platform-mark-sm" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
-            {% endif %}
-            <div>
+            <div class="auth-mobile-brand__logo">
+                {% if denomination_logo or tenant_logo or site_logo %}
+                <img src="{% if denomination_logo %}{{ denomination_logo.url }}{% elif tenant_logo %}{{ tenant_logo.url }}{% else %}{{ site_logo.url }}{% endif %}" alt="{{ institution_display_name|default:site_name }}" class="auth-platform-logo-sm">
+                {% else %}
+                <span class="brand-mark auth-platform-mark-sm" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
+                {% endif %}
+            </div>
+            <div class="auth-mobile-brand__text">
                 <p class="auth-platform-eyebrow mb-0">Member Portal</p>
                 <p class="auth-mobile-brand__name mb-0">{{ institution_display_name|default:site_name }}</p>
             </div>

@@ -1,6 +1,6 @@
 {% load humanize churchhub_tags %}
 {% if user.is_authenticated and not user.is_platform_user and user.role != "MEMBER" %}
-{% if show_working_day_status or system_date or active_church or cash_position %}
+{% if show_working_day_status or system_date or active_church or cash_position or workspace_finance_mtd %}
 <div class="workspace-status-bar" aria-label="Workspace status">
     <div class="workspace-status-bar__inner page-container">
         <div class="workspace-status-bar__meta">
@@ -30,6 +30,14 @@
             </span>
             {% endif %}
         </div>
+        {% if workspace_finance_mtd %}
+        <div class="workspace-status-bar__finance" title="Month-to-date for selected church">
+            <span class="workspace-status-pill workspace-status-pill--finance">
+                <span class="workspace-status-pill__label">Net MTD</span>
+                <strong class="text-currency">{% money workspace_finance_mtd.mtd_net 0 %}</strong>
+            </span>
+        </div>
+        {% endif %}
         {% if cash_position and show_cash_position and not suppress_workspace_cash %}
         <div class="workspace-status-bar__cash" title="Approved book balances" data-currency-symbol="{{ currency_symbol }}">
             <span class="workspace-status-pill workspace-status-pill--cash">

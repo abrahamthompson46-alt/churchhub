@@ -399,11 +399,15 @@ def record_remittance_view(request):
     month_str = request.POST.get("month") if request.method == "POST" else request.GET.get("month")
     month_date = parse_date(month_str) if month_str else timezone.now().date()
     cutoff = generate_monthly_cutoff(church, month_date)
-    amount = cutoff.total_payable
+    from remittance.services import outstanding_district_remittance_parts
+
+    outstanding = outstanding_district_remittance_parts(church)
+    amount = outstanding["total"]
     context = {
         "cutoff": cutoff,
         "month_date": month_date,
         "amount": amount,
+        "outstanding": outstanding,
         "idempotency_key": f"remit-{church.pk}-{month_date.strftime('%Y-%m')}",
     }
 

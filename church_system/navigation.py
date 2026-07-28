@@ -233,21 +233,25 @@ def _finance_sections(user, active_church=None):
 
     if (
         _church_feature(active_church, "remittance", user)
-        and (
-            can_view_remittance(user)
-            or can_manage_remittance_policy(user)
-            or can_manage_settlements(user)
-            or can_view_welfare(user)
-        )
+        or can_manage_settlements(user)
+    ) and (
+        can_view_remittance(user)
+        or can_manage_remittance_policy(user)
+        or can_manage_settlements(user)
+        or can_view_welfare(user)
     ):
         remittance_items = []
-        if can_manage_remittance_policy(user):
+        if can_manage_remittance_policy(user) and _church_feature(active_church, "remittance", user):
             remittance_items.append(_item("Remittance Policies", "remittance:index", "bi-percent"))
         if can_manage_settlements(user):
-            remittance_items.append(_item("Settlements", "remittance:settlements", "bi-arrow-up-right-circle"))
-        if can_manage_expenses(user) or can_manage_receipts(user) or can_manage_finances(user):
+            remittance_items.append(
+                _item("Settlement Desk", "remittance:settlements", "bi-arrow-up-right-circle")
+            )
+        if _church_feature(active_church, "remittance", user) and (
+            can_manage_expenses(user) or can_manage_receipts(user) or can_manage_finances(user)
+        ):
             remittance_items.append(_item("Remittance Payment", "transactions:record_remittance", "bi-bank"))
-        if can_view_welfare(user):
+        if can_view_welfare(user) and _church_feature(active_church, "remittance", user):
             remittance_items.append(_item("Welfare", "remittance:welfare", "bi-heart-pulse"))
         if remittance_items:
             sections.append(_section("Remittance & welfare", remittance_items, "remittance"))
@@ -846,6 +850,11 @@ def _tab_allowed(user, url_name, active_church=None):
                 or can_manage_settlements(user)
             )
             and _church_feature(active_church, "remittance", user)
+        ),
+        "remittance:settlements": lambda: (
+            can_manage_finances(user)
+            or can_manage_settlements(user)
+            or can_manage_remittance_policy(user)
         ),
         "payroll:index": lambda: (
             (can_view_payroll(user) or can_manage_payroll(user))

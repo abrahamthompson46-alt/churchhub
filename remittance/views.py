@@ -22,6 +22,7 @@ from remittance import repositories as repo
 from remittance import selectors
 from remittance.forms import (
     RemittancePolicyForm,
+    HierarchySettlementDraftForm,
     SettlementDraftForm,
     WelfareApproveForm,
     WelfareCaseAttachmentForm,
@@ -45,7 +46,15 @@ from remittance.services import (
     reject_welfare_case,
     resolve_unit_label,
     save_remittance_policy,
+    unit_in_user_scope,
 )
+from remittance.settlement_desk import (
+    list_settlement_desks,
+    resolve_settlement_desk,
+    user_can_access_settlement_batch,
+    user_has_hierarchy_settlement_desk,
+)
+from permissions.scoping import get_manageable_churches
 from remittance.welfare_services import (
     cancel_welfare_case,
     build_member_welfare_statement,
@@ -74,9 +83,35 @@ def _finance_or_policy(view_func):
     @login_required
     @require_feature("remittance")
     def _wrapped(request, *args, **kwargs):
-        if not (can_manage_finances(request.user) or can_manage_remittance_policy(request.user)):
+        if not (
+            can_manage_finances(request.user)
+            or can_manage_remittance_policy(request.user)
+            or can_manage_settlements(request.user)
+        ):
             raise PermissionDenied
         return view_func(request, *args, **kwargs)
+    return _wrapped
+
+
+def _settlement_access(view_func):
+    """Settlements page: church treasury or hierarchy settlement permission."""
+
+    @login_required
+    def _wrapped(request, *args, **kwargs):
+        user = request.user
+        if not (
+            can_manage_finances(user)
+            or can_manage_settlements(user)
+            or can_manage_remittance_policy(user)
+        ):
+            raise PermissionDenied
+        church = get_active_church(request)
+        if church is None and not user_has_hierarchy_settlement_desk(user, church=church):
+            raise PermissionDenied(
+                "No church context is available. Select a church or contact your administrator."
+            )
+        return view_func(request, *args, **kwargs)
+
     return _wrapped
 
 
@@ -176,64 +211,256 @@ def policy_edit(request, pk):
     })
 
 
-@_finance_or_policy
+@_settlement_access
 def settlement_list(request):
-    church = require_church(request)
-    ensure_hierarchy_settlement_policies(church, user=request.user)
-
-    batches = selectors.settlements_for_church(church)
-
-    draft_form = SettlementDraftForm(
-        request.POST or None,
-        initial={
-            "period_start": timezone.now().date().replace(day=1),
-            "period_end": timezone.now().date(),
-        },
+    church = get_active_church(request)
+    desk = resolve_settlement_desk(request.user, request, church=church)
+    hierarchy_mode = desk is not None and (
+        can_manage_settlements(request.user)
+        or infer_scope_above_church(request.user)
     )
 
-    if request.method == "POST" and request.POST.get("action") == "create_draft":
-        if not can_manage_finances(request.user):
+    if church and not hierarchy_mode:
+        from sitecontrol.services import church_has_feature
+
+        if not church_has_feature(church, "remittance"):
             raise PermissionDenied
-        draft_form = SettlementDraftForm(request.POST)
-        if draft_form.is_valid():
-            try:
-                create_settlement_draft(
-                    from_unit_type="CHURCH",
-                    from_unit_id=church.pk,
-                    offering_type=draft_form.cleaned_data["offering_type"],
-                    period_start=draft_form.cleaned_data["period_start"],
-                    period_end=draft_form.cleaned_data["period_end"],
-                    user=request.user,
-                    church=church,
+
+    if church:
+        ensure_hierarchy_settlement_policies(church, user=request.user)
+
+    tab = (request.GET.get("tab") or "all").lower()
+    if tab not in ("incoming", "outgoing", "churches", "all", "local"):
+        tab = "all"
+    status_filter = (request.GET.get("status") or "").upper() or None
+    if status_filter and status_filter not in ("DRAFT", "POSTED", "VOID"):
+        status_filter = None
+    offering_filter = (request.GET.get("offering") or "").upper() or None
+
+    manageable_ids = list(
+        get_manageable_churches(request.user).values_list("pk", flat=True)
+    )
+
+    batches = []
+    incoming_rows = []
+    desk_summary = None
+    desk_choices = []
+    show_local_church = bool(church) and can_manage_finances(request.user)
+
+    if hierarchy_mode and desk:
+        desk_choices = [
+            (d.unit_type, str(d.unit_id), d.label)
+            for d in list_settlement_desks(request.user, church=church)
+        ]
+        if tab == "local" and show_local_church:
+            batches = list(selectors.settlements_for_church(church))
+            tab = "local"
+        else:
+            if tab == "local":
+                tab = "all"
+            batches = list(
+                selectors.settlement_desk_batches(
+                    desk_type=desk.unit_type,
+                    desk_id=desk.unit_id,
+                    church_ids=manageable_ids,
+                    tab=tab,
+                    status=status_filter,
+                    offering_type=offering_filter,
                 )
-                flash_success(request, "Settlement draft created.")
-                return redirect("remittance:settlements")
-            except RemittancePolicyError as exc:
-                flash_exception(request, exc)
+            )
+        incoming_batches = selectors.settlements_incoming_to_unit(
+            desk.unit_type,
+            desk.unit_id,
+            limit=50,
+            status="POSTED",
+            offering_type=offering_filter,
+        )
+        incoming_rows = [
+            {
+                "batch": batch,
+                "from_label": resolve_unit_label(batch.from_unit_type, batch.from_unit_id),
+            }
+            for batch in incoming_batches
+        ]
+        desk_summary = selectors.settlement_desk_summary(
+            desk.unit_type, desk.unit_id, manageable_ids
+        )
+    elif church:
+        batches = list(selectors.settlements_for_church(church))
+        incoming_batches = (
+            selectors.settlements_incoming_to_unit(
+                "DISTRICT", church.district_id
+            )
+            if church.district_id
+            else []
+        )
+        incoming_rows = [
+            {
+                "batch": batch,
+                "from_label": resolve_unit_label(batch.from_unit_type, batch.from_unit_id),
+            }
+            for batch in incoming_batches
+        ]
+        tab = "local"
+    else:
+        raise PermissionDenied
+
+    period_defaults = {
+        "period_start": timezone.now().date().replace(day=1),
+        "period_end": timezone.now().date(),
+    }
+    draft_form = SettlementDraftForm(request.POST or None, initial=period_defaults)
+    hierarchy_draft_form = HierarchySettlementDraftForm(
+        request.POST or None,
+        user=request.user,
+        church=church,
+        desk_choices=desk_choices,
+        initial=period_defaults,
+    )
+
+    can_create_church = bool(church) and can_manage_finances(request.user)
+    can_create_hierarchy = hierarchy_mode and can_manage_settlements(request.user)
+
+    if request.method == "POST" and request.POST.get("action") == "create_draft":
+        if request.POST.get("draft_scope") == "hierarchy":
+            if not can_create_hierarchy:
+                raise PermissionDenied
+            hierarchy_draft_form = HierarchySettlementDraftForm(
+                request.POST,
+                user=request.user,
+                church=church,
+                desk_choices=desk_choices,
+            )
+            if hierarchy_draft_form.is_valid():
+                from_type, from_id = hierarchy_draft_form.cleaned_data["from_unit"]
+                if not unit_in_user_scope(
+                    request.user, from_type, from_id, church=church
+                ):
+                    raise PermissionDenied
+                try:
+                    create_settlement_draft(
+                        from_unit_type=from_type,
+                        from_unit_id=from_id,
+                        offering_type=hierarchy_draft_form.cleaned_data["offering_type"],
+                        period_start=hierarchy_draft_form.cleaned_data["period_start"],
+                        period_end=hierarchy_draft_form.cleaned_data["period_end"],
+                        user=request.user,
+                        church=church,
+                    )
+                    flash_success(request, "Hierarchy settlement draft created.")
+                    return redirect(_settlements_redirect(desk, tab))
+                except RemittancePolicyError as exc:
+                    flash_exception(request, exc)
+        else:
+            if not can_create_church or not church:
+                raise PermissionDenied
+            draft_form = SettlementDraftForm(request.POST)
+            if draft_form.is_valid():
+                try:
+                    create_settlement_draft(
+                        from_unit_type="CHURCH",
+                        from_unit_id=church.pk,
+                        offering_type=draft_form.cleaned_data["offering_type"],
+                        period_start=draft_form.cleaned_data["period_start"],
+                        period_end=draft_form.cleaned_data["period_end"],
+                        user=request.user,
+                        church=church,
+                    )
+                    flash_success(request, "Settlement draft created.")
+                    return redirect(_settlements_redirect(desk, tab="local"))
+                except RemittancePolicyError as exc:
+                    flash_exception(request, exc)
+
+    batch_rows = [
+        {
+            "batch": batch,
+            "from_label": resolve_unit_label(batch.from_unit_type, batch.from_unit_id),
+            "to_label": resolve_unit_label(batch.to_unit_type, batch.to_unit_id),
+            "can_post": _batch_can_post(request.user, batch, church),
+        }
+        for batch in batches
+    ]
 
     return render(request, "remittance/settlements.html", {
         "batches": batches,
+        "batch_rows": batch_rows,
+        "incoming_batches": incoming_rows and [r["batch"] for r in incoming_rows] or [],
+        "incoming_rows": incoming_rows,
+        "show_incoming": request.GET.get("incoming") == "1" or bool(incoming_rows),
         "active_church": church,
-        "can_edit": can_manage_finances(request.user),
+        "can_edit": can_create_church,
+        "can_hierarchy_edit": can_create_hierarchy,
         "draft_form": draft_form,
+        "hierarchy_draft_form": hierarchy_draft_form,
+        "hierarchy_mode": hierarchy_mode,
+        "desk": desk,
+        "desk_choices": desk_choices,
+        "desk_summary": desk_summary,
+        "tab": tab,
+        "status_filter": status_filter or "",
+        "offering_filter": offering_filter or "",
+        "show_local_church": show_local_church,
+        "can_manage_remittance_policy": can_manage_remittance_policy(request.user),
     })
 
 
-@_finance_or_policy
+def infer_scope_above_church(user):
+    from permissions.org_scope import OrgScopeLevel, infer_scope_level
+
+    return infer_scope_level(user) != OrgScopeLevel.CHURCH
+
+
+def _settlements_redirect(desk, tab="all"):
+    from django.urls import reverse
+
+    url = reverse("remittance:settlements")
+    params = []
+    if desk:
+        params.append(f"desk={desk.unit_type}:{desk.unit_id}")
+    if tab and tab != "all":
+        params.append(f"tab={tab}")
+    if params:
+        return f"{url}?{'&'.join(params)}"
+    return url
+
+
+def _batch_can_post(user, batch, church):
+    if batch.status != "DRAFT":
+        return False
+    if batch.from_unit_type == "CHURCH":
+        if not can_manage_finances(user) or not church:
+            return False
+        return str(batch.from_unit_id) == str(church.pk)
+    return False
+
+
+@_settlement_access
 def settlement_post(request, pk):
-    if not can_manage_finances(request.user):
-        raise PermissionDenied
     batch = selectors.settlement_by_pk(pk)
-    church = require_church(request)
-    if batch.from_unit_type != "CHURCH" or str(batch.from_unit_id) != str(church.pk):
+    church = get_active_church(request)
+    if not user_can_access_settlement_batch(request.user, batch, church=church):
         raise PermissionDenied
+    if batch.from_unit_type == "CHURCH":
+        if not can_manage_finances(request.user):
+            raise PermissionDenied
+        if church and str(batch.from_unit_id) != str(church.pk):
+            manageable = {
+                str(c)
+                for c in get_manageable_churches(request.user).values_list("pk", flat=True)
+            }
+            if str(batch.from_unit_id) not in manageable:
+                raise PermissionDenied
+            church = selectors.church_by_pk(batch.from_unit_id)
+    else:
+        raise PermissionDenied("Only church settlement batches can be posted at this time.")
     if request.method == "POST":
         try:
             post_settlement_batch(batch, request.user)
             flash_success(request, "Settlement batch posted.")
         except RemittancePolicyError as exc:
             flash_exception(request, exc)
-    return redirect("remittance:settlements")
+    desk = resolve_settlement_desk(request.user, request, church=church)
+    return redirect(_settlements_redirect(desk))
 
 
 @_finance_or_policy

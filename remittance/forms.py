@@ -107,6 +107,30 @@ class SettlementDraftForm(forms.Form):
         return cleaned
 
 
+class HierarchySettlementDraftForm(SettlementDraftForm):
+    """Draft from a hierarchy unit (district, conference, union, GC)."""
+
+    from_unit = forms.ChoiceField(
+        widget=forms.Select(attrs=select_attrs()),
+        label="From unit",
+    )
+
+    def __init__(self, *args, user=None, church=None, desk_choices=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        choices = desk_choices or []
+        self.fields["from_unit"].choices = [("", "Select unit")] + [
+            (f"{unit_type}:{unit_id}", label)
+            for unit_type, unit_id, label in choices
+        ]
+
+    def clean_from_unit(self):
+        raw = self.cleaned_data.get("from_unit") or ""
+        if not raw or ":" not in raw:
+            raise ValidationError("Select the unit sending this settlement.")
+        unit_type, unit_id = raw.split(":", 1)
+        return unit_type.upper(), unit_id
+
+
 class WelfareCaseForm(forms.Form):
     member = forms.CharField(widget=forms.HiddenInput())
     assistance_type = forms.ChoiceField(

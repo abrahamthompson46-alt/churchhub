@@ -4,7 +4,11 @@
 {% block title %}Remittance Payment — ChurchHub{% endblock %}
 
 {% block content %}
-{% include "includes/form_open.html" with form_subtitle="Finance" form_title="Remittance Payment" form_description="Record district remittance for the selected month. The amount comes from remittance payable cut-off totals." wide=True %}
+{% include "includes/form_open.html" with form_subtitle="Finance" form_title="Remittance Payment" form_description="Pay the district from bank or cash. Clears remittance payable and, if you posted a settlement batch, district clearing balances." wide=True %}
+
+<div class="alert alert-info py-2 small mb-4" role="status">
+    <strong>Workflow:</strong> Receipts build payable → optional <a href="{% url 'remittance:settlements' %}">settlement batch</a> reclassifies to district clearing (cash unchanged) → this payment sends cash/bank to the district.
+</div>
 
 <form method="get" class="row g-3 align-items-end mb-4">
     <div class="col-md-6">
@@ -19,12 +23,18 @@
 </form>
 
 <div class="mb-4">
-    <span class="form-label d-block">Payable amount</span>
+    <span class="form-label d-block">Amount to pay (outstanding)</span>
     <p class="fs-4 mb-0 text-currency">{{ amount|floatformat:2|intcomma }}</p>
-    {% if cutoff %}
+    {% if outstanding %}
     <div class="form-text">
-        Tithe {{ cutoff.total_tithe|floatformat:2|intcomma }}
-        · Combined {{ cutoff.total_combined|floatformat:2|intcomma }}
+        Tithe {{ outstanding.tithe|floatformat:2|intcomma }}
+        · Combined {{ outstanding.combined|floatformat:2|intcomma }}
+        {% if cutoff and cutoff.transferred %}· Cut-off marked remitted{% endif %}
+    </div>
+    {% elif cutoff %}
+    <div class="form-text">
+        Cut-off tithe {{ cutoff.total_tithe|floatformat:2|intcomma }}
+        · combined {{ cutoff.total_combined|floatformat:2|intcomma }}
         {% if cutoff.transferred %}· Already remitted{% endif %}
     </div>
     {% endif %}

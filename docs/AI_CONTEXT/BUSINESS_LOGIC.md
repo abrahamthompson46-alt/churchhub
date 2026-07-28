@@ -339,7 +339,7 @@ Views should use `permission_required` / `any_permission_required` / `can_*` fro
 ## 12. Reports and dashboard
 
 - `reports`: builds scoped datasets; `ReportExportJob` for async-capable exports; `ReportAccessAuditLog`
-- `dashboard`: KPIs, notifications (`Notification`), church switching for hierarchy users
+- `dashboard`: KPIs, notifications (`Notification`), church switching for hierarchy users. **Current:** `DashboardScope` (`dashboard/scope.py`) drives MTD roll-ups (active church vs manageable scope); KPI cards use `build_kpi_widgets` (`dashboard/widgets.py`) and shared aggregates in `dashboard/metrics.py`. Leadership roles see finance KPIs when they hold `manage_finances`, `view_dashboard_finance`, or `approve_transactions`.
 
 Always scope report queries to the user’s manageable churches / denomination.
 

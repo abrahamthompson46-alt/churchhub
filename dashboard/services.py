@@ -113,15 +113,7 @@ def _compute_remittance_payable_mtd(church, month_start_date):
 
 def _sum_remittance_payable_mtd_for_churches(churches, month_start_date):
     """Per-church cut-off or GL compute, summed — matches the cut-off page and church KPIs."""
-    total = Decimal("0")
-    for church in churches:
-        existing = selectors.monthly_cutoff_for_church_month(church, month_start_date)
-        if existing:
-            total += existing.total_payable
-        else:
-            _, _, amount = _compute_remittance_payable_mtd(church, month_start_date)
-            total += amount
-    return total
+    return selectors.sum_remittance_payable_mtd_for_churches(churches, month_start_date)
 
 
 def get_workspace_finance_mtd(request):
@@ -624,39 +616,23 @@ def get_executive_kpis(
         finance_scope_label = f"{len(church_ids)} churches"
         finance_scope = "scope"
 
-    mtd_lines = selectors.mtd_lines_for_churches(finance_church_ids, month_start_date)
-    mtd_tithe, mtd_combined = selectors.sum_tithe_combined_mtd(mtd_lines)
-    mtd_totals = selectors.sum_line_amounts_by_types(mtd_lines, ("INCOME", "EXPENSE"))
-    mtd_income = mtd_totals["INCOME"]
-    mtd_expense = mtd_totals["EXPENSE"]
-    finance_churches = list(manageable.filter(pk__in=finance_church_ids))
-    mtd_remit = _sum_remittance_payable_mtd_for_churches(finance_churches, month_start_date)
-
-    pending_txn = selectors.pending_transactions_for_churches_count(church_ids)
-    member_count = selectors.active_member_count_for_churches(church_ids)
     if compliance is None:
         compliance = get_compliance_snapshot(
             request, user, church_ids=church_ids, manageable=manageable
         )
 
-    return {
-        "period_label": now.strftime("%B %Y"),
-        "finance_scope": finance_scope,
-        "finance_scope_label": finance_scope_label,
-        "church_count": len(church_ids),
-        "district_count": manageable.values("district_id").distinct().count(),
-        "member_count": member_count,
-        "mtd_tithe": mtd_tithe,
-        "mtd_combined": mtd_combined,
-        "mtd_income": mtd_income,
-        "mtd_expense": mtd_expense,
-        "mtd_remittance_payable": mtd_remit,
-        "mtd_net": mtd_income - mtd_expense,
-        "pending_transactions": pending_txn,
-        "overdue_remittances": compliance.get("overdue_count", 0),
-        "locked_periods": compliance.get("locked_periods", 0),
-        "action_items": pending_txn + compliance.get("overdue_count", 0),
-    }
+    from dashboard import metrics
+
+    return metrics.build_executive_finance_bundle(
+        church_ids=church_ids,
+        finance_church_ids=finance_church_ids,
+        finance_scope_label=finance_scope_label,
+        manageable=manageable,
+        month_start_date=month_start_date,
+        period_label=now.strftime("%B %Y"),
+        compliance=compliance,
+        finance_scope=finance_scope,
+    )
 
 
 def get_action_queue(request, user):
@@ -969,23 +945,35 @@ def get_this_week_pulse(request):
 
 def build_home_context(request):
     """Assemble full dashboard context for the home view."""
+    from dashboard import metrics
+    from dashboard.scope import resolve_dashboard_scope, scope_selection_banner
+    from dashboard.widgets import build_kpi_widgets
+
     user = request.user
     role = get_dashboard_role(user)
-    show_finance = can_manage_finances(user)
+    show_finance = (
+        can_manage_finances(user)
+        or can_view_dashboard_finance(user)
+        or can_approve_transactions(user)
+    )
     show_treasury_ops = show_finance or can_view_transactions(user)
     show_members = can_view_members(user) or can_manage_members(user)
     show_admin = can_view_all_churches(user) or user.is_superuser
     show_hierarchy = role in ("admin", "overseer", "district_overseer") or show_admin
     is_control_center = role in ("admin", "overseer", "district_overseer")
 
+    scope = resolve_dashboard_scope(request)
+    scope_banner = scope_selection_banner(scope, user)
+
     actions = get_quick_actions(user)
     alerts = get_alerts(request, user)
     show_finance_charts = show_finance and role in (
-        "treasury", "admin", "finance", "overseer", "district_overseer",
-    )
-    # Role-density: hide panels that duplicate or clutter for a given role.
-    show_church_finance_kpis = (
-        not is_control_center and show_finance and role in ("treasury", "finance")
+        "treasury",
+        "admin",
+        "finance",
+        "overseer",
+        "district_overseer",
+        "leadership",
     )
     show_member_kpis = show_members and role in ("secretary", "members", "member", "leadership")
     show_upcoming_panel = role in ("secretary", "leadership", "members", "member")
@@ -1017,7 +1005,6 @@ def build_home_context(request):
         "action_queue": get_action_queue(request, user),
         "show_finance": show_finance,
         "show_finance_charts": show_finance_charts,
-        "show_church_finance_kpis": show_church_finance_kpis,
         "show_member_kpis": show_member_kpis,
         "show_upcoming_panel": show_upcoming_panel,
         "show_announcements_panel": show_announcements_panel,
@@ -1027,6 +1014,8 @@ def build_home_context(request):
         "show_admin": show_admin,
         "show_hierarchy": show_hierarchy,
         "is_control_center": is_control_center,
+        "dashboard_scope": scope,
+        "scope_banner": scope_banner,
         "emphasize_approvals": role == "leadership",
         "primary_work": primary_work,
         "show_action_queue": show_action_queue,
@@ -1124,5 +1113,55 @@ def build_home_context(request):
             "announcements": len(context["recent_announcements"]),
             "upcoming": context["upcoming_counts"].get("total", 0),
         }
+
+    finance_bundle = context.get("executive_kpis")
+    if finance_bundle is None and scope.church_ids:
+        manageable = get_manageable_churches(user)
+        church_ids = list(scope.church_ids)
+        now, _, month_start_date = _month_bounds()
+        compliance = {}
+        if show_finance:
+            compliance = get_compliance_snapshot(
+                request, user, church_ids=church_ids, manageable=manageable
+            )
+        if show_finance and scope.finance_church_ids:
+            finance_bundle = metrics.build_executive_finance_bundle(
+                church_ids=church_ids,
+                finance_church_ids=list(scope.finance_church_ids),
+                finance_scope_label=scope.finance_scope_label,
+                manageable=manageable,
+                month_start_date=month_start_date,
+                period_label=now.strftime("%B %Y"),
+                compliance=compliance or {"overdue_count": 0, "locked_periods": 0},
+                finance_scope="church" if scope.level == "CHURCH" else "scope",
+            )
+        elif show_members:
+            finance_bundle = {
+                "member_count": metrics.aggregate_member_count(scope.church_ids),
+            }
+
+    context["dashboard_kpi_widgets"] = build_kpi_widgets(
+        user=user,
+        dashboard_role=role,
+        scope=scope,
+        finance_bundle=finance_bundle,
+        pending_transfers=context.get("pending_transfers", 0),
+        member_home_kpis=context.get("member_home_kpis"),
+        is_control_center=is_control_center,
+    )
+
+    if show_finance_charts and scope.finance_church_ids:
+        labels, income, expense = metrics.income_expense_trend_chart(list(scope.finance_church_ids))
+        context["trend_labels"] = labels
+        context["income_data"] = income
+        context["expense_data"] = expense
+        context["show_finance_chart"] = True
+    else:
+        context["show_finance_chart"] = False
+
+    if scope.level == "CHURCH" and scope.primary_church:
+        context["has_active_church"] = True
+    elif context.get("has_active_church") is None:
+        context["has_active_church"] = bool(get_active_church(request))
 
     return context

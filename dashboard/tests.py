@@ -601,3 +601,80 @@ class ThisWeekPulseTests(DashboardTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         # Treasury layout does not enable the pastoral pulse panel.
         self.assertFalse(response.context.get("show_this_week_pulse"))
+
+
+class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
+    def test_resolve_scope_focuses_active_church_finance(self):
+        from dashboard.scope import resolve_dashboard_scope
+
+        user = User.objects.create_user(
+            username="scope_u",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+        request.session = {"current_church_id": str(self.church.id)}
+
+        scope = resolve_dashboard_scope(request)
+        self.assertEqual(scope.level, "CHURCH")
+        self.assertEqual(scope.finance_church_ids, (self.church.pk,))
+
+    def test_build_kpi_widgets_orders_pastoral_profile(self):
+        from dashboard.scope import DashboardScope
+        from dashboard.widgets import build_kpi_widgets
+
+        scope = DashboardScope(
+            level="CHURCH",
+            church_ids=(self.church.pk,),
+            primary_church=self.church,
+            label=self.church.name,
+            finance_church_ids=(self.church.pk,),
+            finance_scope_label=self.church.name,
+        )
+        user = User.objects.create_user(
+            username="pastor_widgets",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=self.church,
+        )
+        widgets = build_kpi_widgets(
+            user=user,
+            dashboard_role="leadership",
+            scope=scope,
+            finance_bundle={"member_count": 3},
+            pending_transfers=1,
+            is_control_center=False,
+        )
+        ids = [w["id"] for w in widgets]
+        self.assertIn("active_members", ids)
+        self.assertIn("pending_transfers", ids)
+        self.assertLess(ids.index("pending_transfers"), ids.index("active_members"))
+
+    def test_pastor_home_renders_unified_kpi_strip(self):
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        User.objects.create_user(
+            username="pastor_home",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=self.church,
+        )
+        client = Client()
+        client.login(username="pastor_home", password="pass12345")
+        session = client.session
+        session["current_church_id"] = str(self.church.id)
+        from accounts.mfa import SESSION_MFA_VERIFIED
+
+        session[SESSION_MFA_VERIFIED] = True
+        session.save()
+
+        response = client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        widgets = response.context.get("dashboard_kpi_widgets") or []
+        self.assertTrue(widgets)
+        self.assertContains(response, "Active Members")
+        self.assertTrue(response.context.get("show_finance_charts"))

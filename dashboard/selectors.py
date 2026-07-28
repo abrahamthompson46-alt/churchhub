@@ -74,6 +74,12 @@ def transactions_for_request(request):
     return filter_by_church(Transaction.objects.all(), request)
 
 
+def transactions_for_church_ids(church_ids):
+    if not church_ids:
+        return Transaction.objects.none()
+    return Transaction.objects.filter(church_id__in=list(church_ids))
+
+
 def approved_transactions(qs):
     return qs.filter(approval_status="APPROVED", is_voided=False)
 
@@ -145,6 +151,19 @@ def remittance_payable_mtd_amounts(church, month_start_date):
         or Decimal("0")
     )
     return tithe, combined, tithe + combined
+
+
+def sum_remittance_payable_mtd_for_churches(churches, month_start_date):
+    """Per-church cut-off or GL compute, summed — matches the cut-off page."""
+    total = Decimal("0")
+    for church in churches:
+        existing = monthly_cutoff_for_church_month(church, month_start_date)
+        if existing:
+            total += existing.total_payable
+        else:
+            _, _, amount = remittance_payable_mtd_amounts(church, month_start_date)
+            total += amount
+    return total
 
 
 def monthly_cutoff_for_church_month(church, month_start_date):

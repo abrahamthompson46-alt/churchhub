@@ -1,0 +1,14 @@
+{% if portal_staff_alerts %}
+<section class="cc-portal-alerts mb-3" aria-label="Member portal inbox">
+    <a href="{{ portal_staff_alerts.prayer_url }}" class="cc-portal-alert cc-portal-alert--prayer">
+        <i class="bi bi-heart-pulse"></i>
+        <span>Prayer requests</span>
+        {% if portal_staff_alerts.prayer_new %}<strong class="cc-portal-alert__badge">{{ portal_staff_alerts.prayer_new }}</strong>{% endif %}
+    </a>
+    <a href="{{ portal_staff_alerts.praise_url }}" class="cc-portal-alert cc-portal-alert--praise">
+        <i class="bi bi-stars"></i>
+        <span>Thanksgiving &amp; testimony</span>
+        {% if portal_staff_alerts.praise_new %}<strong class="cc-portal-alert__badge">{{ portal_staff_alerts.praise_new }}</strong>{% endif %}
+    </a>
+</section>
+{% endif %}

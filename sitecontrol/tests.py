@@ -170,6 +170,46 @@ class PlatformServiceTests(TestCase):
         self.assertIsNone(sub.suspended_at)
 
 
+class BrandingServicesTests(TestCase):
+    def test_denomination_overrides_platform_colors(self):
+        from sitecontrol.branding_services import resolve_institution_branding
+        from sitecontrol.models import Denomination, SiteSettings
+
+        settings = SiteSettings.load()
+        settings.admin_primary_color = "#111111"
+        settings.accent_color = "#222222"
+        settings.highlight_color = "#333333"
+        settings.save()
+        denom = Denomination.objects.create(
+            code="brandtest",
+            name="Brand Test",
+            primary_color="#aabbcc",
+            accent_color="#ddeeff",
+            highlight_color="#ffeedd",
+        )
+        branding = resolve_institution_branding(denomination=denom, settings_obj=settings)
+        self.assertEqual(branding["primary_color"], "#aabbcc")
+        self.assertEqual(branding["accent_color"], "#ddeeff")
+        self.assertEqual(branding["highlight_color"], "#ffeedd")
+
+
+class ChurchSeedSuiteTests(TestCase):
+    def setUp(self):
+        conf = Conference.objects.create(name="Seed Conf", code="SC")
+        zone = Zone.objects.create(name="Seed Zone", code="SZ", conference=conf)
+        district = District.objects.create(name="Seed Dist", code="SD", zone=zone)
+        self.church = Church.objects.create(name="Seed Church", code="SCH", district=district)
+
+    def test_run_church_seed_suite_completes(self):
+        from sitecontrol.services import run_church_seed_suite
+
+        result = run_church_seed_suite(self.church)
+        self.assertTrue(result["ok"])
+        self.assertGreaterEqual(len(result["steps"]), 3)
+        self.church.refresh_from_db()
+        self.assertTrue(self.church.financials_provisioned)
+
+
 class PlatformRBACTests(SiteControlClientHarness, TestCase):
     def setUp(self):
         self.disable_privileged_mfa()

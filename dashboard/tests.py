@@ -217,6 +217,19 @@ class HierarchyScopeTests(TestCase):
 
 
 class NavigationDensityTests(DashboardTestMixin, TestCase):
+    def test_home_module_has_no_sticky_tabs(self):
+        from church_system.navigation import get_module_tabs
+
+        treasury = User.objects.create_user(
+            username="hometabs",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        key, tabs = get_module_tabs(treasury, "dashboard", "dashboard:home", active_church=self.church)
+        self.assertIsNone(key)
+        self.assertIsNone(tabs)
+
     def test_finance_tabs_pruned_for_treasury(self):
         from church_system.navigation import get_module_tabs
 

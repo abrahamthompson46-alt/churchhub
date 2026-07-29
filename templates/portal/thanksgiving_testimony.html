@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Thanksgiving &amp; testimony — Member Portal{% endblock %}
+{% block body_class %}portal-app{% endblock %}
+
+{% block content %}
+<div class="page-container portal-page">
+    <header class="portal-page__header">
+        <h1 class="page-title h4 mb-1">Thanksgiving &amp; testimony</h1>
+        <p class="text-muted small mb-0">Celebrate God's goodness with your church family.</p>
+    </header>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <section class="cc-panel">
+                <form method="post" class="px-3 py-3">
+                    {% csrf_token %}
+                    {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+                    </div>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-primary">Share message</button>
+                    <a href="{% url 'portal:home' %}" class="btn btn-link">Back to portal</a>
+                </form>
+            </section>
+        </div>
+        <div class="col-lg-6">
+            <section class="cc-panel">
+                <div class="cc-panel__header"><h2 class="cc-panel__title h6 mb-0">Your recent messages</h2></div>
+                <ul class="list-plain px-3 pb-3 mb-0">
+                    {% for item in history %}
+                    <li class="py-2 border-bottom">
+                        <span class="small fw-semibold">{{ item.get_kind_display }}</span>
+                        <span class="small text-muted"> · {{ item.created_at|date:"M j, Y" }}</span>
+                        <span class="chip chip--{% if item.status == 'NEW' %}warning{% elif item.status == 'REVIEWED' %}success{% else %}muted{% endif %} ms-1">{{ item.get_status_display }}</span>
+                        {% if item.title %}<div class="small fw-medium">{{ item.title }}</div>{% endif %}
+                        <p class="mb-0 small">{{ item.body|truncatewords:40 }}</p>
+                    </li>
+                    {% empty %}
+                    <li class="text-muted small py-3">Nothing shared yet.</li>
+                    {% endfor %}
+                </ul>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

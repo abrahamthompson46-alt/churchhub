@@ -192,3 +192,34 @@ def get_dashboard_coaching_hints(context):
             "url_name": "dashboard:home",
         })
     return hints[:3]
+
+
+def get_portal_staff_alerts(request):
+    from permissions.checks import can_view_portal_submissions
+    from portal.models import SpiritualSubmissionKind
+    from portal.spiritual_services import count_new_praise_submissions, count_new_submissions
+
+    if not can_view_portal_submissions(request.user):
+        return None
+    prayer_new = count_new_submissions(
+        request.user, request, kind=SpiritualSubmissionKind.PRAYER
+    )
+    praise_new = count_new_praise_submissions(request.user, request)
+    return {
+        "prayer_new": prayer_new,
+        "praise_new": praise_new,
+        "prayer_url": reverse("portal:staff_submissions") + "?kind=PRAYER",
+        "praise_url": reverse("portal:staff_submissions") + "?kind=THANKSGIVING",
+    }
+
+
+def get_member_portal_banner(user):
+    from portal.views import user_can_use_member_portal
+
+    if not user_can_use_member_portal(user):
+        return None
+    return {
+        "portal_home_url": reverse("portal:home"),
+        "prayer_url": reverse("portal:prayer_request"),
+        "thanksgiving_url": reverse("portal:thanksgiving_testimony"),
+    }

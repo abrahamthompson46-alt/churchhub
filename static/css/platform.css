@@ -630,3 +630,118 @@ body.platform-body {
 .platform-breadcrumb {
     font-size: 0.75rem;
 }
+
+/* Compact control room density */
+.platform-content {
+    padding: 0.75rem 1.25rem 1.5rem;
+}
+
+.platform-card-header {
+    padding: 0.45rem 0.85rem;
+    font-size: 0.78rem;
+}
+
+.platform-card-body {
+    padding: 0.65rem 0.85rem;
+}
+
+.platform-stat-card {
+    padding: 0.55rem 0.75rem;
+}
+
+.platform-stat-card .value {
+    font-size: 1.15rem;
+}
+
+.platform-table th {
+    background: #f1f5f9;
+    color: #64748b;
+    padding: 0.38rem 0.65rem;
+    font-size: 0.62rem;
+}
+
+.platform-table td {
+    padding: 0.42rem 0.65rem;
+    font-size: 0.78rem;
+}
+
+.platform-form-grid--compact {
+    gap: 0.65rem;
+}
+
+.platform-color-field input[type="color"] {
+    width: 100%;
+    max-width: 120px;
+    height: 2rem;
+    padding: 0.15rem;
+    border: 1px solid var(--pf-border);
+    border-radius: 6px;
+}
+
+.platform-subnav--pills .platform-subnav-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.22rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 999px;
+    border: 1px solid var(--pf-border);
+    color: #64748b;
+    text-decoration: none;
+    background: #fff;
+}
+
+.platform-subnav-link.is-active {
+    background: var(--pf-accent-soft);
+    border-color: color-mix(in srgb, var(--pf-accent) 35%, var(--pf-border));
+    color: var(--pf-accent);
+}
+
+.platform-brand-preview__nav {
+    background: var(--ch-brand, var(--pf-navy));
+    border-radius: 8px;
+    padding: 0.45rem 0.65rem;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.platform-brand-preview__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ch-accent, #0e7490);
+}
+
+.platform-brand-preview__chip {
+    display: inline-block;
+    font-size: 0.68rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ch-accent, #0e7490) 15%, white);
+    color: var(--ch-accent, #0e7490);
+    margin-left: 0.35rem;
+}
+
+.platform-brand-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--pf-border);
+}
+
+.platform-brand-swatch[data-swatch="brand"] {
+    background: var(--ch-brand);
+}
+
+.platform-brand-swatch[data-swatch="action"] {
+    background: var(--ch-action);
+}
+
+.platform-brand-swatch[data-swatch="highlight"] {
+    background: var(--ch-accent);
+}
+
+.platform-preview-logo {
+    max-height: 40px;
+}

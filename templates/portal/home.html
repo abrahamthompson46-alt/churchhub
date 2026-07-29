@@ -27,10 +27,12 @@
             </div>
         </div>
         <div class="portal-hero__actions">
-            <a href="{% url 'portal:profile' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-person me-1"></i>Profile</a>
-            {% if user.role != 'MEMBER' %}
+        {% if user.role != 'MEMBER' %}
             <a href="{% url 'dashboard:home' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-speedometer2 me-1"></i>Staff dashboard</a>
             {% endif %}
+            <a href="{% url 'portal:prayer_request' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-heart me-1"></i>Prayer</a>
+            <a href="{% url 'portal:thanksgiving_testimony' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-stars me-1"></i>Thanksgiving</a>
+            <a href="{% url 'portal:profile' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-person me-1"></i>Profile</a>
             <a href="{% url 'dashboard:logout' %}" class="btn btn-primary btn-sm">Sign out</a>
         </div>
     </header>
@@ -41,8 +43,19 @@
     </div>
     {% endif %}
 
-    <div class="row g-4">
-        <div class="col-lg-4">
+    <div class="row g-4 portal-home__grid">
+        <div class="col-lg-4 portal-home__sidebar">
+            <section class="cc-panel mb-4">
+                <div class="cc-panel__header">
+                    <h2 class="cc-panel__title"><i class="bi bi-heart-pulse"></i> Spiritual care</h2>
+                </div>
+                <div class="px-3 pb-3 d-grid gap-2">
+                    <a href="{% url 'portal:prayer_request' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-heart me-1"></i>Prayer request</a>
+                    <a href="{% url 'portal:thanksgiving_testimony' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-stars me-1"></i>Thanksgiving &amp; testimony</a>
+                    <a href="{% url 'portal:praise_wall' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-chat-heart me-1"></i>Praise wall</a>
+                </div>
+            </section>
+
             <section class="cc-panel mb-4">
                 <div class="cc-panel__header">
                     <h2 class="cc-panel__title"><i class="bi bi-cash-stack"></i> Giving {{ giving_year }}</h2>
@@ -70,7 +83,7 @@
             {% endif %}
         </div>
 
-        <div class="col-lg-8">
+        <div class="col-lg-8 portal-home__main">
             <section class="cc-panel mb-4">
                 <div class="cc-panel__header">
                     <h2 class="cc-panel__title"><i class="bi bi-receipt"></i> Recent giving</h2>

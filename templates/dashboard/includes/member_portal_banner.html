@@ -1,0 +1,10 @@
+{% if member_portal_banner %}
+<div class="alert-banner alert-info mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2" role="navigation" aria-label="Member portal">
+    <span><i class="bi bi-people me-1"></i> Member portal — prayer, giving, and calendar</span>
+    <span class="d-flex flex-wrap gap-2">
+        <a href="{{ member_portal_banner.portal_home_url }}" class="btn btn-sm btn-primary">Open portal</a>
+        <a href="{{ member_portal_banner.prayer_url }}" class="btn btn-sm btn-outline-primary">Prayer request</a>
+        <a href="{{ member_portal_banner.thanksgiving_url }}" class="btn btn-sm btn-outline-primary">Thanksgiving</a>
+    </span>
+</div>
+{% endif %}

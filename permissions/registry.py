@@ -613,6 +613,21 @@ PERMISSION_REGISTRY = {
         "implies": ["view_announcements"],
     },
 
+    # ── Member portal (pastoral inbox) ────────────────────────────
+    "view_portal_submissions": {
+        "name": "View Portal Submissions",
+        "category": "Member Portal",
+        "description": "Read prayer requests and thanksgiving/testimony from the member portal.",
+        "default_roles": _ROLE_LEADERSHIP | {"SECRETARY"},
+    },
+    "manage_portal_submissions": {
+        "name": "Manage Portal Submissions",
+        "category": "Member Portal",
+        "description": "Mark portal prayer and praise submissions as reviewed.",
+        "default_roles": _ROLE_LEADERSHIP | {"SECRETARY"},
+        "implies": ["view_portal_submissions"],
+    },
+
     # ── Church History (2) ────────────────────────────────────────
     "view_church_history": {
         "name": "View Church History",

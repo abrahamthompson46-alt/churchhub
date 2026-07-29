@@ -358,21 +358,35 @@ class BrandingSettingsForm(forms.ModelForm):
             "favicon",
             "admin_primary_color",
             "accent_color",
+            "highlight_color",
         )
         widgets = {
             "site_name": forms.TextInput(attrs=input_attrs()),
             "site_tagline": forms.TextInput(attrs=input_attrs()),
             "login_highlights": forms.Textarea(attrs=textarea_attrs(rows=4)),
             "footer_text": forms.TextInput(attrs=input_attrs()),
-            "admin_primary_color": forms.TextInput(attrs=input_attrs(type="color")),
-            "accent_color": forms.TextInput(attrs=input_attrs(type="color")),
+            "admin_primary_color": forms.TextInput(attrs={**input_attrs(), "type": "color"}),
+            "accent_color": forms.TextInput(attrs={**input_attrs(), "type": "color"}),
+            "highlight_color": forms.TextInput(attrs={**input_attrs(), "type": "color"}),
         }
         help_texts = {
             "site_name": "Platform product name shown on login and footers.",
             "site_tagline": "Short line under the platform name on the login page.",
             "login_highlights": "One highlight per line on the staff login brand panel.",
             "footer_text": "Shown in the application footer when signed in.",
+            "admin_primary_color": "Brand chrome (navbar). Overridden per denomination when set.",
+            "accent_color": "Primary buttons and links.",
+            "highlight_color": "Secondary accent (KPIs, highlights).",
         }
+
+    def save(self, commit=True):
+        from sitecontrol.branding_services import apply_branding_to_form_instance
+
+        instance = super().save(commit=False)
+        apply_branding_to_form_instance(self, instance)
+        if commit:
+            instance.save()
+        return instance
 
     def clean_logo(self):
         from church_system.uploads import validate_upload

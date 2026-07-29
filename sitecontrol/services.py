@@ -192,6 +192,40 @@ def ensure_default_payment_methods():
     ])
 
 
+def run_church_seed_suite(church):
+    """Re-run all church-scoped seeds (financials, catalogs, settlement policies)."""
+    from members.lookups import ensure_member_form_catalogs
+    from organization.services import provision_church
+    from remittance.services import ensure_hierarchy_settlement_policies
+
+    steps = []
+    provision_church(church, force=True)
+    steps.append({
+        "id": "financials",
+        "label": f"Financial & module seeds for {church.name}",
+        "ok": True,
+    })
+
+    counts = ensure_member_form_catalogs(church)
+    steps.append({
+        "id": "member_catalogs",
+        "label": f"Member form catalogs ({sum(counts.values())} items)",
+        "ok": True,
+    })
+
+    ensure_hierarchy_settlement_policies(church)
+    steps.append({
+        "id": "settlement",
+        "label": "Hierarchy settlement policies",
+        "ok": True,
+    })
+    return {
+        "steps": steps,
+        "ok": True,
+        "message": f"Church seed suite completed for {church.name}.",
+    }
+
+
 def run_platform_seed_suite(*, church=None, reset_permissions=False):
     """
     One-click setup suite for platform owners: migrate + seed matrix/plans/payments/denominations.
@@ -232,14 +266,8 @@ def run_platform_seed_suite(*, church=None, reset_permissions=False):
     })
 
     if church is not None:
-        from sitecontrol.provisioning_services import reprovision_tenant_financials
-
-        reprovision_tenant_financials(church)
-        steps.append({
-            "id": "church_financials",
-            "label": f"Financial seeds re-provisioned for {church.name}",
-            "ok": True,
-        })
+        church_result = run_church_seed_suite(church)
+        steps.extend(church_result["steps"])
 
     return {
         "steps": steps,

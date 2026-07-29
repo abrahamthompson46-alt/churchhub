@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Praise wall — Member Portal{% endblock %}
+{% block body_class %}portal-app{% endblock %}
+
+{% block content %}
+<div class="page-container portal-page">
+    <header class="portal-page__header">
+        <h1 class="page-title h4 mb-1">Praise wall</h1>
+        <p class="text-muted small mb-0">
+            Thanksgiving and testimonies shared by your church family{% if church %} at {{ church.name }}{% endif %}.
+        </p>
+    </header>
+
+    <section class="cc-panel">
+        <ul class="list-plain px-3 py-3 mb-0">
+            {% for item in entries %}
+            <li class="py-3 border-bottom">
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                    <span class="chip chip--success">{{ item.get_kind_display }}</span>
+                    <span class="small text-muted">{{ item.reviewed_at|default:item.created_at|date:"M j, Y" }}</span>
+                </div>
+                {% if item.title %}<h2 class="h6 mb-1">{{ item.title }}</h2>{% endif %}
+                <p class="mb-0 small">{{ item.body|linebreaksbr }}</p>
+            </li>
+            {% empty %}
+            <li class="text-muted small py-4 text-center">No shared messages yet. Be the first to give thanks.</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <p class="mt-3">
+        <a href="{% url 'portal:thanksgiving_testimony' %}" class="btn btn-sm btn-primary">Share thanksgiving</a>
+        <a href="{% url 'portal:home' %}" class="btn btn-sm btn-link">Back to portal</a>
+    </p>
+</div>
+{% endblock %}

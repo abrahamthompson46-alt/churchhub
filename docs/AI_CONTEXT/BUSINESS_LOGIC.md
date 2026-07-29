@@ -339,7 +339,7 @@ Views should use `permission_required` / `any_permission_required` / `can_*` fro
 ## 12. Reports and dashboard
 
 - `reports`: builds scoped datasets; `ReportExportJob` for async-capable exports; `ReportAccessAuditLog`
-- `dashboard`: KPIs, notifications (`Notification`), church switching for hierarchy users. **Current:** `DashboardScope` drives roll-ups; `build_kpi_widgets` + `dashboard/metrics.py` (including vs prior-month deltas on finance KPIs); `dashboard/home_panels.py` adds inbox, attendance, visitor funnel, settlement strip, budget glance, activity feed, and coaching hints on `templates/dashboard/home.html`.
+- `dashboard`: KPIs, notifications (`Notification`), church switching for hierarchy users. **Current:** `DashboardScope` drives roll-ups; compact hero on `control-center--home`; `build_kpi_widgets` + `dashboard/metrics.py` (including vs prior-month deltas); `dashboard/home_panels.py` for inbox, attendance, visitor funnel, settlement strip, budget glance, activity feed, coaching hints, portal staff alert links, and member portal banner.
 
 Always scope report queries to the user’s manageable churches / denomination.
 
@@ -347,7 +347,7 @@ Always scope report queries to the user’s manageable churches / denomination.
 
 ## 13. Portal
 
-`portal` provides member-linked self-service views. No portal-owned domain models. Reuses other apps’ data with portal-appropriate permission boundaries.
+`portal` provides member-linked self-service views. **Current:** `SpiritualSubmission` (prayer, thanksgiving, testimony) with forms at `/portal/prayer/` and `/portal/thanksgiving/`; moderated **praise wall** at `/portal/praise/` (reviewed thanksgiving/testimony only); staff inbox at `/portal/staff/submissions/` with CSV export via `view_portal_submissions` / `manage_portal_submissions`; pastoral team in-app notifications and immutable `SpiritualSubmissionAuditLog`; submit rate limit (12/hour per user). After deploy, run `python manage.py seed_permissions` if new portal permissions were added.
 
 ---
 

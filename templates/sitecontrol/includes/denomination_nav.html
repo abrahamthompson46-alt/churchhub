@@ -1,9 +1,9 @@
-<nav class="platform-subnav mb-3" aria-label="Denomination sections">
-    <div class="d-flex flex-wrap gap-2">
-        <a href="{% url 'sitecontrol:denomination_detail' denomination.pk %}" class="btn btn-sm {% if active_tab == 'overview' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Overview</a>
-        <a href="{% url 'sitecontrol:denomination_terminology' denomination.pk %}" class="btn btn-sm {% if active_tab == 'terminology' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Terminology</a>
-        <a href="{% url 'sitecontrol:denomination_seeds' denomination.pk %}" class="btn btn-sm {% if active_tab == 'seeds' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Seed Config</a>
-        <a href="{% url 'sitecontrol:denomination_branding' denomination.pk %}" class="btn btn-sm {% if active_tab == 'branding' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Branding</a>
-        <a href="{% url 'sitecontrol:denomination_billing' denomination.pk %}" class="btn btn-sm {% if active_tab == 'billing' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Billing</a>
+<nav class="platform-subnav platform-subnav--pills mb-2" aria-label="Denomination sections">
+    <div class="d-flex flex-wrap gap-1">
+        <a href="{% url 'sitecontrol:denomination_detail' denomination.pk %}" class="platform-subnav-link{% if active_tab == 'overview' %} is-active{% endif %}">Overview</a>
+        <a href="{% url 'sitecontrol:denomination_terminology' denomination.pk %}" class="platform-subnav-link{% if active_tab == 'terminology' %} is-active{% endif %}">Terminology</a>
+        <a href="{% url 'sitecontrol:denomination_seeds' denomination.pk %}" class="platform-subnav-link{% if active_tab == 'seeds' %} is-active{% endif %}">Seeds</a>
+        <a href="{% url 'sitecontrol:denomination_branding' denomination.pk %}" class="platform-subnav-link{% if active_tab == 'branding' %} is-active{% endif %}">Branding</a>
+        <a href="{% url 'sitecontrol:denomination_billing' denomination.pk %}" class="platform-subnav-link{% if active_tab == 'billing' %} is-active{% endif %}">Billing</a>
     </div>
 </nav>

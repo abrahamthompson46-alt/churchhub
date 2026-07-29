@@ -12,21 +12,11 @@
     <link rel="stylesheet" href="{% static 'vendor/fonts/plus-jakarta-sans/plus-jakarta-sans.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/font/bootstrap-icons.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260728c">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260729a">
     <meta name="theme-color" content="{{ institution_primary_color|default:'#0f2942' }}">
     <style>
         :root {
-            --ch-brand: {{ institution_primary_color|default:'#0f2942' }};
-            --ch-brand-mid: color-mix(in srgb, {{ institution_primary_color|default:'#0f2942' }} 82%, white);
-            --ch-navy: var(--ch-brand);
-            --ch-navy-mid: var(--ch-brand-mid);
-            --ch-action: {{ institution_accent_color|default:'#1d4ed8' }};
-            --ch-action-hover: color-mix(in srgb, {{ institution_accent_color|default:'#1d4ed8' }} 82%, black);
-            --ch-primary: var(--ch-action);
-            --ch-primary-hover: var(--ch-action-hover);
-            --ch-accent: {{ institution_highlight_color|default:'#0e7490' }};
-            --ch-focus-ring: color-mix(in srgb, var(--ch-action) 22%, transparent);
-            --ch-table-head-bg: var(--ch-brand);
+            {{ institution_branding_css|safe }}
         }
     </style>
     {% block extra_css %}{% endblock %}
@@ -37,10 +27,12 @@
             {% include "includes/portal_navbar.html" %}
         {% else %}
             {% include "includes/navbar.html" %}
-            {% if module_tabs %}
-            {% include "includes/module_tabs.html" %}
-            {% endif %}
-            {% include "includes/workspace_status_bar.html" %}
+            <div class="app-chrome-secondary">
+                {% include "includes/workspace_status_bar.html" %}
+                {% if module_tabs %}
+                {% include "includes/module_tabs.html" %}
+                {% endif %}
+            </div>
         {% endif %}
     {% endif %}
 

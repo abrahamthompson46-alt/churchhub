@@ -178,8 +178,10 @@ def denomination_branding(request, pk):
     _require_denomination_access(request, denomination)
     form = DenominationBrandingForm(request.POST or None, request.FILES or None, instance=denomination)
     if request.method == "POST" and form.is_valid():
-        obj = form.save(commit=False)
-        repo.save_model(obj)
+        obj = form.save()
+        from sitecontrol.branding_services import clear_branding_caches
+
+        clear_branding_caches()
         log_platform_action(
             request,
             "DENOMINATION_UPDATE",
@@ -188,11 +190,20 @@ def denomination_branding(request, pk):
             target_id=denomination.pk,
             denomination=denomination,
         )
-        flash_success(request, "Branding saved.")
-        return redirect("sitecontrol:denomination_detail", pk=pk)
+        flash_success(
+            request,
+            "Tenant branding saved. Churches under this denomination will see updated colors on next page load.",
+        )
+        return redirect("sitecontrol:denomination_branding", pk=pk)
+    preview_branding = None
+    if denomination:
+        from sitecontrol.branding_services import resolve_institution_branding
+
+        preview_branding = resolve_institution_branding(denomination=denomination)
     return render(request, "sitecontrol/denomination_branding.html", {
         "form": form,
         "denomination": denomination,
+        "preview_branding": preview_branding,
         "breadcrumbs": _breadcrumbs(
             ("Platform", "/platform/"),
             ("Denominations", "/platform/denominations/"),

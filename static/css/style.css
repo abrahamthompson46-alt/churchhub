@@ -3780,6 +3780,99 @@ main .page-container,
     }
 }
 
+/* Compact dashboard hero */
+.control-center--home .dashboard-welcome {
+    padding: 0.65rem 0.85rem;
+    margin-bottom: 0.75rem;
+}
+.control-center--home .cc-hero__grid {
+    gap: 0.65rem;
+}
+.control-center--home .cc-hero__main h1,
+.control-center--home .cc-hero__title {
+    font-size: clamp(1rem, 2.2vw, 1.2rem);
+    font-weight: 700;
+    margin: 0 0 0.2rem;
+    line-height: 1.2;
+}
+.control-center--home .cc-hero__meta {
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+.control-center--home .dashboard-role-focus {
+    font-size: 0.72rem;
+    margin-top: 0.15rem;
+    opacity: 0.85;
+}
+.control-center--home:not(.control-center--executive) .cc-hero__focus {
+    display: none;
+}
+.control-center--home .cc-hero__footer--compact {
+    margin-top: 0.35rem;
+    font-size: 0.62rem;
+}
+.control-center--home .cc-hero__health {
+    scale: 0.92;
+    transform-origin: top right;
+}
+
+.cc-portal-alerts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.cc-portal-alert {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.75rem;
+    border-radius: var(--ch-radius-xs);
+    border: 1px solid var(--ch-border);
+    background: #fff;
+    text-decoration: none;
+    color: inherit;
+    font-size: 0.82rem;
+}
+.cc-portal-alert__badge {
+    background: var(--ch-danger);
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.05rem 0.45rem;
+    font-size: 0.72rem;
+}
+.cc-portal-alert--prayer { border-left: 3px solid var(--ch-accent); }
+.cc-portal-alert--praise { border-left: 3px solid var(--ch-warning); }
+
+.portal-page__header {
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 991.98px) {
+    .portal-home__grid {
+        display: flex;
+        flex-direction: column;
+    }
+    .portal-home__sidebar {
+        order: -1;
+    }
+    .portal-home__sidebar .cc-panel:first-child {
+        margin-bottom: 0.75rem;
+    }
+}
+
+.cc-health-stat--link {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.cc-health-stat--link:hover {
+    color: var(--ch-accent);
+}
+
+.cc-hero__portal-cta .btn {
+    font-size: 0.8125rem;
+}
+
 .cc-context-bar {
     display: flex;
     flex-wrap: wrap;
@@ -4782,6 +4875,149 @@ nav.page-eyebrow .page-eyebrow__page { color: var(--ch-text); }
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: #64748b;
+}
+
+/* ── App chrome: workspace + section nav below main navbar ── */
+.app-chrome-secondary {
+    background: var(--ch-surface);
+    border-bottom: 1px solid var(--ch-border);
+}
+
+.module-tabs--section {
+    position: static;
+    background: transparent;
+    border-bottom: none;
+    padding: 0.15rem 0 0.55rem;
+    margin: 0;
+}
+
+.module-tabs--section .module-tabs-scroll {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.module-tabs--section .module-tab {
+    padding: 0.28rem 0.62rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border: 1px solid var(--ch-border);
+    border-radius: 999px;
+    margin-bottom: 0;
+    background: #fff;
+    color: var(--ch-text-secondary);
+}
+
+.module-tabs--section .module-tab:hover {
+    color: var(--ch-text);
+    border-color: var(--ch-border-strong);
+    background: #fff;
+}
+
+.module-tabs--section .module-tab.is-active {
+    color: var(--ch-primary);
+    border-color: color-mix(in srgb, var(--ch-primary) 35%, var(--ch-border));
+    background: var(--ch-primary-soft);
+    border-bottom-color: color-mix(in srgb, var(--ch-primary) 35%, var(--ch-border));
+}
+
+.module-tabs--section .module-tab i {
+    font-size: 0.78rem;
+}
+
+.workspace-status-bar {
+    border-bottom: none;
+    background: transparent;
+}
+
+.workspace-status-bar__inner {
+    padding: 0.35rem 0 0.15rem;
+}
+
+/* ── Calm density: tables, buttons, cards ── */
+.main-content .btn {
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.32rem 0.72rem;
+    box-shadow: none;
+}
+
+.main-content .btn-sm {
+    font-size: 0.72rem;
+    padding: 0.22rem 0.55rem;
+}
+
+.main-content .btn-primary:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.main-content .card,
+.main-content .data-card,
+.main-content .cc-panel {
+    border-radius: var(--ch-radius-sm);
+    box-shadow: none;
+}
+
+.main-content .cc-panel__header {
+    padding: 0.55rem 0.85rem;
+    background: #fff;
+    border-bottom: 1px solid var(--ch-border);
+}
+
+.main-content .cc-panel__title {
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.main-content .cc-panel__body {
+    padding: 0.65rem 0.85rem;
+}
+
+.main-content .card-header,
+.main-content .data-card__header {
+    padding: 0.55rem 0.85rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.main-content .card-body {
+    padding: 0.75rem 0.85rem;
+}
+
+.main-content .table thead th {
+    background: var(--ch-table-head-bg);
+    color: var(--ch-table-head-text);
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--ch-border);
+    padding: 0.38rem 0.65rem;
+}
+
+.main-content .table tbody td {
+    padding: 0.38rem 0.65rem;
+    font-size: 0.76rem;
+}
+
+.main-content .table tbody tr:nth-child(even) {
+    background: #fafbfc;
+}
+
+.main-content .table tbody tr:hover {
+    background: rgba(15, 41, 66, 0.03);
+}
+
+.main-content .badge {
+    font-size: 0.65rem;
+    padding: 0.25em 0.5em;
+    font-weight: 600;
+}
+
+.control-center--home .cc-hero {
+    box-shadow: none;
 }
 
 @media print {

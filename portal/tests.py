@@ -66,11 +66,52 @@ class PortalTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Ada Member")
 
-    def test_staff_without_member_redirected(self):
-        self.client.login(username="portal_staff", password="pass12345")
-        response = self.client.get(reverse("portal:home"))
+    def test_member_can_submit_prayer_request(self):
+        self.client.login(username="portal_member", password="pass12345")
+        response = self.client.post(
+            reverse("portal:prayer_request"),
+            {"body": "Please pray for my family during this time of need.", "is_anonymous": "on"},
+        )
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/dashboard/", response.url)
+        from portal.models import SpiritualSubmission, SpiritualSubmissionKind
+
+        self.assertEqual(
+            SpiritualSubmission.objects.filter(
+                member=self.member, kind=SpiritualSubmissionKind.PRAYER
+            ).count(),
+            1,
+        )
+
+    def test_pastor_sees_portal_alerts_on_dashboard(self):
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        pastor = User.objects.create_user(
+            username="portal_pastor",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=self.church,
+        )
+        from portal.models import SpiritualSubmission, SpiritualSubmissionKind
+        from portal.spiritual_services import create_spiritual_submission
+
+        create_spiritual_submission(
+            user=self.member_user,
+            member=self.member,
+            kind=SpiritualSubmissionKind.PRAYER,
+            body="Please pray for safe travels this Sabbath.",
+        )
+        self.client.login(username="portal_pastor", password="pass12345")
+        from accounts.mfa import SESSION_MFA_VERIFIED
+
+        session = self.client.session
+        session[SESSION_MFA_VERIFIED] = True
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Prayer requests")
+        self.assertContains(response, reverse("portal:staff_submissions"))
 
     def test_login_uses_site_branding_fields(self):
         from sitecontrol.services import clear_settings_cache, get_site_settings
@@ -124,6 +165,101 @@ class PortalTests(TestCase):
 
         blocked = self.client.get(reverse("portal:meeting_live", args=[hidden.pk]))
         self.assertEqual(blocked.status_code, 404)
+
+    def test_submission_creates_audit_log_and_notification(self):
+        from dashboard.models import Notification
+        from portal.models import SpiritualSubmissionAuditLog, SpiritualSubmissionKind
+        from portal.spiritual_services import create_spiritual_submission
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        pastor = User.objects.create_user(
+            username="portal_pastor_audit",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=self.church,
+        )
+        sub = create_spiritual_submission(
+            user=self.member_user,
+            member=self.member,
+            kind=SpiritualSubmissionKind.PRAYER,
+            body="Please pray for healing and peace this week.",
+        )
+        self.assertTrue(
+            SpiritualSubmissionAuditLog.objects.filter(
+                submission=sub, action=SpiritualSubmissionAuditLog.Action.CREATED
+            ).exists()
+        )
+        self.assertTrue(Notification.objects.filter(user=pastor).exists())
+
+    def test_rate_limit_blocks_excessive_submissions(self):
+        from django.core.cache import cache
+
+        from portal.models import SpiritualSubmissionKind
+
+        cache.clear()
+        self.client.login(username="portal_member", password="pass12345")
+        for i in range(12):
+            response = self.client.post(
+                reverse("portal:prayer_request"),
+                {"body": f"Prayer request number {i} for our church family."},
+            )
+            self.assertEqual(response.status_code, 302, msg=i)
+        blocked = self.client.post(
+            reverse("portal:prayer_request"),
+            {"body": "This thirteenth request should be rate limited."},
+        )
+        self.assertEqual(blocked.status_code, 200)
+        self.assertContains(blocked, "recently")
+
+    def test_staff_csv_export_requires_permission(self):
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        pastor = User.objects.create_user(
+            username="portal_pastor_csv",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=self.church,
+        )
+        self.client.login(username="portal_pastor_csv", password="pass12345")
+        response = self.client.get(reverse("portal:staff_submissions") + "?export=csv")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv")
+
+    def test_praise_wall_shows_reviewed_entries_only(self):
+        from portal.models import SpiritualSubmission, SpiritualSubmissionKind, SpiritualSubmissionStatus
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        pastor = User.objects.create_user(
+            username="portal_pastor_wall",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=self.church,
+        )
+        pending = SpiritualSubmission.objects.create(
+            church=self.church,
+            member=self.member,
+            submitted_by=self.member_user,
+            kind=SpiritualSubmissionKind.THANKSGIVING,
+            body="Thank God for provision.",
+            status=SpiritualSubmissionStatus.NEW,
+        )
+        reviewed = SpiritualSubmission.objects.create(
+            church=self.church,
+            member=self.member,
+            submitted_by=self.member_user,
+            kind=SpiritualSubmissionKind.TESTIMONY,
+            title="Grace",
+            body="God answered prayer.",
+            status=SpiritualSubmissionStatus.REVIEWED,
+        )
+        self.client.login(username="portal_member", password="pass12345")
+        response = self.client.get(reverse("portal:praise_wall"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reviewed.body)
+        self.assertNotContains(response, pending.body)
 
 
 class PortalAuthFlowTests(TestCase):

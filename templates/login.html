@@ -58,8 +58,14 @@
                 <p class="text-center mt-3 mb-0 small">
                     <a href="{% url 'password_reset' %}" class="text-muted text-decoration-none">Forgot password?</a>
                 </p>
+                <p class="auth-secondary-links text-center mt-3 mb-2 small text-muted">
+                    Members sign in with email and date of birth (first visit) or your chosen password.
+                </p>
+                <p class="text-center mb-0">
+                    <a href="{% url 'portal:login' %}" class="btn btn-outline-primary btn-sm w-100">Go to member portal</a>
+                </p>
                 <p class="auth-secondary-links text-center mt-3 mb-0 small">
-                    <a href="{% url 'portal:login' %}" class="text-decoration-none">Member portal</a>
+                    <span class="text-muted">Church staff use the sign-in form above.</span>
                     {% if public_registration_allowed %}
                     <span class="text-muted" aria-hidden="true">·</span>
                     <a href="{% url 'church_apply' %}{% if active_denomination %}?denomination={{ active_denomination.code }}{% endif %}" class="text-decoration-none">Register your church</a>

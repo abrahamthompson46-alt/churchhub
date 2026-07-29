@@ -369,7 +369,10 @@ def get_quick_actions(user):
 
     # Keep hero to primary CTAs; calendar lives under Church Life.
     if role in ("member", "members") and len(actions) < 3:
+        _add(_item("Member portal", "portal:home", "bi-people"))
         _add(_item("Upcoming", "announcements:upcoming_calendar", "bi-calendar-heart"))
+    elif role in ("member", "members"):
+        _add(_item("Member portal", "portal:home", "bi-people"))
     return actions[:6]
 
 
@@ -875,6 +878,9 @@ def get_organization_health(request, user, *, compliance=None, kpis=None, pastor
     elif open_transfers > 5:
         overall = "warning"
         label = "Transfer backlog"
+    elif pastoral.get("new_portal_submissions", 0) > 0:
+        overall = "warning"
+        label = "Pastoral inbox"
     else:
         overall = "healthy"
         label = "Operating normally"
@@ -888,6 +894,7 @@ def get_organization_health(request, user, *, compliance=None, kpis=None, pastor
         "working_day_issues": working,
         "visitor_stale": visitor_stale,
         "open_transfers": open_transfers,
+        "new_portal_submissions": pastoral.get("new_portal_submissions", 0),
     }
 
 
@@ -1254,9 +1261,16 @@ def build_home_context(request):
     else:
         context["member_role_extras"] = None
     context["dashboard_coaching"] = home_panels.get_dashboard_coaching_hints(context)
+    context["portal_staff_alerts"] = home_panels.get_portal_staff_alerts(request)
+    if role in ("member", "members"):
+        context["member_portal_banner"] = home_panels.get_member_portal_banner(user)
+    else:
+        context["member_portal_banner"] = None
 
     if is_control_center and context.get("org_health") is not None:
-        pastoral = {}
+        from portal.spiritual_services import count_new_submissions_scope
+
+        pastoral = {"new_portal_submissions": count_new_submissions_scope(user, request)}
         church_ref = scope.primary_church or get_active_church(request)
         if church_ref and show_members:
             funnel = selectors.visitor_funnel_counts_for_church(church_ref)

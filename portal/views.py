@@ -1,7 +1,7 @@
 """Member portal views — self-service home for linked members."""
 
 from django.contrib.auth import update_session_auth_hash
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.views import (
     PasswordResetCompleteView,
     PasswordResetConfirmView,
@@ -274,3 +274,202 @@ class PortalPasswordResetConfirmView(PasswordResetConfirmView):
 
 class PortalPasswordResetCompleteView(PasswordResetCompleteView):
     template_name = "portal/password_reset_complete.html"
+
+
+def _require_portal_submissions_view(user):
+    from permissions.checks import can_view_portal_submissions
+
+    return can_view_portal_submissions(user)
+
+
+@login_required
+@user_passes_test(_require_portal_submissions_view)
+def staff_submission_list(request):
+    import csv
+
+    from django.http import HttpResponse
+
+    from permissions.checks import can_manage_portal_submissions
+
+    from .models import SpiritualSubmissionKind, SpiritualSubmissionStatus
+    from .spiritual_services import mark_submission_reviewed, submissions_for_staff_queryset
+
+    kind = (request.GET.get("kind") or "").strip().upper()
+    status = (request.GET.get("status") or SpiritualSubmissionStatus.NEW).strip().upper()
+    qs = submissions_for_staff_queryset(request.user, request)
+    if kind in SpiritualSubmissionKind.values:
+        qs = qs.filter(kind=kind)
+    if status in SpiritualSubmissionStatus.values:
+        qs = qs.filter(status=status)
+
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="portal_submissions.csv"'
+        writer = csv.writer(response)
+        writer.writerow(
+            [
+                "created_at",
+                "church",
+                "kind",
+                "status",
+                "from",
+                "title",
+                "body",
+                "anonymous",
+            ]
+        )
+        for row in qs.order_by("-created_at")[:2000]:
+            if row.is_anonymous and row.kind == SpiritualSubmissionKind.PRAYER:
+                who = "Anonymous"
+            elif row.member_id:
+                who = row.member.full_name
+            else:
+                who = ""
+            writer.writerow(
+                [
+                    row.created_at.isoformat(),
+                    row.church.name,
+                    row.kind,
+                    row.status,
+                    who,
+                    row.title,
+                    row.body,
+                    "yes" if row.is_anonymous else "no",
+                ]
+            )
+        return response
+
+    if request.method == "POST" and can_manage_portal_submissions(request.user):
+        pk = request.POST.get("submission_id")
+        sub = submissions_for_staff_queryset(request.user, request).filter(pk=pk).first()
+        if sub:
+            mark_submission_reviewed(sub, request.user)
+            flash_success(request, "Marked as reviewed.")
+            return redirect(request.get_full_path())
+
+    submissions = list(qs[:100])
+    return render(
+        request,
+        "portal/staff_submissions.html",
+        {
+            "submissions": submissions,
+            "filter_kind": kind,
+            "filter_status": status,
+            "kind_choices": SpiritualSubmissionKind.choices,
+            "status_choices": SpiritualSubmissionStatus.choices,
+            "can_manage": can_manage_portal_submissions(request.user),
+            "filter_qs": request.GET.urlencode(),
+        },
+    )
+
+
+@login_required
+def praise_wall(request):
+    member, denied = _portal_member_or_redirect(request)
+    if denied:
+        return denied
+    if getattr(request.user, "must_change_password", False):
+        return redirect("portal:password_change")
+
+    from .spiritual_services import praise_wall_for_church
+
+    church = member.church if member and member.church_id else getattr(request.user, "church", None)
+    entries = list(praise_wall_for_church(church))
+    return render(
+        request,
+        "portal/praise_wall.html",
+        {"member": member, "church": church, "entries": entries},
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def prayer_request(request):
+    member, denied = _portal_member_or_redirect(request)
+    if denied:
+        return denied
+    if getattr(request.user, "must_change_password", False):
+        return redirect("portal:password_change")
+    if member is None:
+        flash_info(request, "Link your account to a member profile before submitting prayer requests.")
+        return redirect("portal:home")
+
+    from .spiritual_forms import PrayerRequestForm
+    from .spiritual_services import create_spiritual_submission, member_submissions_for_user
+    from .models import SpiritualSubmissionKind
+
+    form = PrayerRequestForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            from .spiritual_services import PortalSubmitRateLimitError, assert_portal_submit_allowed
+
+            assert_portal_submit_allowed(request)
+            create_spiritual_submission(
+                user=request.user,
+                member=member,
+                kind=SpiritualSubmissionKind.PRAYER,
+                body=form.cleaned_data["body"],
+                is_anonymous=form.cleaned_data.get("is_anonymous", False),
+            )
+            flash_success(request, "Your prayer request was shared with the pastoral care team.")
+            return redirect("portal:prayer_request")
+        except PortalSubmitRateLimitError as exc:
+            flash_error(request, str(exc))
+        except ValueError as exc:
+            flash_error(request, str(exc))
+
+    history = list(member_submissions_for_user(request.user, member, kind=SpiritualSubmissionKind.PRAYER, limit=10))
+    return render(
+        request,
+        "portal/prayer_request.html",
+        {"form": form, "member": member, "history": history},
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def thanksgiving_testimony(request):
+    member, denied = _portal_member_or_redirect(request)
+    if denied:
+        return denied
+    if getattr(request.user, "must_change_password", False):
+        return redirect("portal:password_change")
+    if member is None:
+        flash_info(request, "Link your account to a member profile before sharing thanksgiving or testimony.")
+        return redirect("portal:home")
+
+    from .spiritual_forms import ThanksgivingTestimonyForm
+    from .models import SpiritualSubmission, SpiritualSubmissionKind
+    from .spiritual_services import create_spiritual_submission, member_submissions_for_user
+
+    form = ThanksgivingTestimonyForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            from .spiritual_services import PortalSubmitRateLimitError, assert_portal_submit_allowed
+
+            assert_portal_submit_allowed(request)
+            create_spiritual_submission(
+                user=request.user,
+                member=member,
+                kind=form.cleaned_data["kind"],
+                title=form.cleaned_data.get("title", ""),
+                body=form.cleaned_data["body"],
+            )
+            flash_success(request, "Thank you — your message was shared with church leadership.")
+            return redirect("portal:thanksgiving_testimony")
+        except PortalSubmitRateLimitError as exc:
+            flash_error(request, str(exc))
+        except ValueError as exc:
+            flash_error(request, str(exc))
+
+    history = list(
+        SpiritualSubmission.objects.filter(
+            member=member,
+            kind__in=(SpiritualSubmissionKind.THANKSGIVING, SpiritualSubmissionKind.TESTIMONY),
+        ).order_by("-created_at")[:10]
+    )
+    return render(
+        request,
+        "portal/thanksgiving_testimony.html",
+        {"form": form, "member": member, "history": history},
+    )

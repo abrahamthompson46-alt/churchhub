@@ -8,7 +8,15 @@
     <link rel="stylesheet" href="{% static 'vendor/fonts/plus-jakarta-sans/plus-jakarta-sans.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/font/bootstrap-icons.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/platform.css' %}?v=20260728b">
+    <link rel="stylesheet" href="{% static 'css/platform.css' %}?v=20260729b">
+    <style>
+        :root {
+            {{ institution_branding_css|safe }}
+            --pf-accent: var(--ch-action);
+            --pf-accent-soft: color-mix(in srgb, var(--ch-action) 12%, white);
+            --pf-navy: var(--ch-brand);
+        }
+    </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body class="platform-body">

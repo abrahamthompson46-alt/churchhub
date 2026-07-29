@@ -172,7 +172,7 @@
                     <a href="{% url 'sitecontrol:subscription_edit' stats.subscription.pk %}" class="btn btn-sm btn-primary">Manage Subscription</a>
                     <form method="post" action="{% url 'sitecontrol:tenant_reprovision_financials' church.pk %}" onsubmit="return confirm('Re-run financial seeding for this church?');">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Re-provision Financials</button>
+                        <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Re-run church seed suite</button>
                     </form>
                         {% if stats.subscription.status == "SUSPENDED" %}
                         <form method="post" action="{% url 'sitecontrol:tenant_reactivate' church.pk %}">

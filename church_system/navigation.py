@@ -636,11 +636,7 @@ def resolve_module_key(namespace, current_view=""):
 
 
 MODULE_TABS = {
-    "home": [
-        _item("Overview", "dashboard:home", "bi-speedometer2"),
-        _item("Cut-off", "dashboard:cutoff", "bi-calendar-check"),
-        _item("Working day", "transactions:period_list", "bi-calendar2-week"),
-    ],
+    # Home dashboard links live in the main nav Home dropdown — no duplicate strip.
     "people": [
         _item("Directory", "members:list", "bi-list-ul"),
         _item("Visitors", "members:visitor_list", "bi-person-heart"),
@@ -783,6 +779,8 @@ def get_page_eyebrow(module_key, module_tabs, current_view="", report_key=""):
     if module_key == "home" and current_view in ("", "dashboard:home"):
         return None
     section = MODULE_LABELS.get(module_key, module_key.replace("_", " ").title())
+    if module_key == "home" and current_view == "dashboard:cutoff":
+        return {"section": "Dashboard", "page": "Monthly Cut-off"}
     page = None
     for tab in module_tabs or []:
         if tab.get("report_key") and report_key and tab["report_key"] == report_key:

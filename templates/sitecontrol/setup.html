@@ -45,18 +45,30 @@
 <div class="platform-card platform-card--compact mt-3">
     <div class="platform-card-header"><i class="bi bi-magic me-1"></i>Run setup seeds</div>
     <div class="platform-card-body">
-        <p class="small text-muted mb-3">Apply migrations and seed permissions, plans, payment methods, and denominations without using the terminal.</p>
-        <form method="post" class="d-flex flex-wrap gap-2 align-items-center">
+        <p class="small text-muted mb-2">Migrates, seeds permissions, plans, payments, and denominations. Pick a church to also run full church seeds (financials, member catalogs, settlement policies).</p>
+        <form method="post" class="row g-2 align-items-end">
             {% csrf_token %}
             <input type="hidden" name="action" value="run_seed_suite">
-            <div class="form-check me-2">
-                <input class="form-check-input" type="checkbox" name="reset_permissions" value="1" id="setupResetPerms">
-                <label class="form-check-label small" for="setupResetPerms">Reset permission matrix</label>
+            <div class="col-md-5">
+                <label class="form-label small mb-1">Church (optional)</label>
+                <select name="church_id" class="form-select form-select-sm">
+                    <option value="">Platform seeds only</option>
+                    {% for c in seed_churches %}
+                    <option value="{{ c.pk }}">{{ c.name }}</option>
+                    {% endfor %}
+                </select>
             </div>
-            <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Run migrate + all seed steps now?');">
-                <i class="bi bi-play-fill me-1"></i>Run all seeds
-            </button>
-            <a href="{% url 'sitecontrol:ops_health' %}" class="btn btn-outline-secondary btn-sm">Ops (church re-seed)</a>
+            <div class="col-md-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="reset_permissions" value="1" id="setupResetPerms">
+                    <label class="form-check-label small" for="setupResetPerms">Reset permission matrix</label>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary btn-sm w-100" onclick="return confirm('Run migrate + seed steps now?');">
+                    <i class="bi bi-play-fill me-1"></i>Run seeds
+                </button>
+            </div>
         </form>
     </div>
 </div>

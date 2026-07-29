@@ -42,6 +42,11 @@ class SiteSettings(models.Model):
         default="#1d4ed8",
         help_text="Action color for primary buttons and links.",
     )
+    highlight_color = models.CharField(
+        max_length=7,
+        default="#0e7490",
+        help_text="Secondary accent (KPI highlights, portal accents).",
+    )
     logo = models.ImageField(upload_to="platform/branding/", blank=True, null=True)
     favicon = models.ImageField(upload_to="platform/branding/", blank=True, null=True)
     footer_text = models.CharField(max_length=200, blank=True, default="Enterprise Church Management")
@@ -625,6 +630,7 @@ class Denomination(models.Model):
     logo = models.ImageField(upload_to="denominations/branding/", blank=True, null=True)
     primary_color = models.CharField(max_length=7, default="#1e3a5f")
     accent_color = models.CharField(max_length=7, default="#1d4ed8")
+    highlight_color = models.CharField(max_length=7, default="#0e7490")
     hierarchy_labels = models.JSONField(
         default=dict,
         blank=True,

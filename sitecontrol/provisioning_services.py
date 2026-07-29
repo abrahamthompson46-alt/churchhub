@@ -138,6 +138,8 @@ def provision_tenant(
 
 @transaction.atomic
 def reprovision_tenant_financials(church, reviewer=None):
-    """Re-run financial seeding for an existing church."""
-    provision_church(church, force=True)
+    """Re-run full church seed suite for an existing church."""
+    from sitecontrol.services import run_church_seed_suite
+
+    run_church_seed_suite(church)
     return church

@@ -126,6 +126,8 @@ def can_export_giving(user): return _p(user, "export_giving")
 
 # ── Announcements ─────────────────────────────────────────────────
 def can_view_announcements(user): return _p(user, "view_announcements")
+def can_view_portal_submissions(user): return _p(user, "view_portal_submissions")
+def can_manage_portal_submissions(user): return _p(user, "manage_portal_submissions")
 def can_view_church_history(user): return _p(user, "view_church_history")
 def can_manage_church_history(user): return _p(user, "manage_church_history")
 def can_create_announcements(user): return _p(user, "create_announcements")

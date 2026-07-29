@@ -9,14 +9,21 @@
     <header class="cc-hero dashboard-welcome dashboard-welcome--{{ dashboard_role }}">
         <div class="cc-hero__grid">
             <div class="cc-hero__main">
-                <h1>Good day{% if user.first_name %}, {{ user.first_name }}{% endif %}</h1>
+                <h1 class="cc-hero__title">Good day{% if user.first_name %}, {{ user.first_name }}{% endif %}</h1>
                 <p class="cc-hero__meta">
                     <span class="cc-hero__badge">{% if is_control_center %}Mission Control{% else %}Operations{% endif %}</span>
                     · {{ role_label }}
-                    {% if active_church %} · {{ active_church.name }}{% elif user_church %} · {{ user_church.name }}{% elif executive_kpis %} · {{ executive_kpis.church_count }} churches in scope{% endif %}
+                    {% if active_church %} · {{ active_church.name }}{% elif user_church %} · {{ user_church.name }}{% elif executive_kpis %} · {{ executive_kpis.church_count }} churches{% endif %}
                 </p>
-                {% if role_focus.headline %}
-                <p class="dashboard-role-focus mb-0">{{ role_focus.headline }}</p>
+                {% if role_focus.headline and is_control_center %}
+                <p class="dashboard-role-focus cc-hero__focus mb-0">{{ role_focus.headline }}</p>
+                {% endif %}
+                {% if member_portal_banner and dashboard_role == "member" %}
+                <div class="cc-hero__portal-cta d-flex flex-wrap gap-2 mt-2">
+                    <a href="{{ member_portal_banner.portal_home_url }}" class="btn btn-sm btn-primary"><i class="bi bi-house-heart me-1"></i>Member portal</a>
+                    <a href="{{ member_portal_banner.prayer_url }}" class="btn btn-sm btn-outline-primary">Prayer request</a>
+                    <a href="{{ member_portal_banner.thanksgiving_url }}" class="btn btn-sm btn-outline-primary">Thanksgiving</a>
+                </div>
                 {% endif %}
             </div>
 
@@ -32,6 +39,9 @@
                     {% endif %}
                     {% if org_health.pending_approvals %}
                     <span class="cc-health-stat">{{ org_health.pending_approvals }} approvals</span>
+                    {% endif %}
+                    {% if org_health.new_portal_submissions %}
+                    <a href="{% url 'portal:staff_submissions' %}?status=NEW" class="cc-health-stat cc-health-stat--link">{{ org_health.new_portal_submissions }} pastoral inbox</a>
                     {% endif %}
                 </div>
             </div>
@@ -62,11 +72,19 @@
             {% endif %}
         </div>
 		   
-        <!-- New Timestamp Footer -->
-        <div class="cc-hero__footer">
-            Data updated: {% now "j M Y, g:i A" %}
+        <!-- Timestamp footer -->
+        <div class="cc-hero__footer cc-hero__footer--compact">
+            Updated {% now "j M, g:i A" %}
         </div>
            </header>
+
+    {% if member_portal_banner %}
+    {% include "dashboard/includes/member_portal_banner.html" %}
+    {% endif %}
+
+    {% if portal_staff_alerts %}
+    {% include "dashboard/includes/portal_staff_alerts.html" %}
+    {% endif %}
 
     {% if alerts %}
     {% include "includes/alert_banners.html" %}

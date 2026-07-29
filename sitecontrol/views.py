@@ -168,23 +168,43 @@ def setup_checklist(request):
             raise PermissionDenied
         from sitecontrol.services import run_platform_seed_suite
 
+        church = None
+        church_id = (request.POST.get("church_id") or "").strip()
+        if church_id:
+            from sitecontrol.platform_access import filter_churches_for_operator
+            from sitecontrol import selectors
+
+            church = filter_churches_for_operator(
+                selectors.churches_filter_by_pk(church_id),
+                request.user,
+            ).first()
         result = run_platform_seed_suite(
+            church=church,
             reset_permissions=bool(request.POST.get("reset_permissions")),
         )
         log_platform_action(
             request,
             "PLATFORM_SEED_SUITE",
             result["message"],
-            target_model="SiteSettings",
+            target_model="Church" if church else "SiteSettings",
+            target_id=str(church.pk) if church else "",
             details={"steps": [s["id"] for s in result["steps"]]},
         )
         flash_success(request, result["message"] + " No CLI required.")
         return redirect("sitecontrol:setup")
 
     setup = build_platform_setup_checklist()
+    from sitecontrol.selectors import churches_ordered_with_district
+    from sitecontrol.platform_access import filter_churches_for_operator
+
+    churches = filter_churches_for_operator(
+        churches_ordered_with_district(),
+        request.user,
+    )[:200]
     return render(request, "sitecontrol/setup.html", {
         "setup": setup,
         "can_run_seeds": operator_has_capability(request.user, CAP_OPS),
+        "seed_churches": churches,
         "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Setup Guide",)),
     })
 
@@ -364,15 +384,20 @@ def branding_settings(request):
     settings_obj = SiteSettings.load()
     form = BrandingSettingsForm(request.POST or None, request.FILES or None, instance=settings_obj)
     if request.method == "POST" and form.is_valid():
-        obj = form.save(commit=False)
-        repo.save_model(obj)
-        clear_settings_cache()
+        form.save()
+        from sitecontrol.branding_services import clear_branding_caches
+
+        clear_branding_caches()
         log_platform_action(request, "SETTINGS_UPDATE", "Branding settings updated", target_model="SiteSettings")
-        flash_success(request, "Branding saved.")
+        flash_success(request, "Branding saved. Staff and member apps use these colors when no denomination override applies.")
         return redirect("sitecontrol:branding")
+    from sitecontrol.branding_services import resolve_institution_branding
+
+    preview_branding = resolve_institution_branding(settings_obj=settings_obj)
     return render(request, "sitecontrol/branding.html", {
         "form": form,
         "settings_obj": settings_obj,
+        "preview_branding": preview_branding,
         "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Branding",)),
     })
 

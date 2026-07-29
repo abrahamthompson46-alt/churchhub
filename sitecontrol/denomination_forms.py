@@ -136,6 +136,7 @@ class DenominationBrandingForm(forms.ModelForm):
             "logo",
             "primary_color",
             "accent_color",
+            "highlight_color",
             "registration_intro",
             "allow_public_registration",
             "default_plan",
@@ -145,12 +146,27 @@ class DenominationBrandingForm(forms.ModelForm):
             "display_name": forms.TextInput(attrs=input_attrs()),
             "tagline": forms.TextInput(attrs=input_attrs()),
             "registration_intro": forms.Textarea(attrs=textarea_attrs(rows=3)),
-            "primary_color": forms.TextInput(attrs=input_attrs(type="color")),
-            "accent_color": forms.TextInput(attrs=input_attrs(type="color")),
+            "primary_color": forms.TextInput(attrs={**input_attrs(), "type": "color"}),
+            "accent_color": forms.TextInput(attrs={**input_attrs(), "type": "color"}),
+            "highlight_color": forms.TextInput(attrs={**input_attrs(), "type": "color"}),
             "allow_public_registration": forms.CheckboxInput(attrs=checkbox_attrs()),
             "default_plan": forms.Select(attrs=select_attrs()),
             "default_role": forms.Select(attrs=select_attrs(), choices=UserRole.CHOICES),
         }
+        help_texts = {
+            "primary_color": "Navbar and chrome for this tenant.",
+            "accent_color": "Buttons and primary links.",
+            "highlight_color": "Secondary accent across dashboards and portal.",
+        }
+
+    def save(self, commit=True):
+        from sitecontrol.branding_services import apply_branding_to_form_instance
+
+        instance = super().save(commit=False)
+        apply_branding_to_form_instance(self, instance)
+        if commit:
+            instance.save()
+        return instance
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

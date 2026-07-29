@@ -1,40 +1,68 @@
 {% extends "sitecontrol/base_platform.html" %}
 
 {% block page_title %}Branding{% endblock %}
+{% block page_subtitle %}
+<p class="platform-topbar-meta mb-0">Platform defaults. Each denomination can override under Denominations → Branding.</p>
+{% endblock %}
 
 {% block content %}
-<div class="platform-card mb-3">
-    <div class="platform-card-body">
-        <p class="text-muted small mb-0">
-            Set the platform product name, tagline, login highlights, logo, and colors.
-            Institution (denomination) branding is edited under Denominations → Branding.
-        </p>
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="platform-card platform-card--compact">
+            <div class="platform-card-header">Platform palette</div>
+            <div class="platform-card-body">
+                <form method="post" enctype="multipart/form-data" id="platformBrandingForm">
+                    {% csrf_token %}
+                    <div class="platform-form-grid platform-form-grid--compact">
+                        {% for field in form %}
+                        <div class="{% if field.name in 'admin_primary_color accent_color highlight_color' %}platform-color-field{% elif field.name == 'login_highlights' %}full-width{% endif %}">
+                            <label class="form-label small mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                            {% if field.name == 'logo' and settings_obj.logo %}
+                            <div class="mt-1"><img src="{{ settings_obj.logo.url }}" alt="" class="platform-preview-logo"></div>
+                            {% endif %}
+                            {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary btn-sm">Save branding</button>
+                        <a href="{% url 'sitecontrol:denomination_list' %}" class="btn btn-outline-secondary btn-sm">Tenant branding</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        {% include "sitecontrol/includes/branding_preview.html" with preview=preview_branding preview_name=settings_obj.site_name %}
+        <p class="small text-muted mt-2 mb-0">Signed-in staff see tenant colors from their church’s denomination. Set that under <strong>Denominations → Branding</strong>.</p>
     </div>
 </div>
-<div class="platform-card">
-    <div class="platform-card-body">
-        <form method="post" enctype="multipart/form-data">
-            {% csrf_token %}
-            <div class="platform-form-grid">
-                {% for field in form %}
-                <div class="{% if field.name == 'login_highlights' %}platform-form-span-2{% endif %}">
-                    <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                    {% if field.name == 'logo' and settings_obj.logo %}
-                    <div class="mt-2"><img src="{{ settings_obj.logo.url }}" alt="Logo" style="max-height:48px"></div>
-                    {% endif %}
-                    {% if field.name == 'favicon' and settings_obj.favicon %}
-                    <div class="mt-2"><img src="{{ settings_obj.favicon.url }}" alt="Favicon" style="max-height:24px"></div>
-                    {% endif %}
-                    {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-                </div>
-                {% endfor %}
-            </div>
-            <div class="mt-4">
-                <button type="submit" class="btn btn-primary">Save Branding</button>
-            </div>
-        </form>
-    </div>
-</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var form = document.getElementById("platformBrandingForm");
+    if (!form) return;
+    ["id_admin_primary_color", "id_accent_color", "id_highlight_color"].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener("input", syncPreview);
+    });
+    function syncPreview() {
+        var root = document.documentElement;
+        var brand = document.getElementById("id_admin_primary_color");
+        var action = document.getElementById("id_accent_color");
+        var highlight = document.getElementById("id_highlight_color");
+        if (brand) root.style.setProperty("--ch-brand", brand.value);
+        if (action) {
+            root.style.setProperty("--ch-action", action.value);
+            root.style.setProperty("--ch-primary", action.value);
+            root.style.setProperty("--pf-accent", action.value);
+        }
+        if (highlight) root.style.setProperty("--ch-accent", highlight.value);
+    }
+})();
+</script>
 {% endblock %}

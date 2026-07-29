@@ -15,8 +15,20 @@ from church_system.church_scope import filter_by_church
 from members.models import Member
 from transactions.models import Transaction, TransactionLine
 
-GIVING_LINE_ACCOUNT_TYPES = ("TITHE", "COMBINED", "INCOME", "WELFARE_FUND")
-LEADERBOARD_ACCOUNT_TYPES = ("TITHE", "COMBINED")
+GIVING_LINE_ACCOUNT_TYPES = (
+    "TITHE",
+    "TITHE_REMIT_PAYABLE",
+    "COMBINED",
+    "COMBINED_RETENTION",
+    "COMBINED_REMIT_PAYABLE",
+    "INCOME",
+    "WELFARE_FUND",
+)
+TITHE_ROLLUP_ACCOUNT_TYPES = frozenset({"TITHE", "TITHE_REMIT_PAYABLE"})
+COMBINED_ROLLUP_ACCOUNT_TYPES = frozenset(
+    {"COMBINED", "COMBINED_RETENTION", "COMBINED_REMIT_PAYABLE"}
+)
+LEADERBOARD_ACCOUNT_TYPES = tuple(TITHE_ROLLUP_ACCOUNT_TYPES | COMBINED_ROLLUP_ACCOUNT_TYPES)
 
 
 def approved_member_transactions_qs(member, *, year=None):

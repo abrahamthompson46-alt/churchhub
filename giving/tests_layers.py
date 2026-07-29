@@ -120,6 +120,40 @@ class GivingLayerTests(TestCase):
         self.assertEqual(lines.count(), 1)
         self.assertEqual(lines.first().account.account_type, "TITHE")
 
+    def test_summary_rolls_up_remittance_split_lines(self):
+        """Receipts often post to remit/retention GL types, not only TITHE/COMBINED."""
+        tithe_remit = Account.objects.get(
+            church=self.church_a, account_type="TITHE_REMIT_PAYABLE"
+        )
+        combined_ret = Account.objects.get(
+            church=self.church_a, account_type="COMBINED_RETENTION"
+        )
+        txn = Transaction.objects.create(
+            transaction_type="RECEIPT",
+            church=self.church_a,
+            member=self.member_a,
+            date=date(self.year, 8, 1),
+            description="Split receipt",
+            approval_status="APPROVED",
+            created_by=self.treasury_a,
+        )
+        TransactionLine.objects.create(
+            transaction=txn, account=self.cash_a, amount=Decimal("300.00")
+        )
+        TransactionLine.objects.create(
+            transaction=txn, account=self.tithe_a, amount=Decimal("-100.00")
+        )
+        TransactionLine.objects.create(
+            transaction=txn, account=tithe_remit, amount=Decimal("-100.00")
+        )
+        TransactionLine.objects.create(
+            transaction=txn, account=combined_ret, amount=Decimal("-100.00")
+        )
+        summary = member_giving_summary(self.member_a, year=self.year)
+        self.assertEqual(summary["TITHE"], Decimal("200.00"))
+        self.assertEqual(summary["COMBINED"], Decimal("100.00"))
+        self.assertEqual(summary["total"], Decimal("300.00"))
+
     def test_church_isolation_leaders_and_lines(self):
         self._post_approved_tithe(
             church=self.church_a,

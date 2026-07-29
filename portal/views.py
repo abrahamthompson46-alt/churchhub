@@ -133,6 +133,13 @@ def home(request):
         return redirect("portal:password_change")
 
     year = timezone.localdate().year
+    year_param = request.GET.get("year")
+    if year_param:
+        try:
+            year = int(year_param)
+        except (TypeError, ValueError):
+            pass
+
     giving_summary = None
     giving_lines = []
     has_payslips = bool(getattr(request.user, "employee_profile", None))
@@ -176,6 +183,9 @@ def home(request):
             "giving_summary": giving_summary,
             "giving_lines": giving_lines,
             "giving_year": year,
+            "giving_year_choices": list(
+                range(timezone.localdate().year, timezone.localdate().year - 6, -1)
+            ),
             "has_payslips": has_payslips,
             "announcements": announcements,
             "upcoming_preview": upcoming,

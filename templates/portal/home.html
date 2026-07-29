@@ -60,15 +60,24 @@
             </section>
 
             <section class="cc-panel mb-4">
-                <div class="cc-panel__header">
-                    <h2 class="cc-panel__title"><i class="bi bi-cash-stack"></i> Giving {{ giving_year }}</h2>
+                <div class="cc-panel__header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h2 class="cc-panel__title mb-0"><i class="bi bi-cash-stack"></i> Giving {{ giving_year }}</h2>
+                    <form method="get" class="d-flex align-items-center gap-2">
+                        <label class="small text-muted mb-0" for="giving-year">Year</label>
+                        <select name="year" id="giving-year" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+                            {% for y in giving_year_choices %}
+                            <option value="{{ y }}" {% if y == giving_year %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </form>
                 </div>
                 {% if giving_summary %}
                 <div class="cc-mini-kpis px-3 pb-3">
-                    <div class="cc-mini-kpi"><span>Tithe</span><strong class="text-currency">{{ giving_summary.TITHE|default:0|floatformat:2|intcomma }}</strong></div>
-                    <div class="cc-mini-kpi"><span>Combined</span><strong class="text-currency">{{ giving_summary.COMBINED|default:0|floatformat:2|intcomma }}</strong></div>
-                    <div class="cc-mini-kpi"><span>Total</span><strong class="text-currency">{{ giving_summary.total|default:0|floatformat:2|intcomma }}</strong></div>
+                    <div class="cc-mini-kpi"><span>Tithe</span><strong class="text-currency">{{ giving_summary.TITHE|floatformat:2|intcomma }}</strong></div>
+                    <div class="cc-mini-kpi"><span>Combined</span><strong class="text-currency">{{ giving_summary.COMBINED|floatformat:2|intcomma }}</strong></div>
+                    <div class="cc-mini-kpi"><span>Total</span><strong class="text-currency">{{ giving_summary.total|floatformat:2|intcomma }}</strong></div>
                 </div>
+                <p class="small text-muted px-3 mb-3">Totals include approved receipts (local retention and remittance portions).</p>
                 {% else %}
                 <p class="text-muted small px-3 pb-3 mb-0">No giving summary available.</p>
                 {% endif %}

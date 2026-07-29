@@ -26,8 +26,20 @@ def member_giving_lines(member, year=None):
 
 def member_giving_summary(member, year=None):
     lines = member_giving_lines(member, year)
-    raw = selectors.line_totals_by_account_type(lines, GIVING_ACCOUNT_TYPES)
-    by_type = {acc: abs(raw.get(acc) or Decimal("0")) for acc in GIVING_ACCOUNT_TYPES}
+    raw = selectors.line_totals_by_account_type(lines, selectors.GIVING_LINE_ACCOUNT_TYPES)
+
+    def _rollup(types):
+        total = Decimal("0")
+        for acc_type in types:
+            total += abs(raw.get(acc_type) or Decimal("0"))
+        return total
+
+    by_type = {
+        "TITHE": _rollup(selectors.TITHE_ROLLUP_ACCOUNT_TYPES),
+        "COMBINED": _rollup(selectors.COMBINED_ROLLUP_ACCOUNT_TYPES),
+        "INCOME": abs(raw.get("INCOME") or Decimal("0")),
+        "WELFARE_FUND": abs(raw.get("WELFARE_FUND") or Decimal("0")),
+    }
     by_type["total"] = sum(by_type.values())
 
     from remittance.welfare_services import member_welfare_summary

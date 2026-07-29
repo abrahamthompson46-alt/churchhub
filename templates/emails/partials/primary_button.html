@@ -1,0 +1,14 @@
+<table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0;">
+  <tr>
+    <td align="left" style="border-radius:8px;background-color:{{ action_color|default:'#1d4ed8' }};">
+      <a href="{{ button_url }}" target="_blank" rel="noopener"
+         style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;line-height:1.2;">
+        {{ button_label }}
+      </a>
+    </td>
+  </tr>
+</table>
+<p style="margin:0 0 16px;font-size:13px;line-height:1.5;color:#64748b;word-break:break-all;">
+  Or copy this link:<br>
+  <a href="{{ button_url }}" style="color:{{ action_color|default:'#1d4ed8' }};">{{ button_url }}</a>
+</p>

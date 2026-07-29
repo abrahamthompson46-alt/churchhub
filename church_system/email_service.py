@@ -195,25 +195,56 @@ def send_platform_email(*, subject, to, text_body, html_body=None, fail_silently
 
 def send_test_email(recipient: str) -> bool:
     """Send a short connectivity test using the resolved SMTP config."""
-    site = get_site_settings()
+    from django.template.loader import render_to_string
+
+    context = get_email_branding_context(
+        None,
+        preheader="ChurchHub SMTP test",
+    )
+    html_body = render_to_string("emails/test_email.html", context)
     return send_platform_email(
-        subject=f"[{site.site_name}] Email test",
+        subject=f"[{context['site_name']}] Email test",
         to=recipient,
         text_body=(
-            "ChurchHub email test succeeded.\n\n"
-            "Invitations and password resets can use this SMTP connection."
+            f"{context['site_name']} email test succeeded.\n\n"
+            "Invitations, portal sign-in, and password resets can use this SMTP connection."
         ),
+        html_body=html_body,
         fail_silently=False,
     )
 
 
 def build_absolute_uri(request, path):
-    if request:
-        return request.build_absolute_uri(path)
-    base = getattr(settings, "CHURCHHUB_PUBLIC_URL", "").rstrip("/")
-    if base:
-        return f"{base}{path}"
-    return path
+    from church_system.public_urls import build_public_absolute_uri
+
+    return build_public_absolute_uri(request, path)
+
+
+def get_email_branding_context(request=None, *, preheader: str = "") -> dict:
+    """Shared template context for HTML emails (platform SiteSettings + public URLs)."""
+    from church_system.public_urls import resolve_public_site_base
+
+    site = get_site_settings()
+    base = resolve_public_site_base(request).rstrip("/")
+    logo_url = ""
+    if site.logo:
+        logo_path = site.logo.url
+        if logo_path.startswith(("http://", "https://")):
+            logo_url = logo_path
+        else:
+            logo_url = f"{base}{logo_path if logo_path.startswith('/') else '/' + logo_path}"
+
+    return {
+        "site_name": site.site_name,
+        "site_tagline": (site.site_tagline or "").strip(),
+        "brand_color": site.admin_primary_color or "#1e3a5f",
+        "action_color": site.accent_color or "#1d4ed8",
+        "site_url": base,
+        "logo_url": logo_url,
+        "support_email": (site.support_email or "").strip(),
+        "footer_text": (site.footer_text or "").strip(),
+        "email_preheader": (preheader or "").strip(),
+    }
 
 
 def send_user_invitation_email(invitation, request=None, *, fail_silently=True):
@@ -222,9 +253,12 @@ def send_user_invitation_email(invitation, request=None, *, fail_silently=True):
     accept_url = build_absolute_uri(request, accept_path)
     site = get_site_settings()
     context = {
+        **get_email_branding_context(
+            request,
+            preheader=f"Accept your invitation to {invitation.church.name}",
+        ),
         "invitation": invitation,
         "accept_url": accept_url,
-        "site_name": site.site_name,
         "church_name": invitation.church.name,
         "invited_by": invitation.invited_by.get_full_name() or invitation.invited_by.username,
         "expires_at": invitation.expires_at,

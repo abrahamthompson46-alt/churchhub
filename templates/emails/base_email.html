@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>{% block email_title %}{{ site_name }}{% endblock %}</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+  <style>
+    body { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table { border-collapse: collapse; mso-table-lspace: 0; mso-table-rspace: 0; }
+    img { border: 0; line-height: 100%; outline: none; text-decoration: none; max-width: 100%; height: auto; }
+    a { color: {{ action_color|default:"#1d4ed8" }}; }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#eef1f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  {% if email_preheader %}
+  <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">
+    {{ email_preheader }}
+  </div>
+  {% endif %}
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#eef1f6;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;">
+          <tr>
+            <td style="background-color:{{ brand_color|default:'#1e3a5f' }};border-radius:12px 12px 0 0;padding:20px 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="left" valign="middle">
+                    {% if logo_url %}
+                    <a href="{{ site_url }}" style="text-decoration:none;">
+                      <img src="{{ logo_url }}" alt="{{ site_name }}" height="40" style="display:block;height:40px;width:auto;max-width:200px;">
+                    </a>
+                    {% else %}
+                    <a href="{{ site_url }}" style="text-decoration:none;font-size:20px;font-weight:600;color:#ffffff;letter-spacing:-0.02em;">
+                      {{ site_name }}
+                    </a>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% if site_tagline %}
+                <tr>
+                  <td style="padding-top:6px;font-size:13px;line-height:1.4;color:rgba(255,255,255,0.85);">
+                    {{ site_tagline }}
+                  </td>
+                </tr>
+                {% endif %}
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#ffffff;padding:32px 28px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+              {% block email_content %}{% endblock %}
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#f8fafc;border-radius:0 0 12px 12px;padding:20px 28px;border:1px solid #e2e8f0;border-top:none;">
+              <p style="margin:0 0 8px;font-size:12px;line-height:1.5;color:#64748b;text-align:center;">
+                {% if footer_text %}{{ footer_text }}{% else %}{{ site_name }}{% endif %}
+              </p>
+              {% if support_email %}
+              <p style="margin:0;font-size:12px;line-height:1.5;color:#64748b;text-align:center;">
+                Questions? <a href="mailto:{{ support_email }}" style="color:#64748b;text-decoration:underline;">{{ support_email }}</a>
+              </p>
+              {% endif %}
+              <p style="margin:12px 0 0;font-size:11px;line-height:1.4;color:#94a3b8;text-align:center;">
+                <a href="{{ site_url }}" style="color:#94a3b8;text-decoration:underline;">{{ site_url }}</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

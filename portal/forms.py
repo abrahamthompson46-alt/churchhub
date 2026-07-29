@@ -103,35 +103,51 @@ class PortalPasswordResetForm(PasswordResetForm):
     ):
         """Send via platform SMTP when possible; fall back to Django mailer."""
         from django.contrib.sites.shortcuts import get_current_site
-        from church_system.email_service import send_platform_email
+        from church_system.email_service import (
+            build_absolute_uri,
+            get_email_branding_context,
+            send_platform_email,
+        )
         from django.template.loader import render_to_string
+        from django.urls import reverse
 
         email = self.cleaned_data["email"]
         if not domain_override:
             current_site = get_current_site(request)
-            site_name = current_site.name
             domain = current_site.domain
         else:
-            site_name = domain = domain_override
+            domain = domain_override
 
         for user in self.get_users(email):
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = token_generator.make_token(user)
             context = {
                 "email": email,
                 "domain": domain,
-                "site_name": site_name,
-                "uid": urlsafe_base64_encode(force_bytes(user.pk)),
+                "uid": uid,
                 "user": user,
-                "token": token_generator.make_token(user),
+                "token": token,
                 "protocol": "https" if use_https else "http",
                 **(extra_email_context or {}),
             }
+            reset_path = reverse(
+                "portal:password_reset_confirm",
+                kwargs={"uidb64": uid, "token": token},
+            )
+            context["reset_url"] = build_absolute_uri(request, reset_path)
+            context.update(
+                get_email_branding_context(
+                    request,
+                    preheader="Reset your member portal password",
+                )
+            )
             subject = render_to_string(
-                subject_template_name or "registration/password_reset_subject.txt",
+                subject_template_name or "emails/portal_password_reset_subject.txt",
                 context,
             )
             subject = "".join(subject.splitlines())
             text_body = render_to_string(
-                email_template_name or "registration/password_reset_email.html",
+                email_template_name or "emails/portal_password_reset.txt",
                 context,
             )
             html_body = None

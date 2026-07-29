@@ -299,7 +299,7 @@ class PortalAuthFlowTests(TestCase):
         self.assertEqual(user.username, "kwame.asante@example.com")
         self.assertTrue(user.must_change_password)
 
-    @override_settings(DEBUG=True)
+    @override_settings(DEBUG=True, CHURCHHUB_PUBLIC_URL="https://portal.example.com")
     def test_first_login_requires_email_confirmation(self):
         response = self.client.post(
             reverse("portal:login"),

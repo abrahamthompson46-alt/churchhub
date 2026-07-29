@@ -1,0 +1,13 @@
+{% extends "emails/base_email.html" %}
+
+{% block email_title %}Email test — {{ site_name }}{% endblock %}
+
+{% block email_content %}
+<p style="margin:0 0 16px;font-size:16px;line-height:1.55;color:#1e293b;">
+  SMTP test successful
+</p>
+<p style="margin:0;font-size:15px;line-height:1.6;color:#334155;">
+  Your platform email settings are working. Member portal confirmations, invitations, MFA codes,
+  and password resets will use this branded layout.
+</p>
+{% endblock %}

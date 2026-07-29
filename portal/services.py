@@ -267,10 +267,9 @@ def resolve_confirm_token(token: str):
 
 
 def public_absolute_url(request, path: str) -> str:
-    base = (getattr(settings, "CHURCHHUB_PUBLIC_URL", "") or "").rstrip("/")
-    if base:
-        return f"{base}{path}"
-    return request.build_absolute_uri(path)
+    from church_system.public_urls import build_public_absolute_uri
+
+    return build_public_absolute_uri(request, path)
 
 
 def send_portal_device_confirmation(request, user) -> bool:
@@ -282,23 +281,21 @@ def send_portal_device_confirmation(request, user) -> bool:
     token = build_confirm_token(user)
     confirm_path = reverse("portal:confirm_device", kwargs={"token": token})
     confirm_url = public_absolute_url(request, confirm_path)
-    site_name = "ChurchHub"
-    try:
-        from sitecontrol.services import get_site_settings
-
-        site_name = get_site_settings().site_name or site_name
-    except Exception:
-        pass
+    from church_system.email_service import get_email_branding_context
 
     context = {
+        **get_email_branding_context(
+            request,
+            preheader="Confirm your member portal sign-in",
+        ),
         "user": user,
         "member": getattr(user, "member", None),
         "confirm_url": confirm_url,
-        "site_name": site_name,
         "expires_hours": PORTAL_CONFIRM_MAX_AGE // 3600,
         "device_hint": (request.META.get("HTTP_USER_AGENT") or "")[:120],
         "ip_address": get_client_ip(request),
     }
+    site_name = context["site_name"]
     text_body = render_to_string("emails/portal_device_confirm.txt", context)
     html_body = render_to_string("emails/portal_device_confirm.html", context)
     sent = send_platform_email(

@@ -90,6 +90,7 @@ def validate_production_environment(
     database_engine: str,
     redis_url: str,
     csrf_trusted_origins: list[str],
+    public_site_url: str = "",
     require_redis: bool = True,
     allow_mysql: bool = False,
     allow_sqlite: bool = False,
@@ -128,6 +129,16 @@ def validate_production_environment(
         errors.append(
             "DJANGO_CSRF_TRUSTED_ORIGINS must include https://your-production-host"
         )
+
+    from church_system.public_urls import is_localhost_url
+
+    if not debug:
+        pub = (public_site_url or "").strip()
+        if not pub or is_localhost_url(pub):
+            errors.append(
+                "CHURCHHUB_PUBLIC_URL must be your live HTTPS site URL (not localhost) "
+                "so portal and invitation emails link correctly."
+            )
 
     if errors:
         raise ImproperlyConfigured(

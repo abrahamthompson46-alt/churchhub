@@ -8,6 +8,7 @@ from church_system.env import env_flag, validate_production_environment
 from church_system.settings.base import *  # noqa: F401,F403
 from church_system.settings.base import (
     ALLOWED_HOSTS,
+    CHURCHHUB_PUBLIC_URL,
     CSRF_TRUSTED_ORIGINS,
     DEBUG,
     ON_PYTHONANYWHERE,
@@ -44,6 +45,7 @@ SECURE_HSTS_PRELOAD = os.environ.get("SECURE_HSTS_PRELOAD", "false").lower() in 
     "yes",
 )
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
 
 # Pure-Python MySQL driver for PythonAnywhere (mysqlclient often unavailable).
 if ON_PYTHONANYWHERE:
@@ -72,6 +74,7 @@ validate_production_environment(
     database_engine=DATABASES["default"]["ENGINE"],
     redis_url=REDIS_URL,
     csrf_trusted_origins=CSRF_TRUSTED_ORIGINS,
+    public_site_url=CHURCHHUB_PUBLIC_URL,
     require_redis=_require_redis,
     allow_mysql=True,
     allow_sqlite=_allow_sqlite,

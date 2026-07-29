@@ -30,7 +30,7 @@ urlpatterns = [
     path("transactions/", include(("transactions.urls", "transactions"), namespace="transactions")),
     path("accounts/", include(("accounts.urls", "accounts"), namespace="accounts")),
     path("permissions/", include(("permissions.urls", "permissions"), namespace="permissions")),
-    path("accounts/", include("django.contrib.auth.urls")),
+    path("accounts/", include("church_system.auth_urls")),
     path("announcements/", include(("announcements.urls", "announcements"), namespace="announcements")),
     path("reports/", include(("reports.urls", "reports"), namespace="reports")),
     path("meetings/", include(("meetings.urls", "meetings"), namespace="meetings")),

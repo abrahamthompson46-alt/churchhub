@@ -6,6 +6,7 @@ from church_system.env import validate_production_environment
 from church_system.settings.base import *  # noqa: F401,F403
 from church_system.settings.base import (
     ALLOWED_HOSTS,
+    CHURCHHUB_PUBLIC_URL,
     CSRF_TRUSTED_ORIGINS,
     DATABASES,
     DEBUG,
@@ -34,6 +35,7 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 3600
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
 
 if os.environ.get("CHURCHHUB_ALLOW_SQLITE", "").lower() not in ("true", "1", "yes"):
     DATABASES = configure_databases(require_managed=True)
@@ -45,6 +47,7 @@ validate_production_environment(
     database_engine=DATABASES["default"]["ENGINE"],
     redis_url=REDIS_URL,
     csrf_trusted_origins=CSRF_TRUSTED_ORIGINS,
+    public_site_url=CHURCHHUB_PUBLIC_URL,
     require_redis=os.environ.get("CHURCHHUB_REQUIRE_REDIS", "true").lower()
     in ("true", "1", "yes"),
     allow_mysql=True,

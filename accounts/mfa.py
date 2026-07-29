@@ -311,18 +311,21 @@ def send_mfa_email_otp(user, *, fail_silently: bool = True) -> tuple[bool, str]:
         return False, reason
     code = issue_email_otp(user)
     try:
-        from church_system.email_service import send_platform_email
+        from church_system.email_service import get_email_branding_context, send_platform_email
         from django.template.loader import render_to_string
         from sitecontrol.services import get_site_settings
 
         site = get_site_settings()
         context = {
+            **get_email_branding_context(
+                None,
+                preheader="Your sign-in verification code",
+            ),
             "user": user,
             "code": code,
-            "site_name": site.site_name,
             "ttl_minutes": EMAIL_OTP_TTL_SECONDS // 60,
         }
-        subject = f"[{site.site_name}] Your sign-in code"
+        subject = f"[{context['site_name']}] Your sign-in code"
         text_body = render_to_string("emails/mfa_email_otp.txt", context)
         html_body = render_to_string("emails/mfa_email_otp.html", context)
         sent = send_platform_email(

@@ -664,6 +664,7 @@ def tenant_list(request):
 @require_platform_capability(CAP_VIEW)
 def tenant_detail(request, pk):
     from accounts import selectors as account_selectors
+    from sitecontrol.tenant_user_services import tenant_role_choices
 
     church = selectors.get_church_or_404(selectors.church_detail_qs(), pk)
     _require_tenant_access(request, church)
@@ -677,8 +678,54 @@ def tenant_detail(request, pk):
         "pending_invites": pending_invites,
         "can_manage_lifecycle": operator_has_capability(request.user, CAP_MANAGE_TENANTS),
         "can_impersonate": operator_has_capability(request.user, CAP_IMPERSONATE),
+        "tenant_role_choices": tenant_role_choices(),
         "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Tenants", "/platform/tenants/"), (church.name,)),
     })
+
+
+@platform_required
+@require_platform_capability(CAP_MANAGE_TENANTS)
+@require_POST
+def tenant_set_user_role(request, pk, user_id):
+    from permissions.roles import UserRole
+    from sitecontrol.tenant_user_services import set_tenant_user_role
+
+    church = selectors.get_church_or_404(selectors.church_tenant_access_qs(), pk)
+    _require_tenant_access(request, church)
+    new_role = (request.POST.get("role") or "").strip()
+    if new_role not in {c[0] for c in UserRole.CHOICES}:
+        flash_error(request, "Select a valid role.", title="Role not updated")
+        return redirect("sitecontrol:tenant_detail", pk=church.pk)
+    try:
+        target, changed = set_tenant_user_role(
+            church=church,
+            user_id=user_id,
+            new_role=new_role,
+            operator=request.user,
+            request=request,
+        )
+    except ValueError as exc:
+        flash_error(request, str(exc), title="Role not updated")
+        return redirect("sitecontrol:tenant_detail", pk=church.pk)
+
+    if changed:
+        log_platform_action(
+            request,
+            "TENANT_UPDATE",
+            f"Role for {target.username} at {church.name} → {UserRole.label(new_role)}",
+            target_model="User",
+            target_id=target.pk,
+            details={
+                "church_id": str(church.pk),
+                "username": target.username,
+                "new_role": new_role,
+            },
+            denomination=getattr(church, "denomination", None),
+        )
+        flash_success(request, f"Role updated for {target.username}.")
+    else:
+        flash_success(request, "No change — role was already set.")
+    return redirect("sitecontrol:tenant_detail", pk=church.pk)
 
 
 @platform_required

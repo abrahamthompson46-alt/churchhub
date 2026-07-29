@@ -53,6 +53,7 @@ urlpatterns = [
     path("tenants/", views.tenant_list, name="tenant_list"),
     path("tenants/provision/", views.tenant_provision, name="tenant_provision"),
     path("tenants/<uuid:pk>/", views.tenant_detail, name="tenant_detail"),
+    path("tenants/<uuid:pk>/users/<uuid:user_id>/role/", views.tenant_set_user_role, name="tenant_set_user_role"),
     path("tenants/<uuid:pk>/edit/", views.tenant_edit, name="tenant_edit"),
     path("tenants/<uuid:pk>/reprovision-financials/", views.tenant_reprovision_financials, name="tenant_reprovision_financials"),
     path("tenants/<uuid:pk>/suspend/", views.tenant_suspend, name="tenant_suspend"),

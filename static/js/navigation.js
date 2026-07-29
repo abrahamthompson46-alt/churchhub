@@ -4,22 +4,81 @@
 (function () {
     const DESKTOP_BP = 992;
     const DEFAULT_FLASH_MS = 6000;
+    const DROPDOWN_HIDE_MS = 90;
+
+    function isDesktop() {
+        return window.innerWidth >= DESKTOP_BP;
+    }
+
+    function dropdownParts(el) {
+        return {
+            toggle: el.querySelector('[data-bs-toggle="dropdown"]'),
+            menu: el.querySelector('.dropdown-menu'),
+        };
+    }
+
+    function hideDropdown(toggle) {
+        if (!toggle) return;
+        const instance = bootstrap.Dropdown.getOrCreateInstance(toggle);
+        instance.hide();
+    }
+
+    function showDropdown(toggle) {
+        if (!toggle) return;
+        document.querySelectorAll('.hover-dropdown [data-bs-toggle="dropdown"]').forEach(function (other) {
+            if (other !== toggle) hideDropdown(other);
+        });
+        bootstrap.Dropdown.getOrCreateInstance(toggle).show();
+    }
+
+    function pointerInside(el, toggle, menu) {
+        if (!el) return false;
+        if (el.matches(':hover')) return true;
+        if (menu && menu.matches(':hover')) return true;
+        if (toggle && toggle.matches(':hover')) return true;
+        return false;
+    }
 
     function initHoverDropdowns() {
         document.querySelectorAll('.hover-dropdown').forEach(function (el) {
-            let timeout;
-            el.addEventListener('mouseenter', function () {
-                if (window.innerWidth < DESKTOP_BP) return;
-                clearTimeout(timeout);
-                const toggle = el.querySelector('[data-bs-toggle="dropdown"]');
-                if (toggle) bootstrap.Dropdown.getOrCreateInstance(toggle).show();
+            const parts = dropdownParts(el);
+            const toggle = parts.toggle;
+            const menu = parts.menu;
+            if (!toggle || !menu) return;
+
+            let hideTimer = null;
+
+            function scheduleHide() {
+                clearTimeout(hideTimer);
+                hideTimer = setTimeout(function () {
+                    if (!isDesktop()) return;
+                    if (!pointerInside(el, toggle, menu)) {
+                        hideDropdown(toggle);
+                    }
+                }, DROPDOWN_HIDE_MS);
+            }
+
+            function cancelHide() {
+                clearTimeout(hideTimer);
+            }
+
+            function onEnter() {
+                if (!isDesktop()) return;
+                cancelHide();
+                showDropdown(toggle);
+            }
+
+            [toggle, menu, el].forEach(function (node) {
+                node.addEventListener('mouseenter', onEnter);
+                node.addEventListener('mouseleave', scheduleHide);
+                node.addEventListener('focusin', onEnter);
+                node.addEventListener('focusout', scheduleHide);
             });
-            el.addEventListener('mouseleave', function () {
-                if (window.innerWidth < DESKTOP_BP) return;
-                const toggle = el.querySelector('[data-bs-toggle="dropdown"]');
-                timeout = setTimeout(function () {
-                    if (toggle) bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
-                }, 150);
+
+            document.addEventListener('click', function (evt) {
+                if (!isDesktop()) return;
+                if (el.contains(evt.target)) return;
+                hideDropdown(toggle);
             });
         });
     }

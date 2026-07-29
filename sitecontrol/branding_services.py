@@ -67,8 +67,8 @@ def branding_css_block(branding: dict[str, str]) -> str:
             --ch-primary-hover: var(--ch-action-hover);
             --ch-accent: {highlight};
             --ch-focus-ring: color-mix(in srgb, var(--ch-action) 22%, transparent);
-            --ch-table-head-bg: #f1f5f9;
-            --ch-table-head-text: #64748b;
+            --ch-table-head-bg: color-mix(in srgb, {primary} 82%, #020617);
+            --ch-table-head-text: #f1f5f9;
             --ch-surface: {branding.get("surface_color", DEFAULT_SURFACE)};
     """.strip()
 

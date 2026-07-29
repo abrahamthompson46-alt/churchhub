@@ -718,8 +718,18 @@ body.app-body.auth-page {
 }
 
 @media (min-width: 992px) {
-    .hover-dropdown:hover > .dropdown-menu,
-    .hover-dropdown:focus-within > .dropdown-menu { display: block; }
+    .dropdown-mega .nav-mega--full {
+        top: 100%;
+    }
+
+    .dropdown-mega .nav-mega--full::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: -6px;
+        height: 6px;
+    }
 }
 
 /* ── Flash messages ── */
@@ -4993,7 +5003,7 @@ nav.page-eyebrow .page-eyebrow__page { color: var(--ch-text); }
     font-size: 0.58rem;
     font-weight: 600;
     letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--ch-border);
+    border-bottom: none;
     padding: 0.38rem 0.65rem;
 }
 

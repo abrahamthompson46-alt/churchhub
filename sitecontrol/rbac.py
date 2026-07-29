@@ -117,6 +117,7 @@ NAV_ITEM_CAPABILITIES = {
     "sitecontrol:tenant_provision": CAP_MANAGE_TENANTS,
     "sitecontrol:tenant_resend_invitation": CAP_MANAGE_TENANTS,
     "sitecontrol:tenant_create_admin_invitation": CAP_MANAGE_TENANTS,
+    "sitecontrol:tenant_set_user_role": CAP_MANAGE_TENANTS,
     "sitecontrol:hierarchy": CAP_VIEW,
     "sitecontrol:registration_settings": CAP_MANAGE_REGISTRATION,
     "sitecontrol:operator_list": CAP_MANAGE_OPERATORS,

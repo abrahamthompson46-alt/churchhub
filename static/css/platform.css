@@ -654,8 +654,8 @@ body.platform-body {
 }
 
 .platform-table th {
-    background: #f1f5f9;
-    color: #64748b;
+    background: color-mix(in srgb, var(--ch-brand, var(--pf-navy)) 82%, #020617);
+    color: #f1f5f9;
     padding: 0.38rem 0.65rem;
     font-size: 0.62rem;
 }

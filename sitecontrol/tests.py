@@ -629,6 +629,52 @@ class BillingProvisioningTests(SiteControlClientHarness, TestCase):
         self.assertEqual(sub.status, "EXPIRED")
 
 
+class TenantUserRoleTests(SiteControlClientHarness, TestCase):
+    def setUp(self):
+        self.disable_privileged_mfa()
+        ensure_default_plans()
+        conf = Conference.objects.create(name="Role Conf", code="RC1")
+        zone = Zone.objects.create(name="Role Zone", code="RZ1", conference=conf)
+        district = District.objects.create(name="Role Dist", code="RD1", zone=zone)
+        self.church = Church.objects.create(name="Role Church", code="RCH1", district=district)
+        self.treasury = User.objects.create_user(
+            username="tenant_treasury",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        self.platform_user = User.objects.create_user(
+            username="tenant_role_owner",
+            password="pass12345",
+            is_platform_user=True,
+            is_superuser=True,
+            platform_role="OWNER",
+        )
+
+    def test_platform_owner_can_change_tenant_user_role(self):
+        self.client.login(username="tenant_role_owner", password="pass12345")
+        url = reverse("sitecontrol:tenant_set_user_role", args=[self.church.pk, self.treasury.pk])
+        response = self.client.post(url, {"role": UserRole.SECRETARY})
+        self.assertEqual(response.status_code, 302)
+        self.treasury.refresh_from_db()
+        self.assertEqual(self.treasury.role, UserRole.SECRETARY)
+
+    def test_cannot_change_user_from_other_church(self):
+        other = Church.objects.create(name="Other", code="OTH1", district=self.church.district)
+        outsider = User.objects.create_user(
+            username="other_user",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=other,
+        )
+        self.client.login(username="tenant_role_owner", password="pass12345")
+        url = reverse("sitecontrol:tenant_set_user_role", args=[self.church.pk, outsider.pk])
+        response = self.client.post(url, {"role": UserRole.SECRETARY})
+        self.assertEqual(response.status_code, 302)
+        outsider.refresh_from_db()
+        self.assertEqual(outsider.role, UserRole.TREASURY)
+
+
 class MfaSecurityPolicyTests(SiteControlClientHarness, TestCase):
     """Platform owners configure optional MFA audiences under Security Policy."""
 

@@ -103,7 +103,14 @@ def confirm_sent(request):
     return render(request, "portal/confirm_sent.html", context)
 
 
-def confirm_device(request, token):
+def confirm_device(request, path_token=None):
+    from urllib.parse import unquote
+
+    raw = path_token or request.GET.get("token", "")
+    token = unquote(raw).strip()
+    if not token:
+        flash_error(request, "This confirmation link is invalid or has expired.")
+        return redirect("portal:login")
     try:
         user = resolve_confirm_token(token)
         device_token = complete_portal_login(request, user, trust_device=True)

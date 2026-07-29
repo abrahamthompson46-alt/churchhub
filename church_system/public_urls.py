@@ -4,6 +4,33 @@ from __future__ import annotations
 
 from django.conf import settings
 
+# Common mistakes when setting CHURCHHUB_PUBLIC_URL (must be site root, not a deep link).
+_MISTAKEN_PUBLIC_URL_SUFFIXES = (
+    "/dashboard",
+    "/portal",
+    "/platform",
+    "/admin",
+    "/accounts/login",
+)
+
+
+def normalize_public_site_base(url: str) -> str:
+    """Strip accidental path segments from a configured public site URL."""
+    cleaned = (url or "").strip().rstrip("/")
+    if not cleaned:
+        return cleaned
+    lower = cleaned.lower()
+    changed = True
+    while changed:
+        changed = False
+        for suffix in _MISTAKEN_PUBLIC_URL_SUFFIXES:
+            if lower.endswith(suffix.lower()):
+                cleaned = cleaned[: -len(suffix)].rstrip("/")
+                lower = cleaned.lower()
+                changed = True
+                break
+    return cleaned
+
 
 def is_localhost_url(url: str) -> bool:
     if not url:
@@ -24,7 +51,9 @@ def resolve_public_site_base(request=None) -> str:
     Prefers CHURCHHUB_PUBLIC_URL when it is not a localhost URL in non-debug
     environments, then the incoming request, then CSRF trusted origins / allowed hosts.
     """
-    configured = (getattr(settings, "CHURCHHUB_PUBLIC_URL", "") or "").strip().rstrip("/")
+    configured = normalize_public_site_base(
+        getattr(settings, "CHURCHHUB_PUBLIC_URL", "") or ""
+    )
     debug = getattr(settings, "DEBUG", True)
 
     if configured and (debug or not is_localhost_url(configured)):

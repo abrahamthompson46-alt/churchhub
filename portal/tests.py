@@ -299,7 +299,11 @@ class PortalAuthFlowTests(TestCase):
         self.assertEqual(user.username, "kwame.asante@example.com")
         self.assertTrue(user.must_change_password)
 
-    @override_settings(DEBUG=True, CHURCHHUB_PUBLIC_URL="https://portal.example.com")
+    @override_settings(
+        DEBUG=True,
+        CHURCHHUB_PUBLIC_URL="https://portal.example.com",
+        SECURE_SSL_REDIRECT=False,
+    )
     def test_first_login_requires_email_confirmation(self):
         response = self.client.post(
             reverse("portal:login"),
@@ -312,9 +316,13 @@ class PortalAuthFlowTests(TestCase):
         self.assertEqual(response.url, reverse("portal:confirm_sent"))
         self.assertFalse(response.wsgi_request.user.is_authenticated)
 
+        from urllib.parse import quote
+
         user = User.objects.get(email__iexact="kwame.asante@example.com")
         token = build_confirm_token(user)
-        confirm = self.client.get(reverse("portal:confirm_device", kwargs={"token": token}))
+        confirm = self.client.get(
+            reverse("portal:confirm_device") + "?token=" + quote(token, safe="")
+        )
         self.assertEqual(confirm.status_code, 302)
         self.assertEqual(confirm.url, reverse("portal:password_change"))
 
@@ -323,11 +331,15 @@ class PortalAuthFlowTests(TestCase):
         self.assertEqual(home.status_code, 302)
         self.assertEqual(home.url, reverse("portal:password_change"))
 
-    @override_settings(DEBUG=True)
+    @override_settings(DEBUG=True, SECURE_SSL_REDIRECT=False)
     def test_password_change_after_confirm(self):
+        from urllib.parse import quote
+
         user = authenticate_portal_credentials("kwame.asante@example.com", "1988-03-14")
         token = build_confirm_token(user)
-        self.client.get(reverse("portal:confirm_device", kwargs={"token": token}))
+        self.client.get(
+            reverse("portal:confirm_device") + "?token=" + quote(token, safe="")
+        )
         response = self.client.post(
             reverse("portal:password_change"),
             {

@@ -49,7 +49,7 @@ flowchart TD
 | Match rule | Email and DOB must both match the member directory before a portal session is issued |
 | Provisioning | First successful match creates/links a `User` (`role=MEMBER`, `must_change_password=True`) |
 | New device / first login | Confirmation email link (`/portal/confirm/<token>/`) before session; trusted-device cookie afterward |
-| Email link base URL | Set **`CHURCHHUB_PUBLIC_URL`** to your live HTTPS site (no trailing slash). If unset or left at `localhost`, confirmation links in email will not work on phones or other devices. After changing it, redeploy and request a **new** confirmation email. Production also falls back to `DJANGO_CSRF_TRUSTED_ORIGINS` when the public URL is still localhost. |
+| Email link base URL | Set **`CHURCHHUB_PUBLIC_URL`** to your live HTTPS **site root** only (example: `https://churchhub.pythonanywhere.com`) — **not** a path like `/dashboard/`. If unset or left at `localhost`, confirmation links in email will not work on phones or other devices. After changing it, redeploy and request a **new** confirmation email. Production also falls back to `DJANGO_CSRF_TRUSTED_ORIGINS` when the public URL is still localhost. Confirm links use `/portal/confirm/?token=…` so email clients handle signed tokens reliably. |
 | After login | Forced password change when `must_change_password`; change at `/portal/password/change/`; reset at `/portal/password/reset/` |
 
 ### Success redirects (`post_login_url`)

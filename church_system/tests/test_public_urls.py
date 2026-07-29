@@ -1,9 +1,15 @@
 from django.test import RequestFactory, SimpleTestCase, override_settings
 
-from church_system.public_urls import build_public_absolute_uri, resolve_public_site_base
+from church_system.public_urls import build_public_absolute_uri, normalize_public_site_base, resolve_public_site_base
 
 
 class PublicUrlTests(SimpleTestCase):
+    def test_strips_dashboard_suffix_from_public_url(self):
+        self.assertEqual(
+            normalize_public_site_base("https://churchhub.pythonanywhere.com/dashboard"),
+            "https://churchhub.pythonanywhere.com",
+        )
+
     @override_settings(
         DEBUG=False,
         CHURCHHUB_PUBLIC_URL="http://localhost:8000",

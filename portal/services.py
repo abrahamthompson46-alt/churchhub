@@ -279,7 +279,9 @@ def send_portal_device_confirmation(request, user) -> bool:
         raise PortalAuthError("No email address is available to send a confirmation link.")
 
     token = build_confirm_token(user)
-    confirm_path = reverse("portal:confirm_device", kwargs={"token": token})
+    from urllib.parse import quote
+
+    confirm_path = reverse("portal:confirm_device") + "?token=" + quote(token, safe="")
     confirm_url = public_absolute_url(request, confirm_path)
     from church_system.email_service import get_email_branding_context
 

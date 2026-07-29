@@ -300,10 +300,32 @@ else:
         }
     }
 
-CHURCHHUB_PUBLIC_URL = os.environ.get(
-    "CHURCHHUB_PUBLIC_URL",
-    f"https://{_RENDER_HOST}" if _RENDER_HOST else "http://localhost:8000",
+def _public_url_is_localhost(url: str) -> bool:
+    if not (url or "").strip():
+        return True
+    lower = url.lower()
+    return (
+        "localhost" in lower
+        or "127.0.0.1" in lower
+        or "[::1]" in lower
+        or lower.startswith("http://0.0.0.0")
+    )
+
+
+CHURCHHUB_PUBLIC_URL = (
+    os.environ.get(
+        "CHURCHHUB_PUBLIC_URL",
+        f"https://{_RENDER_HOST}" if _RENDER_HOST else "http://localhost:8000",
+    )
+    .strip()
+    .rstrip("/")
 )
+if ON_PYTHONANYWHERE and _public_url_is_localhost(CHURCHHUB_PUBLIC_URL):
+    _pa_site = (os.environ.get("PYTHONANYWHERE_SITE") or "").strip()
+    if _pa_site:
+        CHURCHHUB_PUBLIC_URL = f"https://{_pa_site.lower()}"
+    elif CSRF_TRUSTED_ORIGINS:
+        CHURCHHUB_PUBLIC_URL = CSRF_TRUSTED_ORIGINS[0].strip().rstrip("/")
 
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "").strip()
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587") or 587)

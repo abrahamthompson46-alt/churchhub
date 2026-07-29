@@ -52,8 +52,23 @@ class EnvHelperTests(SimpleTestCase):
             database_engine="django.db.backends.postgresql",
             redis_url="redis://localhost:6379/0",
             csrf_trusted_origins=["https://app.example.com"],
+            public_site_url="https://app.example.com",
             require_redis=True,
         )
+
+    def test_validate_production_rejects_localhost_public_url(self):
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_production_environment(
+                secret_key="unique-production-secret-key-value",
+                debug=False,
+                allowed_hosts=["app.example.com"],
+                database_engine="django.db.backends.postgresql",
+                redis_url="redis://localhost:6379/0",
+                csrf_trusted_origins=["https://app.example.com"],
+                public_site_url="http://localhost:8000",
+                require_redis=True,
+            )
+        self.assertIn("CHURCHHUB_PUBLIC_URL", str(ctx.exception))
 
     def test_validate_production_allows_mysql_when_enabled(self):
         validate_production_environment(
@@ -63,6 +78,7 @@ class EnvHelperTests(SimpleTestCase):
             database_engine="django.db.backends.mysql",
             redis_url="",
             csrf_trusted_origins=["https://churchhub.pythonanywhere.com"],
+            public_site_url="https://churchhub.pythonanywhere.com",
             require_redis=False,
             allow_mysql=True,
         )

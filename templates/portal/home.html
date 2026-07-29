@@ -31,6 +31,9 @@
             <a href="{% url 'dashboard:home' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-speedometer2 me-1"></i>Staff dashboard</a>
             {% endif %}
             <a href="{% url 'portal:prayer_request' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-heart me-1"></i>Prayer</a>
+            {% if welfare_enabled %}
+            <a href="{% url 'portal:welfare' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-life-preserver me-1"></i>Welfare</a>
+            {% endif %}
             <a href="{% url 'portal:thanksgiving_testimony' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-stars me-1"></i>Thanksgiving</a>
             <a href="{% url 'portal:profile' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-person me-1"></i>Profile</a>
             <a href="{% url 'dashboard:logout' %}" class="btn btn-primary btn-sm">Sign out</a>
@@ -70,6 +73,23 @@
                 <p class="text-muted small px-3 pb-3 mb-0">No giving summary available.</p>
                 {% endif %}
             </section>
+
+            {% if welfare_enabled and welfare_summary %}
+            <section class="cc-panel mb-4">
+                <div class="cc-panel__header d-flex justify-content-between align-items-center">
+                    <h2 class="cc-panel__title"><i class="bi bi-life-preserver"></i> Welfare {{ giving_year }}</h2>
+                    <a href="{% url 'portal:welfare' %}" class="btn btn-link btn-sm">View all</a>
+                </div>
+                <div class="cc-mini-kpis px-3 pb-3">
+                    <div class="cc-mini-kpi"><span>Contributed</span><strong class="text-currency">{{ welfare_summary.contributed|floatformat:2|intcomma }}</strong></div>
+                    <div class="cc-mini-kpi"><span>Received</span><strong class="text-currency">{{ welfare_summary.received|floatformat:2|intcomma }}</strong></div>
+                    <div class="cc-mini-kpi"><span>Open</span><strong>{{ welfare_summary.open_requests }}</strong></div>
+                </div>
+                <div class="px-3 pb-3 d-grid gap-2">
+                    <a href="{% url 'portal:welfare_request' %}" class="btn btn-outline-primary btn-sm">Request assistance</a>
+                </div>
+            </section>
+            {% endif %}
 
             {% if has_payslips %}
             <section class="cc-panel mb-4">

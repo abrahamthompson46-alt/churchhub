@@ -7,6 +7,9 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
+from decimal import Decimal
+
+from remittance.models import WelfareAssistanceCase
 from permissions.roles import UserRole
 
 from .services import (
@@ -187,3 +190,36 @@ class PortalSetPasswordForm(SetPasswordForm):
         if commit:
             user.save()
         return user
+
+
+class PortalWelfareRequestForm(forms.Form):
+    assistance_type = forms.ChoiceField(
+        label="Type of assistance",
+        choices=WelfareAssistanceCase.ASSISTANCE_TYPES,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    amount_requested = forms.DecimalField(
+        label="Amount requested (₵)",
+        min_value=Decimal("0.01"),
+        max_digits=12,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+    )
+    priority = forms.ChoiceField(
+        label="Urgency",
+        choices=WelfareAssistanceCase.PRIORITY_CHOICES,
+        initial="NORMAL",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    reason = forms.CharField(
+        label="Describe your need",
+        min_length=20,
+        max_length=2000,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 4,
+                "placeholder": "Share enough detail for the welfare team to understand your situation.",
+            }
+        ),
+    )

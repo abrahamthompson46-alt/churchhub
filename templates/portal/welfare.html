@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}My welfare — {{ institution_display_name|default:site_name }}{% endblock %}
+{% block body_class %}portal-app{% endblock %}
+
+{% block content %}
+<div class="page-container portal-home">
+    <header class="portal-hero mb-4">
+        <div class="portal-hero__identity">
+            <div>
+                <p class="page-eyebrow mb-1">Member Portal</p>
+                <h1 class="page-title mb-1">My welfare</h1>
+                <p class="text-muted mb-0">Contributions, assistance, and your welfare ledger</p>
+            </div>
+        </div>
+        <div class="portal-hero__actions">
+            <a href="{% url 'portal:welfare_request' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>Request assistance</a>
+            <a href="{% url 'portal:home' %}" class="btn btn-outline-secondary btn-sm">Portal home</a>
+        </div>
+    </header>
+
+    <form method="get" class="cc-panel mb-4 p-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label small text-muted">Year</label>
+                <select name="year" class="form-select form-select-sm">
+                    <option value="">Any</option>
+                    {% for y in year_choices %}
+                    <option value="{{ y }}" {% if filters.year == y %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">From</label>
+                <input type="date" name="start_date" class="form-control form-control-sm" value="{{ filters.start_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">To</label>
+                <input type="date" name="end_date" class="form-control form-control-sm" value="{{ filters.end_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">Ledger type</label>
+                <select name="entry_type" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for code, label in entry_type_choices %}
+                    <option value="{{ code }}" {% if filters.entry_type == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">Direction</label>
+                <select name="direction" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for code, label in direction_choices %}
+                    <option value="{{ code }}" {% if filters.direction == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">Case status</label>
+                <select name="case_status" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for code, label in case_status_choices %}
+                    <option value="{{ code }}" {% if filters.case_status == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">Assistance type</label>
+                <select name="assistance_type" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for code, label in assistance_type_choices %}
+                    <option value="{{ code }}" {% if filters.assistance_type == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">Focus</label>
+                <select name="view" class="form-select form-select-sm">
+                    <option value="all" {% if filters.view == 'all' %}selected{% endif %}>Everything</option>
+                    <option value="ledger" {% if filters.view == 'ledger' %}selected{% endif %}>Ledger only</option>
+                    <option value="contributions" {% if filters.view == 'contributions' %}selected{% endif %}>Contributions</option>
+                    <option value="cases" {% if filters.view == 'cases' %}selected{% endif %}>Cases only</option>
+                </select>
+            </div>
+            <div class="col-md-auto d-flex gap-2 flex-wrap">
+                <button type="submit" class="btn btn-primary btn-sm">Apply filters</button>
+                <a href="{% url 'portal:welfare' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+            </div>
+        </div>
+    </form>
+
+    <div class="cc-mini-kpis d-flex flex-wrap gap-3 mb-4 px-1">
+        <div class="cc-mini-kpi"><span>Contributed</span><strong class="text-currency">{{ summary.contributed|floatformat:2|intcomma }}</strong></div>
+        <div class="cc-mini-kpi"><span>Received</span><strong class="text-currency">{{ summary.received|floatformat:2|intcomma }}</strong></div>
+        <div class="cc-mini-kpi"><span>Net</span><strong class="text-currency">{{ summary.net_position|floatformat:2|intcomma }}</strong></div>
+        <div class="cc-mini-kpi"><span>Open requests</span><strong>{{ summary.open_requests }}</strong></div>
+        <div class="cc-mini-kpi"><span>Closing balance</span><strong class="text-currency">{{ statement.closing_balance|floatformat:2|intcomma }}</strong></div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{{ export_csv_href }}" class="btn btn-outline-secondary btn-sm">Export CSV</a>
+        <a href="{{ export_excel_href }}" class="btn btn-outline-secondary btn-sm">Export Excel</a>
+        <a href="{{ export_pdf_href }}" class="btn btn-outline-secondary btn-sm">Export PDF</a>
+    </div>
+
+    {% if filtered_balance_note %}
+    <p class="small text-muted">Running balance reflects filtered ledger rows; use date range without type filters for full statement balance.</p>
+    {% endif %}
+
+    {% if filters.view == 'all' or filters.view == 'ledger' %}
+    <section class="cc-panel mb-4">
+        <div class="cc-panel__header">
+            <h2 class="cc-panel__title"><i class="bi bi-journal-text"></i> Welfare ledger</h2>
+        </div>
+        <div class="table-responsive table-in-card">
+            <table class="table table-hover table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Date</th><th>Type</th><th>Reference</th><th>Description</th>
+                        <th class="text-end">In</th><th class="text-end">Out</th><th class="text-end">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if statement.opening_balance %}
+                    <tr class="table-light">
+                        <td colspan="4" class="text-muted small">Opening balance</td>
+                        <td class="text-end">—</td><td class="text-end">—</td>
+                        <td class="text-end fw-semibold">{{ statement.opening_balance|floatformat:2 }}</td>
+                    </tr>
+                    {% endif %}
+                    {% for row in statement.rows %}
+                    <tr>
+                        <td>{{ row.date }}</td>
+                        <td>{{ row.type }}</td>
+                        <td>
+                            {% if row.case_id %}
+                            <a href="{% url 'portal:welfare_case' row.case_id %}">{{ row.reference }}</a>
+                            {% else %}{{ row.reference|default:"—" }}{% endif %}
+                        </td>
+                        <td>{{ row.description|default:"—" }}</td>
+                        <td class="text-end">{% if row.in_amount %}{{ row.in_amount|floatformat:2 }}{% else %}—{% endif %}</td>
+                        <td class="text-end">{% if row.out_amount %}{{ row.out_amount|floatformat:2 }}{% else %}—{% endif %}</td>
+                        <td class="text-end fw-semibold">{{ row.balance|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="text-muted text-center py-4">No ledger activity for these filters.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if filters.view == 'all' or filters.view == 'contributions' %}
+    <section class="cc-panel mb-4">
+        <div class="cc-panel__header">
+            <h2 class="cc-panel__title"><i class="bi bi-piggy-bank"></i> My contributions</h2>
+        </div>
+        <div class="table-responsive table-in-card">
+            <table class="table table-hover table-sm mb-0">
+                <thead><tr><th>Date</th><th class="text-end">Amount</th><th>Notes</th></tr></thead>
+                <tbody>
+                    {% for c in contributions %}
+                    <tr>
+                        <td>{{ c.contribution_date }}</td>
+                        <td class="text-end">{{ c.amount|floatformat:2|intcomma }}</td>
+                        <td>{{ c.notes|default:"—" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-muted text-center py-4">No contributions in this period.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if filters.view == 'all' or filters.view == 'cases' %}
+    <section class="cc-panel mb-4">
+        <div class="cc-panel__header">
+            <h2 class="cc-panel__title"><i class="bi bi-life-preserver"></i> Assistance cases</h2>
+        </div>
+        <div class="table-responsive table-in-card">
+            <table class="table table-hover table-sm mb-0">
+                <thead>
+                    <tr><th>Case</th><th>Date</th><th>Type</th><th class="text-end">Requested</th><th class="text-end">Approved</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    {% for case in cases %}
+                    <tr>
+                        <td><a href="{% url 'portal:welfare_case' case.pk %}">{{ case.case_number }}</a></td>
+                        <td>{{ case.created_at|date:"j M Y" }}</td>
+                        <td>{{ case.get_assistance_type_display }}</td>
+                        <td class="text-end">{{ case.amount_requested|floatformat:2 }}</td>
+                        <td class="text-end">{% if case.amount_approved %}{{ case.amount_approved|floatformat:2 }}{% else %}—{% endif %}</td>
+                        <td><span class="badge text-bg-light border">{{ case.get_status_display }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="text-muted text-center py-4">No assistance cases match these filters.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

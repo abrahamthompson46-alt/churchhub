@@ -144,10 +144,22 @@ def welfare_module_enabled(church, user=None):
     return church_has_feature(church, "remittance")
 
 
-def member_welfare_ledger(member, year=None, start_date=None, end_date=None, limit=500):
+def member_welfare_ledger(
+    member,
+    year=None,
+    start_date=None,
+    end_date=None,
+    limit=500,
+    entry_type=None,
+    direction=None,
+):
     qs = selectors.member_ledger_qs(
         member, year=year, start_date=start_date, end_date=end_date
     )
+    if entry_type:
+        qs = qs.filter(entry_type=entry_type)
+    if direction:
+        qs = qs.filter(direction=direction)
     return qs.order_by("entry_date", "created_at")[:limit]
 
 
@@ -160,12 +172,26 @@ def member_welfare_opening_balance(member, before_date):
     return _quantize(ins - outs)
 
 
-def build_member_welfare_statement(member, start_date=None, end_date=None):
+def build_member_welfare_statement(
+    member,
+    start_date=None,
+    end_date=None,
+    entry_type=None,
+    direction=None,
+):
     """Chronological welfare ledger with running balance (contributions in, disbursements out)."""
     entries = list(
-        member_welfare_ledger(member, start_date=start_date, end_date=end_date, limit=2000)
+        member_welfare_ledger(
+            member,
+            start_date=start_date,
+            end_date=end_date,
+            entry_type=entry_type,
+            direction=direction,
+            limit=2000,
+        )
     )
-    opening = member_welfare_opening_balance(member, start_date) if start_date else Decimal("0.00")
+    use_opening = start_date and not entry_type and not direction
+    opening = member_welfare_opening_balance(member, start_date) if use_opening else Decimal("0.00")
     balance = opening
     rows = []
     total_in = Decimal("0.00")
@@ -202,8 +228,13 @@ def build_member_welfare_statement(member, start_date=None, end_date=None):
     }
 
 
-def member_welfare_cases(member, limit=50):
-    return selectors.member_cases_qs(member).order_by("-created_at")[:limit]
+def member_welfare_cases(member, limit=50, status=None, assistance_type=None):
+    qs = selectors.member_cases_qs(member)
+    if status:
+        qs = qs.filter(status=status)
+    if assistance_type:
+        qs = qs.filter(assistance_type=assistance_type)
+    return qs.order_by("-created_at")[:limit]
 
 
 def member_welfare_contributions(member, year=None, limit=100):

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Request welfare assistance — {{ institution_display_name|default:site_name }}{% endblock %}
+{% block body_class %}portal-app{% endblock %}
+
+{% block content %}
+<div class="page-container portal-home">
+    <header class="portal-hero mb-4">
+        <div>
+            <p class="page-eyebrow mb-1">Member Portal</p>
+            <h1 class="page-title mb-1">Request assistance</h1>
+            <p class="text-muted mb-0">Submit a confidential request to your church welfare team.</p>
+        </div>
+        <div class="portal-hero__actions">
+            <a href="{% url 'portal:welfare' %}" class="btn btn-outline-secondary btn-sm">Back to my welfare</a>
+        </div>
+    </header>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <form method="post" class="cc-panel p-4">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+                <div class="mb-3">
+                    <label class="form-label" for="{{ form.assistance_type.id_for_label }}">{{ form.assistance_type.label }}</label>
+                    {{ form.assistance_type }}
+                    {{ form.assistance_type.errors }}
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.amount_requested.id_for_label }}">{{ form.amount_requested.label }}</label>
+                        {{ form.amount_requested }}
+                        {{ form.amount_requested.errors }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.priority.id_for_label }}">{{ form.priority.label }}</label>
+                        {{ form.priority }}
+                        {{ form.priority.errors }}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="{{ form.reason.id_for_label }}">{{ form.reason.label }}</label>
+                    {{ form.reason }}
+                    {{ form.reason.errors }}
+                </div>
+                <button type="submit" class="btn btn-primary">Submit request</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

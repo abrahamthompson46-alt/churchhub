@@ -154,6 +154,15 @@ def home(request):
         upcoming = []
 
     church = getattr(member, "church", None) or getattr(request.user, "church", None)
+    welfare_enabled = False
+    welfare_summary = None
+    if member:
+        from remittance.welfare_services import member_welfare_summary, welfare_module_enabled
+
+        welfare_enabled = welfare_module_enabled(member.church, request.user)
+        if welfare_enabled:
+            welfare_summary = member_welfare_summary(member, year=year)
+
     if church:
         from meetings import selectors as meeting_selectors
 
@@ -171,6 +180,8 @@ def home(request):
             "announcements": announcements,
             "upcoming_preview": upcoming,
             "live_meetings": live_meetings,
+            "welfare_enabled": welfare_enabled,
+            "welfare_summary": welfare_summary,
         },
     )
 
@@ -479,4 +490,152 @@ def thanksgiving_testimony(request):
         request,
         "portal/thanksgiving_testimony.html",
         {"form": form, "member": member, "history": history},
+    )
+
+
+@login_required
+def my_welfare(request):
+    member, denied = _portal_member_or_redirect(request)
+    if denied:
+        return denied
+    if getattr(request.user, "must_change_password", False):
+        return redirect("portal:password_change")
+    if not member:
+        flash_info(request, "Link your account to a member profile to view welfare.")
+        return redirect("portal:home")
+
+    from django.core.exceptions import PermissionDenied
+
+    from portal.welfare_services import (
+        build_portal_welfare_page,
+        parse_portal_welfare_filters,
+        require_portal_welfare_access,
+        welfare_statement_export_rows,
+    )
+    from reports.exporters import export_table_csv, export_table_excel, export_table_pdf
+    from reports.services import audit_export
+
+    try:
+        require_portal_welfare_access(request.user, member)
+    except PermissionDenied:
+        flash_info(request, "Welfare self-service is not available for your church yet.")
+        return redirect("portal:home")
+
+    filters = parse_portal_welfare_filters(request.GET)
+    page = build_portal_welfare_page(member, filters)
+
+    export_fmt = (request.GET.get("export") or "").strip().lower()
+    if export_fmt in ("csv", "excel", "pdf"):
+        headers, rows = welfare_statement_export_rows(page["statement"])
+        slug = f"my-welfare-{member.pk}"
+        audit_export(
+            user=request.user,
+            report_key="portal_welfare_statement",
+            export_format=export_fmt,
+            row_count=len(rows),
+            church=member.church,
+            params=filters.query_dict(),
+        )
+        title = f"My Welfare — {member.full_name}"
+        if export_fmt == "csv":
+            return export_table_csv(headers, rows, f"{slug}.csv")
+        if export_fmt == "excel":
+            return export_table_excel(headers, rows, f"{slug}.xlsx", "Welfare")
+        return export_table_pdf(headers, rows, "My Welfare Statement", member.full_name, f"{slug}.pdf")
+
+    return render(
+        request,
+        "portal/welfare.html",
+        {
+            "member": member,
+            "export_csv_href": "?" + filters.export_query("csv"),
+            "export_excel_href": "?" + filters.export_query("excel"),
+            "export_pdf_href": "?" + filters.export_query("pdf"),
+            **page,
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def welfare_request(request):
+    member, denied = _portal_member_or_redirect(request)
+    if denied:
+        return denied
+    if getattr(request.user, "must_change_password", False):
+        return redirect("portal:password_change")
+    if not member:
+        return redirect("portal:home")
+
+    from django.core.exceptions import PermissionDenied
+
+    from portal.forms import PortalWelfareRequestForm
+    from portal.welfare_services import require_portal_welfare_access
+    from remittance.services import RemittancePolicyError
+    from remittance.welfare_services import create_welfare_case
+
+    try:
+        require_portal_welfare_access(request.user, member)
+    except PermissionDenied:
+        flash_info(request, "Welfare requests are not available for your church yet.")
+        return redirect("portal:home")
+
+    form = PortalWelfareRequestForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            case = create_welfare_case(
+                member.church,
+                member,
+                form.cleaned_data["amount_requested"],
+                form.cleaned_data["reason"],
+                request.user,
+                assistance_type=form.cleaned_data["assistance_type"],
+                priority=form.cleaned_data["priority"],
+            )
+            flash_success(
+                request,
+                f"Your request {case.case_number} was submitted. The welfare team will review it.",
+            )
+            return redirect("portal:welfare_case", pk=case.pk)
+        except RemittancePolicyError as exc:
+            flash_error(request, str(exc))
+
+    return render(
+        request,
+        "portal/welfare_request.html",
+        {"form": form, "member": member},
+    )
+
+
+@login_required
+def welfare_case_detail(request, pk):
+    member, denied = _portal_member_or_redirect(request)
+    if denied:
+        return denied
+    if getattr(request.user, "must_change_password", False):
+        return redirect("portal:password_change")
+    if not member:
+        return redirect("portal:home")
+
+    from django.core.exceptions import PermissionDenied
+
+    from portal.welfare_services import (
+        member_safe_case_detail,
+        portal_welfare_case_for_member,
+        require_portal_welfare_access,
+    )
+
+    try:
+        require_portal_welfare_access(request.user, member)
+    except PermissionDenied:
+        return redirect("portal:home")
+
+    case = portal_welfare_case_for_member(member, pk)
+    if not case:
+        raise PermissionDenied
+    detail = member_safe_case_detail(case)
+    return render(
+        request,
+        "portal/welfare_case.html",
+        {"member": member, **detail},
     )

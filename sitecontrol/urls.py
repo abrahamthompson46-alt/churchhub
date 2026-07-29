@@ -3,6 +3,7 @@ from django.urls import path
 from . import views
 from . import views_registration
 from . import views_denominations
+from . import views_import
 
 app_name = "sitecontrol"
 
@@ -79,4 +80,13 @@ urlpatterns = [
     path("announcements/", views.announcement_list, name="announcement_list"),
     path("announcements/add/", views.announcement_edit, name="announcement_add"),
     path("announcements/<uuid:pk>/edit/", views.announcement_edit, name="announcement_edit"),
+    path("import/", views_import.import_hub, name="import_hub"),
+    path("import/members/", views_import.import_members, name="import_members"),
+    path("import/members/template/", views_import.import_member_template, name="import_member_template"),
+    path("import/transactions/", views_import.import_transactions, name="import_transactions"),
+    path(
+        "import/transactions/template/",
+        views_import.import_transaction_template,
+        name="import_transaction_template",
+    ),
 ]

@@ -437,6 +437,8 @@ class PlatformAuditLog(models.Model):
         ("IMPERSONATE_START", "Impersonation Started"),
         ("IMPERSONATE_END", "Impersonation Ended"),
         ("BREAKGLASS_GRANT", "Break-glass Access Granted"),
+        ("MEMBER_IMPORT", "Member Bulk Import"),
+        ("TRANSACTION_IMPORT", "Receipt Bulk Import"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

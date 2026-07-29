@@ -29,6 +29,7 @@ PLATFORM_NAV = [
             {"label": "Plans", "url_name": "sitecontrol:plan_list", "icon": "bi-box-seam"},
             {"label": "Payment Methods", "url_name": "sitecontrol:payment_method_list", "icon": "bi-wallet2"},
             {"label": "Organization Tree", "url_name": "sitecontrol:hierarchy", "icon": "bi-diagram-3"},
+            {"label": "Data Import", "url_name": "sitecontrol:import_hub", "icon": "bi-file-earmark-spreadsheet"},
         ],
     },
     {

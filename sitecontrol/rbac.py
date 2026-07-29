@@ -38,6 +38,7 @@ CAP_EXPORT_AUDIT = "export_audit"
 CAP_VIEW_BILLING = "view_billing"
 CAP_OPS = "manage_ops"
 CAP_IMPERSONATE = "impersonate"
+CAP_MANAGE_DATA_IMPORT = "manage_data_import"
 
 ALL_CAPABILITIES = frozenset({
     CAP_VIEW,
@@ -59,6 +60,7 @@ ALL_CAPABILITIES = frozenset({
     CAP_VIEW_BILLING,
     CAP_OPS,
     CAP_IMPERSONATE,
+    CAP_MANAGE_DATA_IMPORT,
 })
 
 ROLE_CAPABILITIES = {
@@ -73,6 +75,7 @@ ROLE_CAPABILITIES = {
         CAP_MANAGE_ANNOUNCEMENTS,
         CAP_MANAGE_REGISTRATION,
         CAP_OPS,
+        CAP_MANAGE_DATA_IMPORT,
     }),
     ROLE_BILLING: frozenset({
         CAP_VIEW,
@@ -89,6 +92,7 @@ ROLE_CAPABILITIES = {
         CAP_MANAGE_ANNOUNCEMENTS,
         CAP_VIEW_AUDIT,
         CAP_IMPERSONATE,
+        CAP_MANAGE_DATA_IMPORT,
     }),
     ROLE_READONLY: frozenset({
         CAP_VIEW,
@@ -128,6 +132,9 @@ NAV_ITEM_CAPABILITIES = {
     "sitecontrol:security_settings": CAP_MANAGE_SECURITY,
     "sitecontrol:features": CAP_MANAGE_FEATURES,
     "sitecontrol:member_lookup_list": CAP_MANAGE_SETTINGS,
+    "sitecontrol:import_hub": CAP_MANAGE_DATA_IMPORT,
+    "sitecontrol:import_members": CAP_MANAGE_DATA_IMPORT,
+    "sitecontrol:import_transactions": CAP_MANAGE_DATA_IMPORT,
 }
 
 

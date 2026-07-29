@@ -1,0 +1,66 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Import Members{% endblock %}
+{% block page_subtitle %}
+<p class="platform-topbar-meta mb-0">Upload an .xlsx file. Preview validates every row before you commit.</p>
+{% endblock %}
+
+{% block content %}
+<div class="platform-card mb-3">
+    <div class="platform-card-body d-flex flex-wrap gap-2 align-items-center">
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'sitecontrol:import_member_template' %}">
+            <i class="bi bi-download me-1"></i>Download template
+        </a>
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'sitecontrol:import_hub' %}">All imports</a>
+    </div>
+</div>
+
+<div class="platform-card mb-3">
+    <div class="platform-card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="platform-form-grid">
+                {% for field in form %}
+                <div class="{% if field.name == 'file' or field.field.widget.input_type == 'checkbox' %}full-width{% endif %}">
+                    {% if field.field.widget.input_type == 'checkbox' %}
+                    <div class="platform-form-check">{{ field }}<label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label></div>
+                    {% else %}
+                    <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% endif %}
+                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                    {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">Upload</button>
+        </form>
+    </div>
+</div>
+
+{% if preview %}
+<div class="platform-card">
+    <div class="platform-card-body">
+        <h6 class="fw-semibold mb-3">
+            {% if preview.dry_run %}Preview{% else %}Import results{% endif %}
+            — {{ preview.succeeded }} ok, {{ preview.failed }} failed ({{ preview.total }} rows)
+        </h6>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead><tr><th>Row</th><th>Status</th><th>Detail</th><th>Message</th></tr></thead>
+                <tbody>
+                    {% for row in preview.rows %}
+                    <tr class="{% if not row.ok %}table-danger{% endif %}">
+                        <td>{{ row.row_number }}</td>
+                        <td>{% if row.ok %}<span class="badge text-bg-success">OK</span>{% else %}<span class="badge text-bg-danger">Error</span>{% endif %}</td>
+                        <td>{{ row.label }}</td>
+                        <td>{{ row.message }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

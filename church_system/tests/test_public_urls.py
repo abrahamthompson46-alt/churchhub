@@ -1,6 +1,11 @@
 from django.test import RequestFactory, SimpleTestCase, override_settings
 
-from church_system.public_urls import build_public_absolute_uri, normalize_public_site_base, resolve_public_site_base
+from church_system.public_urls import (
+    build_public_absolute_uri,
+    normalize_public_site_base,
+    resolve_public_site_base,
+    resolve_pythonanywhere_public_url,
+)
 
 
 class PublicUrlTests(SimpleTestCase):
@@ -9,6 +14,20 @@ class PublicUrlTests(SimpleTestCase):
             normalize_public_site_base("https://churchhub.pythonanywhere.com/dashboard"),
             "https://churchhub.pythonanywhere.com",
         )
+
+    def test_pythonanywhere_ignores_www_marketing_host(self):
+        import os
+
+        previous = os.environ.get("PYTHONANYWHERE_SITE")
+        os.environ["PYTHONANYWHERE_SITE"] = "churchhub.pythonanywhere.com"
+        try:
+            resolved = resolve_pythonanywhere_public_url("https://www.pythonanywhere.com")
+            self.assertEqual(resolved, "https://churchhub.pythonanywhere.com")
+        finally:
+            if previous is None:
+                os.environ.pop("PYTHONANYWHERE_SITE", None)
+            else:
+                os.environ["PYTHONANYWHERE_SITE"] = previous
 
     @override_settings(
         DEBUG=False,

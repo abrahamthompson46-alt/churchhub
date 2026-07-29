@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+from urllib.parse import urlparse
+
 from django.conf import settings
 
 # Common mistakes when setting CHURCHHUB_PUBLIC_URL (must be site root, not a deep link).
@@ -32,6 +35,25 @@ def normalize_public_site_base(url: str) -> str:
     return cleaned
 
 
+def resolve_pythonanywhere_public_url(configured: str) -> str:
+    """
+    On PythonAnywhere, email links must use the web app hostname (PYTHONANYWHERE_SITE),
+    not www.pythonanywhere.com or another host from a mis-set CHURCHHUB_PUBLIC_URL.
+    """
+    pa_site = (os.environ.get("PYTHONANYWHERE_SITE") or "").strip().lower()
+    if not pa_site:
+        return (configured or "").strip().rstrip("/")
+
+    canonical = f"https://{pa_site}"
+    cleaned = normalize_public_site_base(configured or "")
+    if not cleaned:
+        return canonical
+    host = (urlparse(cleaned).hostname or "").lower()
+    if host == pa_site:
+        return cleaned.rstrip("/")
+    return canonical
+
+
 def is_localhost_url(url: str) -> bool:
     if not url:
         return True
@@ -51,6 +73,11 @@ def resolve_public_site_base(request=None) -> str:
     Prefers CHURCHHUB_PUBLIC_URL when it is not a localhost URL in non-debug
     environments, then the incoming request, then CSRF trusted origins / allowed hosts.
     """
+    if getattr(settings, "ON_PYTHONANYWHERE", False) and os.environ.get("PYTHONANYWHERE_SITE"):
+        return resolve_pythonanywhere_public_url(
+            getattr(settings, "CHURCHHUB_PUBLIC_URL", "") or ""
+        )
+
     configured = normalize_public_site_base(
         getattr(settings, "CHURCHHUB_PUBLIC_URL", "") or ""
     )

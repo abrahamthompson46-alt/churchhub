@@ -327,9 +327,11 @@ if ON_PYTHONANYWHERE and _public_url_is_localhost(CHURCHHUB_PUBLIC_URL):
     elif CSRF_TRUSTED_ORIGINS:
         CHURCHHUB_PUBLIC_URL = CSRF_TRUSTED_ORIGINS[0].strip().rstrip("/")
 
-from church_system.public_urls import normalize_public_site_base
+from church_system.public_urls import normalize_public_site_base, resolve_pythonanywhere_public_url
 
 CHURCHHUB_PUBLIC_URL = normalize_public_site_base(CHURCHHUB_PUBLIC_URL)
+if ON_PYTHONANYWHERE:
+    CHURCHHUB_PUBLIC_URL = resolve_pythonanywhere_public_url(CHURCHHUB_PUBLIC_URL)
 
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "").strip()
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587") or 587)

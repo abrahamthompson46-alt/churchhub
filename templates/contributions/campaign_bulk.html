@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Bulk entry — {{ campaign.name }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title=campaign.name page_description="Enter amounts for multiple members in one save." %}
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="filter-bar mb-3 d-flex flex-wrap gap-3 align-items-end">
+            <div>
+                <label class="form-label">Date</label>
+                {{ bulk_form.contribution_date }}
+            </div>
+            <div>
+                <label class="form-label">Payment</label>
+                {{ bulk_form.payment_account_type }}
+            </div>
+            <button type="submit" class="btn btn-primary">Save all amounts</button>
+            <a href="{% url 'contributions:campaign_detail' campaign.pk %}" class="btn btn-outline-secondary">Back</a>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Member</th>
+                        <th class="text-end">Target</th>
+                        <th class="text-end">Paid</th>
+                        <th class="text-end">Remaining</th>
+                        <th style="width:140px;" class="text-end">Amount today</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td>{{ row.member.full_name }}{% if row.member.membership_number %} <span class="text-muted small">({{ row.member.membership_number }})</span>{% endif %}</td>
+                        <td class="text-end">{% if row.target %}{{ row.target|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                        <td class="text-end text-currency">{{ row.paid|floatformat:2|intcomma }}</td>
+                        <td class="text-end">{% if row.remaining is not None %}{{ row.remaining|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                        <td class="text-end">
+                            <input type="number" step="0.01" min="0" name="amount_{{ row.member.pk }}" class="form-control form-control-sm text-end" placeholder="0.00">
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endblock %}

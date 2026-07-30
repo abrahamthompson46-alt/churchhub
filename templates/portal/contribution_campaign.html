@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ campaign.name }} — My Portal{% endblock %}
+{% block body_class %}portal-app{% endblock %}
+
+{% block content %}
+<div class="page-container portal-home">
+    <header class="portal-hero mb-4">
+        <div>
+            <p class="page-eyebrow mb-1">Contribution campaign</p>
+            <h1 class="page-title mb-1">{{ campaign.name }}</h1>
+            <p class="text-muted mb-0">Deadline {{ campaign.deadline|date:"F j, Y" }}
+                {% if summary.is_past_deadline %}<span class="badge text-bg-warning ms-1">Past deadline</span>
+                {% elif summary.days_until_deadline <= 7 %}<span class="badge text-bg-danger ms-1">{{ summary.days_until_deadline }} days left</span>{% endif %}
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'portal:contributions' %}" class="btn btn-outline-secondary btn-sm">All campaigns</a>
+            <a href="{% url 'portal:home' %}" class="btn btn-outline-secondary btn-sm">Home</a>
+        </div>
+    </header>
+
+    {% if campaign.purpose %}
+    <div class="alert alert-light border mb-4">{{ campaign.purpose|linebreaksbr }}</div>
+    {% endif %}
+
+    <div class="cc-mini-kpis mb-4">
+        <div class="cc-mini-kpi"><span>My total</span><strong class="text-currency">{{ member_total|floatformat:2|intcomma }}</strong></div>
+        {% if member_target %}
+        <div class="cc-mini-kpi"><span>My target</span><strong class="text-currency">{{ member_target|floatformat:2|intcomma }}</strong></div>
+        {% if member_remaining is not None %}
+        <div class="cc-mini-kpi"><span>Remaining</span><strong class="text-currency">{{ member_remaining|floatformat:2|intcomma }}</strong></div>
+        {% endif %}
+        {% endif %}
+        {% if show_church_progress and summary.total_raised is not None %}
+        <div class="cc-mini-kpi"><span>Church total</span><strong class="text-currency">{{ summary.total_raised|floatformat:2|intcomma }}</strong></div>
+        {% if summary.target_amount %}
+        <div class="cc-mini-kpi"><span>Goal</span><strong class="text-currency">{{ summary.target_amount|floatformat:2|intcomma }}</strong></div>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    {% if member_progress_pct is not None %}
+    <div class="progress mb-4" style="height:10px;">
+        <div class="progress-bar" style="width: {{ member_progress_pct }}%"></div>
+    </div>
+    {% endif %}
+
+    {% if show_church_progress and summary.progress_pct is not None %}
+    <div class="progress mb-4" style="height:10px;">
+        <div class="progress-bar" style="width: {{ summary.progress_pct }}%"></div>
+    </div>
+    {% endif %}
+
+    <section class="cc-panel">
+        <div class="cc-panel__header"><h2 class="cc-panel__title">My contributions</h2></div>
+        <div class="table-responsive table-in-card">
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Date</th><th>Notes</th><th class="text-end">Amount</th><th>Status</th></tr></thead>
+                <tbody>
+                    {% for gift in contributions %}
+                    <tr>
+                        <td>{{ gift.contribution_date|date:"M j, Y" }}</td>
+                        <td>{{ gift.notes|default:"—" }}</td>
+                        <td class="text-end text-currency">{{ gift.amount|floatformat:2|intcomma }}</td>
+                        <td><span class="badge text-bg-secondary">{{ gift.transaction.get_approval_status_display }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-muted text-center py-3">You have not contributed to this campaign yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

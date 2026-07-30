@@ -207,7 +207,9 @@ PERMISSION_REGISTRY = {
             "view_giving", "manage_giving", "view_remittance", "manage_settlements",
             "view_welfare", "manage_welfare_cases", "view_audit_log",
             "view_pending_approvals", "view_reconciliation", "view_dashboard_finance",
-            "export_transactions", "export_budgets", "export_giving",
+            "export_transactions", "export_budgets",     "export_giving",
+            "view_contribution_reports", "manage_contribution_campaigns", "record_contributions",
+            "view_own_contributions",
         ],
     },
     "manage_receipts": {
@@ -575,6 +577,34 @@ PERMISSION_REGISTRY = {
         "description": "Export giving statements and donor summaries.",
         "default_roles": _ROLE_LEADERSHIP | {"TREASURY"},
         "implies": ["view_giving"],
+    },
+
+    # ── Contribution campaigns (4) ────────────────────────────────
+    "view_contribution_reports": {
+        "name": "View Contribution Campaigns",
+        "category": "Giving",
+        "description": "View contribution campaign progress and member participation.",
+        "default_roles": _ROLE_ALL_STAFF | {"BOARD_MEMBER"},
+    },
+    "manage_contribution_campaigns": {
+        "name": "Manage Contribution Campaigns",
+        "category": "Giving",
+        "description": "Create, open, close, and configure contribution campaigns.",
+        "default_roles": _ROLE_TREASURY_OPS | {"SECRETARY", "LOCAL_PASTOR"},
+        "implies": ["view_contribution_reports"],
+    },
+    "record_contributions": {
+        "name": "Record Campaign Contributions",
+        "category": "Giving",
+        "description": "Record member gifts against open contribution campaigns.",
+        "default_roles": _ROLE_TREASURY_OPS | {"SECRETARY"},
+        "implies": ["view_contribution_reports", "manage_receipts"],
+    },
+    "view_own_contributions": {
+        "name": "View Own Campaign Contributions",
+        "category": "Giving",
+        "description": "Members may view their contribution campaign history on the portal.",
+        "default_roles": _ROLE_ALL_STAFF | {"BOARD_MEMBER", "MEMBER"},
     },
 
     # ── Announcements (5) ─────────────────────────────────────────

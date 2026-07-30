@@ -20,6 +20,7 @@ FEATURE_FIELDS = {
     "budgets": "feature_budgets",
     "giving_portal": "feature_giving_portal",
     "assets": "feature_assets",
+    "contribution_campaigns": "feature_contribution_campaigns",
 }
 
 GLOBAL_FEATURE_FIELDS = {
@@ -31,6 +32,7 @@ GLOBAL_FEATURE_FIELDS = {
     "budgets": "global_enable_budgets",
     "giving_portal": "global_enable_giving",
     "assets": "global_enable_assets",
+    "contribution_campaigns": "global_enable_contributions",
 }
 
 
@@ -393,7 +395,10 @@ def _global_feature_enabled(feature):
     if not field:
         return False
     settings_obj = get_site_settings()
-    return bool(getattr(settings_obj, field, False))
+    if not hasattr(settings_obj, field):
+        # Pre-migration column: treat as enabled until migrate adds the flag.
+        return True
+    return bool(getattr(settings_obj, field, True))
 
 
 def church_has_feature(church, feature):
@@ -408,7 +413,7 @@ def church_has_feature(church, feature):
     denomination = church.denomination
     if denomination:
         field = FEATURE_FIELDS[feature]
-        if not getattr(denomination, field, True):
+        if hasattr(denomination, field) and not getattr(denomination, field, True):
             return False
 
     sub = get_church_subscription(church)
@@ -425,7 +430,10 @@ def church_has_feature(church, feature):
         return True
 
     field = FEATURE_FIELDS[feature]
-    return bool(getattr(sub.plan, field, False))
+    plan = sub.plan
+    if not hasattr(plan, field):
+        return True
+    return bool(getattr(plan, field, True))
 
 
 def church_user_count(church):
@@ -541,6 +549,18 @@ def ip_allowed_for_platform(ip_address, settings_obj=None):
     if not allowed:
         return True
     return (ip_address or "") in allowed
+
+
+def platform_ip_allowlist_configured(settings_obj=None) -> bool:
+    """True when at least one non-comment IP/CIDR line is configured."""
+    settings_obj = settings_obj or get_site_settings()
+    raw = (getattr(settings_obj, "platform_ip_allowlist", "") or "").strip()
+    if not raw:
+        return False
+    return any(
+        line.strip() and not line.strip().startswith("#")
+        for line in raw.splitlines()
+    )
 
 
 def expire_due_subscriptions():

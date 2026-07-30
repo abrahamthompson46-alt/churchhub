@@ -290,7 +290,6 @@ def sync_role_groups(user):
 
 
 def get_client_ip(request):
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR")
+    from church_system.client_ip import get_client_ip as _resolve_client_ip
+
+    return _resolve_client_ip(request)

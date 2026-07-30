@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Import — {{ campaign.name }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title=campaign.name page_description="Import member contributions from Excel for this campaign only." %}
+
+    <div class="mb-3 d-flex gap-2">
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'contributions:campaign_import_template' campaign.pk %}">Download template</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'contributions:campaign_detail' campaign.pk %}">Back</a>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% for field in form %}
+                <div class="mb-3">
+                    {% if field.field.widget.input_type == 'checkbox' %}
+                    <div class="form-check">{{ field }} <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label></div>
+                    {% else %}
+                    <label class="form-label fw-semibold">{{ field.label }}</label>
+                    {{ field }}
+                    {% endif %}
+                    {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary">Upload</button>
+            </form>
+        </div>
+    </div>
+
+    {% if preview %}
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h6 class="fw-semibold">{% if preview.dry_run %}Preview{% else %}Results{% endif %} — {{ preview.succeeded }} ok, {{ preview.failed }} failed</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>Row</th><th>Status</th><th>Detail</th><th>Message</th></tr></thead>
+                    <tbody>
+                        {% for row in preview.rows %}
+                        <tr class="{% if not row.ok %}table-danger{% endif %}">
+                            <td>{{ row.row_number }}</td>
+                            <td>{% if row.ok %}OK{% else %}Error{% endif %}</td>
+                            <td>{{ row.label }}</td>
+                            <td>{{ row.message }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

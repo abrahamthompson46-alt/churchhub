@@ -372,9 +372,16 @@ def create_default_offering_categories(church):
 # RECEIPT AUTO-APPROVAL (income SoD exception)
 # ==========================================
 
+# When a church policy leaves the limit blank, cap auto-approval at this amount
+# instead of allowing unlimited maker self-approval.
+DEFAULT_RECEIPT_AUTO_APPROVE_LIMIT = Decimal("500.00")
+
 def get_or_create_treasury_approval_policy(church):
-    """Church policy defaults: auto-approve enabled, unlimited limit."""
-    policy, _ = TreasuryApprovalPolicy.objects.get_or_create(church=church)
+    """Church policy defaults: auto-approve enabled with a capped limit."""
+    policy, created = TreasuryApprovalPolicy.objects.get_or_create(church=church)
+    if created and policy.default_receipt_auto_approve_limit is None:
+        policy.default_receipt_auto_approve_limit = DEFAULT_RECEIPT_AUTO_APPROVE_LIMIT
+        policy.save(update_fields=["default_receipt_auto_approve_limit"])
     return policy
 
 
@@ -398,7 +405,7 @@ def effective_receipt_auto_approve_limit(user, church):
         return enabled, Decimal(str(user_limit))
     if church_limit is not None:
         return enabled, Decimal(str(church_limit))
-    return enabled, None
+    return enabled, DEFAULT_RECEIPT_AUTO_APPROVE_LIMIT
 
 
 def receipt_should_auto_approve(user, church, amount):

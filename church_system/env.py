@@ -94,6 +94,7 @@ def validate_production_environment(
     require_redis: bool = True,
     allow_mysql: bool = False,
     allow_sqlite: bool = False,
+    health_check_token: str = "",
 ) -> None:
     """Raise ImproperlyConfigured when production essentials are missing."""
     errors: list[str] = []
@@ -138,6 +139,10 @@ def validate_production_environment(
             errors.append(
                 "CHURCHHUB_PUBLIC_URL must be your live HTTPS site URL (not localhost) "
                 "so portal and invitation emails link correctly."
+            )
+        if not (health_check_token or "").strip():
+            errors.append(
+                "CHURCHHUB_HEALTH_TOKEN must be set so /health/ probes are not public."
             )
 
     if errors:

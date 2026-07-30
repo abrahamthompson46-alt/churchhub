@@ -536,6 +536,7 @@ class FeatureRegistryForm(forms.ModelForm):
             "global_enable_budgets",
             "global_enable_advanced_reports",
             "global_enable_assets",
+            "global_enable_contributions",
         )
         widgets = {
             "global_enable_payroll": forms.CheckboxInput(attrs=checkbox_attrs()),
@@ -546,6 +547,7 @@ class FeatureRegistryForm(forms.ModelForm):
             "global_enable_budgets": forms.CheckboxInput(attrs=checkbox_attrs()),
             "global_enable_advanced_reports": forms.CheckboxInput(attrs=checkbox_attrs()),
             "global_enable_assets": forms.CheckboxInput(attrs=checkbox_attrs()),
+            "global_enable_contributions": forms.CheckboxInput(attrs=checkbox_attrs()),
         }
 
 
@@ -571,6 +573,7 @@ class SubscriptionPlanForm(forms.ModelForm):
             "feature_budgets",
             "feature_giving_portal",
             "feature_assets",
+            "feature_contribution_campaigns",
             "is_default",
             "is_active",
             "sort_order",
@@ -874,6 +877,7 @@ class DenominationForm(forms.ModelForm):
             "feature_budgets",
             "feature_giving_portal",
             "feature_assets",
+            "feature_contribution_campaigns",
         )
         widgets = {
             "code": forms.TextInput(attrs=input_attrs()),
@@ -896,6 +900,7 @@ class DenominationForm(forms.ModelForm):
             "feature_budgets": forms.CheckboxInput(attrs=checkbox_attrs()),
             "feature_giving_portal": forms.CheckboxInput(attrs=checkbox_attrs()),
             "feature_assets": forms.CheckboxInput(attrs=checkbox_attrs()),
+            "feature_contribution_campaigns": forms.CheckboxInput(attrs=checkbox_attrs()),
         }
 
     def __init__(self, *args, **kwargs):

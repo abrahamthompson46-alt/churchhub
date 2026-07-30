@@ -45,10 +45,12 @@ flowchart TD
 | Step | Behavior |
 |------|----------|
 | Username | Member **email** (must match an active `members.Member.email`) |
-| First password | Member **date of birth** as `YYYY-MM-DD` (other common date formats accepted) |
+| First password | Member **date of birth** as `YYYY-MM-DD` — **only while** `must_change_password` is true (first sign-in) |
+| After password set | DOB login is **permanently disabled**; use chosen password or reset flow |
 | Match rule | Email and DOB must both match the member directory before a portal session is issued |
 | Provisioning | First successful match creates/links a `User` (`role=MEMBER`, `must_change_password=True`) |
-| New device / first login | Confirmation email link (`/portal/confirm/<token>/`) before session; trusted-device cookie afterward |
+| New device / first login | Confirmation email link (`/portal/confirm/?token=…`) before session; **single-use**, **1 hour** TTL; trusted-device cookie afterward |
+| Portal login throttling | Stricter cap (**3** failed attempts per 15 minutes per IP/email on `/portal/login/`); honeypot field rejects bots |
 | Email link base URL | Set **`CHURCHHUB_PUBLIC_URL`** to your live HTTPS **site root** only (example: `https://churchhub.pythonanywhere.com`) — **not** a path like `/dashboard/`. If unset or left at `localhost`, confirmation links in email will not work on phones or other devices. After changing it, redeploy and request a **new** confirmation email. Production also falls back to `DJANGO_CSRF_TRUSTED_ORIGINS` when the public URL is still localhost. Confirm links use `/portal/confirm/?token=…` so email clients handle signed tokens reliably. |
 | After login | Forced password change when `must_change_password`; change at `/portal/password/change/`; reset at `/portal/password/reset/` |
 
@@ -278,7 +280,7 @@ Public tenant onboarding: `/apply/` → platform approve → church provision + 
 
 | State | Detail |
 |-------|--------|
-| **Current** | MFA is **optional**. Platform owners enable it under **Platform → Security** (`SiteSettings.mfa_required_for_privileged`) and choose **who**: institution roles (`mfa_institution_roles`), platform roles (`mfa_platform_roles`), and optionally Django superusers (`mfa_include_django_superusers`). Recommended starter audiences: OWNER/SECURITY + SUPER_ADMIN/TREASURY. Methods: **TOTP** (QR enroll), **email OTP**, **recovery codes**. **Trusted device** cookie skips MFA for 30 days when checked. Secrets stored encrypted. Default for new sites: enforcement **off**. |
+| **Current** | MFA is **on by default** for privileged audiences. Platform owners configure audiences under **Platform → Security** (`SiteSettings.mfa_required_for_privileged`, default **True**) and choose **who**: institution roles (`mfa_institution_roles`), platform roles (`mfa_platform_roles`), and optionally Django superusers (`mfa_include_django_superusers`). Recommended starter audiences: OWNER/SECURITY + SUPER_ADMIN/TREASURY. Methods: **TOTP** (QR enroll), **email OTP**, **recovery codes**. **Trusted device** cookie skips MFA for 30 days when checked. Secrets stored encrypted. **Impersonation** requires MFA enrollment + verified session when policy applies. |
 | **Planned (AGENTS.md)** | Optional SMS OTP, richer device management UI |
 | **Recommended** | Dedicated `MFA_ENCRYPTION_KEY`; rate-limit TOTP verify attempts |
 
@@ -294,7 +296,8 @@ Login flow: password success → trusted device (if cookie valid) → home; else
 | Path | Behavior |
 |------|----------|
 | `/accounts/login` | Fail counters by IP + username; clear on successful auth (incl. MFA pending) |
-| `/portal/login/` | Same as staff login; lock redirects to portal login |
+| `/portal/login/` | **Stricter:** max **3** failed attempts per IP/email (independent of `login_max_attempts`); honeypot field; lock redirects to portal login |
+| `/apply/` | Registration POST throttled (**5** attempts / lockout window per IP) |
 | `/accounts/password_reset/` | Attempt counters by IP + email (`reset_*` keys) |
 | `/accounts/reset/<uidb64>/<token>/` | Same reset counters (confirm POSTs) |
 
@@ -352,7 +355,9 @@ SiteSettings also: session timeout, login attempts/lockout, password min length 
 
 1. Dedicated MFA encryption key separate from `SECRET_KEY`; rate-limit TOTP verify attempts.
 2. Require Redis in production for shared login lockout.  
-3. Keep `DJANGO_DEBUG=False` in production (startup + `/health/` already reject unsafe DEBUG).  
+3. Keep `DJANGO_DEBUG=False` in production (startup + `/health/` already reject unsafe DEBUG).
+4. Set **`CHURCHHUB_HEALTH_TOKEN`** in production — `/health/`, `/health/live/`, and `/health/ready/` require `?token=` or `X-Health-Token` header when configured.
+5. Configure **`platform_ip_allowlist`** in Site Settings for `/platform/` (production defaults `CHURCHHUB_REQUIRE_PLATFORM_IP_ALLOWLIST=True`; set env to `false` only during initial setup).  
 4. Rate-limit password reset / invite accept endpoints.  
 5. Password history + optional expiry for finance/platform roles.  
 6. Session absolute timeout + logout-all.  

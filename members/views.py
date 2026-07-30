@@ -261,7 +261,7 @@ def member_search(request):
         subtitle_parts = []
         if member.membership_number:
             subtitle_parts.append(f"#{member.membership_number}")
-        if member.phone:
+        if can_view_members(request.user) and member.phone:
             subtitle_parts.append(member.phone)
         if member.department:
             subtitle_parts.append(member.department.name)
@@ -275,17 +275,20 @@ def member_search(request):
             "initials": f"{(member.first_name or '?')[:1]}{(member.last_name or '?')[:1]}".upper(),
         }
         if include_detail:
-            dob = member.date_of_birth.isoformat() if member.date_of_birth else ""
             row.update({
                 "membership_number": member.membership_number or "",
                 "membership_status": member.membership_status or "",
                 "gender": member.gender or "",
-                "phone": member.phone or "",
                 "department": member.department.name if member.department else "",
-                "date_of_birth": dob,
-                "address": (member.address or "")[:120],
                 "church": member.church.name if member.church_id else "",
             })
+            if can_manage_member_records(request.user):
+                dob = member.date_of_birth.isoformat() if member.date_of_birth else ""
+                row.update({
+                    "phone": member.phone or "",
+                    "date_of_birth": dob,
+                    "address": (member.address or "")[:120],
+                })
         results.append(row)
     return JsonResponse({"results": results})
 

@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.urls import reverse
 import uuid
+from decimal import Decimal
 
 from members.models import Member
 
@@ -733,9 +734,9 @@ class TreasuryApprovalPolicy(models.Model):
         decimal_places=2,
         null=True,
         blank=True,
+        default=Decimal("500.00"),
         help_text=(
             "Church default: receipts up to this amount auto-approve. "
-            "Leave blank for unlimited (all receipts auto-approve). "
             "Set 0 to require second approval for every receipt."
         ),
     )

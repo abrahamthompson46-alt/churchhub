@@ -17,6 +17,7 @@ from permissions.checks import (
     can_manage_asset_policy,
     can_manage_assets,
     can_manage_baptisms,
+    can_manage_contribution_campaigns,
     can_manage_budgets,
     can_manage_church_history,
     can_manage_departments,
@@ -35,6 +36,7 @@ from permissions.checks import (
     can_manage_payroll_policy,
     can_manage_permissions,
     can_manage_receipts,
+    can_record_contributions,
     can_manage_reconciliation,
     can_manage_remittance_policy,
     can_manage_settlements,
@@ -54,6 +56,7 @@ from permissions.checks import (
     can_view_assets,
     can_view_audit_log,
     can_view_budgets,
+    can_view_contribution_reports,
     can_view_church_history,
     can_view_dashboard_finance,
     can_view_finance_reports,
@@ -286,6 +289,19 @@ def _finance_sections(user, active_church=None):
         if can_view_all_churches(user):
             asset_items.append(_item("Roll-up", "assets:hierarchy", "bi-bar-chart-steps"))
         sections.append(_section("Fixed Assets", asset_items, "assets"))
+
+    giving_items = []
+    if _church_feature(active_church, "contribution_campaigns", user) and (
+        can_view_contribution_reports(user)
+        or can_manage_contribution_campaigns(user)
+        or can_record_contributions(user)
+        or can_manage_finances(user)
+    ):
+        giving_items.append(_item("Contribution Campaigns", "contributions:campaign_list", "bi-bullseye"))
+        if can_manage_contribution_campaigns(user) or can_manage_finances(user):
+            giving_items.append(_item("New Campaign", "contributions:campaign_create", "bi-plus-circle"))
+    if giving_items:
+        sections.append(_section("Contribution campaigns", giving_items, "giving"))
 
     return sections
 

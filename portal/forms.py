@@ -47,6 +47,17 @@ class MemberPortalLoginForm(AuthenticationForm):
         ),
         help_text="First sign-in: use your date of birth as YYYY-MM-DD (example: 1990-05-21).",
     )
+    website = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "d-none",
+                "tabindex": "-1",
+                "autocomplete": "off",
+                "aria-hidden": "true",
+            }
+        ),
+    )
 
     error_messages = {
         **AuthenticationForm.error_messages,
@@ -54,6 +65,8 @@ class MemberPortalLoginForm(AuthenticationForm):
     }
 
     def clean(self):
+        if self.cleaned_data.get("website"):
+            raise forms.ValidationError("Unable to sign in. Contact your church office if this persists.")
         email = normalize_email(self.cleaned_data.get("username", ""))
         password = self.cleaned_data.get("password")
         if email and password:
@@ -77,6 +90,9 @@ class PortalPasswordChangeForm(PasswordChangeForm):
         user.must_change_password = False
         if commit:
             user.save()
+            from accounts.mfa import revoke_all_trusted_devices
+
+            revoke_all_trusted_devices(user)
         return user
 
 

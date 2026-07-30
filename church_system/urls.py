@@ -36,6 +36,7 @@ urlpatterns = [
     path("meetings/", include(("meetings.urls", "meetings"), namespace="meetings")),
     path("budgets/", include(("budgets.urls", "budgets"), namespace="budgets")),
     path("giving/", include(("giving.urls", "giving"), namespace="giving")),
+    path("contributions/", include(("contributions.urls", "contributions"), namespace="contributions")),
     path("ledger/", include(("ledger.urls", "ledger"), namespace="ledger")),
     path("remittance/", include(("remittance.urls", "remittance"), namespace="remittance")),
     path("payroll/", include(("payroll.urls", "payroll"), namespace="payroll")),

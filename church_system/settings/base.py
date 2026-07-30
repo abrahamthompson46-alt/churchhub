@@ -33,6 +33,9 @@ PRODUCTION_LIKE = is_production_like_env(
 _INSECURE_SECRET = insecure_secret_default()
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", _INSECURE_SECRET)
 
+HEALTH_CHECK_TOKEN = env_str("CHURCHHUB_HEALTH_TOKEN") or ""
+REQUIRE_PLATFORM_IP_ALLOWLIST = env_flag("CHURCHHUB_REQUIRE_PLATFORM_IP_ALLOWLIST", False)
+
 DEBUG = resolve_debug(production_like=PRODUCTION_LIKE)
 
 ALLOWED_HOSTS = [
@@ -86,6 +89,7 @@ INSTALLED_APPS = [
     "meetings",
     "budgets",
     "giving",
+    "contributions",
     "ledger",
     "remittance.apps.RemittanceConfig",
     "payroll.apps.PayrollConfig",

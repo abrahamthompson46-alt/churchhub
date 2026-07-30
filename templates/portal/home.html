@@ -34,6 +34,9 @@
             {% if welfare_enabled %}
             <a href="{% url 'portal:welfare' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-life-preserver me-1"></i>Welfare</a>
             {% endif %}
+            {% if contributions_enabled %}
+            <a href="{% url 'portal:contributions' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-bullseye me-1"></i>Campaigns</a>
+            {% endif %}
             <a href="{% url 'portal:thanksgiving_testimony' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-stars me-1"></i>Thanksgiving</a>
             <a href="{% url 'portal:profile' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-person me-1"></i>Profile</a>
             <a href="{% url 'dashboard:logout' %}" class="btn btn-primary btn-sm">Sign out</a>
@@ -96,6 +99,38 @@
                 </div>
                 <div class="px-3 pb-3 d-grid gap-2">
                     <a href="{% url 'portal:welfare_request' %}" class="btn btn-outline-primary btn-sm">Request assistance</a>
+                </div>
+            </section>
+            {% endif %}
+
+            {% if contributions_enabled and contribution_cards %}
+            <section class="cc-panel mb-4">
+                <div class="cc-panel__header d-flex justify-content-between align-items-center">
+                    <h2 class="cc-panel__title mb-0"><i class="bi bi-bullseye"></i> Contribution campaigns</h2>
+                    <a href="{% url 'portal:contributions' %}" class="btn btn-link btn-sm">View all</a>
+                </div>
+                <div class="px-3 pb-3 d-grid gap-3">
+                    {% for card in contribution_cards|slice:":3" %}
+                    <div class="border rounded p-3">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <strong>{{ card.campaign.name }}</strong>
+                            {% if card.is_overdue %}
+                            <span class="badge text-bg-warning">Past deadline</span>
+                            {% elif card.is_urgent %}
+                            <span class="badge text-bg-danger">{{ card.days_until_deadline }}d left</span>
+                            {% else %}
+                            <span class="small text-muted">{{ card.days_until_deadline }} days left</span>
+                            {% endif %}
+                        </div>
+                        {% if card.campaign.purpose %}
+                        <p class="small text-muted mb-2">{{ card.campaign.purpose|truncatewords:24 }}</p>
+                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <span class="small">My total: <strong class="text-currency">{{ card.member_total|floatformat:2|intcomma }}</strong></span>
+                            <a href="{% url 'portal:contribution_campaign' card.campaign.pk %}" class="btn btn-outline-primary btn-sm">Details</a>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
             </section>
             {% endif %}

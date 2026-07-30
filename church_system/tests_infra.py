@@ -54,6 +54,7 @@ class EnvHelperTests(SimpleTestCase):
             csrf_trusted_origins=["https://app.example.com"],
             public_site_url="https://app.example.com",
             require_redis=True,
+            health_check_token="probe-secret-token",
         )
 
     def test_validate_production_rejects_localhost_public_url(self):
@@ -81,6 +82,7 @@ class EnvHelperTests(SimpleTestCase):
             public_site_url="https://churchhub.pythonanywhere.com",
             require_redis=False,
             allow_mysql=True,
+            health_check_token="probe-secret-token",
         )
 
 

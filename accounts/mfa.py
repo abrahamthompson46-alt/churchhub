@@ -401,6 +401,14 @@ def create_trusted_device(user, request) -> str:
     return token
 
 
+def revoke_all_trusted_devices(user) -> int:
+    """Remove every trusted device for the user (password change / security reset)."""
+    from accounts.models import TrustedDevice
+
+    deleted, _ = TrustedDevice.objects.filter(user=user).delete()
+    return deleted
+
+
 def find_valid_trusted_device(user, token: str):
     from accounts.models import TrustedDevice
 

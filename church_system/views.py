@@ -12,22 +12,33 @@ from church_system.health import (
     run_liveness_checks,
     run_readiness_checks,
 )
+from church_system.health_auth import health_check_authorized
+
+
+def _health_unauthorized():
+    return JsonResponse({"detail": "health check token required"}, status=401)
 
 
 @require_GET
 def health_check(request):
+    if not health_check_authorized(request):
+        return _health_unauthorized()
     payload, status = run_health_checks()
     return JsonResponse(payload, status=status)
 
 
 @require_GET
 def live_check(request):
+    if not health_check_authorized(request):
+        return _health_unauthorized()
     payload, status = run_liveness_checks()
     return JsonResponse(payload, status=status)
 
 
 @require_GET
 def ready_check(request):
+    if not health_check_authorized(request):
+        return _health_unauthorized()
     payload, status = run_readiness_checks()
     return JsonResponse(payload, status=status)
 

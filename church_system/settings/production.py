@@ -11,6 +11,7 @@ from church_system.settings.base import (
     CHURCHHUB_PUBLIC_URL,
     CSRF_TRUSTED_ORIGINS,
     DEBUG,
+    HEALTH_CHECK_TOKEN,
     ON_PYTHONANYWHERE,
     REDIS_URL,
     SECRET_KEY,
@@ -19,6 +20,9 @@ from church_system.settings.base import (
 )
 
 DJANGO_ENV = "production"
+
+# Block /platform/ when Site Settings IP allowlist is empty (override with env if needed).
+REQUIRE_PLATFORM_IP_ALLOWLIST = env_flag("CHURCHHUB_REQUIRE_PLATFORM_IP_ALLOWLIST", True)
 
 if DEBUG:
     raise ImproperlyConfigured(
@@ -78,6 +82,7 @@ validate_production_environment(
     require_redis=_require_redis,
     allow_mysql=True,
     allow_sqlite=_allow_sqlite,
+    health_check_token=HEALTH_CHECK_TOKEN,
 )
 
 # File logs on by default in production

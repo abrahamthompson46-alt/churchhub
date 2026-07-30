@@ -123,6 +123,10 @@ def can_view_giving(user): return _p(user, "view_giving")
 def can_manage_giving(user): return _p(user, "manage_giving")
 def can_view_own_giving(user): return _p(user, "view_own_giving")
 def can_export_giving(user): return _p(user, "export_giving")
+def can_view_contribution_reports(user): return _p(user, "view_contribution_reports")
+def can_manage_contribution_campaigns(user): return _p(user, "manage_contribution_campaigns")
+def can_record_contributions(user): return _p(user, "record_contributions")
+def can_view_own_contributions(user): return _p(user, "view_own_contributions")
 
 # ── Announcements ─────────────────────────────────────────────────
 def can_view_announcements(user): return _p(user, "view_announcements")

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Member targets — {{ campaign.name }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title=campaign.name page_description="Override the default member target for specific members. Leave blank to use the campaign default or no target." %}
+
+    <p class="text-muted small">Campaign default target: {% if campaign.default_member_target %}{{ campaign.default_member_target|floatformat:2|intcomma }}{% else %}Not set{% endif %}</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle">
+                <thead><tr><th>Member</th><th class="text-end">Paid so far</th><th style="width:160px;" class="text-end">Target override</th></tr></thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td>{{ row.member.full_name }}</td>
+                        <td class="text-end text-currency">{{ row.paid|floatformat:2|intcomma }}</td>
+                        <td class="text-end">
+                            <input type="number" step="0.01" min="0" name="target_{{ row.member.pk }}" class="form-control form-control-sm text-end"
+                                value="{% if row.override_target %}{{ row.override_target }}{% endif %}" placeholder="Default">
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <button type="submit" class="btn btn-primary">Save targets</button>
+        <a href="{% url 'contributions:campaign_detail' campaign.pk %}" class="btn btn-outline-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

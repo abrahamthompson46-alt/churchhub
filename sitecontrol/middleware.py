@@ -1,5 +1,6 @@
 """Platform middleware: session timeout, login rate limit, maintenance mode, user scope."""
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.core.cache import cache
@@ -7,8 +8,14 @@ from django.http import HttpResponseForbidden
 from django.shortcuts import redirect
 from django.urls import reverse
 
+from church_system.client_ip import get_client_ip
+
 from sitecontrol.checks import can_access_django_admin, can_manage_platform
-from sitecontrol.services import get_site_settings, ip_allowed_for_platform
+from sitecontrol.services import (
+    get_site_settings,
+    ip_allowed_for_platform,
+    platform_ip_allowlist_configured,
+)
 
 SHARED_EXEMPT_PREFIXES = (
     "/accounts/login",
@@ -33,10 +40,12 @@ INSTITUTION_PREFIXES = (
     "/meetings/",
     "/budgets/",
     "/giving/",
+    "/contributions/",
     "/ledger/",
     "/remittance/",
     "/payroll/",
     "/assets/",
+    "/portal/",
 )
 
 INSTITUTION_ACCOUNT_PATHS = (
@@ -73,7 +82,13 @@ class UserScopeMiddleware:
                 messages.error(request, "You do not have access to the platform control room.")
                 return redirect("dashboard:home")
             settings_obj = get_site_settings()
-            client_ip = request.META.get("REMOTE_ADDR", "")
+            if getattr(settings, "REQUIRE_PLATFORM_IP_ALLOWLIST", False):
+                if not platform_ip_allowlist_configured(settings_obj):
+                    return HttpResponseForbidden(
+                        "Platform control room requires an IP allowlist. "
+                        "Configure platform_ip_allowlist in Site Settings."
+                    )
+            client_ip = get_client_ip(request) or ""
             if not ip_allowed_for_platform(client_ip, settings_obj):
                 return HttpResponseForbidden(
                     "Your IP address is not permitted to access the platform control room."
@@ -143,10 +158,13 @@ class MaintenanceModeMiddleware:
 
 
 class LoginRateLimitMiddleware:
-    """Throttle failed auth POSTs: staff login, portal login, and password reset."""
+    """Throttle failed auth POSTs: staff login, portal login, password reset, and /apply/."""
 
     LOGIN_PATHS = frozenset({"/accounts/login", "/portal/login"})
     RESET_REQUEST_PATHS = frozenset({"/accounts/password_reset", "/portal/password/reset"})
+    APPLY_PATH = "/apply"
+    PORTAL_LOGIN_MAX_ATTEMPTS = 3
+    APPLY_MAX_ATTEMPTS = 5
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -182,6 +200,10 @@ class LoginRateLimitMiddleware:
             and parts[3] != "done"
         )
 
+    @classmethod
+    def _is_apply_path(cls, path: str) -> bool:
+        return path == cls.APPLY_PATH
+
     @staticmethod
     def _login_succeeded(request) -> bool:
         if request.user.is_authenticated:
@@ -201,19 +223,45 @@ class LoginRateLimitMiddleware:
         path = self._norm_path(request.path)
         is_login = self._is_login_path(path)
         is_reset = self._is_reset_path(path)
-        if not is_login and not is_reset:
+        is_apply = self._is_apply_path(path)
+        if not is_login and not is_reset and not is_apply:
             return self.get_response(request)
 
         settings_obj = get_site_settings()
-        ip = request.META.get("REMOTE_ADDR", "unknown")
+        ip = get_client_ip(request) or "unknown"
         ttl = settings_obj.login_lockout_minutes * 60
         max_attempts = settings_obj.login_max_attempts
+
+        if is_apply:
+            lock_key = f"apply_lock:{ip}"
+            if cache.get(lock_key):
+                messages.error(
+                    request,
+                    f"Too many registration attempts. Try again in "
+                    f"{settings_obj.login_lockout_minutes} minutes.",
+                )
+                return redirect("church_apply")
+
+            response = self.get_response(request)
+            if response.status_code in (301, 302, 303, 307, 308):
+                cache.delete(f"apply_fail:{ip}")
+                return response
+
+            fail_key = f"apply_fail:{ip}"
+            fails = cache.get(fail_key, 0) + 1
+            cache.set(fail_key, fails, ttl)
+            if fails >= self.APPLY_MAX_ATTEMPTS:
+                cache.set(lock_key, True, ttl)
+                cache.delete(fail_key)
+            return response
 
         if is_login:
             username = (request.POST.get("username") or "").strip().lower()
             lock_key = f"login_lock:{ip}"
             user_lock_key = f"login_lock_user:{username}" if username else None
             redirect_name = "portal:login" if path == "/portal/login" else "login"
+            portal_attempt_cap = min(self.PORTAL_LOGIN_MAX_ATTEMPTS, max_attempts)
+            attempt_cap = portal_attempt_cap if path == "/portal/login" else max_attempts
 
             if cache.get(lock_key) or (user_lock_key and cache.get(user_lock_key)):
                 messages.error(
@@ -234,7 +282,7 @@ class LoginRateLimitMiddleware:
             fail_key = f"login_fail:{ip}"
             fails = cache.get(fail_key, 0) + 1
             cache.set(fail_key, fails, ttl)
-            if fails >= max_attempts:
+            if fails >= attempt_cap:
                 cache.set(lock_key, True, ttl)
                 cache.delete(fail_key)
 
@@ -242,7 +290,7 @@ class LoginRateLimitMiddleware:
                 user_fail_key = f"login_fail_user:{username}"
                 user_fails = cache.get(user_fail_key, 0) + 1
                 cache.set(user_fail_key, user_fails, ttl)
-                if user_fails >= max_attempts:
+                if user_fails >= attempt_cap:
                     cache.set(user_lock_key, True, ttl)
                     cache.delete(user_fail_key)
             return response

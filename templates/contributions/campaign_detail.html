@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ campaign.name }} — Contribution Campaign{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title=campaign.name page_description=campaign.purpose|truncatewords:24 %}
+
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        {% if can_manage %}
+        <a href="{% url 'contributions:campaign_edit' campaign.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-1"></i>Edit</a>
+        {% if campaign.status == 'DRAFT' or campaign.status == 'CLOSED' %}
+        <form method="post" action="{% url 'contributions:campaign_open' campaign.pk %}">{% csrf_token %}<button class="btn btn-success btn-sm">Open campaign</button></form>
+        {% endif %}
+        {% if campaign.status == 'OPEN' %}
+        <form method="post" action="{% url 'contributions:campaign_close' campaign.pk %}">{% csrf_token %}<button class="btn btn-warning btn-sm">Close campaign</button></form>
+        {% endif %}
+        {% if campaign.status != 'OPEN' and campaign.status != 'ARCHIVED' %}
+        <form method="post" action="{% url 'contributions:campaign_archive' campaign.pk %}">{% csrf_token %}<button class="btn btn-outline-danger btn-sm">Archive</button></form>
+        {% endif %}
+        {% endif %}
+        <a href="?export=excel" class="btn btn-outline-primary btn-sm"><i class="bi bi-download me-1"></i>Export</a>
+        {% if can_record %}
+        <a href="{% url 'contributions:campaign_bulk' campaign.pk %}" class="btn btn-outline-primary btn-sm">Bulk entry</a>
+        <a href="{% url 'contributions:campaign_import' campaign.pk %}" class="btn btn-outline-primary btn-sm">Excel import</a>
+        {% endif %}
+        {% if can_manage %}
+        <a href="{% url 'contributions:campaign_targets' campaign.pk %}" class="btn btn-outline-secondary btn-sm">Member targets</a>
+        {% endif %}
+    </div>
+
+    <div class="metrics-row mb-4">
+        <div class="metric-card metric-card--success">
+            <span class="metric-label">Total raised</span>
+            <span class="metric-value text-currency">{{ summary.total_raised|floatformat:2|intcomma }}</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Contributors</span>
+            <span class="metric-value">{{ summary.contributor_count }} / {{ summary.active_member_count }}</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Deadline</span>
+            <span class="metric-value">{{ campaign.deadline|date:"M j, Y" }}</span>
+        </div>
+        {% if summary.target_amount %}
+        <div class="metric-card">
+            <span class="metric-label">Goal progress</span>
+            <span class="metric-value">{% if summary.progress_pct %}{{ summary.progress_pct|floatformat:0 }}%{% else %}—{% endif %}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if can_record %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold">Record contribution</div>
+        <div class="card-body">
+            <form method="post" action="{% url 'contributions:campaign_record' campaign.pk %}" class="row g-3 align-items-end">
+                {% csrf_token %}
+                <div class="col-md-4">{{ record_form.member.label_tag }}{{ record_form.member }}</div>
+                <div class="col-md-2">{{ record_form.amount.label_tag }}{{ record_form.amount }}</div>
+                <div class="col-md-2">{{ record_form.contribution_date.label_tag }}{{ record_form.contribution_date }}</div>
+                <div class="col-md-2">{{ record_form.payment_account_type.label_tag }}{{ record_form.payment_account_type }}</div>
+                <div class="col-md-2">{{ record_form.notes.label_tag }}{{ record_form.notes }}</div>
+                <div class="col-12"><button type="submit" class="btn btn-primary">Post receipt &amp; record</button></div>
+            </form>
+        </div>
+    </div>
+    {% elif campaign.is_open %}
+    <div class="alert alert-info">You can view this campaign but do not have permission to record contributions.</div>
+    {% endif %}
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-header fw-semibold">Member totals</div>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead><tr><th>Member</th><th class="text-end">Total</th><th class="text-end">Gifts</th></tr></thead>
+                        <tbody>
+                            {% for row in member_totals %}
+                            <tr>
+                                <td>{{ row.member__first_name }} {{ row.member__last_name }}{% if row.member__membership_number %} <span class="text-muted">({{ row.member__membership_number }})</span>{% endif %}</td>
+                                <td class="text-end text-currency">{{ row.total|floatformat:2|intcomma }}</td>
+                                <td class="text-end">{{ row.gift_count }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="text-muted text-center py-3">No contributions recorded yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header fw-semibold">No contribution yet (first 50)</div>
+                <ul class="list-group list-group-flush small">
+                    {% for member in non_contributors %}
+                    <li class="list-group-item">{{ member.full_name }}</li>
+                    {% empty %}
+                    <li class="list-group-item text-muted">All active members have contributed.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="card shadow-sm">
+                <div class="card-header fw-semibold">Recent gifts</div>
+                <ul class="list-group list-group-flush small">
+                    {% for gift in recent_contributions %}
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>{{ gift.member.full_name }} · {{ gift.contribution_date|date:"M j" }}</span>
+                        <span class="text-currency">{{ gift.amount|floatformat:2|intcomma }}</span>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-muted">No gifts yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

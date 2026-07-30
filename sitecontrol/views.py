@@ -1139,6 +1139,22 @@ def impersonate_start(request, user_id):
     """Support operators may temporarily act as an institution user (audited)."""
     from django.contrib.auth import login
 
+    from accounts.mfa import session_mfa_verified, user_requires_mfa
+
+    if user_requires_mfa(request.user):
+        if not request.user.mfa_enabled:
+            messages.error(
+                request,
+                "Enroll multi-factor authentication before using impersonation.",
+            )
+            return redirect("accounts:mfa_enroll")
+        if not session_mfa_verified(request):
+            messages.error(
+                request,
+                "Verify multi-factor authentication before using impersonation.",
+            )
+            return redirect("accounts:mfa_verify")
+
     target = selectors.get_institution_user_or_404(user_id)
     if not target.church_id:
         messages.error(request, "Target user has no church assignment.")

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Contribution Campaigns — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% if can_manage %}
+    {% url 'contributions:campaign_create' as create_url %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Contribution Campaigns" page_description="Time-bound giving drives with member tracking and portal visibility." action_url=create_url action_label="New Campaign" action_icon="bi-plus-lg" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Contribution Campaigns" page_description="Time-bound giving drives with member tracking." %}
+    {% endif %}
+
+    <div class="filter-bar mb-3">
+        <form method="get" class="filter-form d-flex align-items-end gap-3 flex-wrap">
+            <div class="filter-field">
+                <label class="form-label">Status</label>
+                {{ filter_form.status }}
+            </div>
+            <button type="submit" class="btn btn-outline-primary btn-sm">Filter</button>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Campaign</th>
+                    <th>Deadline</th>
+                    <th>Status</th>
+                    <th class="text-end">Raised</th>
+                    <th>Contributors</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>
+                        <strong>{{ row.campaign.name }}</strong>
+                        <div class="small text-muted">{{ row.campaign.code }}</div>
+                    </td>
+                    <td>
+                        {{ row.campaign.deadline|date:"M j, Y" }}
+                        {% if row.summary.is_past_deadline %}
+                        <span class="badge text-bg-warning ms-1">Past deadline</span>
+                        {% elif row.summary.days_until_deadline <= 7 %}
+                        <span class="badge text-bg-danger ms-1">{{ row.summary.days_until_deadline }}d left</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge text-bg-secondary">{{ row.campaign.get_status_display }}</span></td>
+                    <td class="text-end text-currency">{{ row.summary.total_raised|floatformat:2|intcomma }}</td>
+                    <td>{{ row.summary.contributor_count }} / {{ row.summary.active_member_count }}</td>
+                    <td class="text-end"><a href="{% url 'contributions:campaign_detail' row.campaign.pk %}" class="btn btn-sm btn-outline-primary">Open</a></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-muted text-center py-4">
+                        No campaigns yet.
+                        {% if can_manage %}
+                        <div class="mt-2">
+                            <a href="{% url 'contributions:campaign_create' %}" class="btn btn-primary btn-sm">
+                                <i class="bi bi-plus-lg me-1"></i>New Campaign
+                            </a>
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

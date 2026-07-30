@@ -170,6 +170,24 @@ def home(request):
         if welfare_enabled:
             welfare_summary = member_welfare_summary(member, year=year)
 
+    contribution_cards = []
+    contributions_enabled = False
+    if member:
+        from contributions.services import contributions_enabled as _contributions_enabled
+        from contributions.services import portal_open_campaign_cards
+
+        contributions_enabled = _contributions_enabled(member.church, request.user)
+        if contributions_enabled:
+            contribution_cards = portal_open_campaign_cards(member)
+
+    try:
+        if member and contributions_enabled:
+            from contributions.reminder_services import ensure_portal_deadline_notifications
+
+            ensure_portal_deadline_notifications(member)
+    except Exception:
+        pass
+
     if church:
         from meetings import selectors as meeting_selectors
 
@@ -192,6 +210,8 @@ def home(request):
             "live_meetings": live_meetings,
             "welfare_enabled": welfare_enabled,
             "welfare_summary": welfare_summary,
+            "contributions_enabled": contributions_enabled,
+            "contribution_cards": contribution_cards,
         },
     )
 
@@ -649,3 +669,70 @@ def welfare_case_detail(request, pk):
         "portal/welfare_case.html",
         {"member": member, **detail},
     )
+
+
+@login_required
+def my_contributions(request):
+    member, denied = _portal_member_or_redirect(request)
+    if denied:
+        return denied
+    if getattr(request.user, "must_change_password", False):
+        return redirect("portal:password_change")
+    if not member:
+        flash_info(request, "Link your account to a member profile to view contribution campaigns.")
+        return redirect("portal:home")
+
+    from django.core.exceptions import PermissionDenied
+
+    from contributions.services import (
+        build_portal_campaign_page,
+        can_view_own_contributions,
+        contributions_enabled,
+        portal_open_campaign_cards,
+    )
+
+    if not contributions_enabled(member.church, request.user):
+        return redirect("portal:home")
+    if not can_view_own_contributions(request.user, member):
+        raise PermissionDenied
+
+    cards = portal_open_campaign_cards(member)
+    return render(
+        request,
+        "portal/contributions.html",
+        {"member": member, "cards": cards},
+    )
+
+
+@login_required
+def contribution_campaign_detail(request, pk):
+    member, denied = _portal_member_or_redirect(request)
+    if denied:
+        return denied
+    if getattr(request.user, "must_change_password", False):
+        return redirect("portal:password_change")
+    if not member:
+        return redirect("portal:home")
+
+    from django.core.exceptions import PermissionDenied
+
+    from contributions import selectors
+    from contributions.services import (
+        build_portal_campaign_page,
+        can_view_own_contributions,
+        contributions_enabled,
+    )
+
+    if not contributions_enabled(member.church, request.user):
+        return redirect("portal:home")
+    if not can_view_own_contributions(request.user, member):
+        raise PermissionDenied
+
+    campaign = selectors.get_portal_campaign_for_member(member, pk)
+    page = build_portal_campaign_page(member, campaign)
+    return render(
+        request,
+        "portal/contribution_campaign.html",
+        {"member": member, **page},
+    )
+

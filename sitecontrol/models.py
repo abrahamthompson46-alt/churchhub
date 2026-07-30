@@ -64,10 +64,10 @@ class SiteSettings(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(120)],
     )
     mfa_required_for_privileged = models.BooleanField(
-        default=False,
+        default=True,
         help_text=(
             "When enabled, require MFA (TOTP / email OTP / recovery) for the audiences "
-            "selected below. Off by default — platform owners decide when to enforce."
+            "selected below. Recommended for production — treasury and platform roles."
         ),
         verbose_name="Require MFA for selected audiences",
     )
@@ -172,6 +172,7 @@ class SiteSettings(models.Model):
     global_enable_budgets = models.BooleanField(default=True)
     global_enable_advanced_reports = models.BooleanField(default=True)
     global_enable_assets = models.BooleanField(default=True)
+    global_enable_contributions = models.BooleanField(default=True)
     default_billing_currency = models.CharField(max_length=3, default="GHS")
     billing_payment_instructions = models.TextField(
         blank=True,
@@ -237,6 +238,7 @@ class SubscriptionPlan(models.Model):
     feature_budgets = models.BooleanField(default=True)
     feature_giving_portal = models.BooleanField(default=True)
     feature_assets = models.BooleanField(default=True)
+    feature_contribution_campaigns = models.BooleanField(default=True)
     is_default = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     sort_order = models.PositiveSmallIntegerField(default=0)
@@ -664,6 +666,7 @@ class Denomination(models.Model):
     feature_budgets = models.BooleanField(default=True)
     feature_giving_portal = models.BooleanField(default=True)
     feature_assets = models.BooleanField(default=True)
+    feature_contribution_campaigns = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import logging
 import re
+import secrets
 from datetime import date, datetime
 from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import signing
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
 from django.template.loader import render_to_string
@@ -30,7 +32,8 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 PORTAL_CONFIRM_SALT = "churchhub.portal.device-confirm"
-PORTAL_CONFIRM_MAX_AGE = 60 * 60 * 24  # 24 hours
+PORTAL_CONFIRM_MAX_AGE = 60 * 60  # 1 hour — shorter window limits link replay
+PORTAL_CONFIRM_CACHE_PREFIX = "portal_confirm:"
 PORTAL_DOB_PASSWORD_FORMATS = (
     "%Y-%m-%d",
     "%Y/%m/%d",
@@ -196,8 +199,9 @@ def authenticate_portal_credentials(email: str, password: str) -> User:
     """
     Verify portal credentials.
 
-    Accepts an existing MEMBER password, or date of birth matching the Member
-    record (first-time / default password). Email must match the directory.
+    Accepts an existing MEMBER password. Date of birth is accepted only for
+    first-time sign-in while ``must_change_password`` is still required.
+    After a member sets a real password, DOB login is permanently disabled.
     """
     email = normalize_email(email)
     password = (password or "").strip()
@@ -219,22 +223,22 @@ def authenticate_portal_credentials(email: str, password: str) -> User:
             user.save(update_fields=["member", "church"])
         return user
 
+    if user is not None and not user.must_change_password:
+        raise PortalAuthError(
+            "Use the password you set for the portal, or reset it from the sign-in page."
+        )
+
     if not member_matches_dob(member, password):
         raise PortalAuthError(
             "Email and date of birth do not match our records. "
             "For first sign-in use your member email and date of birth as YYYY-MM-DD."
         )
 
-    user = provision_portal_user(member)
+    user = provision_portal_user(member) if user is None else user
     if user.check_password(password) or user.check_password(
         canonical_dob_password(member.date_of_birth)
     ):
         return user
-
-    if not user.must_change_password and user.last_login is not None:
-        raise PortalAuthError(
-            "Use the password you set for the portal, or reset it from the sign-in page."
-        )
 
     user.set_password(canonical_dob_password(member.date_of_birth))
     user.must_change_password = True
@@ -250,16 +254,28 @@ def portal_needs_device_confirmation(request, user) -> bool:
 
 
 def build_confirm_token(user) -> str:
+    nonce = secrets.token_urlsafe(16)
+    cache_key = f"{PORTAL_CONFIRM_CACHE_PREFIX}{nonce}"
+    cache.set(cache_key, str(user.pk), PORTAL_CONFIRM_MAX_AGE)
     signer = signing.TimestampSigner(salt=PORTAL_CONFIRM_SALT)
-    return signer.sign(str(user.pk))
+    return signer.sign(f"{user.pk}:{nonce}")
 
 
 def resolve_confirm_token(token: str):
     signer = signing.TimestampSigner(salt=PORTAL_CONFIRM_SALT)
     try:
-        user_id = signer.unsign(token, max_age=PORTAL_CONFIRM_MAX_AGE)
+        payload = signer.unsign(token, max_age=PORTAL_CONFIRM_MAX_AGE)
     except signing.BadSignature as exc:
         raise PortalAuthError("This confirmation link is invalid or has expired.") from exc
+    parts = payload.split(":", 1)
+    if len(parts) != 2:
+        raise PortalAuthError("This confirmation link is invalid or has expired.")
+    user_id, nonce = parts
+    cache_key = f"{PORTAL_CONFIRM_CACHE_PREFIX}{nonce}"
+    cached_user_id = cache.get(cache_key)
+    if not cached_user_id or str(cached_user_id) != str(user_id):
+        raise PortalAuthError("This confirmation link is invalid or has expired.")
+    cache.delete(cache_key)
     user = User.objects.filter(pk=user_id, is_active=True, role=UserRole.MEMBER).first()
     if not user:
         raise PortalAuthError("This confirmation link is invalid or has expired.")

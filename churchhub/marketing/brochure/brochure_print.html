@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ChurchHub Enterprise — Product Brochure</title>
+  <style>
+    :root {
+      --navy: #0f172a;
+      --blue: #1d4ed8;
+      --teal: #047857;
+      --slate: #334155;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --soft: #f8fafc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--slate);
+      background: #e5e7eb;
+      line-height: 1.5;
+      font-size: 11pt;
+    }
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 12px auto;
+      background: #fff;
+      padding: 18mm 18mm 20mm;
+      box-shadow: 0 8px 30px rgba(15, 23, 42, 0.12);
+      position: relative;
+      page-break-after: always;
+    }
+    .page.cover {
+      background: var(--navy);
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 28mm 22mm;
+    }
+    .cover h1 {
+      font-size: 32pt;
+      letter-spacing: 0.08em;
+      margin: 0 0 0.25em;
+      color: #fff;
+      text-align: center;
+    }
+    .cover .tagline {
+      text-align: center;
+      color: #94a3b8;
+      margin-bottom: 2em;
+    }
+    .cover h2 {
+      text-align: center;
+      color: #fff;
+      font-size: 18pt;
+      line-height: 1.3;
+      margin: 0 0 1em;
+    }
+    .cover p.lead {
+      text-align: center;
+      max-width: 36em;
+      margin: 0 auto 1.5em;
+      color: #cbd5e1;
+    }
+    .cover .meta {
+      text-align: center;
+      color: #94a3b8;
+      font-size: 9.5pt;
+    }
+    .cover .stripe {
+      height: 4px;
+      background: linear-gradient(90deg, var(--blue), var(--teal));
+      margin: 2em 0;
+    }
+    .kicker {
+      color: var(--blue);
+      font-size: 8.5pt;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin: 0 0 0.35em;
+    }
+    h1.section {
+      color: var(--navy);
+      font-size: 16pt;
+      margin: 0 0 0.6em;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 0.35em;
+    }
+    h2 {
+      color: var(--blue);
+      font-size: 11.5pt;
+      margin: 1.1em 0 0.4em;
+    }
+    p { margin: 0 0 0.7em; text-align: justify; }
+    ul { margin: 0.2em 0 0.9em; padding-left: 1.2em; }
+    li { margin-bottom: 0.25em; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.6em 0 1em;
+      font-size: 9pt;
+    }
+    th {
+      background: var(--navy);
+      color: #fff;
+      text-align: left;
+      padding: 7px 8px;
+      font-weight: 600;
+    }
+    td {
+      border: 1px solid var(--line);
+      padding: 6px 8px;
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: var(--soft); }
+    .quote {
+      border-left: 3px solid var(--blue);
+      padding: 0.4em 0 0.4em 0.9em;
+      color: var(--muted);
+      font-style: italic;
+      margin: 0.8em 0;
+    }
+    .footer-note {
+      position: absolute;
+      left: 18mm;
+      right: 18mm;
+      bottom: 10mm;
+      font-size: 8pt;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid var(--line);
+      padding-top: 6px;
+    }
+    .cta {
+      text-align: center;
+      margin-top: 1.5em;
+      color: var(--navy);
+      font-weight: 700;
+    }
+    @media print {
+      body { background: #fff; }
+      .page {
+        margin: 0;
+        box-shadow: none;
+        width: auto;
+        min-height: auto;
+        page-break-after: always;
+      }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <p class="no-print" style="text-align:center;padding:12px;font-size:13px;color:#334155">
+    Open in a browser → <strong>Print → Save as PDF</strong> (A4, backgrounds enabled).
+    Prefer the ReportLab PDF: <code>ChurchHub_Enterprise_Brochure.pdf</code>
+  </p>
+
+  <!-- COVER -->
+  <section class="page cover">
+    <h1>CHURCHHUB</h1>
+    <p class="tagline">Enterprise Church Management System</p>
+    <div class="stripe"></div>
+    <h2>One platform. Complete hierarchy.<br/>Books you can trust.</h2>
+    <p class="lead">
+      Govern membership, treasury, remittance, and church life—from the local congregation
+      to conference and union scale—with role-based security, denomination isolation,
+      and double-entry financial integrity.
+    </p>
+    <p class="meta">
+      <strong>Scale:</strong> 100 members → 100,000+ &nbsp;|&nbsp;
+      Clerks · Treasurers · Pastors · Overseers · Operators
+    </p>
+    <p class="meta" style="margin-top:1.5em">Request a Demo · Talk to Sales · Pilot Program</p>
+  </section>
+
+  <!-- 01-02 -->
+  <section class="page">
+    <p class="kicker">01 · Company Introduction</p>
+    <h1 class="section">Enterprise discipline for ministry operations</h1>
+    <p>
+      ChurchHub was built for a simple reality: <strong>church administration is enterprise work</strong>.
+      Membership records, tithes and offerings, remittance obligations, pastoral meetings, and
+      multi-level governance cannot be managed with spreadsheets and disconnected tools.
+      Financial mistakes are not “IT issues”—they are trust issues.
+    </p>
+    <p>ChurchHub Enterprise is a purpose-built Church Management System (ChMS) that unifies:</p>
+    <ul>
+      <li><strong>People &amp; pastoral operations</strong></li>
+      <li><strong>Treasury &amp; double-entry accounting</strong></li>
+      <li><strong>Hierarchical organization</strong> (GC → Union → Conference → Zone → District → Church)</li>
+      <li><strong>Denomination-level multi-tenancy</strong> for SaaS and network deployments</li>
+      <li><strong>Auditability</strong> leadership and finance committees can rely on</li>
+    </ul>
+    <p class="quote">
+      We design for institutions that expect the same discipline they would demand from a
+      financial system—not a consumer app with a church skin.
+    </p>
+
+    <p class="kicker">02 · Product Overview</p>
+    <h1 class="section">A role-aware operations platform</h1>
+    <p>
+      Staff work in a role-aware control center; members engage through a dedicated member portal.
+      ChurchHub scales <strong>with your structure</strong>—not by forcing every congregation into a flat template.
+    </p>
+    <table>
+      <thead><tr><th>Capability</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Mission Control</strong></td><td>KPIs, action queues, teller console, pastoral pulse</td></tr>
+        <tr><td><strong>Membership lifecycle</strong></td><td>Directory, families, visitors, baptisms, transfers, leadership</td></tr>
+        <tr><td><strong>Church Life</strong></td><td>Announcements, calendar, meetings &amp; minutes, church history</td></tr>
+        <tr><td><strong>Books of record</strong></td><td>Double-entry journals, approvals, voids via reversal, periods</td></tr>
+        <tr><td><strong>Stewardship stack</strong></td><td>Receipts, expenses, budgets, giving, remittance &amp; settlements</td></tr>
+        <tr><td><strong>Platform control plane</strong></td><td>Denominations, subscriptions, tenant applications</td></tr>
+      </tbody>
+    </table>
+    <div class="footer-note"><span>ChurchHub Enterprise</span><span>Confidential</span></div>
+  </section>
+
+  <!-- 03 Benefits -->
+  <section class="page">
+    <p class="kicker">03 · Key Benefits</p>
+    <h1 class="section">Value at every scale</h1>
+    <h2>Local church (100–2,000 members)</h2>
+    <ul>
+      <li>One permissioned workspace instead of fragmented tools</li>
+      <li>Printable treasurer confirmation slips</li>
+      <li>Pastoral follow-ups: visitors, birthdays, transfers, meetings</li>
+      <li>Member portal for profile, announcements, live meetings</li>
+    </ul>
+    <h2>District &amp; conference (2,000–50,000 members)</h2>
+    <ul>
+      <li>Hierarchy scope enforcement across manageable churches</li>
+      <li>Giving and remittance roll-ups</li>
+      <li>Standardized approvals, periods, and teller console</li>
+    </ul>
+    <h2>Unions, networks &amp; denominations (50,000–100,000+)</h2>
+    <ul>
+      <li>Denomination wall for SaaS multi-tenancy</li>
+      <li>Separate platform operator lane</li>
+      <li>Production stack: PostgreSQL, Redis, Celery, HTTPS, health checks</li>
+    </ul>
+    <table>
+      <thead><tr><th>Benefit</th><th>Why it matters</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Financial integrity</strong></td><td>Balanced journals; locked approvals; reversals not silent edits</td></tr>
+        <tr><td><strong>Least privilege</strong></td><td>RBAC matrix with implies/overrides</td></tr>
+        <tr><td><strong>Audit trails</strong></td><td>Domain logs for finance, organization, communications</td></tr>
+        <tr><td><strong>Operational clarity</strong></td><td>Dashboards that drive the next action</td></tr>
+        <tr><td><strong>Institutional memory</strong></td><td>Church History chronicle for lasting milestones</td></tr>
+      </tbody>
+    </table>
+    <div class="footer-note"><span>ChurchHub Enterprise</span><span>Confidential</span></div>
+  </section>
+
+  <!-- 04 Modules -->
+  <section class="page">
+    <p class="kicker">04 · Core Modules</p>
+    <h1 class="section">A complete institutional suite</h1>
+    <table>
+      <thead><tr><th>Module</th><th>Delivers</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Accounts &amp; Access</strong></td><td>Users, invitations, roles, activity logs</td></tr>
+        <tr><td><strong>Organization</strong></td><td>Full hierarchy; onboarding &amp; church transfers</td></tr>
+        <tr><td><strong>Members</strong></td><td>Profiles, families, visitors, baptisms, leadership, gifts</td></tr>
+        <tr><td><strong>Meetings</strong></td><td>Scheduling, attendance, minutes, online join links</td></tr>
+        <tr><td><strong>Announcements</strong></td><td>Approve/publish workflow + communications calendar</td></tr>
+        <tr><td><strong>Church History</strong></td><td>Searchable chronicle by church or conference</td></tr>
+        <tr><td><strong>Transactions (GL)</strong></td><td>Receipts/expenses, approvals, voids, working day, periods</td></tr>
+        <tr><td><strong>Budgets · Giving · Remittance</strong></td><td>Planning, statements, cut-offs, settlements, welfare</td></tr>
+        <tr><td><strong>Payroll · Assets · Reports</strong></td><td>Integrated ops + leadership export packs</td></tr>
+        <tr><td><strong>Dashboard · Portal · Platform</strong></td><td>Mission Control, member lane, operator control plane</td></tr>
+      </tbody>
+    </table>
+    <div class="footer-note"><span>ChurchHub Enterprise</span><span>Confidential</span></div>
+  </section>
+
+  <!-- 05-06 -->
+  <section class="page">
+    <p class="kicker">05 · Security</p>
+    <h1 class="section">Security is the operating model</h1>
+    <h2>Identity &amp; access</h2>
+    <ul>
+      <li>Session authentication + CSRF on mutating requests</li>
+      <li>RBAC with hierarchy-aware scoping</li>
+      <li>Separate platform control plane for operators</li>
+    </ul>
+    <h2>Financial controls</h2>
+    <ul>
+      <li>Approval paths, period lock, working-day gates</li>
+      <li>Idempotent financial POSTs</li>
+      <li>Void via reversing entries—never silent history edits</li>
+    </ul>
+    <h2>Data protection</h2>
+    <ul>
+      <li>Hashed passwords; validated uploads; careful audit logging</li>
+      <li>Optional MFA for privileged roles (policy-configurable)</li>
+      <li>HTTPS, secure cookies, debug disabled in production</li>
+    </ul>
+
+    <p class="kicker">06 · Multi-Tenant Architecture</p>
+    <h1 class="section">Denomination wall. Church-scoped books.</h1>
+    <p class="quote">
+      Platform → Denomination (SaaS boundary) → Conference → Zone → District → Church →
+      church-owned records
+    </p>
+    <table>
+      <thead><tr><th>Principle</th><th>Implementation</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Denomination wall</strong></td><td>Tenant isolation at the SaaS boundary</td></tr>
+        <tr><td><strong>Church as operational tenant</strong></td><td>Books and membership bind to local church</td></tr>
+        <tr><td><strong>Server-side enforcement</strong></td><td>Query scope—never UI-only filtering</td></tr>
+        <tr><td><strong>Dual lanes</strong></td><td>Institution apps vs platform console</td></tr>
+      </tbody>
+    </table>
+    <div class="footer-note"><span>ChurchHub Enterprise</span><span>Confidential</span></div>
+  </section>
+
+  <!-- 07-09 -->
+  <section class="page">
+    <p class="kicker">07 · Cloud Deployment</p>
+    <h1 class="section">Production-grade by design</h1>
+    <table>
+      <thead><tr><th>Layer</th><th>Technology</th></tr></thead>
+      <tbody>
+        <tr><td>Application</td><td>Django (church_system)</td></tr>
+        <tr><td>Web tier</td><td>Gunicorn · Nginx</td></tr>
+        <tr><td>Database</td><td>PostgreSQL</td></tr>
+        <tr><td>Cache / broker</td><td>Redis</td></tr>
+        <tr><td>Jobs</td><td>Celery · Celery Beat</td></tr>
+        <tr><td>Containers</td><td>Docker · Compose (prod profiles)</td></tr>
+      </tbody>
+    </table>
+
+    <p class="kicker">08 · Mobile Support</p>
+    <h1 class="section">Responsive staff app + member portal</h1>
+    <ul>
+      <li>Bootstrap 5 responsive UI for laptop, tablet, and phone</li>
+      <li>Member portal for announcements, profile, and live meetings</li>
+      <li>Device confirmation and privileged session hygiene</li>
+    </ul>
+    <p class="quote">Responsive web platform today; native store apps are optional roadmap—not a go-live blocker.</p>
+
+    <p class="kicker">09 · Analytics &amp; Insight</p>
+    <h1 class="section">Workflow-native intelligence</h1>
+    <ul>
+      <li>Mission Control KPIs, Teller Console, church performance, district roll-ups</li>
+      <li>This Week Pulse pastoral metrics</li>
+      <li>Report Center with permission-scoped exports</li>
+    </ul>
+    <div class="footer-note"><span>ChurchHub Enterprise</span><span>Confidential</span></div>
+  </section>
+
+  <!-- 10-11 -->
+  <section class="page">
+    <p class="kicker">10 · Pricing Placeholders</p>
+    <h1 class="section">Commercial packaging for sales conversations</h1>
+    <table>
+      <thead>
+        <tr><th></th><th>Parish</th><th>Conference</th><th>Network / Enterprise</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Best for</strong></td><td>Single church</td><td>Multi-church conference</td><td>Unions · denominations · SaaS</td></tr>
+        <tr><td><strong>Members</strong></td><td>Up to 1,500</td><td>Up to 25,000</td><td>25,000–100,000+</td></tr>
+        <tr><td><strong>Churches</strong></td><td>1</td><td>Up to ___</td><td>Unlimited*</td></tr>
+        <tr><td><strong>Core + Finance</strong></td><td>Included</td><td>Included</td><td>Included</td></tr>
+        <tr><td><strong>Hierarchy</strong></td><td>—</td><td>Included</td><td>Included</td></tr>
+        <tr><td><strong>Platform</strong></td><td>—</td><td>Optional</td><td>Included</td></tr>
+        <tr><td><strong>Support</strong></td><td>Standard</td><td>Priority</td><td>Named CSM + SLA</td></tr>
+        <tr><td><strong>Price</strong></td><td>$___ / month</td><td>$___ / month</td><td>Custom</td></tr>
+      </tbody>
+    </table>
+    <p class="quote">*Subject to infrastructure sizing and fair-use policies.</p>
+
+    <p class="kicker">11 · Contact</p>
+    <h1 class="section">Let’s build the operating system for your ministry network</h1>
+    <table>
+      <tbody>
+        <tr><td><strong>Sales</strong></td><td>sales@churchhub.example</td></tr>
+        <tr><td><strong>Partnerships</strong></td><td>partners@churchhub.example</td></tr>
+        <tr><td><strong>Support</strong></td><td>support@churchhub.example</td></tr>
+        <tr><td><strong>Web</strong></td><td>www.churchhub.example</td></tr>
+        <tr><td><strong>Demo</strong></td><td>Request a guided Mission Control walkthrough</td></tr>
+      </tbody>
+    </table>
+    <h2>Pilot checklist</h2>
+    <ul>
+      <li>Select 1–3 churches for a 30–60 day pilot</li>
+      <li>Provision hierarchy + chart of accounts</li>
+      <li>Train treasurer, clerk, and pastor roles</li>
+      <li>Validate remittance cut-off and approval workflows</li>
+      <li>Enable member portal for a controlled group</li>
+      <li>Review audit &amp; reporting packs with leadership</li>
+    </ul>
+    <p class="cta">ChurchHub Enterprise</p>
+    <p class="meta" style="text-align:center;color:var(--muted)"><em>Secure. Hierarchical. Financially accountable.</em></p>
+    <div class="footer-note"><span>© ChurchHub · All rights reserved</span><span>Prospective customers</span></div>
+  </section>
+</body>
+</html>

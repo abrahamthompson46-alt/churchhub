@@ -83,6 +83,25 @@
             <input type="hidden" name="next" value="{{ request.path }}">
             <button type="submit" class="btn btn-outline-primary btn-sm w-100">Use as platform filter context</button>
         </form>
+
+        {% if can_purge %}
+        <div class="platform-card mt-3 border-danger">
+            <div class="platform-card-header text-danger">Danger zone</div>
+            <div class="card-body small">
+                <p class="mb-2">
+                    Permanently delete this denomination, its org hierarchy, churches, members, financial records, and institution users.
+                    This cannot be undone.
+                </p>
+                {% if purge_blocked_reason %}
+                <p class="text-muted mb-0">{{ purge_blocked_reason }}</p>
+                {% else %}
+                <a href="{% url 'sitecontrol:denomination_purge' denomination.pk %}" class="btn btn-outline-danger btn-sm w-100">
+                    Delete denomination permanently…
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

@@ -1,0 +1,137 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Delete {{ denomination.name }}{% endblock %}
+
+{% block content %}
+{% include "sitecontrol/includes/denomination_nav.html" with active_tab="overview" %}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="platform-card border-danger">
+            <div class="platform-card-header bg-danger text-white">
+                <span><i class="bi bi-exclamation-triangle-fill me-1"></i> Permanent deletion — step {{ step }} of 3</span>
+            </div>
+            <div class="card-body">
+                {% if step == 1 %}
+                <div class="alert alert-danger">
+                    <strong>This action is irreversible.</strong>
+                    You are about to permanently delete the denomination
+                    <strong>{{ denomination.display_name|default:denomination.name }}</strong>
+                    (<code>{{ denomination.code }}</code>) and all related institution data listed below.
+                    Financial journals, members, users, and org hierarchy records will be removed from the database.
+                </div>
+
+                <ul class="list-group list-group-flush mb-4 small">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Conferences</span><strong>{{ preview.conference_count }}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Churches</span><strong>{{ preview.church_count }}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Institution user accounts</span><strong>{{ preview.institution_user_count }}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Pending applications</span><strong>{{ preview.application_count }}</strong>
+                    </li>
+                </ul>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="step" value="1">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="ack_irreversible" id="ack_irreversible" value="yes" required>
+                        <label class="form-check-label" for="ack_irreversible">
+                            I understand this permanently deletes all data for this denomination and cannot be undone.
+                        </label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="ack_financial" id="ack_financial" value="yes" required>
+                        <label class="form-check-label" for="ack_financial">
+                            I understand financial records, members, and audit-linked business data will be destroyed.
+                        </label>
+                    </div>
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" name="ack_authority" id="ack_authority" value="yes" required>
+                        <label class="form-check-label" for="ack_authority">
+                            I am authorized to permanently remove this tenant from the platform.
+                        </label>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'sitecontrol:denomination_detail' denomination.pk %}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-danger">Continue to confirmation</button>
+                    </div>
+                </form>
+
+                {% elif step == 2 %}
+                <div class="alert alert-warning small">
+                    Second confirmation: type the denomination code exactly and acknowledge the final warning.
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="step" value="2">
+                    <div class="mb-3">
+                        <label class="form-label" for="confirm_code">Type denomination code: <code>{{ denomination.code }}</code></label>
+                        <input type="text" name="confirm_code" id="confirm_code" class="form-control" required autocomplete="off" spellcheck="false">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="reason">Reason for deletion (required)</label>
+                        <textarea name="reason" id="reason" class="form-control" rows="3" required placeholder="Document why this tenant is being permanently removed."></textarea>
+                    </div>
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" name="ack_final" id="ack_final" value="yes" required>
+                        <label class="form-check-label" for="ack_final">
+                            I have verified backups or legal retention requirements and still want to proceed.
+                        </label>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'sitecontrol:denomination_purge' denomination.pk %}" class="btn btn-outline-secondary">Back</a>
+                        <button type="submit" class="btn btn-danger">Continue to password verification</button>
+                    </div>
+                </form>
+
+                {% elif step == 3 %}
+                <div class="alert alert-danger">
+                    Final step: enter your platform operator password and the confirmation phrase to execute deletion.
+                </div>
+
+                <form method="post" id="purge-final-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="step" value="3">
+                    <input type="hidden" name="reason" value="{{ reason|escape }}">
+                    <div class="mb-3">
+                        <label class="form-label" for="confirm_phrase">Type <code>DELETE PERMANENTLY</code></label>
+                        <input type="text" name="confirm_phrase" id="confirm_phrase" class="form-control" required autocomplete="off" spellcheck="false">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label" for="password">Your password</label>
+                        <input type="password" name="password" id="password" class="form-control" required autocomplete="current-password">
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'sitecontrol:denomination_purge' denomination.pk %}?step=2" class="btn btn-outline-secondary">Back</a>
+                        <button type="submit" class="btn btn-danger" id="purge-submit-btn">
+                            Delete denomination permanently
+                        </button>
+                    </div>
+                </form>
+                <script>
+                (function () {
+                    var form = document.getElementById("purge-final-form");
+                    if (!form) return;
+                    form.addEventListener("submit", function (event) {
+                        var ok = window.confirm(
+                            "Last chance: permanently delete {{ denomination.name|escapejs }} and ALL related data?"
+                        );
+                        if (!ok) {
+                            event.preventDefault();
+                        }
+                    });
+                })();
+                </script>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

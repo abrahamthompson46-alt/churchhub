@@ -49,6 +49,7 @@ urlpatterns = [
     path("denominations/<uuid:pk>/seeds/", views_denominations.denomination_seeds, name="denomination_seeds"),
     path("denominations/<uuid:pk>/branding/", views_denominations.denomination_branding, name="denomination_branding"),
     path("denominations/<uuid:pk>/billing/", views_denominations.denomination_billing, name="denomination_billing"),
+    path("denominations/<uuid:pk>/purge/", views_denominations.denomination_purge, name="denomination_purge"),
     path("denominations/<uuid:pk>/set-context/", views_denominations.denomination_set_context, name="denomination_set_context"),
     path("denominations/clear-context/", views_denominations.denomination_clear_context, name="clear_denomination_context"),
     path("tenants/", views.tenant_list, name="tenant_list"),

@@ -1,5 +1,6 @@
 """Platform denomination management — profiles, branding, billing, audit."""
 
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect, render
 
@@ -24,7 +25,13 @@ from sitecontrol.denomination_services import (
 from sitecontrol import repositories as repo
 from sitecontrol import selectors
 from sitecontrol.forms import DenominationForm
-from sitecontrol.platform_access import operator_can_access_denomination
+from sitecontrol.denomination_purge_services import (
+    DenominationPurgeError,
+    denomination_purge_preview,
+    purge_denomination_completely,
+    validate_denomination_purge,
+)
+from sitecontrol.platform_access import operator_can_access_denomination, operator_has_global_access
 from sitecontrol.rbac import CAP_MANAGE_DENOMINATIONS, CAP_VIEW, CAP_VIEW_BILLING
 from sitecontrol.services import log_platform_action
 
@@ -61,6 +68,13 @@ def denomination_detail(request, pk):
     billing = denomination_billing_summary(denomination)
     alerts = tenant_health_alerts_for_denomination(denomination)
     recent_audit = denomination_audit_log(denomination, limit=8)
+    can_purge = operator_has_global_access(request.user)
+    purge_blocked_reason = ""
+    if can_purge:
+        try:
+            validate_denomination_purge(denomination)
+        except DenominationPurgeError as exc:
+            purge_blocked_reason = str(exc)
     return render(request, "sitecontrol/denomination_detail.html", {
         "denomination": denomination,
         "terminology": terminology,
@@ -70,6 +84,8 @@ def denomination_detail(request, pk):
         "billing": billing,
         "alerts": alerts,
         "recent_audit": recent_audit,
+        "can_purge": can_purge,
+        "purge_blocked_reason": purge_blocked_reason,
         "breadcrumbs": _breadcrumbs(
             ("Platform", "/platform/"),
             ("Denominations", "/platform/denominations/"),
@@ -289,6 +305,115 @@ def denomination_clear_context(request):
     return redirect(
         safe_internal_redirect(request.POST.get("next"), "sitecontrol:denomination_list")
     )
+
+
+@platform_required
+@require_platform_capability(CAP_MANAGE_DENOMINATIONS)
+def denomination_purge(request, pk):
+    """Multi-step permanent deletion with repeated warnings and password verification."""
+    denomination = selectors.get_denomination_or_404(pk)
+    _require_denomination_access(request, denomination)
+
+    if not operator_has_global_access(request.user):
+        raise PermissionDenied("Only platform owners may permanently delete denominations.")
+
+    session_reason_key = f"denom_purge_reason_{pk}"
+
+    try:
+        validate_denomination_purge(denomination)
+    except DenominationPurgeError as exc:
+        messages.error(request, str(exc))
+        return redirect("sitecontrol:denomination_detail", pk=pk)
+
+    preview = denomination_purge_preview(denomination)
+    step = 1
+    reason = ""
+
+    if request.method == "POST":
+        step = int(request.POST.get("step", 1))
+        if step == 1:
+            required = ("ack_irreversible", "ack_financial", "ack_authority")
+            if not all(request.POST.get(key) == "yes" for key in required):
+                messages.error(request, "Confirm all warnings before continuing.")
+            else:
+                step = 2
+        elif step == 2:
+            confirm_code = request.POST.get("confirm_code", "").strip()
+            reason = request.POST.get("reason", "").strip()
+            if confirm_code != denomination.code:
+                messages.error(request, "Denomination code does not match.")
+            elif not reason:
+                messages.error(request, "A reason for deletion is required.")
+            elif request.POST.get("ack_final") != "yes":
+                messages.error(request, "Confirm the final acknowledgement.")
+            else:
+                request.session[session_reason_key] = reason
+                step = 3
+        elif step == 3:
+            reason = request.session.get(session_reason_key, "").strip()
+            if not reason:
+                messages.error(request, "Session expired. Start the deletion flow again.")
+                return redirect("sitecontrol:denomination_purge", pk=pk)
+            if request.POST.get("confirm_phrase", "").strip() != "DELETE PERMANENTLY":
+                messages.error(request, 'Type DELETE PERMANENTLY to confirm.')
+            elif not request.user.check_password(request.POST.get("password", "")):
+                messages.error(request, "Incorrect password.")
+            else:
+                try:
+                    result = purge_denomination_completely(
+                        denomination,
+                        performed_by=request.user,
+                        reason=reason,
+                    )
+                except DenominationPurgeError as exc:
+                    messages.error(request, str(exc))
+                    return redirect("sitecontrol:denomination_detail", pk=pk)
+                except Exception as exc:
+                    from django.db.models.deletion import ProtectedError
+
+                    if isinstance(exc, ProtectedError):
+                        messages.error(
+                            request,
+                            "Deletion blocked by protected related records. "
+                            "Contact engineering if this persists.",
+                        )
+                        return redirect("sitecontrol:denomination_detail", pk=pk)
+                    raise
+
+                log_platform_action(
+                    request,
+                    "DENOMINATION_PURGE",
+                    f"Permanently deleted denomination {result['denomination_name']}",
+                    target_model="Denomination",
+                    target_id=result["denomination_id"],
+                    details=result,
+                )
+                request.session.pop(session_reason_key, None)
+                if request.session.get("active_denomination_id") == str(pk):
+                    request.session.pop("active_denomination_id", None)
+                flash_success(
+                    request,
+                    f"Denomination “{result['denomination_name']}” and all related data were permanently deleted.",
+                )
+                return redirect("sitecontrol:denomination_list")
+    elif request.GET.get("step") == "2":
+        step = 2
+
+    if step == 3:
+        reason = request.session.get(session_reason_key, "")
+
+    return render(request, "sitecontrol/denomination_purge_confirm.html", {
+        "denomination": denomination,
+        "preview": preview,
+        "step": step,
+        "reason": reason,
+        "breadcrumbs": _breadcrumbs(
+            ("Platform", "/platform/"),
+            ("Denominations", "/platform/denominations/"),
+            (denomination.name, f"/platform/denominations/{denomination.pk}/"),
+            ("Permanent deletion",),
+        ),
+    })
 
 
 @platform_required

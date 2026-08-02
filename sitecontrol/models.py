@@ -434,6 +434,7 @@ class PlatformAuditLog(models.Model):
         ("DENOMINATION_TERMINOLOGY", "Denomination Terminology Updated"),
         ("DENOMINATION_SEEDS_CONFIG", "Denomination Seed Config Updated"),
         ("DENOMINATION_BILLING_VIEW", "Denomination Billing Viewed"),
+        ("DENOMINATION_PURGE", "Denomination Permanently Deleted"),
         ("AUDIT_EXPORT", "Audit Log Exported"),
         ("OPS_EMAIL_TEST", "Ops Email Test Sent"),
         ("IMPERSONATE_START", "Impersonation Started"),

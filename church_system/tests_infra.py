@@ -71,7 +71,24 @@ class EnvHelperTests(SimpleTestCase):
             )
         self.assertIn("CHURCHHUB_PUBLIC_URL", str(ctx.exception))
 
-    def test_validate_production_allows_mysql_when_enabled(self):
+    def test_validate_production_ignores_invalid_pa_host_when_corrected_url_passed(self):
+        # Callers must pass an already-corrected URL; invalid PA hosts are treated as missing.
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_production_environment(
+                secret_key="unique-production-secret-key-value",
+                debug=False,
+                allowed_hosts=["churchhub.pythonanywhere.com"],
+                database_engine="django.db.backends.mysql",
+                redis_url="",
+                csrf_trusted_origins=["https://churchhub.pythonanywhere.com"],
+                public_site_url="https://www.pythonanywhere.com",
+                require_redis=False,
+                allow_mysql=True,
+                require_health_token=False,
+            )
+        self.assertIn("CHURCHHUB_PUBLIC_URL", str(ctx.exception))
+
+    def test_validate_production_allows_pa_without_health_token(self):
         validate_production_environment(
             secret_key="unique-production-secret-key-value",
             debug=False,
@@ -82,7 +99,8 @@ class EnvHelperTests(SimpleTestCase):
             public_site_url="https://churchhub.pythonanywhere.com",
             require_redis=False,
             allow_mysql=True,
-            health_check_token="probe-secret-token",
+            require_health_token=False,
+            health_check_token="",
         )
 
 

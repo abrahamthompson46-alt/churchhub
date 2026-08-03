@@ -95,6 +95,7 @@ def validate_production_environment(
     allow_mysql: bool = False,
     allow_sqlite: bool = False,
     health_check_token: str = "",
+    require_health_token: bool = True,
 ) -> None:
     """Raise ImproperlyConfigured when production essentials are missing."""
     errors: list[str] = []
@@ -131,30 +132,27 @@ def validate_production_environment(
             "DJANGO_CSRF_TRUSTED_ORIGINS must include https://your-production-host"
         )
 
-    from church_system.public_urls import is_localhost_url
+    from urllib.parse import urlparse
+
+    from church_system.public_urls import (
+        is_invalid_pythonanywhere_host,
+        is_localhost_url,
+        normalize_public_site_base,
+    )
 
     if not debug:
         pub = (public_site_url or "").strip()
+        host = (urlparse(normalize_public_site_base(pub)).hostname or "").lower()
+        # www.pythonanywhere.com is auto-corrected in settings — do not take the site down.
+        if is_invalid_pythonanywhere_host(host):
+            pub = ""
         if not pub or is_localhost_url(pub):
             errors.append(
                 "CHURCHHUB_PUBLIC_URL must be your live HTTPS site URL (not localhost) "
-                "so portal and invitation emails link correctly."
+                "so portal and invitation emails link correctly. "
+                "Example: https://churchhub.pythonanywhere.com"
             )
-        else:
-            from church_system.public_urls import (
-                is_invalid_pythonanywhere_host,
-                normalize_public_site_base,
-            )
-            from urllib.parse import urlparse
-
-            host = (urlparse(normalize_public_site_base(pub)).hostname or "").lower()
-            if is_invalid_pythonanywhere_host(host):
-                errors.append(
-                    "CHURCHHUB_PUBLIC_URL must be your web app host "
-                    "(e.g. https://churchhub.pythonanywhere.com), "
-                    "not https://www.pythonanywhere.com."
-                )
-        if not (health_check_token or "").strip():
+        if require_health_token and not (health_check_token or "").strip():
             errors.append(
                 "CHURCHHUB_HEALTH_TOKEN must be set so /health/ probes are not public."
             )

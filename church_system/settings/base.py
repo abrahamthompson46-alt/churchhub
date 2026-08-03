@@ -331,11 +331,24 @@ if ON_PYTHONANYWHERE and _public_url_is_localhost(CHURCHHUB_PUBLIC_URL):
     elif CSRF_TRUSTED_ORIGINS:
         CHURCHHUB_PUBLIC_URL = CSRF_TRUSTED_ORIGINS[0].strip().rstrip("/")
 
-from church_system.public_urls import normalize_public_site_base, resolve_pythonanywhere_public_url
+from church_system.public_urls import (
+    is_invalid_pythonanywhere_host,
+    normalize_public_site_base,
+    resolve_pythonanywhere_public_url,
+)
+from urllib.parse import urlparse as _urlparse
 
 CHURCHHUB_PUBLIC_URL = normalize_public_site_base(CHURCHHUB_PUBLIC_URL)
 if ON_PYTHONANYWHERE:
     CHURCHHUB_PUBLIC_URL = resolve_pythonanywhere_public_url(CHURCHHUB_PUBLIC_URL)
+    _pub_host = (_urlparse(CHURCHHUB_PUBLIC_URL or "").hostname or "").lower()
+    if not CHURCHHUB_PUBLIC_URL or is_invalid_pythonanywhere_host(_pub_host):
+        # Last-resort so WSGI can boot even with a mis-set env var.
+        _pa = (os.environ.get("PYTHONANYWHERE_SITE") or "").strip().lower()
+        if _pa and not is_invalid_pythonanywhere_host(_pa):
+            CHURCHHUB_PUBLIC_URL = f"https://{_pa}"
+        else:
+            CHURCHHUB_PUBLIC_URL = "https://churchhub.pythonanywhere.com"
 
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "").strip()
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587") or 587)

@@ -71,6 +71,22 @@ _allow_sqlite = ON_PYTHONANYWHERE
 if env_flag("CHURCHHUB_ALLOW_SQLITE", None) is not None:
     _allow_sqlite = bool(env_flag("CHURCHHUB_ALLOW_SQLITE", False)) and ON_PYTHONANYWHERE
 
+# After auto-correct, ensure we never validate an empty/invalid PA marketing URL.
+_public_url = (CHURCHHUB_PUBLIC_URL or "").strip()
+if ON_PYTHONANYWHERE:
+    from church_system.public_urls import (
+        is_invalid_pythonanywhere_host,
+        resolve_pythonanywhere_public_url,
+    )
+    from urllib.parse import urlparse
+
+    _host = (urlparse(_public_url).hostname or "").lower()
+    if not _public_url or is_invalid_pythonanywhere_host(_host):
+        _public_url = resolve_pythonanywhere_public_url(_public_url) or (
+            "https://churchhub.pythonanywhere.com"
+        )
+        CHURCHHUB_PUBLIC_URL = _public_url
+
 validate_production_environment(
     secret_key=SECRET_KEY,
     debug=DEBUG,
@@ -83,6 +99,8 @@ validate_production_environment(
     allow_mysql=True,
     allow_sqlite=_allow_sqlite,
     health_check_token=HEALTH_CHECK_TOKEN,
+    # PA free tier often omits this; empty token keeps /health/ open (acceptable there).
+    require_health_token=not ON_PYTHONANYWHERE,
 )
 
 # File logs on by default in production

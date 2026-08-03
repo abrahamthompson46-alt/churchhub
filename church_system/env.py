@@ -140,6 +140,20 @@ def validate_production_environment(
                 "CHURCHHUB_PUBLIC_URL must be your live HTTPS site URL (not localhost) "
                 "so portal and invitation emails link correctly."
             )
+        else:
+            from church_system.public_urls import (
+                is_invalid_pythonanywhere_host,
+                normalize_public_site_base,
+            )
+            from urllib.parse import urlparse
+
+            host = (urlparse(normalize_public_site_base(pub)).hostname or "").lower()
+            if is_invalid_pythonanywhere_host(host):
+                errors.append(
+                    "CHURCHHUB_PUBLIC_URL must be your web app host "
+                    "(e.g. https://churchhub.pythonanywhere.com), "
+                    "not https://www.pythonanywhere.com."
+                )
         if not (health_check_token or "").strip():
             errors.append(
                 "CHURCHHUB_HEALTH_TOKEN must be set so /health/ probes are not public."

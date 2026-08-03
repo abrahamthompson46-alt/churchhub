@@ -29,25 +29,63 @@ class PublicUrlTests(SimpleTestCase):
             else:
                 os.environ["PYTHONANYWHERE_SITE"] = previous
 
+    @override_settings(ALLOWED_HOSTS=["churchhub.pythonanywhere.com", "www.pythonanywhere.com"])
+    def test_pythonanywhere_falls_back_from_allowed_hosts(self):
+        import os
+
+        previous = os.environ.pop("PYTHONANYWHERE_SITE", None)
+        try:
+            resolved = resolve_pythonanywhere_public_url("https://www.pythonanywhere.com")
+            self.assertEqual(resolved, "https://churchhub.pythonanywhere.com")
+        finally:
+            if previous is not None:
+                os.environ["PYTHONANYWHERE_SITE"] = previous
+
+    def test_strips_dashboard_logout_suffix(self):
+        self.assertEqual(
+            normalize_public_site_base(
+                "https://churchhub.pythonanywhere.com/dashboard/logout/"
+            ),
+            "https://churchhub.pythonanywhere.com",
+        )
+
     @override_settings(
         DEBUG=False,
+        ON_PYTHONANYWHERE=False,
+        CHURCHHUB_PUBLIC_URL="https://app.churchhub.org",
+        ALLOWED_HOSTS=["app.churchhub.org"],
+        CSRF_TRUSTED_ORIGINS=["https://app.churchhub.org"],
+    )
+    def test_uses_configured_public_url(self):
+        import os
+
+        previous = os.environ.pop("PYTHONANYWHERE_SITE", None)
+        try:
+            factory = RequestFactory()
+            request = factory.get("/", HTTP_HOST="localhost:8000")
+            url = build_public_absolute_uri(request, "/portal/confirm/abc/")
+            self.assertTrue(url.startswith("https://app.churchhub.org/portal/confirm/"))
+        finally:
+            if previous is not None:
+                os.environ["PYTHONANYWHERE_SITE"] = previous
+
+    @override_settings(
+        DEBUG=False,
+        ON_PYTHONANYWHERE=False,
         CHURCHHUB_PUBLIC_URL="http://localhost:8000",
         CSRF_TRUSTED_ORIGINS=["https://church.example.com"],
         ALLOWED_HOSTS=["church.example.com"],
         SECURE_SSL_REDIRECT=True,
     )
     def test_ignores_localhost_public_url_in_production(self):
-        self.assertEqual(
-            resolve_public_site_base(),
-            "https://church.example.com",
-        )
+        import os
 
-    @override_settings(
-        DEBUG=False,
-        CHURCHHUB_PUBLIC_URL="https://app.churchhub.org",
-    )
-    def test_uses_configured_public_url(self):
-        factory = RequestFactory()
-        request = factory.get("/", HTTP_HOST="localhost:8000")
-        url = build_public_absolute_uri(request, "/portal/confirm/abc/")
-        self.assertTrue(url.startswith("https://app.churchhub.org/portal/confirm/"))
+        previous = os.environ.pop("PYTHONANYWHERE_SITE", None)
+        try:
+            self.assertEqual(
+                resolve_public_site_base(),
+                "https://church.example.com",
+            )
+        finally:
+            if previous is not None:
+                os.environ["PYTHONANYWHERE_SITE"] = previous

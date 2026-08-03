@@ -266,8 +266,8 @@ sequenceDiagram
 | Item | Detail |
 |------|--------|
 | Accept URL | `/accounts/invite/accept/<uuid:token>/` |
-| Validity | Not accepted, not expired, not revoked (`UserInvitation.is_valid`) |
-| Default validity | `days_valid=7` |
+| Validity | Not accepted (single-use), not expired, not revoked (`UserInvitation.is_valid`) |
+| Default validity | **1 hour** (`accounts.services.INVITATION_VALIDITY`); resend issues a **new token** + fresh 1-hour window |
 | Activation toggle | `activate_user` / `deactivate_user` set `is_active` |
 | Audit | INVITE_*, USER_CREATE on `UserActivityLog` |
 | Gates | `sitecontrol` invite limits / `institution_invites_allowed()` |

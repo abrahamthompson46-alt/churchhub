@@ -56,6 +56,10 @@ ACCOUNT_CODE_BY_NAME = {
     "Building Fund": "BUILDING",
     "Mission Offering": "MISSION_OFFERING",
     "Special Project Income": "SPECIAL_PROJECT",
+    "Youth Offering": "YOUTH_OFFERING",
+    "Sabbath School Offering": "SABBATH_SCHOOL",
+    "Women's Ministries Offering": "WOMENS_MINISTRIES",
+    "Pledge Income": "PLEDGE_INCOME",
     "Accrued Expenses": "ACCRUED_EXPENSE",
 }
 

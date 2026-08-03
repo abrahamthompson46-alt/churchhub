@@ -6,6 +6,6 @@ Accept your invitation and set your password:
 {{ accept_url }}
 
 Username: {{ invitation.username }}
-This link expires on {{ expires_at }}.
+This link can be used once and expires in one hour ({{ expires_at }}).
 
 If you did not expect this invitation, you can ignore this email.

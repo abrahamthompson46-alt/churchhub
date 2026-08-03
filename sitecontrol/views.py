@@ -835,7 +835,6 @@ def tenant_resend_invitation(request, pk, invite_pk):
             invitation,
             performed_by=request.user,
             ip_address=request.META.get("REMOTE_ADDR"),
-            days_valid=14,
             request=request,
             fail_silently=False,
         )
@@ -888,7 +887,6 @@ def tenant_create_admin_invitation(request, pk):
             role=role if role in {c[0] for c in UserRole.CHOICES} else UserRole.LOCAL_PASTOR,
             church=church,
             invited_by=request.user,
-            days_valid=14,
         )
         emailed = send_invitation_email(invitation, request=request, fail_silently=False)
     except ValueError as exc:

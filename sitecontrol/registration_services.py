@@ -193,7 +193,6 @@ def approve_tenant_application(
         role=role,
         church=church,
         invited_by=reviewer,
-        days_valid=14,
     )
 
     application.status = "APPROVED"

@@ -35,6 +35,10 @@ EXTENDED_ACCOUNTS = [
     ("Building Fund", "INCOME"),
     ("Mission Offering", "INCOME"),
     ("Special Project Income", "INCOME"),
+    ("Youth Offering", "INCOME"),
+    ("Sabbath School Offering", "INCOME"),
+    ("Women's Ministries Offering", "INCOME"),
+    ("Pledge Income", "INCOME"),
     ("Accrued Expenses", "DISTRICT_PAYABLE"),
     # Remittance clearing (credit side for remittance transfers — not Main Bank)
     ("District Tithe Remittance", "DISTRICT_PAYABLE"),
@@ -56,6 +60,10 @@ CATEGORY_TEMPLATES = [
     ("REC_MISSION_CASH", "Mission Offering (Cash)", "RECEIPT", "Cash", "Mission Offering", "Mission offering — cash", False, False, 60),
     ("REC_WELFARE_CASH", "Welfare Fund (Cash)", "RECEIPT", "Cash", "Welfare Fund", "Welfare fund — cash", True, False, 70),
     ("REC_SPECIAL_CASH", "Special Project (Cash)", "RECEIPT", "Cash", "Special Project Income", "Special project income — cash", False, False, 80),
+    ("REC_YOUTH_CASH", "Youth Offering (Cash)", "RECEIPT", "Cash", "Youth Offering", "Youth offering — cash", False, False, 81),
+    ("REC_SS_CASH", "Sabbath School Offering (Cash)", "RECEIPT", "Cash", "Sabbath School Offering", "Sabbath School offering — cash", False, False, 82),
+    ("REC_WM_CASH", "Women's Ministries (Cash)", "RECEIPT", "Cash", "Women's Ministries Offering", "Women's ministries offering — cash", False, False, 83),
+    ("REC_PLEDGE_CASH", "Pledge Payment (Cash)", "RECEIPT", "Cash", "Pledge Income", "Pledge payment — cash", True, False, 84),
     # Receipts — Bank
     ("REC_TITHE_BANK", "Tithe Receipt (Bank)", "RECEIPT", "Main Bank", "Tithe", "Tithe received — bank", True, True, 110),
     ("REC_COMBINED_BANK", "Combined Offering (Bank)", "RECEIPT", "Main Bank", "Combined Offering", "Combined offering — bank", False, True, 120),
@@ -63,6 +71,10 @@ CATEGORY_TEMPLATES = [
     ("REC_THANKS_BANK", "Thanksgiving (Bank)", "RECEIPT", "Main Bank", "Thanksgiving Offering", "Thanksgiving offering — bank", False, False, 140),
     ("REC_BUILDING_BANK", "Building Fund (Bank)", "RECEIPT", "Main Bank", "Building Fund", "Building fund — bank", False, False, 150),
     ("REC_WELFARE_BANK", "Welfare Fund (Bank)", "RECEIPT", "Main Bank", "Welfare Fund", "Welfare fund — bank", True, False, 160),
+    ("REC_YOUTH_BANK", "Youth Offering (Bank)", "RECEIPT", "Main Bank", "Youth Offering", "Youth offering — bank", False, False, 161),
+    ("REC_SS_BANK", "Sabbath School Offering (Bank)", "RECEIPT", "Main Bank", "Sabbath School Offering", "Sabbath School offering — bank", False, False, 162),
+    ("REC_WM_BANK", "Women's Ministries (Bank)", "RECEIPT", "Main Bank", "Women's Ministries Offering", "Women's ministries offering — bank", False, False, 163),
+    ("REC_PLEDGE_BANK", "Pledge Payment (Bank)", "RECEIPT", "Main Bank", "Pledge Income", "Pledge payment — bank", True, False, 164),
     # Expenses — Cash
     ("EXP_UTIL_CASH", "Utilities (Cash)", "EXPENSE", "Utilities Expense", "Cash", "Utilities expense — cash", False, False, 10),
     ("EXP_RENT_CASH", "Rent (Cash)", "EXPENSE", "Rent Expense", "Cash", "Rent expense — cash", False, False, 20),

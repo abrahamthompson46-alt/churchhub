@@ -130,7 +130,6 @@ def provision_tenant(
             role=role,
             church=church,
             invited_by=reviewer,
-            days_valid=14,
         )
 
     return church, sub, invitation

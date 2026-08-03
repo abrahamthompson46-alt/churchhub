@@ -31,6 +31,7 @@ from church_system.church_scope import get_active_church, require_church
 from church_system.flash import flash_error, flash_exception, flash_success, flash_warning
 from transactions.forms import (
     BankReconciliationForm,
+    ClassicReceiptForm,
     ExpenseForm,
     PeriodLockForm,
     ReceiptForm,
@@ -70,6 +71,7 @@ from transactions.services import (
     record_district_remittance,
     record_expense,
     record_receipt,
+    record_receipt_by_category,
     reject_transaction as svc_reject,
     resolve_transaction_date,
     unlock_financial_period,
@@ -286,7 +288,9 @@ def record_receipt_view(request):
     church = require_church(request)
     default_date = resolve_transaction_date(church)
     initial = {"idempotency_key": str(uuid.uuid4()), "date": default_date}
-    form = ReceiptForm(request.POST or None, church=church, initial=initial)
+    classic = request.GET.get("classic") == "1" or request.POST.get("classic") == "1"
+    form_class = ClassicReceiptForm if classic else ReceiptForm
+    form = form_class(request.POST or None, church=church, initial=initial)
     if request.method == "POST" and form.is_valid():
         idem_record = None
         try:
@@ -296,18 +300,29 @@ def record_receipt_view(request):
                 "RECEIPT",
                 form.cleaned_data.get("idempotency_key"),
             )
-            txn = record_receipt(
-                church=church,
-                created_by=request.user,
-                tithe_amount=form.cleaned_data["tithe_amount"],
-                combined_amount=form.cleaned_data["combined_amount"],
-                income_amount=form.cleaned_data["income_amount"],
-                special_offerings=form.get_special_offerings(),
-                payment_account_type=form.cleaned_data["payment_account_type"],
-                description=form.cleaned_data["description"],
-                member=form.cleaned_data.get("member"),
-                date=form.cleaned_data.get("date"),
-            )
+            if classic:
+                txn = record_receipt(
+                    church=church,
+                    created_by=request.user,
+                    tithe_amount=form.cleaned_data["tithe_amount"],
+                    combined_amount=form.cleaned_data["combined_amount"],
+                    income_amount=form.cleaned_data["income_amount"],
+                    special_offerings=form.get_special_offerings(),
+                    payment_account_type=form.cleaned_data["payment_account_type"],
+                    description=form.cleaned_data["description"],
+                    member=form.cleaned_data.get("member"),
+                    date=form.cleaned_data.get("date"),
+                )
+            else:
+                txn = record_receipt_by_category(
+                    church=church,
+                    created_by=request.user,
+                    category=form.cleaned_data["category"],
+                    amount=form.cleaned_data["amount"],
+                    description=form.cleaned_data["description"],
+                    member=form.cleaned_data.get("member"),
+                    date=form.cleaned_data.get("date"),
+                )
             complete_financial_idempotency(idem_record, txn)
             if txn.approval_status == "APPROVED":
                 flash_success(
@@ -333,9 +348,28 @@ def record_receipt_view(request):
             )
         except MissingIdempotencyKey as exc:
             flash_error(request, str(exc))
-        except (PeriodLockedError, WorkingDayClosedError) as exc:
+        except (PeriodLockedError, WorkingDayClosedError, ValueError) as exc:
             flash_exception(request, str(exc))
-    return render(request, "transactions/record_receipt.html", {"form": form})
+
+    category_payload = {}
+    if not classic:
+        from ledger.services import category_to_dict, get_categories_for_type
+
+        category_payload = {
+            str(c.pk): category_to_dict(c)
+            for c in get_categories_for_type(church, "RECEIPT")
+        }
+
+    return render(
+        request,
+        "transactions/record_receipt.html",
+        {
+            "form": form,
+            "classic": classic,
+            "category_payload": category_payload,
+            "business_date": default_date,
+        },
+    )
 
 
 @_finance_required

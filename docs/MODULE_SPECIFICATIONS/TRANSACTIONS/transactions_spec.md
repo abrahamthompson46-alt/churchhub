@@ -107,7 +107,7 @@ erDiagram
 
 ## 8. Services (Current)
 
-**`services.py`:** `validate_transaction_balance`; period/working-day helpers; `create_default_accounts` / offerings; `record_receipt`, `record_expense`, `record_transfer`, `record_district_remittance`; `approve_transaction`, `reject_transaction`, `void_transaction`; `generate_monthly_cutoff`; recon create/match/finalize; `budget_vs_actual` (delegates to budgets).
+**`services.py`:** `validate_transaction_balance`; period/working-day helpers; `create_default_accounts` / offerings; `record_receipt` (multi-amount API), `record_receipt_by_category` (teller UI → ledger category posting), `record_expense`, `record_transfer`, `record_district_remittance`; `approve_transaction`, `reject_transaction`, `void_transaction`; `generate_monthly_cutoff`; recon create/match/finalize; `budget_vs_actual` (delegates to budgets).
 
 **Also:** `treasury.py`, `idempotency.py`, `account_codes.py`, `reporting.py`.
 
@@ -119,7 +119,9 @@ erDiagram
 
 ## 9. Forms (Current)
 
-`ReceiptForm`, `ExpenseForm`, `PeriodLockForm`, `WorkingDayOpenForm`, `WorkingDayCloseForm`, `VoidTransactionForm`, `BankReconciliationForm`.
+`ReceiptForm` (category-driven teller receipt), `ClassicReceiptForm` (`?classic=1` multi-amount escape hatch), `ExpenseForm`, `PeriodLockForm`, `WorkingDayOpenForm`, `WorkingDayCloseForm`, `VoidTransactionForm`, `BankReconciliationForm`.
+
+**Record Receipt (Current):** select active `ledger.LedgerCategory` (RECEIPT) → debit/credit preview from category defaults → amount + description (kept) → member required when `category.requires_member`. Server re-resolves accounts via `record_receipt_by_category` / `post_ledger_entry` (never trust client account IDs).
 
 ---
 

@@ -1,9 +1,12 @@
 """Tests for accounts permissions, services, views, and middleware."""
 
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.forms import AcceptInvitationForm, UserInviteForm, UserManageForm
 from accounts.models import UserActivityLog, UserInvitation
@@ -384,15 +387,36 @@ class ServiceTests(ChurchHubTestMixin, TestCase):
             role=UserRole.MEMBER,
             church=self.church,
             invited_by=self.manager,
-            days_valid=1,
         )
         old_expiry = invitation.expires_at
-        resend_invitation(invitation, performed_by=self.manager, days_valid=14)
+        old_token = invitation.token
+        before = timezone.now()
+        resend_invitation(invitation, performed_by=self.manager)
         invitation.refresh_from_db()
+        self.assertNotEqual(invitation.token, old_token)
         self.assertGreater(invitation.expires_at, old_expiry)
+        self.assertLessEqual(invitation.expires_at, before + timedelta(hours=1, minutes=1))
         self.assertTrue(
             UserActivityLog.objects.filter(user=self.manager, action="INVITE_RESENT").exists()
         )
+
+    def test_invitation_defaults_to_one_hour_and_single_use(self):
+        before = timezone.now()
+        invitation = create_invitation(
+            email="hour@test.com",
+            username="hour_user",
+            role=UserRole.MEMBER,
+            church=self.church,
+            invited_by=self.manager,
+        )
+        self.assertGreaterEqual(invitation.expires_at, before + timedelta(minutes=55))
+        self.assertLessEqual(invitation.expires_at, before + timedelta(hours=1, minutes=1))
+        accept_invitation(invitation, password="securepass12", first_name="H", last_name="U")
+        invitation.refresh_from_db()
+        self.assertTrue(invitation.is_accepted)
+        self.assertFalse(invitation.is_valid)
+        with self.assertRaises(ValueError):
+            accept_invitation(invitation, password="securepass12", first_name="H", last_name="U")
 
 
 class FormTests(ChurchHubTestMixin, TestCase):

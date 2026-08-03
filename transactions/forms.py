@@ -3,13 +3,105 @@ from decimal import Decimal
 from django import forms
 
 from church_system.widgets import input_attrs, select_attrs, textarea_attrs
+from ledger.models import LedgerCategory
 from members.models import Member
 from transactions.models import Account, OfferingCategory, TreasuryApprovalPolicy
+from transactions.services import resolve_transaction_date
 
 _MONEY = lambda **extra: input_attrs(step="0.01", placeholder="0.00", **extra)
 
 
 class ReceiptForm(forms.Form):
+    """Category-driven teller receipt: one category, one amount, description preserved."""
+
+    idempotency_key = forms.CharField(
+        widget=forms.HiddenInput(),
+        required=True,
+    )
+    category = forms.ModelChoiceField(
+        label="Category",
+        queryset=LedgerCategory.objects.none(),
+        widget=forms.Select(attrs={**select_attrs(), "id": "id_category"}),
+        help_text="Debit and credit accounts fill automatically from the category.",
+    )
+    amount = forms.DecimalField(
+        label="Amount",
+        min_value=Decimal("0.01"),
+        decimal_places=2,
+        widget=forms.NumberInput(attrs=_MONEY()),
+    )
+    description = forms.CharField(
+        required=False,
+        label="Description",
+        widget=forms.TextInput(
+            attrs={
+                **input_attrs(placeholder="e.g. Sabbath morning offering"),
+                "id": "id_description",
+            }
+        ),
+    )
+    member = forms.ModelChoiceField(
+        queryset=Member.objects.none(),
+        required=False,
+        label="Member",
+        widget=forms.HiddenInput(attrs={"id": "id_member"}),
+    )
+    date = forms.DateField(
+        required=False,
+        label="Receipt Date",
+        widget=forms.HiddenInput(),
+    )
+
+    def __init__(self, *args, church=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.church = church
+        if church:
+            from ledger import selectors as ledger_selectors
+            from ledger.services import seed_ledger
+
+            if not ledger_selectors.categories_for_type_qs(church, "RECEIPT").exists():
+                seed_ledger(church)
+            if "date" not in self.initial and not self.data:
+                self.fields["date"].initial = resolve_transaction_date(church)
+            self.fields["category"].queryset = ledger_selectors.categories_for_type_qs(
+                church, "RECEIPT"
+            )
+            self.fields["member"].queryset = Member.objects.filter(
+                church=church, is_active=True
+            )
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.church and not cleaned.get("date"):
+            cleaned["date"] = resolve_transaction_date(self.church)
+        category = cleaned.get("category")
+        member = cleaned.get("member")
+        if category and self.church and category.church_id != self.church.pk:
+            raise forms.ValidationError("Invalid category for this church.")
+        if category and category.transaction_type != "RECEIPT":
+            raise forms.ValidationError("Only receipt categories can be used here.")
+        if category and not category.is_active:
+            raise forms.ValidationError("This category is inactive.")
+        if category and category.requires_member and not member:
+            self.add_error("member", "This category requires a member.")
+        if category:
+            debit = category.default_debit_account
+            credit = category.default_credit_account
+            if debit.church_id != category.church_id or credit.church_id != category.church_id:
+                raise forms.ValidationError(
+                    "Category accounts are misconfigured for this church. "
+                    "Contact an administrator."
+                )
+        description = (cleaned.get("description") or "").strip()
+        if not description and category:
+            description = (category.default_narration or category.name or "").strip()
+        cleaned["description"] = description
+        return cleaned
+
+
+class ClassicReceiptForm(forms.Form):
+    """Legacy multi-amount receipt (escape hatch via ?classic=1)."""
+
     idempotency_key = forms.CharField(
         widget=forms.HiddenInput(),
         required=True,
@@ -71,7 +163,9 @@ class ReceiptForm(forms.Form):
         offerings = {}
         if not self.church:
             return offerings
-        for cat in OfferingCategory.objects.filter(church=self.church, is_active=True).exclude(code__in=["TITHE", "COMBINED"]):
+        for cat in OfferingCategory.objects.filter(
+            church=self.church, is_active=True
+        ).exclude(code__in=["TITHE", "COMBINED"]):
             val = self.cleaned_data.get(f"offering_{cat.code}", Decimal("0"))
             if val and val > 0:
                 offerings[cat.code] = val
@@ -85,7 +179,9 @@ class ReceiptForm(forms.Form):
             + cleaned.get("income_amount", Decimal("0"))
         )
         if self.church:
-            for cat in OfferingCategory.objects.filter(church=self.church, is_active=True).exclude(code__in=["TITHE", "COMBINED"]):
+            for cat in OfferingCategory.objects.filter(
+                church=self.church, is_active=True
+            ).exclude(code__in=["TITHE", "COMBINED"]):
                 total += cleaned.get(f"offering_{cat.code}", Decimal("0")) or Decimal("0")
         if total <= 0:
             raise forms.ValidationError("At least one amount must be greater than zero.")

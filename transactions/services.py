@@ -492,6 +492,9 @@ def record_receipt(
 
     Receipts within the church/user auto-approve limit are approved immediately
     (maker-checker exception for income). Larger amounts stay PENDING.
+
+    Prefer record_receipt_by_category for the teller UI; this multi-amount API
+    remains for imports, contributions, welfare, and classic mode.
     """
     special_offerings = special_offerings or {}
     special_total = sum(Decimal(str(v)) for v in special_offerings.values())
@@ -559,6 +562,45 @@ def record_receipt(
     if receipt_should_auto_approve(created_by, church, total_received):
         trx = auto_approve_receipt(trx, created_by)
     return trx
+
+
+@db_transaction.atomic
+def record_receipt_by_category(
+    church,
+    created_by,
+    category,
+    amount,
+    description="",
+    member=None,
+    date=None,
+):
+    """
+    Post a single-category receipt using LedgerCategory defaults.
+
+    Server re-resolves debit/credit from the category (never trust client IDs).
+    Remittance tithe/combined/welfare categories keep policy splits via ledger posting.
+    Auto-approve follows the same receipt rules as post_ledger_entry.
+    """
+    from ledger.services import build_entry_draft, post_ledger_entry
+
+    if category is None:
+        raise ValueError("A receipt category is required.")
+    if getattr(category, "church_id", None) != church.pk:
+        raise ValueError("Invalid category for this church.")
+    if category.transaction_type != "RECEIPT":
+        raise ValueError("Only receipt categories can be recorded here.")
+    if not category.is_active:
+        raise ValueError("This category is inactive.")
+
+    draft = build_entry_draft(
+        category=category,
+        amount=amount,
+        narration=description,
+        entry_date=date,
+        member=member,
+    )
+    # Idempotency is owned by the view (RECEIPT claim); do not double-claim here.
+    return post_ledger_entry(church, created_by, draft, idempotency_key=None)
 
 
 # ==========================================

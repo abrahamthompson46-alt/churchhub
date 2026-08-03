@@ -155,7 +155,9 @@ Key functions in `ledger/services.py`:
 - Else DR `+amount` / CR `-amount` with fund tags from account type  
 - `validate_transaction_balance`  
 - Welfare contribution hook when offering type WELFARE + member  
+- Receipt auto-approve when under treasury limit  
 
+**Treasury Record Receipt (Current):** uses RECEIPT `LedgerCategory` rows via `transactions.record_receipt_by_category` → `post_ledger_entry` (same account/remittance rules; description field retained on the form).
 ---
 
 ## 9. Forms (Current)

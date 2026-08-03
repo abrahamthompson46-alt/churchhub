@@ -30,7 +30,8 @@
                         <dt class="col-sm-4 text-muted">Scope</dt>
                         <dd class="col-sm-8">{{ invitation.get_scope_level_display }}{% if invitation.scope_district %} · {{ invitation.scope_district.name }}{% elif invitation.scope_zone %} · {{ invitation.scope_zone.name }}{% elif invitation.scope_conference %} · {{ invitation.scope_conference.name }}{% elif invitation.denomination %} · {{ invitation.denomination.name }}{% endif %}</dd>
                         <dt class="col-sm-4 text-muted">Home church</dt><dd class="col-sm-8">{% if invitation.church %}{{ invitation.church.name }}{% else %}—{% endif %}</dd>
-                        <dt class="col-sm-4 text-muted">Expires</dt><dd class="col-sm-8">{{ invitation.expires_at|date:"M j, Y H:i" }}</dd>
+                        <dt class="col-sm-4 text-muted">Expires</dt>
+                        <dd class="col-sm-8">{{ invitation.expires_at|date:"M j, Y H:i" }} <span class="text-muted small">(1 hour from send/resend · single use)</span></dd>
                         <dt class="col-sm-4 text-muted">Status</dt>
                         <dd class="col-sm-8">
                             {% if invitation.is_accepted %}

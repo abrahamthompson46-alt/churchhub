@@ -379,9 +379,9 @@ def entry_create(request):
         "form": form,
         "business_date": form.initial.get("date") or resolve_transaction_date(church),
         "path_note": (
-            "Use Treasury → Record Receipt for day-to-day tithes and offerings. "
-            "Use this General Ledger entry when you need a category-driven journal "
-            "(expenses, transfers, or special receipts)."
+            "Day-to-day tithes and offerings: Treasury → Record Receipt "
+            "(category-driven). Use this General Ledger entry for expenses, "
+            "transfers, or journals that need a full type → category cascade."
         ),
         "breadcrumbs": [
             {"label": "Ledger", "url": reverse("ledger:index")},

@@ -93,9 +93,9 @@ Views → Services → Selectors → Repositories → Models
 | `log_activity` | Write activity log |
 | `assert_can_assign_role` | Role-assign gate |
 | `assign_user_to_church` | Set church + log |
-| `create_invitation` / `send_invitation_email` | Invite create + email |
-| `accept_invitation` | Create user from invite (atomic) |
-| `revoke_invitation` / `resend_invitation` | Invite lifecycle |
+| `create_invitation` / `send_invitation_email` | Invite create + email (**1-hour** expiry, single-use after accept) |
+| `accept_invitation` | Create user from invite (atomic); marks invite accepted |
+| `revoke_invitation` / `resend_invitation` | Invite lifecycle; resend rotates token + resets 1-hour window |
 | `deactivate_user` / `activate_user` | `is_active` toggle |
 | `update_user_role` / `update_user_profile` | Admin/profile updates |
 | `get_client_ip`, `sync_role_groups` | Re-exports from permissions (groups sync is no-op) |

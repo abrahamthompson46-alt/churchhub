@@ -73,6 +73,94 @@ class FinancialServicesTests(TestCase):
         self.assertEqual(lines_by_type["COMBINED_REMIT_PAYABLE"], Decimal("-25.00"))
         self.assertEqual(lines_by_type["INCOME"], Decimal("-25.00"))
 
+    def test_record_receipt_by_category_sets_accounts_and_description(self):
+        from ledger.models import LedgerCategory
+        from ledger.services import seed_ledger
+        from members.models import Member
+        from transactions.services import record_receipt_by_category
+
+        seed_ledger(self.church)
+        category = LedgerCategory.objects.get(church=self.church, code="REC_YOUTH_CASH")
+        member = Member.objects.create(
+            church=self.church,
+            first_name="Ada",
+            last_name="Youth",
+            gender="F",
+            membership_number="YH-1",
+        )
+        txn = record_receipt_by_category(
+            church=self.church,
+            created_by=self.treasurer,
+            category=category,
+            amount=Decimal("40.00"),
+            description="Youth Sabbath offering",
+            member=member,
+        )
+        validate_transaction_balance(txn)
+        self.assertEqual(txn.ledger_category_id, category.pk)
+        self.assertEqual(txn.description, "Youth Sabbath offering")
+        self.assertEqual(txn.member_id, member.pk)
+        debit = txn.lines.get(amount__gt=0)
+        credit = txn.lines.get(amount__lt=0)
+        self.assertEqual(debit.account_id, category.default_debit_account_id)
+        self.assertEqual(credit.account_id, category.default_credit_account_id)
+
+    def test_record_receipt_by_category_requires_member_when_configured(self):
+        from ledger.models import LedgerCategory
+        from ledger.services import seed_ledger
+        from members.models import Member
+        from transactions.services import record_receipt_by_category
+
+        seed_ledger(self.church)
+        category = LedgerCategory.objects.get(church=self.church, code="REC_PLEDGE_CASH")
+        self.assertTrue(category.requires_member)
+        with self.assertRaises(ValueError):
+            record_receipt_by_category(
+                church=self.church,
+                created_by=self.treasurer,
+                category=category,
+                amount=Decimal("10.00"),
+                description="Pledge without member",
+            )
+        member = Member.objects.create(
+            church=self.church,
+            first_name="Ben",
+            last_name="Pledge",
+            gender="M",
+            membership_number="PL-1",
+        )
+        txn = record_receipt_by_category(
+            church=self.church,
+            created_by=self.treasurer,
+            category=category,
+            amount=Decimal("10.00"),
+            description="Pledge with member",
+            member=member,
+        )
+        self.assertEqual(txn.member_id, member.pk)
+
+    def test_record_receipt_by_category_rejects_foreign_church_category(self):
+        from ledger.models import LedgerCategory
+        from ledger.services import seed_ledger
+        from transactions.services import record_receipt_by_category
+
+        other = Church.objects.create(
+            name="Church 2",
+            code="C2",
+            district=self.church.district,
+        )
+        seed_ledger(self.church)
+        seed_ledger(other)
+        foreign = LedgerCategory.objects.get(church=other, code="REC_INCOME_CASH")
+        with self.assertRaises(ValueError):
+            record_receipt_by_category(
+                church=self.church,
+                created_by=self.treasurer,
+                category=foreign,
+                amount=Decimal("5.00"),
+                description="Cross-tenant attempt",
+            )
+
     def test_expense_is_balanced(self):
         txn = record_expense(
             church=self.church,
@@ -462,18 +550,20 @@ class TransactionPostPermissionTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
     def test_record_receipt_lands_on_confirmation_page(self):
+        from ledger.models import LedgerCategory
+        from ledger.services import seed_ledger
         from transactions.services import create_default_accounts
 
         create_default_accounts(self.church)
+        seed_ledger(self.church)
+        category = LedgerCategory.objects.get(church=self.church, code="REC_INCOME_CASH")
         self._login_church("perm_treasury")
         response = self.client.post(
             reverse("transactions:record_receipt"),
             {
                 "idempotency_key": "confirm-receipt-key-1",
-                "tithe_amount": "0",
-                "combined_amount": "0",
-                "income_amount": "25.00",
-                "payment_account_type": "CASH",
+                "category": str(category.pk),
+                "amount": "25.00",
                 "description": "Confirmation slip test",
                 "date": timezone.localdate().isoformat(),
             },
@@ -485,6 +575,27 @@ class TransactionPostPermissionTests(TestCase):
         self.assertEqual(confirm.status_code, 200)
         self.assertContains(confirm, "Transaction confirmed")
         self.assertContains(confirm, "Print confirmation")
+
+    def test_classic_record_receipt_still_works(self):
+        from transactions.services import create_default_accounts
+
+        create_default_accounts(self.church)
+        self._login_church("perm_treasury")
+        response = self.client.post(
+            reverse("transactions:record_receipt") + "?classic=1",
+            {
+                "classic": "1",
+                "idempotency_key": "classic-receipt-key-1",
+                "tithe_amount": "0",
+                "combined_amount": "0",
+                "income_amount": "15.00",
+                "payment_account_type": "CASH",
+                "description": "Classic mode",
+                "date": timezone.localdate().isoformat(),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/transactions/confirm/", response["Location"])
 
     def test_pastor_retains_void_and_working_day_post_access(self):
         today = timezone.localdate()

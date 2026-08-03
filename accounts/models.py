@@ -364,6 +364,7 @@ class UserInvitation(models.Model):
 
     @property
     def is_valid(self):
+        """Pending invites only: not accepted (single-use), not expired, not revoked."""
         return not self.is_accepted and not self.is_expired and not self.is_revoked
 
 

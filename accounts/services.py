@@ -1,5 +1,6 @@
 """Account management services."""
 
+import uuid
 from datetime import timedelta
 
 from django.contrib.auth.password_validation import validate_password
@@ -12,6 +13,9 @@ from permissions.roles import UserRole
 from permissions.services import get_client_ip, sync_role_groups
 
 from .models import User
+
+# Staff / tenant invitations: short-lived, single-use after accept.
+INVITATION_VALIDITY = timedelta(hours=1)
 
 __all__ = [
     "get_client_ip",
@@ -28,6 +32,7 @@ __all__ = [
     "activate_user",
     "update_user_role",
     "update_user_profile",
+    "INVITATION_VALIDITY",
 ]
 
 
@@ -77,8 +82,9 @@ def create_invitation(
     role,
     church,
     invited_by,
-    days_valid=7,
+    days_valid=None,
     *,
+    hours_valid=None,
     scope_level=None,
     scope_district=None,
     scope_zone=None,
@@ -106,6 +112,13 @@ def create_invitation(
     if church and not denomination:
         denomination = getattr(church, "denomination", None)
 
+    validity = INVITATION_VALIDITY
+    if hours_valid is not None:
+        validity = timedelta(hours=hours_valid)
+    elif days_valid is not None:
+        # Legacy kwarg — prefer hours_valid; kept so older callers do not break.
+        validity = timedelta(days=days_valid)
+
     invitation = repo.create_invitation(
         email=email,
         username=username,
@@ -119,7 +132,7 @@ def create_invitation(
         scope_general_conference=scope_general_conference,
         denomination=denomination,
         invited_by=invited_by,
-        expires_at=timezone.now() + timedelta(days=days_valid),
+        expires_at=timezone.now() + validity,
     )
     log_activity(
         invited_by,
@@ -131,6 +144,8 @@ def create_invitation(
             "role": role,
             "scope_level": scope_level,
             "invitation_id": str(invitation.id),
+            "expires_at": invitation.expires_at.isoformat(),
+            "single_use": True,
         },
     )
     return invitation
@@ -260,9 +275,10 @@ def resend_invitation(
     invitation,
     performed_by=None,
     ip_address=None,
-    days_valid=7,
+    days_valid=None,
     request=None,
     *,
+    hours_valid=None,
     fail_silently=True,
 ):
     if invitation.is_accepted:
@@ -270,8 +286,19 @@ def resend_invitation(
     if invitation.is_revoked:
         raise ValueError("Revoked invitations cannot be resent.")
 
-    invitation.expires_at = timezone.now() + timedelta(days=days_valid)
-    repo.save_invitation(invitation, update_fields=["expires_at"])
+    validity = INVITATION_VALIDITY
+    if hours_valid is not None:
+        validity = timedelta(hours=hours_valid)
+    elif days_valid is not None:
+        validity = timedelta(days=days_valid)
+
+    # New token so prior emailed links stop working (single-use + fresh window).
+    invitation.token = uuid.uuid4()
+    invitation.expires_at = timezone.now() + validity
+    invitation.revoked_at = None
+    repo.save_invitation(
+        invitation, update_fields=["token", "expires_at", "revoked_at"]
+    )
     actor = performed_by or invitation.invited_by
     if actor:
         log_activity(
@@ -284,6 +311,7 @@ def resend_invitation(
                 "username": invitation.username,
                 "invitation_id": str(invitation.id),
                 "expires_at": invitation.expires_at.isoformat(),
+                "single_use": True,
             },
         )
     emailed = send_invitation_email(

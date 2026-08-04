@@ -107,7 +107,11 @@ class SiteSettings(models.Model):
     platform_ip_allowlist = models.TextField(
         blank=True,
         default="",
-        help_text="Newline-separated IPs allowed for platform access. Empty = allow all.",
+        help_text=(
+            "Optional. Newline-separated public IPs allowed for /platform/. "
+            "Empty = allow any IP (recommended when using MFA on a dynamic home ISP). "
+            "Do not list residential IPs that change daily — use a static/VPN IP later if needed."
+        ),
     )
     allow_church_self_registration = models.BooleanField(
         default=False,

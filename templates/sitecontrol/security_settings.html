@@ -30,7 +30,9 @@
             <section class="mb-4">
                 <h2 class="h5 mb-2">Multi-factor authentication (MFA)</h2>
                 <p class="text-muted small mb-3">
-                    MFA is optional. Enable enforcement when your organization is ready, then choose which audiences must enroll (authenticator app, email OTP, or recovery codes).
+                    Preferred protection for the control room on dynamic home IPs.
+                    Enable enforcement, keep OWNER/SECURITY selected, then enroll with an authenticator app
+                    (email OTP and recovery codes are also available).
                 </p>
                 <div class="platform-form-grid">
                     <div class="platform-form-check">
@@ -62,6 +64,10 @@
 
             <section class="mb-4">
                 <h2 class="h5 mb-2">Platform access</h2>
+                <p class="text-muted small mb-3">
+                    Leave the IP allowlist <strong>empty</strong> while relying on MFA (especially on a home ISP).
+                    Add IPs only when you have a stable office or dedicated VPN address.
+                </p>
                 <div class="platform-form-grid">
                     <div>
                         <label class="form-label fw-semibold" for="{{ form.platform_ip_allowlist.id_for_label }}">{{ form.platform_ip_allowlist.label }}</label>

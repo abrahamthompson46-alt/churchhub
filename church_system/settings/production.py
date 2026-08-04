@@ -21,8 +21,9 @@ from church_system.settings.base import (
 
 DJANGO_ENV = "production"
 
-# Block /platform/ when Site Settings IP allowlist is empty (override with env if needed).
-REQUIRE_PLATFORM_IP_ALLOWLIST = env_flag("CHURCHHUB_REQUIRE_PLATFORM_IP_ALLOWLIST", True)
+# Prefer MFA for /platform/; empty Site Settings allowlist is OK.
+# Set CHURCHHUB_REQUIRE_PLATFORM_IP_ALLOWLIST=true when you have a static/VPN IP list.
+REQUIRE_PLATFORM_IP_ALLOWLIST = env_flag("CHURCHHUB_REQUIRE_PLATFORM_IP_ALLOWLIST", False)
 
 if DEBUG:
     raise ImproperlyConfigured(

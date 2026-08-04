@@ -357,7 +357,7 @@ SiteSettings also: session timeout, login attempts/lockout, password min length 
 2. Require Redis in production for shared login lockout.  
 3. Keep `DJANGO_DEBUG=False` in production (startup + `/health/` already reject unsafe DEBUG).
 4. Set **`CHURCHHUB_HEALTH_TOKEN`** in production — `/health/`, `/health/live/`, and `/health/ready/` require `?token=` or `X-Health-Token` header when configured.
-5. **Platform `/platform/` access:** prefer **MFA** for operators on dynamic home ISPs — leave `platform_ip_allowlist` empty and set `CHURCHHUB_REQUIRE_PLATFORM_IP_ALLOWLIST=false`. Add IP allowlisting later only with a **static or dedicated VPN** exit IP (production still defaults the require-flag to `True` when you want a mandatory non-empty list).  
+5. **Platform `/platform/` access:** prefer **MFA** for operators on dynamic home ISPs — leave `platform_ip_allowlist` empty (production default does **not** require a list). Set `CHURCHHUB_REQUIRE_PLATFORM_IP_ALLOWLIST=true` only when you maintain a **static or dedicated VPN** IP allowlist.  
 4. Rate-limit password reset / invite accept endpoints.  
 5. Password history + optional expiry for finance/platform roles.  
 6. Session absolute timeout + logout-all.  

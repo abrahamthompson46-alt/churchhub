@@ -2494,6 +2494,62 @@ body.app-body.auth-page {
     color: var(--ch-action);
 }
 
+.auth-login-footer {
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--ch-border);
+}
+
+.auth-login-footer__note {
+    margin-top: 0.6rem;
+}
+
+.auth-login-footer__note a {
+    color: var(--ch-action);
+}
+
+/* Staff sign-in: keep the card close to square on desktop instead of a tall column */
+@media (min-width: 992px) {
+    .auth-split--square {
+        max-width: 1240px;
+        grid-template-columns: 1fr 1.2fr;
+        gap: 2.5rem;
+    }
+
+    .auth-split--square .auth-split-form .auth-card {
+        max-width: 580px;
+    }
+
+    .auth-split--square .auth-card .card-body {
+        padding: 1.5rem 2rem !important;
+    }
+
+    .auth-split--square .auth-tenant-header {
+        padding-bottom: 0.75rem;
+        margin-bottom: 0.85rem !important;
+    }
+
+    .auth-split--square .auth-tenant-logo {
+        max-height: 44px;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .auth-split--square .auth-tenant-mark {
+        width: 2.5rem;
+        height: 2.5rem;
+        font-size: 1.05rem;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .auth-split--square .auth-form-title {
+        font-size: 1.35rem;
+    }
+
+    .auth-split--square .auth-form-title + p {
+        margin-bottom: 1rem !important;
+    }
+}
+
 .input-icon-wrap--password .form-control {
     padding-right: 2.75rem;
 }
@@ -3263,6 +3319,11 @@ main .page-container,
     column-gap: 1.25rem;
     row-gap: 0;
     align-items: start;
+}
+
+/* Sign-in forms stay single column even when the card is wide */
+.auth-card .card-body > form:not(.filter-form):not(.row):not(.d-inline):not(:has(> .row)) {
+    grid-template-columns: 1fr;
 }
 
 /* Explicit multi-column layouts use normal block flow and full width */

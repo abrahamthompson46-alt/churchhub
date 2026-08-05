@@ -4,7 +4,7 @@
 {% block body_class %}auth-page{% endblock %}
 
 {% block content %}
-<div class="auth-split">
+<div class="auth-split auth-split--square">
     {% include "includes/auth_platform_panel.html" %}
     <section class="auth-split-form">
         <div class="auth-mobile-brand d-lg-none">
@@ -55,22 +55,23 @@
                     </div>
                     <button type="submit" class="btn btn-primary w-100 py-2 mt-2">Sign In</button>
                 </form>
-                <p class="text-center mt-3 mb-0 small">
+                <p class="text-center mt-2 mb-0 small">
                     <a href="{% url 'password_reset' %}" class="text-muted text-decoration-none">Forgot password?</a>
                 </p>
-                <p class="auth-secondary-links text-center mt-3 mb-2 small text-muted">
-                    Members sign in with email and date of birth (first visit) or your chosen password.
-                </p>
-                <p class="text-center mb-0">
+
+                <div class="auth-login-footer text-center">
+                    <p class="text-muted small mb-2">
+                        Members sign in with email and date of birth (first visit) or your chosen password.
+                    </p>
                     <a href="{% url 'portal:login' %}" class="btn btn-outline-primary btn-sm w-100">Go to member portal</a>
-                </p>
-                <p class="auth-secondary-links text-center mt-3 mb-0 small">
-                    <span class="text-muted">Church staff use the sign-in form above.</span>
-                    {% if public_registration_allowed %}
-                    <span class="text-muted" aria-hidden="true">·</span>
-                    <a href="{% url 'church_apply' %}{% if active_denomination %}?denomination={{ active_denomination.code }}{% endif %}" class="text-decoration-none">Register your church</a>
-                    {% endif %}
-                </p>
+                    <p class="auth-login-footer__note small mb-0">
+                        <span class="text-muted">Church staff use the sign-in form above.</span>
+                        {% if public_registration_allowed %}
+                        <span class="text-muted" aria-hidden="true">·</span>
+                        <a href="{% url 'church_apply' %}{% if active_denomination %}?denomination={{ active_denomination.code }}{% endif %}" class="text-decoration-none">Register your church</a>
+                        {% endif %}
+                    </p>
+                </div>
             </div>
         </div>
     </section>

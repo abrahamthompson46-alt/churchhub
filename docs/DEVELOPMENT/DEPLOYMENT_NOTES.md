@@ -128,13 +128,57 @@ Disable with `CHURCHHUB_CELERY_BEAT=0`.
 
 When `DEBUG=False` / production settings:
 
-- `SECURE_SSL_REDIRECT`, secure cookies, HSTS
+- `SECURE_SSL_REDIRECT`, secure cookies, HSTS (HSTS/cookies follow `SECURE_SSL_REDIRECT` so IP-only HTTP can work before TLS)
 - `SECURE_PROXY_SSL_HEADER` for `X-Forwarded-Proto`
 - `X_FRAME_OPTIONS=DENY`, nosniff, referrer policy
 
 ---
 
-## 8. Backup strategy (Current)
+## 8. Ubuntu VPS self-host (Current)
+
+**Topology:** Nginx → Gunicorn (`127.0.0.1:8000`) → Django · PostgreSQL · Redis · Celery/Beat (systemd).
+
+### Phase A — IP access (HTTP)
+
+1. Copy `deploy/nginx/churchhub.conf` → `/etc/nginx/sites-available/churchhub` (set `server_name` to the VPS IP if desired).
+2. Install units from `deploy/systemd/` → `daemon-reload` → `enable --now`.
+3. `.env` essentials:
+
+| Variable | Example |
+|----------|---------|
+| `DJANGO_ENV` | `production` |
+| `DJANGO_DEBUG` | `False` |
+| `DJANGO_SECRET_KEY` | unique long secret |
+| `DJANGO_ALLOWED_HOSTS` | `YOUR.VPS.IP` |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | `http://YOUR.VPS.IP` |
+| `CHURCHHUB_PUBLIC_URL` | `http://YOUR.VPS.IP` |
+| `SECURE_SSL_REDIRECT` | `false` |
+| `DATABASE_URL` | Postgres URL |
+| `REDIS_URL` | `redis://127.0.0.1:6379/0` (**required** for multi-worker MFA OTP + rate limits) |
+| `CHURCHHUB_HEALTH_TOKEN` | long random string |
+
+4. Deploy: `bash scripts/deploy_selfhost.sh` (migrate, collectstatic, restart units).
+5. Permissions: `chown -R churchhub:www-data media staticfiles logs var` · dirs `750` · files `640` as needed for Nginx read of static/media.
+6. MFA: Platform → Security → require MFA for OWNER/SECURITY; enroll after login. Session uses Redis `cached_db` across Gunicorn workers. Users outside the MFA audience are **not** forced to verify.
+
+### Phase B — Domain + TLS
+
+1. Point DNS A/AAAA to the VPS; update Nginx `server_name` and uncomment TLS block + HTTP→HTTPS redirect.
+2. `certbot --nginx -d example.com`
+3. Update `.env`: `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS=https://…`, `CHURCHHUB_PUBLIC_URL=https://…`, `SECURE_SSL_REDIRECT=true`.
+4. `systemctl restart churchhub-web` and reload Nginx.
+
+### Logs
+
+| Source | Where |
+|--------|--------|
+| Django app / security / audit | `logs/application.log`, `security.log`, `audit.log` (+ journal) |
+| Gunicorn | `journalctl -u churchhub-web` (optional file via `GUNICORN_*_LOG`) |
+| Auth / MFA | `accounts` → security handlers; `UserActivityLog` |
+
+---
+
+## 9. Backup strategy (Current)
 
 | Mechanism | Notes |
 |-----------|-------|
@@ -147,29 +191,29 @@ When `DEBUG=False` / production settings:
 
 ---
 
-## 9. Monitoring (Current)
+## 10. Monitoring (Current)
 
 | Tool | How |
 |------|-----|
-| Liveness | `GET /health/live/` |
+| Liveness | `GET /health/live/` (token when configured) |
 | Readiness | `GET /health/ready/` |
 | Full health | `GET /health/` |
 | Metrics JSON | `GET /metrics/` |
 | Sentry | `SENTRY_DSN` (+ Celery/Redis integrations) |
-| Logs | stdout + optional rotating files (`application.log`, `security.log`, `audit.log`) |
+| Logs | stdout + rotating files (`application.log`, `security.log`, `audit.log`) + systemd journal |
 
 ---
 
-## 10. CI/CD (Current)
+## 11. CI/CD (Current)
 
 `.github/workflows/ci.yml`: lint (Ruff), SQLite+coverage, Postgres+Redis tests, pip-audit (advisory).  
 `.github/workflows/deploy-production.yml`: manual `workflow_dispatch` with GitHub Environment `production` approval gate.
 
 ---
 
-## 11. Related documents
+## 12. Related documents
 
 - Checklist: `docs/DEPLOYMENT_CHECKLIST.md`
-- Runbook: `docs/OPERATIONS_RUNBOOK.md`
+- Runbook: `docs/OPERATIONS_RUNBOOK.md` / `docs/PRODUCTION_RUNBOOK.md`
 - Readiness: `docs/PRODUCTION_READINESS_REPORT.md`
 - Risks: `docs/RISK_REGISTER.md`

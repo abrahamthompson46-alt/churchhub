@@ -1,32 +1,34 @@
 """Financial report export utilities."""
 
 import csv
+from decimal import Decimal
 from io import BytesIO
 
 from django.http import HttpResponse
-from django.db.models import Sum
 from openpyxl import Workbook
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from church_system.money import money_export_value, quantize_money
+
 
 def build_statement_rows(transactions):
     """Build running-balance statement rows from approved transactions."""
     rows = []
-    running_balance = 0
-    total_receipt = 0
-    total_expense = 0
+    running_balance = Decimal("0.00")
+    total_receipt = Decimal("0.00")
+    total_expense = Decimal("0.00")
 
     for t in transactions.prefetch_related("lines__account"):
         cash_delta = sum(
-            line.amount
-            for line in t.lines.all()
-            if line.account.account_type in ("CASH", "BANK")
+            (line.amount for line in t.lines.all()
+             if line.account.account_type in ("CASH", "BANK")),
+            Decimal("0.00"),
         )
-        receipt = cash_delta if cash_delta > 0 else 0
-        expense = abs(cash_delta) if cash_delta < 0 else 0
+        receipt = cash_delta if cash_delta > 0 else Decimal("0.00")
+        expense = abs(cash_delta) if cash_delta < 0 else Decimal("0.00")
         total_receipt += receipt
         total_expense += expense
         running_balance += cash_delta
@@ -36,12 +38,17 @@ def build_statement_rows(transactions):
             "reference": t.reference,
             "description": t.description,
             "type": t.transaction_type,
-            "receipt": receipt,
-            "expense": expense,
-            "balance": running_balance,
+            "receipt": quantize_money(receipt),
+            "expense": quantize_money(expense),
+            "balance": quantize_money(running_balance),
         })
 
-    return rows, total_receipt, total_expense, running_balance
+    return (
+        rows,
+        quantize_money(total_receipt),
+        quantize_money(total_expense),
+        quantize_money(running_balance),
+    )
 
 
 def export_statement_csv(rows):
@@ -52,7 +59,9 @@ def export_statement_csv(rows):
     for row in rows:
         writer.writerow([
             row["date"], row["reference"], row["type"], row["description"],
-            row["receipt"], row["expense"], row["balance"],
+            money_export_value(row["receipt"]),
+            money_export_value(row["expense"]),
+            money_export_value(row["balance"]),
         ])
     return response
 
@@ -65,7 +74,9 @@ def export_statement_excel(rows, title="Financial Statement"):
     for row in rows:
         ws.append([
             str(row["date"]), row["reference"], row["type"], row["description"],
-            float(row["receipt"]), float(row["expense"]), float(row["balance"]),
+            money_export_value(row["receipt"]),
+            money_export_value(row["expense"]),
+            money_export_value(row["balance"]),
         ])
     buffer = BytesIO()
     wb.save(buffer)
@@ -93,9 +104,9 @@ def export_statement_pdf(rows, church_name="", period=""):
             str(row["date"]),
             row["reference"] or "",
             row["type"],
-            f"{row['receipt']:.2f}",
-            f"{row['expense']:.2f}",
-            f"{row['balance']:.2f}",
+            money_export_value(row["receipt"]),
+            money_export_value(row["expense"]),
+            money_export_value(row["balance"]),
         ])
     table = Table(table_data, repeatRows=1)
     table.setStyle(TableStyle([

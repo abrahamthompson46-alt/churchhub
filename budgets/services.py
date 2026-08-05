@@ -6,6 +6,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 
 from budgets import repositories as repo
 from budgets import selectors
+from church_system.money import quantize_money
 from permissions.checks import can_view_all_churches
 
 INCOME_ACCOUNT_TYPES = {"TITHE", "COMBINED", "INCOME", "COMBINED_RETENTION", "WELFARE_FUND"}
@@ -17,7 +18,7 @@ class BudgetServiceError(Exception):
 
 
 def _quantize(amount):
-    return Decimal(str(amount)).quantize(Decimal("0.01"))
+    return quantize_money(amount)
 
 
 def _account_actual(churches_qs, account, year):

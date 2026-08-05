@@ -1,25 +1,37 @@
 [Unit]
-Description=ChurchHub Gunicorn
-After=network.target postgresql.service redis-server.service
-Wants=postgresql.service redis-server.service
+Description=ChurchHub Gunicorn (web)
+Documentation=file:/opt/churchhub/docs/DEVELOPMENT/DEPLOYMENT_NOTES.md
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target postgresql.service redis-server.service
 
 [Service]
 Type=simple
 User=churchhub
 Group=churchhub
 WorkingDirectory=/opt/churchhub
-EnvironmentFile=/opt/churchhub/.env
+EnvironmentFile=-/opt/churchhub/.env
 Environment=DJANGO_SETTINGS_MODULE=church_system.settings
 Environment=DJANGO_ENV=production
+# Ensure runtime dirs exist (idempotent)
+ExecStartPre=/usr/bin/mkdir -p /opt/churchhub/logs /opt/churchhub/media /opt/churchhub/var /opt/churchhub/staticfiles
 ExecStart=/opt/churchhub/.venv/bin/gunicorn \
     --config /opt/churchhub/gunicorn.conf.py \
     church_system.wsgi:application
 ExecReload=/bin/kill -s HUP $MAINPID
 KillMode=mixed
-TimeoutStopSec=30
+TimeoutStopSec=35
 Restart=always
 RestartSec=5
+# Capture Gunicorn stdout/stderr in the journal (also file logs via Django LOGGING)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=churchhub-web
+# Hardening
 PrivateTmp=true
+NoNewPrivileges=true
+LimitNOFILE=65535
+# Allow writes to app media/logs/var under /opt/churchhub
+ReadWritePaths=/opt/churchhub/logs /opt/churchhub/media /opt/churchhub/var /opt/churchhub/staticfiles
 
 [Install]
 WantedBy=multi-user.target

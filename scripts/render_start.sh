@@ -68,6 +68,9 @@ TIMEOUT="${GUNICORN_TIMEOUT:-120}"
 
 echo "==> Starting Gunicorn on port ${PORT}"
 export PORT
+# Render / container platforms need a public bind; VPS defaults to 127.0.0.1 in gunicorn.conf.py
+export GUNICORN_HOST="${GUNICORN_HOST:-0.0.0.0}"
+export GUNICORN_FORWARDED_ALLOW_IPS="${GUNICORN_FORWARDED_ALLOW_IPS:-*}"
 exec $PY -m gunicorn \
   --config gunicorn.conf.py \
   church_system.wsgi:application

@@ -65,11 +65,9 @@ def export_table_pdf(headers, rows, title="ChurchHub Report", subtitle="", filen
 
 
 def _cell_value(val):
-    if val is None:
-        return ""
-    if hasattr(val, "quantize"):
-        return float(val)
-    return val
+    from church_system.money import money_export_value
+
+    return money_export_value(val)
 
 
 def build_export_bytes(export_fmt, headers, rows, title, subtitle, report_key):

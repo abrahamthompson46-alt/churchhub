@@ -437,7 +437,8 @@ def request_has_trusted_device(request, user) -> bool:
 
 def attach_trusted_device_cookie(response, token: str):
     """Set HttpOnly trusted-device cookie on the response."""
-    secure = not getattr(settings, "DEBUG", False)
+    # Align with production SESSION_COOKIE_SECURE (False on transitional HTTP IP access).
+    secure = bool(getattr(settings, "SESSION_COOKIE_SECURE", not settings.DEBUG))
     max_age = TRUSTED_DEVICE_DAYS * 24 * 60 * 60
     response.set_cookie(
         TRUSTED_DEVICE_COOKIE,

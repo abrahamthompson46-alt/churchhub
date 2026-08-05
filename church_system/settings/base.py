@@ -282,6 +282,8 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = env_int(
 
 REDIS_URL = os.environ.get("REDIS_URL", "").strip()
 SESSION_REDIS = env_flag("CHURCHHUB_SESSION_REDIS", False)
+# Overridden in production/staging after env validation.
+REQUIRE_REDIS = False
 
 if REDIS_URL:
     CACHES = {

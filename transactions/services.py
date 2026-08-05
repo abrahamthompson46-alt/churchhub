@@ -4,7 +4,7 @@ Financial services — balanced double-entry posting and audit trail.
 
 from datetime import date
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 
 from django.db import transaction as db_transaction
 from django.db.models import Sum
@@ -51,7 +51,9 @@ def _log_audit(church, action, user, transaction=None, details=None):
 
 
 def _quantize_currency(amount):
-    return Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    from church_system.money import quantize_money
+
+    return quantize_money(amount)
 
 
 def validate_transaction_balance(transaction):

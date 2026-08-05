@@ -1,6 +1,6 @@
 """Remittance policy resolution and offering split posting."""
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 
 from django.db.models import Sum
 from django.db import transaction as db_transaction
@@ -32,7 +32,9 @@ ACCOUNT_TYPE_BY_SPLIT = {
 
 
 def _quantize(amount):
-    return amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    from church_system.money import quantize_money
+
+    return quantize_money(amount)
 
 
 def calculate_split(gross_amount, retain_percent, remit_percent):

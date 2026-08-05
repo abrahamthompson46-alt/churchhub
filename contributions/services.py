@@ -11,6 +11,7 @@ from django.utils import timezone
 from contributions import repositories as repo
 from contributions import selectors
 from contributions.models import CampaignStatus, ContributionCampaign, MemberContribution
+from church_system.money import quantize_money
 from sitecontrol.services import church_has_feature
 
 
@@ -25,7 +26,7 @@ def contributions_enabled(church, user=None) -> bool:
 
 
 def _quantize(amount) -> Decimal:
-    return Decimal(str(amount)).quantize(Decimal("0.01"))
+    return quantize_money(amount)
 
 
 def _validate_category_for_church(church, offering_category):

@@ -47,9 +47,9 @@
 
 | Endpoint | Auth | Pass | Fail action |
 |----------|------|------|-------------|
-| `GET /health/live/` | None | HTTP 200 | Restart web process |
-| `GET /health/ready/` | None | HTTP 200 | Stop routing traffic; check DB/migrations/cache |
-| `GET /health/` | None | HTTP 200 | Investigate failing check in JSON body |
+| `GET /health/live/` | `X-Health-Token` / `?token=` when `CHURCHHUB_HEALTH_TOKEN` set (required on VPS/production) | HTTP 200 | Restart web process |
+| `GET /health/ready/` | Same | HTTP 200 | Stop routing traffic; check DB/migrations/cache/Redis |
+| `GET /health/` | Same | HTTP 200 | Investigate failing check in JSON body |
 | `GET /metrics/` | **Staff / platform user** | HTTP 200 | 401 expected for anonymous |
 
 ### Readiness checks (`church_system/health.py`)

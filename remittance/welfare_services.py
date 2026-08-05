@@ -9,11 +9,12 @@ from django.utils import timezone
 from remittance import repositories as repo
 from remittance import selectors
 from remittance.services import RemittancePolicyError
+from church_system.money import quantize_money
 from transactions import repositories as txn_repo
 
 
 def _quantize(amount):
-    return Decimal(str(amount)).quantize(Decimal("0.01"))
+    return quantize_money(amount)
 
 
 def generate_case_number(church):

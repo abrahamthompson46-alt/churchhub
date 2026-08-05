@@ -109,6 +109,8 @@ def parse_excel_date(value: Any) -> date | None:
 
 
 def parse_decimal_amount(value: Any, *, field_label: str = "Amount") -> Decimal:
+    from church_system.money import quantize_money
+
     if value is None or value == "":
         return Decimal("0.00")
     if isinstance(value, (int, float, Decimal)):
@@ -123,7 +125,10 @@ def parse_decimal_amount(value: Any, *, field_label: str = "Amount") -> Decimal:
             raise ValidationError(f"{field_label} is not a valid number: {value}") from exc
     if amount < 0:
         raise ValidationError(f"{field_label} cannot be negative.")
-    return amount.quantize(Decimal("0.01"))
+    try:
+        return quantize_money(amount)
+    except ValueError as exc:
+        raise ValidationError(f"{field_label} is not a valid number: {value}") from exc
 
 
 def build_template_xlsx(headers: list[str], example_rows: list[list[Any]] | None = None) -> bytes:

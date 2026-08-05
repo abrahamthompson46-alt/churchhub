@@ -48,15 +48,15 @@ def check_debug_safe():
 
 
 def check_redis_configured():
-    """Warn-level for liveness; readiness may require Redis in production."""
+    """Require Redis in production except when startup allows LocMem (e.g. PythonAnywhere)."""
     redis_url = getattr(settings, "REDIS_URL", "") or ""
     env = getattr(settings, "DJANGO_ENV", "development")
-    if env == "production" and not redis_url:
-        raise RuntimeError("REDIS_URL is required in production")
+    require_redis = bool(getattr(settings, "REQUIRE_REDIS", env == "production"))
     if redis_url:
-        # Touch cache which is backed by Redis when configured
         check_cache()
         return "ok"
+    if env == "production" and require_redis:
+        raise RuntimeError("REDIS_URL is required in production")
     return "skipped"
 
 

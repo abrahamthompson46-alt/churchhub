@@ -39,4 +39,7 @@ if [ "$#" -gt 0 ]; then
   exec "$@"
 fi
 
+# Containers need a public bind; bare-metal VPS uses 127.0.0.1 via gunicorn.conf.py default.
+export GUNICORN_HOST="${GUNICORN_HOST:-0.0.0.0}"
+export GUNICORN_FORWARDED_ALLOW_IPS="${GUNICORN_FORWARDED_ALLOW_IPS:-*}"
 exec gunicorn --config gunicorn.conf.py church_system.wsgi:application

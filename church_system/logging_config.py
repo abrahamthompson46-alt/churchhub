@@ -148,6 +148,21 @@ def build_logging_config(
                 "level": "INFO",
                 "propagate": False,
             },
+            "accounts": {
+                "handlers": security_handlers,
+                "level": "INFO",
+                "propagate": False,
+            },
+            "gunicorn.error": {
+                "handlers": app_handlers,
+                "level": "INFO",
+                "propagate": False,
+            },
+            "gunicorn.access": {
+                "handlers": app_handlers,
+                "level": "INFO",
+                "propagate": False,
+            },
             "celery": {
                 "handlers": app_handlers,
                 "level": "INFO",

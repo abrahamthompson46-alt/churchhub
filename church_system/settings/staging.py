@@ -52,3 +52,9 @@ validate_production_environment(
     in ("true", "1", "yes"),
     allow_mysql=True,
 )
+
+REQUIRE_REDIS = os.environ.get("CHURCHHUB_REQUIRE_REDIS", "true").lower() in (
+    "true",
+    "1",
+    "yes",
+)

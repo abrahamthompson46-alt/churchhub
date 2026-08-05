@@ -106,13 +106,37 @@ def totp_qr_data_uri(user, secret: str) -> str:
     return f"data:image/png;base64,{encoded}"
 
 
-def verify_totp(secret: str, token: str, *, window: int = 1) -> bool:
+def verify_totp(secret: str, token: str, *, window: int = 2) -> bool:
+    """
+    Verify a 6-digit TOTP code.
+
+    valid_window=2 tolerates ±60s clock skew (common on VPS without NTP sync).
+    """
     import pyotp
 
     cleaned = (token or "").strip().replace(" ", "")
     if not cleaned.isdigit():
         return False
     return bool(pyotp.TOTP(secret).verify(cleaned, valid_window=window))
+
+
+def get_user_totp_secret(user) -> str | None:
+    if not user.mfa_secret:
+        return None
+    try:
+        return decrypt_totp_secret(user.mfa_secret)
+    except Exception:
+        # SECRET_KEY rotation or corrupt ciphertext — treat as unenrolled for verify
+        return None
+
+
+def enable_mfa_for_user(user, secret: str, recovery_codes: list[str]) -> None:
+    from accounts import repositories as repo
+
+    user.mfa_secret = encrypt_totp_secret(secret)
+    user.mfa_recovery_hashes = store_recovery_code_hashes(recovery_codes)
+    user.mfa_enabled = True
+    repo.save_user(user, update_fields=["mfa_secret", "mfa_recovery_hashes", "mfa_enabled"])
 
 
 def generate_recovery_codes(count: int = RECOVERY_CODE_COUNT) -> list[str]:
@@ -225,21 +249,6 @@ def clear_mfa_session(request) -> None:
     ):
         request.session.pop(key, None)
     request.session.modified = True
-
-
-def enable_mfa_for_user(user, secret: str, recovery_codes: list[str]) -> None:
-    from accounts import repositories as repo
-
-    user.mfa_secret = encrypt_totp_secret(secret)
-    user.mfa_recovery_hashes = store_recovery_code_hashes(recovery_codes)
-    user.mfa_enabled = True
-    repo.save_user(user, update_fields=["mfa_secret", "mfa_recovery_hashes", "mfa_enabled"])
-
-
-def get_user_totp_secret(user) -> str | None:
-    if not user.mfa_secret:
-        return None
-    return decrypt_totp_secret(user.mfa_secret)
 
 
 def verify_user_mfa(user, token: str) -> tuple[bool, str]:

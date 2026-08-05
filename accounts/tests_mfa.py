@@ -303,3 +303,27 @@ class MfaLoginFlowTests(TestCase):
         self.assertEqual(enroll.status_code, 200)
         self.assertContains(enroll, "data:image/png;base64,")
         self.assertContains(enroll, "Scan the QR code")
+
+    def test_enroll_secret_stable_across_reload_and_accepts_code(self):
+        import pyotp
+
+        from accounts.mfa import SESSION_MFA_ENROLL_SECRET
+
+        client = Client()
+        client.post(
+            reverse("login"),
+            {"username": "mfa_login_treasury", "password": "pass12345"},
+        )
+        first = client.get(reverse("accounts:mfa_enroll"))
+        self.assertEqual(first.status_code, 200)
+        secret = client.session[SESSION_MFA_ENROLL_SECRET]
+        second = client.get(reverse("accounts:mfa_enroll"))
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(client.session[SESSION_MFA_ENROLL_SECRET], secret)
+
+        code = pyotp.TOTP(secret).now()
+        enable = client.post(reverse("accounts:mfa_enroll"), {"token": code})
+        self.assertEqual(enable.status_code, 200)
+        self.assertContains(enable, "recovery")
+        self.treasury.refresh_from_db()
+        self.assertTrue(self.treasury.mfa_enabled)

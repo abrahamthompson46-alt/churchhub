@@ -29,7 +29,10 @@
                 <p class="small text-muted text-center mb-3">
                     Can’t scan? Enter this secret manually:
                 </p>
-                <code class="d-block p-2 bg-light rounded user-select-all text-center mb-4 small">{{ secret }}</code>
+                <code class="d-block p-2 bg-light rounded user-select-all text-center mb-3 small">{{ secret }}</code>
+                <p class="small text-muted text-center mb-4">
+                    Delete any older ChurchHub entry in your authenticator app first, then scan this QR once.
+                </p>
 
                 <form method="post" novalidate>
                     {% csrf_token %}
@@ -44,6 +47,11 @@
                         </label>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Enable MFA</button>
+                </form>
+                <form method="post" class="mt-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="regenerate">
+                    <button type="submit" class="btn btn-link btn-sm w-100 text-muted">Generate a new QR code</button>
                 </form>
             </div>
         </div>

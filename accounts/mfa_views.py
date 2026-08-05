@@ -77,7 +77,12 @@ def mfa_enroll(request):
     if user.mfa_enabled:
         return redirect("accounts:mfa_verify")
 
-    if request.method == "GET" or not request.session.get(SESSION_MFA_ENROLL_SECRET):
+    # Keep the same secret across reloads so the scanned QR still matches.
+    # Only mint a new secret when missing, or when the user asks to regenerate.
+    regenerate = (
+        request.method == "POST" and request.POST.get("action") == "regenerate"
+    )
+    if regenerate or not request.session.get(SESSION_MFA_ENROLL_SECRET):
         secret = generate_totp_secret()
         request.session[SESSION_MFA_ENROLL_SECRET] = secret
         request.session.modified = True
@@ -85,12 +90,13 @@ def mfa_enroll(request):
         secret = request.session[SESSION_MFA_ENROLL_SECRET]
 
     error = ""
-    if request.method == "POST":
+    if request.method == "POST" and not regenerate:
         token = request.POST.get("token", "")
         if verify_totp(secret, token):
             codes = generate_recovery_codes()
             enable_mfa_for_user(user, secret, codes)
             mark_mfa_verified(request)
+            request.session.pop(SESSION_MFA_ENROLL_SECRET, None)
             log_activity(user, "MFA_ENROLL", ip_address=get_client_ip(request))
             flash_success(request, "Multi-factor authentication is now enabled.")
             response = render(
@@ -103,10 +109,13 @@ def mfa_enroll(request):
                 },
             )
             if request.POST.get("remember_device"):
-                token = create_trusted_device(user, request)
-                attach_trusted_device_cookie(response, token)
+                device_token = create_trusted_device(user, request)
+                attach_trusted_device_cookie(response, device_token)
             return response
-        error = "Invalid authenticator code. Try again."
+        error = (
+            "Invalid authenticator code. Use the code for the QR currently on this "
+            "page (do not use an older entry). Check the server clock if it keeps failing."
+        )
 
     return render(
         request,

@@ -277,11 +277,30 @@ sudo bash deploy/firewall/ufw-churchhub.sh --check-exposure
 | Mechanism | Notes |
 |-----------|-------|
 | Render / provider Postgres backups | Enable in dashboard |
-| `manage.py backup_database` / `scripts/backup.sh` | pg_dump gzip |
-| Celery Beat `backup_database_task` | Daily when Beat + Postgres |
+| `manage.py backup_database --verify` | Streaming pg_dump→gzip; optional age encrypt; `0600` files |
+| `manage.py restore_database` | Requires `--confirm DESTROY_LOCAL_DATA` (+ production flag) |
+| `scripts/backup.sh` | Wrapper; honors `CHURCHHUB_BACKUP_DIR` |
+| Celery Beat `backup_database_task` | Daily ~03:00 when Beat + Postgres |
+| systemd `churchhub-backup.timer` | Daily 03:15 oneshot (optional; see below) |
+| Offsite | `deploy/backup/rclone-sync.sh` — **opt-in** via env |
 | Media | Disk snapshot or S3 versioning |
 
+### Install backup timer (VPS)
+
+```bash
+# Edit WorkingDirectory / paths if using /home/churchhub/apps/churchhub
+sudo cp deploy/systemd/churchhub-backup.service deploy/systemd/churchhub-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now churchhub-backup.timer
+sudo systemctl list-timers | grep churchhub-backup
+journalctl -u churchhub-backup -n 50
+```
+
+**Rollback timer:** `sudo systemctl disable --now churchhub-backup.timer`
+
 **SECRET_KEY rotation:** MFA TOTP secrets are Fernet-derived from `DJANGO_SECRET_KEY` — plan re-enrollment before rotating.
+
+Detail: `docs/WAVE1_BACKUP_RECOVERY_PLAN.md`, `deploy/backup/README.md`, `docs/OPERATIONS_RUNBOOK.md` §5.
 
 ---
 

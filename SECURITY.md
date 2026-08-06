@@ -559,15 +559,28 @@ Log execution.
 
 Backups must be:
 
-Encrypted
+Encrypted (optional age — `CHURCHHUB_BACKUP_ENCRYPT` + `CHURCHHUB_BACKUP_AGE_RECIPIENT`)
 
-Access-controlled
+Access-controlled (directory mode `0700`, files `0600`; not world-readable)
 
-Verified
+Verified (`manage.py backup_database --verify` + sibling `.sha256`)
 
-Stored securely
+Stored securely (local `CHURCHHUB_BACKUP_DIR`; optional rclone offsite — opt-in only)
 
-Regularly tested
+Regularly tested (`manage.py restore_database` on **staging**, never casually on production)
+
+## Backup & restore commands (Current)
+
+```bash
+python manage.py backup_database --verify
+python manage.py restore_database \
+  --input /var/backups/churchhub/churchhub_YYYYMMDD_HHMMSS.sql.gz \
+  --confirm DESTROY_LOCAL_DATA
+# Production target also requires: --i-understand-production --no-input
+```
+
+Offsite upload never runs unless `CHURCHHUB_BACKUP_POST_HOOK` / rclone remote is configured.
+See `deploy/backup/README.md` and `docs/WAVE1_BACKUP_RECOVERY_PLAN.md`.
 
 ---
 

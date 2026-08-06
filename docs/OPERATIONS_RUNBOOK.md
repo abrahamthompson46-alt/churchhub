@@ -108,22 +108,55 @@ Run via Render Shell, Compose exec, or bastion with production env loaded.
 2. **App command:**
 
 ```bash
-python manage.py backup_database --output-dir /var/data/backups --retention 30
+# Directory: --output-dir or CHURCHHUB_BACKUP_DIR (default backups/)
+python manage.py backup_database --verify
+# Optional: CHURCHHUB_BACKUP_ENCRYPT=true + CHURCHHUB_BACKUP_AGE_RECIPIENT=age1...
 ```
 
 Requires PostgreSQL client `pg_dump` on the host and DB credentials from settings.
+Files are written mode `0600`. Streaming pipeline does not load the full dump into RAM.
 
-3. **Media:** Copy/snapshot `MEDIA_ROOT` / Disk independently.
+3. **Automation:** Celery Beat and/or `churchhub-backup.timer` (see `deploy/systemd/`).  
+4. **Offsite (optional):** `deploy/backup/rclone-sync.sh` via `CHURCHHUB_BACKUP_POST_HOOK` — only if remote configured.  
+5. **Media:** Copy/snapshot `MEDIA_ROOT` / Disk independently.
 
-### Restore (Recommended drill)
+### Restore (Current)
 
-1. Provision empty Postgres.  
-2. Restore dump (`gunzip -c churchhub_YYYYMMDD_HHMMSS.sql.gz | psql ...`).  
-3. Point staging `DATABASE_URL` at restored DB.  
-4. Run `migrate` (should be no-op if dump is current).  
+Prefer **staging** `DATABASE_URL`. Destructive confirmation is mandatory.
+
+```bash
+python manage.py restore_database \
+  --input "$CHURCHHUB_BACKUP_DIR/churchhub_YYYYMMDD_HHMMSS.sql.gz" \
+  --confirm DESTROY_LOCAL_DATA
+
+# If restoring on a production-configured host / DEBUG=False:
+python manage.py restore_database \
+  --input ... \
+  --confirm DESTROY_LOCAL_DATA \
+  --i-understand-production \
+  --no-input
+```
+
+Encrypted dumps (`.sql.gz.age`) need `--age-identity` or `CHURCHHUB_BACKUP_AGE_IDENTITY`.
+
+### Restore drill checklist
+
+1. Provision empty Postgres (staging).  
+2. Point staging `.env` `DATABASE_URL` at that DB.  
+3. `restore_database` with confirm flags.  
+4. `migrate` (should be no-op if dump is current).  
 5. Verify login, one church scoped list, one transaction detail.  
 6. Restore media snapshot if testing uploads.  
-7. Document RTO/RPO achieved.
+7. Document RTO/RPO + date/operator in ops log.
+
+### Rollback (backup hardening)
+
+| Change | Rollback |
+|--------|----------|
+| New flags/env | Unset `CHURCHHUB_BACKUP_*`; old CLI `--output-dir backups --retention 30` still works |
+| systemd timer | `sudo systemctl disable --now churchhub-backup.timer` |
+| Encryption | `CHURCHHUB_BACKUP_ENCRYPT=false` |
+| rclone hook | Unset `CHURCHHUB_BACKUP_POST_HOOK` / remote |
 
 ### Secret rotation
 

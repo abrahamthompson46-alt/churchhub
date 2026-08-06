@@ -317,11 +317,18 @@ Temporary data
 
 Maintain:
 
-Database backups
+Database backups (`manage.py backup_database` — streaming `pg_dump` → gzip; optional age encryption)
 
-Media backups
+Media backups (filesystem / object storage snapshot — separate from DB dump)
 
-Configuration backups
+Configuration backups (`.env` stored in a secrets vault — never in Git)
+
+Automation:
+
+- Celery Beat daily task `backup_database_task` (when Beat enabled), and/or
+- systemd `churchhub-backup.timer` (`deploy/systemd/`)
+
+Offsite: optional rclone hook — see `deploy/backup/README.md` (no upload without config).
 
 ---
 
@@ -329,11 +336,11 @@ Configuration backups
 
 Recommended:
 
-Daily database backup
+Daily database backup (03:00 Beat and/or 03:15 systemd timer — pick one primary)
 
-Weekly full backup
+Weekly full backup / media snapshot
 
-Regular restore testing
+Regular restore testing on staging with `restore_database`
 
 ---
 
@@ -341,11 +348,13 @@ Regular restore testing
 
 Protect backups with:
 
-Encryption
+Encryption (optional age)
 
-Access controls
+Access controls (`0600` files)
 
-Separate storage
+Separate storage (rclone Google Drive / S3 when configured)
+
+Explicit restore confirmation (`DESTROY_LOCAL_DATA` + production flag)
 
 ---
 

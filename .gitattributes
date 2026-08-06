@@ -5,3 +5,6 @@ docker-entrypoint.sh text eol=lf
 # Fail2Ban / UFW templates must stay LF on Linux VPS
 deploy/fail2ban/** text eol=lf
 deploy/firewall/** text eol=lf
+deploy/backup/** text eol=lf
+deploy/systemd/*.service text eol=lf
+deploy/systemd/*.timer text eol=lf

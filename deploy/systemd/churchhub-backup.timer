@@ -1,0 +1,12 @@
+[Unit]
+Description=ChurchHub daily database backup timer
+Documentation=file:/opt/churchhub/docs/WAVE1_BACKUP_RECOVERY_PLAN.md
+
+[Timer]
+# Stagger vs Celery Beat (03:00) — pick one primary schedule in ops docs
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target

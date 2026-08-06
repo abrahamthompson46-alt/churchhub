@@ -35,25 +35,6 @@ if SECRET_KEY == _INSECURE_SECRET:
         "DJANGO_SECRET_KEY must be set to a unique value in production."
     )
 
-# HTTPS enforcement is env-controlled so IP-only HTTP (pre-domain) can work.
-# When a domain + TLS are live: leave SECURE_SSL_REDIRECT=true (default).
-SECURE_SSL_REDIRECT = env_flag("SECURE_SSL_REDIRECT", True)
-_https_mode = bool(SECURE_SSL_REDIRECT)
-
-SESSION_COOKIE_SECURE = _https_mode
-CSRF_COOKIE_SECURE = _https_mode
-SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = False  # Django default — JS rarely needs CSRF cookie
-SESSION_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_SAMESITE = "Lax"
-
-# HSTS only when serving HTTPS; never send HSTS on plain HTTP IP access.
-SECURE_HSTS_SECONDS = 31536000 if _https_mode else 0
-SECURE_HSTS_INCLUDE_SUBDOMAINS = _https_mode
-SECURE_HSTS_PRELOAD = (
-    _https_mode
-    and os.environ.get("SECURE_HSTS_PRELOAD", "false").lower() in ("true", "1", "yes")
-)
 
 # Trust Nginx / TLS terminator for scheme and host.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -61,6 +42,18 @@ USE_X_FORWARDED_HOST = True
 
 # Clickjacking / XSS-related headers (also set in base).
 X_FRAME_OPTIONS = "DENY"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+# HTTPS Security Hardening
+
+SECURE_SSL_REDIRECT = True
+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
+SECURE_HSTS_SECONDS = 3600
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 
@@ -123,3 +116,23 @@ from church_system.logging_config import build_logging_config  # noqa: E402
 from church_system.settings.base import LOG_DIR  # noqa: E402
 
 LOGGING = build_logging_config(debug=False, log_dir=LOG_DIR, enable_file_logs=True)
+# ==========================
+# Production Security
+# ==========================
+
+SECURE_SSL_REDIRECT = True
+
+SESSION_COOKIE_SECURE = True
+
+CSRF_COOKIE_SECURE = True
+
+SECURE_HSTS_SECONDS = 31536000
+
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+
+SECURE_HSTS_PRELOAD = True
+
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https",
+)

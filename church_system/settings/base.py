@@ -42,17 +42,20 @@ ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get(
         "DJANGO_ALLOWED_HOSTS",
-        "localhost,127.0.0.1,testserver,churchhub.pythonanywhere.com,"
-        "www.churchhub.pythonanywhere.com",
+        "localhost,127.0.0.1,testserver,162.35.179.20,zreta.com,www.zreta.com,churchhub.zreta.com",
     ).split(",")
     if host.strip()
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
-    for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+    for origin in os.environ.get(
+        "DJANGO_CSRF_TRUSTED_ORIGINS",
+        "http://zreta.com,http://www.zreta.com,https://zreta.com,https://www.zreta.com",
+    ).split(",")
     if origin.strip()
 ]
+
 if ON_PYTHONANYWHERE and not CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS = [
         "https://churchhub.pythonanywhere.com",

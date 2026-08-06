@@ -24,6 +24,8 @@ SHARED_EXEMPT_PREFIXES = (
     "/dashboard/logout",
     "/apply/",
     "/static/",
+    # Keep all /media/ scope-exempt so platform support can open auth-gated files;
+    # anonymity is enforced in church_system.media_views, not here.
     "/media/",
     "/health/",
     "/platform/impersonate/end/",

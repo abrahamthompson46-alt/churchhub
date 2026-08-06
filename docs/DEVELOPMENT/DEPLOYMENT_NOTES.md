@@ -187,6 +187,32 @@ sudo nginx -t && sudo systemctl reload nginx
 
 **Root cause reminder:** `production.py` ties `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` / HSTS to `SECURE_SSL_REDIRECT`. Leaving `false` from Phase A HTTP looks like “production settings not loaded.”
 
+### Phase B+ — Private media (auth + X-Accel-Redirect)
+
+Sensitive uploads (`members/`, `records/`, `history/`, `meetings/`, `exports/`, etc.) are **not** aliased openly. Nginx serves only:
+
+- `/media/platform/branding/` and `/media/denominations/branding/` (anonymous)
+- `/internal-media/` (**internal** only — Django sets `X-Accel-Redirect`)
+- other `/media/*` → proxied to Django `protected_media` (login required)
+
+Apply with the TLS nginx template from this repo, then:
+
+```bash
+# Ensure production uses X-Accel (default when DJANGO_DEBUG=False):
+# MEDIA_X_ACCEL_REDIRECT=true
+sudo systemctl restart churchhub-web
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Verify:
+
+```bash
+# Public branding still works logged out:
+curl -sI "https://zreta.com/media/platform/branding/<logo-file>" | head -5
+# Private member file must NOT be 200 anonymously (expect 302 → login):
+curl -sI "https://zreta.com/media/members/profile_pictures/<file>" | head -10
+```
+
 ### Logs
 
 | Source | Where |

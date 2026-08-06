@@ -23,7 +23,9 @@ MFA_EXEMPT_PREFIXES = (
     "/portal/password",
     "/admin/login",
     "/static/",
-    "/media/",
+    # Public branding only — private /media/* requires MFA-verified sessions.
+    "/media/platform/branding/",
+    "/media/denominations/branding/",
     "/health/",
     "/metrics/",
 )

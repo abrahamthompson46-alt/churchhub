@@ -251,6 +251,12 @@ STATICFILES_DIRS = [_static_dir] if _static_dir.exists() else []
 MEDIA_URL = "/media/"
 _media_root = os.environ.get("MEDIA_ROOT", "").strip()
 MEDIA_ROOT = Path(_media_root) if _media_root else BASE_DIR / "media"
+# When True (typical behind Nginx), protected_media returns X-Accel-Redirect.
+# Local DEBUG defaults False so FileResponse serves files without Nginx.
+MEDIA_X_ACCEL_REDIRECT = bool(
+    env_flag("MEDIA_X_ACCEL_REDIRECT", default=not DEBUG)
+)
+MEDIA_INTERNAL_URL_PREFIX = env_str("MEDIA_INTERNAL_URL_PREFIX", "/internal-media/")
 
 STORAGES = build_storages(compressed_static=True)
 apply_s3_settings(globals())

@@ -18,6 +18,8 @@ EXEMPT_PREFIXES = (
     "/platform/",
     "/apply/",
     "/static/",
+    # Auth gate is in protected_media; keep exempt so missing church assignment
+    # does not block file bytes after login.
     "/media/",
     "/health/",
     "/permissions/",

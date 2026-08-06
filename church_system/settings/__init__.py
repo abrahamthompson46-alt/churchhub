@@ -9,9 +9,15 @@ DJANGO_SETTINGS_MODULE may be:
   church_system.settings.development
   church_system.settings.staging
   church_system.settings.production
+
+``.env`` is loaded here *before* env resolution so interactive manage.py,
+Gunicorn, and Celery all see the same DJANGO_ENV when it is only set in `.env`.
+Process environment variables always win over `.env` values.
 """
 
-from church_system.env import resolve_django_env
+from church_system.env import ensure_dotenv_loaded, resolve_django_env
+
+ensure_dotenv_loaded()
 
 _env = resolve_django_env()
 

@@ -66,7 +66,7 @@ copy .env.example .env
 # cp .env.example .env
 ```
 
-Edit `.env`. Settings load via `church_system.env.load_dotenv` from `church_system/settings/base.py` (no python-dotenv package required). Select environment with `DJANGO_ENV=development|staging|production` (default: development).
+Edit `.env`. Settings load via `church_system.env.ensure_dotenv_loaded` from `church_system/settings/__init__.py` **before** environment selection (and again idempotently from `base.py`). No `python-dotenv` package required. Select environment with `DJANGO_ENV=development|staging|production` (default: development). Process environment variables always override `.env`.
 
 ### Minimum local `.env`
 

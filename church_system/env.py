@@ -11,8 +11,16 @@ from django.core.exceptions import ImproperlyConfigured
 _INSECURE_SECRET = "django-insecure-change-this-in-production"
 
 
+def project_root() -> Path:
+    """Repository root (parent of the ``church_system`` package)."""
+    return Path(__file__).resolve().parent.parent
+
+
 def load_dotenv(path: Path) -> None:
-    """Load KEY=VALUE pairs from .env without requiring python-dotenv."""
+    """Load KEY=VALUE pairs from .env without requiring python-dotenv.
+
+    Existing process environment variables win (never overwritten).
+    """
     if not path.is_file():
         return
     try:
@@ -28,6 +36,25 @@ def load_dotenv(path: Path) -> None:
             os.environ[key] = value
     except OSError:
         pass
+
+
+_DOTENV_LOADED_PATHS: set[str] = set()
+
+
+def ensure_dotenv_loaded(path: Path | None = None) -> Path:
+    """
+    Load project ``.env`` once per path before settings selection.
+
+    Must run before :func:`resolve_django_env` so ``DJANGO_ENV`` in ``.env``
+    is visible to ``church_system.settings`` package selection (manage.py shell,
+    Gunicorn, Celery, migrations).
+    """
+    dotenv_path = Path(path) if path is not None else project_root() / ".env"
+    key = str(dotenv_path.resolve()) if dotenv_path.exists() else str(dotenv_path)
+    if key not in _DOTENV_LOADED_PATHS:
+        load_dotenv(dotenv_path)
+        _DOTENV_LOADED_PATHS.add(key)
+    return dotenv_path
 
 
 def env_flag(name: str, default: bool | None = None) -> bool | None:

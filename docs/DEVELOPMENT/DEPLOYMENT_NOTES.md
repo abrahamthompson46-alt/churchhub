@@ -35,7 +35,7 @@ flowchart LR
 
 | Component | Current implementation |
 |-----------|------------------------|
-| Settings | `church_system.settings` package — `development` / `staging` / `production` via `DJANGO_ENV` |
+| Settings | `church_system.settings` package — `development` / `staging` / `production` via `DJANGO_ENV` (`.env` loaded in `settings/__init__.py` **before** selection) |
 | App server | **Gunicorn** (`gunicorn.conf.py`) |
 | Static | **WhiteNoise** (CompressedStaticFilesStorage); Nginx serves `/static/` when self-hosting |
 | Media | Filesystem `MEDIA_ROOT` or S3 via `django-storages` when `AWS_STORAGE_BUCKET_NAME` set |
@@ -51,7 +51,18 @@ flowchart LR
 | Variable | Purpose |
 |----------|---------|
 | `DJANGO_ENV` | `development` \| `staging` \| `production` |
-| `DJANGO_SETTINGS_MODULE` | Default `church_system.settings` (auto-selects by `DJANGO_ENV`) |
+| `DJANGO_SETTINGS_MODULE` | Default `church_system.settings` (auto-selects by `DJANGO_ENV` after `ensure_dotenv_loaded()`) |
+
+### Settings loading flow (Current)
+
+1. Entry points (`manage.py`, `wsgi.py`, `asgi.py`, `celery.py`) default `DJANGO_SETTINGS_MODULE=church_system.settings`.
+2. `church_system.settings.__init__` calls `ensure_dotenv_loaded()` so project `.env` populates unset variables.
+3. `resolve_django_env()` reads `DJANGO_ENV` / `CHURCHHUB_ENV` (process env wins over `.env`).
+4. Imports `settings.production` \| `staging` \| `development` accordingly.
+5. Systemd production units still set `Environment=DJANGO_ENV=production` (behavior unchanged); interactive shell now matches when `.env` alone provides `DJANGO_ENV`.
+
+| Variable | Purpose |
+|----------|---------|
 | `DJANGO_SECRET_KEY` | Required unique secret when not DEBUG |
 | `DJANGO_DEBUG` | Must be False in production |
 | `DATABASE_URL` / `DB_ENGINE` | Postgres in staging/production |
@@ -161,12 +172,95 @@ When `DEBUG=False` / production settings:
 5. Permissions: `chown -R churchhub:www-data media staticfiles logs var` · dirs `750` · files `640` as needed for Nginx read of static/media.
 6. MFA: Platform → Security → require MFA for OWNER/SECURITY; enroll after login. Session uses Redis `cached_db` across Gunicorn workers. Users outside the MFA audience are **not** forced to verify.
 
-### Phase B — Domain + TLS
+### Phase B — Domain + TLS (zreta.com / Cloudflare)
 
-1. Point DNS A/AAAA to the VPS; update Nginx `server_name` and uncomment TLS block + HTTP→HTTPS redirect.
-2. `certbot --nginx -d example.com`
-3. Update `.env`: `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS=https://…`, `CHURCHHUB_PUBLIC_URL=https://…`, `SECURE_SSL_REDIRECT=true`.
-4. `systemctl restart churchhub-web` and reload Nginx.
+1. Cloudflare DNS: orange-cloud **both** `zreta.com` and `www`; SSL/TLS mode **Full (Strict)**.
+2. Origin: valid Let's Encrypt (or Cloudflare Origin) cert on Nginx 443.
+3. Install real-IP snippet (so rate limits / Fail2Ban see visitors, not CF anycast):
+
+```bash
+sudo cp deploy/nginx/cloudflare-realip.conf /etc/nginx/snippets/cloudflare-realip.conf
+# Render site config with webroot substituted, then:
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+4. Django `.env` **must** set (otherwise Secure cookies/HSTS stay off even when `production.py` loads):
+
+| Variable | Value |
+|----------|--------|
+| `SECURE_SSL_REDIRECT` | `true` |
+| `DJANGO_ALLOWED_HOSTS` | `zreta.com,www.zreta.com` |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | `https://zreta.com,https://www.zreta.com` |
+| `CHURCHHUB_PUBLIC_URL` | `https://zreta.com` |
+
+5. `systemctl restart churchhub-web` and `sudo systemctl reload nginx`.
+6. Verify: HTTP→301 HTTPS; login `Set-Cookie` includes `Secure`; Django shell prints `SECURE_SSL_REDIRECT True` and `SESSION_COOKIE_SECURE True`.
+
+**Root cause reminder:** `production.py` ties `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` / HSTS to `SECURE_SSL_REDIRECT`. Leaving `false` from Phase A HTTP looks like “production settings not loaded.”
+
+### Phase B+ — Private media (auth + X-Accel-Redirect)
+
+Sensitive uploads (`members/`, `records/`, `history/`, `meetings/`, `exports/`, etc.) are **not** aliased openly. Nginx serves only:
+
+- `/media/platform/branding/` and `/media/denominations/branding/` (anonymous)
+- `/internal-media/` (**internal** only — Django sets `X-Accel-Redirect`)
+- other `/media/*` → proxied to Django `protected_media` (login required)
+
+Apply with the TLS nginx template from this repo, then:
+
+```bash
+# Ensure production uses X-Accel (default when DJANGO_DEBUG=False):
+# MEDIA_X_ACCEL_REDIRECT=true
+sudo systemctl restart churchhub-web
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Verify:
+
+```bash
+# Public branding still works logged out:
+curl -sI "https://zreta.com/media/platform/branding/<logo-file>" | head -5
+# Private member file must NOT be 200 anonymously (expect 302 → login):
+curl -sI "https://zreta.com/media/members/profile_pictures/<file>" | head -10
+```
+
+### Phase C — Fail2Ban + UFW (host hardening)
+
+Templates: `deploy/fail2ban/`, `deploy/firewall/ufw-churchhub.sh`. Full notes: `deploy/fail2ban/README.md`, `docs/WAVE1_INFRA_SECURITY_PLAN.md`.
+
+**Fail2Ban (preserve SSH):**
+
+```bash
+sudo fail2ban-client status sshd   # snapshot live thresholds first
+sudo cp -a /etc/fail2ban/jail.d "/etc/fail2ban/jail.d.bak.$(date +%Y%m%d%H%M)" 2>/dev/null || true
+sudo cp deploy/fail2ban/filter.d/churchhub-nginx-auth.conf /etc/fail2ban/filter.d/
+sudo cp deploy/fail2ban/jail.d/churchhub-sshd.conf /etc/fail2ban/jail.d/
+sudo cp deploy/fail2ban/jail.d/churchhub-nginx-auth.conf /etc/fail2ban/jail.d/
+# If live sshd was stricter, edit the copied jail to match before reload
+sudo fail2ban-client reload
+# HTTP jail stays enabled=false until Cloudflare real-IP is verified
+```
+
+**UFW (additive — never resets):**
+
+```bash
+sudo bash deploy/firewall/ufw-churchhub.sh --plan
+sudo bash deploy/firewall/ufw-churchhub.sh --status   # save numbered output for rollback
+sudo bash deploy/firewall/ufw-churchhub.sh --apply    # ensures SSH/80/443; no ufw reset
+sudo bash deploy/firewall/ufw-churchhub.sh --check-exposure
+```
+
+**Exposure:** Gunicorn `:8000`, Postgres `:5432`, Redis `:6379` must bind to loopback only (script fails if `0.0.0.0`).
+
+**Rollback**
+
+| Component | Steps |
+|-----------|--------|
+| Fail2Ban | Restore `jail.d.bak.*`; remove `churchhub-*.conf`; `fail2ban-client reload` |
+| UFW | `ufw status numbered` → `ufw delete N` only for rules you added; do **not** `ufw reset` unless rebuilding from scratch with a console session |
+| Mistaken ban | `fail2ban-client set sshd unbanip A.B.C.D` |
+
+**Verify bundle:** `bash deploy/scripts/wave1_infra_verify.sh`
 
 ### Logs
 

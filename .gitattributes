@@ -2,3 +2,6 @@
 *.sh text eol=lf
 render.yaml text eol=lf
 docker-entrypoint.sh text eol=lf
+# Fail2Ban / UFW templates must stay LF on Linux VPS
+deploy/fail2ban/** text eol=lf
+deploy/firewall/** text eol=lf

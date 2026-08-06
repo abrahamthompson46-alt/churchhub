@@ -224,6 +224,44 @@ curl -sI "https://zreta.com/media/platform/branding/<logo-file>" | head -5
 curl -sI "https://zreta.com/media/members/profile_pictures/<file>" | head -10
 ```
 
+### Phase C — Fail2Ban + UFW (host hardening)
+
+Templates: `deploy/fail2ban/`, `deploy/firewall/ufw-churchhub.sh`. Full notes: `deploy/fail2ban/README.md`, `docs/WAVE1_INFRA_SECURITY_PLAN.md`.
+
+**Fail2Ban (preserve SSH):**
+
+```bash
+sudo fail2ban-client status sshd   # snapshot live thresholds first
+sudo cp -a /etc/fail2ban/jail.d "/etc/fail2ban/jail.d.bak.$(date +%Y%m%d%H%M)" 2>/dev/null || true
+sudo cp deploy/fail2ban/filter.d/churchhub-nginx-auth.conf /etc/fail2ban/filter.d/
+sudo cp deploy/fail2ban/jail.d/churchhub-sshd.conf /etc/fail2ban/jail.d/
+sudo cp deploy/fail2ban/jail.d/churchhub-nginx-auth.conf /etc/fail2ban/jail.d/
+# If live sshd was stricter, edit the copied jail to match before reload
+sudo fail2ban-client reload
+# HTTP jail stays enabled=false until Cloudflare real-IP is verified
+```
+
+**UFW (additive — never resets):**
+
+```bash
+sudo bash deploy/firewall/ufw-churchhub.sh --plan
+sudo bash deploy/firewall/ufw-churchhub.sh --status   # save numbered output for rollback
+sudo bash deploy/firewall/ufw-churchhub.sh --apply    # ensures SSH/80/443; no ufw reset
+sudo bash deploy/firewall/ufw-churchhub.sh --check-exposure
+```
+
+**Exposure:** Gunicorn `:8000`, Postgres `:5432`, Redis `:6379` must bind to loopback only (script fails if `0.0.0.0`).
+
+**Rollback**
+
+| Component | Steps |
+|-----------|--------|
+| Fail2Ban | Restore `jail.d.bak.*`; remove `churchhub-*.conf`; `fail2ban-client reload` |
+| UFW | `ufw status numbered` → `ufw delete N` only for rules you added; do **not** `ufw reset` unless rebuilding from scratch with a console session |
+| Mistaken ban | `fail2ban-client set sshd unbanip A.B.C.D` |
+
+**Verify bundle:** `bash deploy/scripts/wave1_infra_verify.sh`
+
 ### Logs
 
 | Source | Where |

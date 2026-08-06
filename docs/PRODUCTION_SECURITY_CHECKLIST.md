@@ -95,6 +95,19 @@ Mark each item **Done** before declaring production live.
 
 ---
 
+## H2. Host firewall & Fail2Ban (VPS)
+
+- [ ] Fail2Ban active; `sshd` jail enabled (compare live thresholds before overlaying repo template)
+- [ ] Cloudflare real-IP snippet live before enabling `churchhub-nginx-auth`
+- [ ] `churchhub-nginx-auth` left disabled until real-IP verified (or enabled intentionally)
+- [ ] UFW: deny incoming; allow OpenSSH + 80/443 (additive apply via `deploy/firewall/ufw-churchhub.sh`)
+- [ ] Gunicorn listens on `127.0.0.1:8000` only (not `0.0.0.0`)
+- [ ] PostgreSQL `:5432` and Redis `:6379` not publicly bound
+- [ ] `bash deploy/scripts/wave1_infra_verify.sh` recorded pass
+- [ ] Rollback notes reviewed (`deploy/fail2ban/README.md`, DEPLOYMENT_NOTES Phase C)
+
+---
+
 ## I. Go-live sign-off
 
 | Role | Name | Date | Signature / ack |

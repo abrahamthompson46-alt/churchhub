@@ -161,12 +161,31 @@ When `DEBUG=False` / production settings:
 5. Permissions: `chown -R churchhub:www-data media staticfiles logs var` · dirs `750` · files `640` as needed for Nginx read of static/media.
 6. MFA: Platform → Security → require MFA for OWNER/SECURITY; enroll after login. Session uses Redis `cached_db` across Gunicorn workers. Users outside the MFA audience are **not** forced to verify.
 
-### Phase B — Domain + TLS
+### Phase B — Domain + TLS (zreta.com / Cloudflare)
 
-1. Point DNS A/AAAA to the VPS; update Nginx `server_name` and uncomment TLS block + HTTP→HTTPS redirect.
-2. `certbot --nginx -d example.com`
-3. Update `.env`: `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS=https://…`, `CHURCHHUB_PUBLIC_URL=https://…`, `SECURE_SSL_REDIRECT=true`.
-4. `systemctl restart churchhub-web` and reload Nginx.
+1. Cloudflare DNS: orange-cloud **both** `zreta.com` and `www`; SSL/TLS mode **Full (Strict)**.
+2. Origin: valid Let's Encrypt (or Cloudflare Origin) cert on Nginx 443.
+3. Install real-IP snippet (so rate limits / Fail2Ban see visitors, not CF anycast):
+
+```bash
+sudo cp deploy/nginx/cloudflare-realip.conf /etc/nginx/snippets/cloudflare-realip.conf
+# Render site config with webroot substituted, then:
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+4. Django `.env` **must** set (otherwise Secure cookies/HSTS stay off even when `production.py` loads):
+
+| Variable | Value |
+|----------|--------|
+| `SECURE_SSL_REDIRECT` | `true` |
+| `DJANGO_ALLOWED_HOSTS` | `zreta.com,www.zreta.com` |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | `https://zreta.com,https://www.zreta.com` |
+| `CHURCHHUB_PUBLIC_URL` | `https://zreta.com` |
+
+5. `systemctl restart churchhub-web` and `sudo systemctl reload nginx`.
+6. Verify: HTTP→301 HTTPS; login `Set-Cookie` includes `Secure`; Django shell prints `SECURE_SSL_REDIRECT True` and `SESSION_COOKIE_SECURE True`.
+
+**Root cause reminder:** `production.py` ties `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` / HSTS to `SECURE_SSL_REDIRECT`. Leaving `false` from Phase A HTTP looks like “production settings not loaded.”
 
 ### Logs
 

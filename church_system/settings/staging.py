@@ -2,7 +2,7 @@
 
 from django.core.exceptions import ImproperlyConfigured
 
-from church_system.env import validate_production_environment
+from church_system.env import env_flag, validate_production_environment
 from church_system.settings.base import *  # noqa: F401,F403
 from church_system.settings.base import (
     ALLOWED_HOSTS,
@@ -25,15 +25,14 @@ if not DEBUG and SECRET_KEY == _INSECURE_SECRET:
     )
 
 if not DEBUG:
-    SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "True").lower() in (
-        "true",
-        "1",
-        "yes",
-    )
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = 3600
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    # Match production: Secure cookies / HSTS follow SECURE_SSL_REDIRECT so HTTP
+    # staging does not set Secure cookies that the browser will refuse to send.
+    SECURE_SSL_REDIRECT = bool(env_flag("SECURE_SSL_REDIRECT", True))
+    _https_mode = SECURE_SSL_REDIRECT
+    SESSION_COOKIE_SECURE = _https_mode
+    CSRF_COOKIE_SECURE = _https_mode
+    SECURE_HSTS_SECONDS = 3600 if _https_mode else 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = _https_mode
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     USE_X_FORWARDED_HOST = True
 

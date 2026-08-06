@@ -8,18 +8,19 @@ from pathlib import Path
 
 from church_system.debug_config import is_production_like_env, resolve_debug
 from church_system.env import (
+    ensure_dotenv_loaded,
     env_flag,
     env_int,
     env_str,
     insecure_secret_default,
-    load_dotenv,
 )
 from church_system.storage import apply_s3_settings, build_storages
 from church_system.uploads import MAX_REQUEST_UPLOAD_BYTES
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-load_dotenv(BASE_DIR / ".env")
+# Idempotent: settings/__init__.py already loads .env before env selection.
+ensure_dotenv_loaded(BASE_DIR / ".env")
 
 DJANGO_ENV = env_str("DJANGO_ENV") or env_str("CHURCHHUB_ENV") or "development"
 

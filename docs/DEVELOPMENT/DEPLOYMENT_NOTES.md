@@ -35,7 +35,7 @@ flowchart LR
 
 | Component | Current implementation |
 |-----------|------------------------|
-| Settings | `church_system.settings` package — `development` / `staging` / `production` via `DJANGO_ENV` |
+| Settings | `church_system.settings` package — `development` / `staging` / `production` via `DJANGO_ENV` (`.env` loaded in `settings/__init__.py` **before** selection) |
 | App server | **Gunicorn** (`gunicorn.conf.py`) |
 | Static | **WhiteNoise** (CompressedStaticFilesStorage); Nginx serves `/static/` when self-hosting |
 | Media | Filesystem `MEDIA_ROOT` or S3 via `django-storages` when `AWS_STORAGE_BUCKET_NAME` set |
@@ -51,7 +51,18 @@ flowchart LR
 | Variable | Purpose |
 |----------|---------|
 | `DJANGO_ENV` | `development` \| `staging` \| `production` |
-| `DJANGO_SETTINGS_MODULE` | Default `church_system.settings` (auto-selects by `DJANGO_ENV`) |
+| `DJANGO_SETTINGS_MODULE` | Default `church_system.settings` (auto-selects by `DJANGO_ENV` after `ensure_dotenv_loaded()`) |
+
+### Settings loading flow (Current)
+
+1. Entry points (`manage.py`, `wsgi.py`, `asgi.py`, `celery.py`) default `DJANGO_SETTINGS_MODULE=church_system.settings`.
+2. `church_system.settings.__init__` calls `ensure_dotenv_loaded()` so project `.env` populates unset variables.
+3. `resolve_django_env()` reads `DJANGO_ENV` / `CHURCHHUB_ENV` (process env wins over `.env`).
+4. Imports `settings.production` \| `staging` \| `development` accordingly.
+5. Systemd production units still set `Environment=DJANGO_ENV=production` (behavior unchanged); interactive shell now matches when `.env` alone provides `DJANGO_ENV`.
+
+| Variable | Purpose |
+|----------|---------|
 | `DJANGO_SECRET_KEY` | Required unique secret when not DEBUG |
 | `DJANGO_DEBUG` | Must be False in production |
 | `DATABASE_URL` / `DB_ENGINE` | Postgres in staging/production |

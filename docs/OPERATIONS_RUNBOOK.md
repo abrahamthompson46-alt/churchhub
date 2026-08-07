@@ -167,6 +167,42 @@ Encrypted dumps (`.sql.gz.age`) need `--age-identity` or `CHURCHHUB_BACKUP_AGE_I
 
 ## 6. Incidents
 
+### 0. Downtime response (first 5 minutes)
+
+1. **Confirm blast radius:** Can you reach `https://zreta.com/` or only some pages?
+2. **Service status:**
+
+```bash
+sudo systemctl status churchhub-web nginx postgresql redis-server \
+  churchhub-celery churchhub-celerybeat --no-pager
+```
+
+3. **Health JSON** (prefer header token):
+
+```bash
+curl -sS -H "X-Health-Token: $CHURCHHUB_HEALTH_TOKEN" https://zreta.com/health/live/ | jq .
+curl -sS -H "X-Health-Token: $CHURCHHUB_HEALTH_TOKEN" https://zreta.com/health/ready/ | jq .
+```
+
+Interpret `checks.*`: `ok` / `error` / `skipped`. Production `*_detail` is a safe code (`unavailable`, `timeout`, `pending_migrations`, `misconfigured`) — full errors are in server logs only.
+
+4. **Recent errors:**
+
+```bash
+sudo journalctl -u churchhub-web -n 100 --no-pager
+sudo journalctl -u churchhub-celery -n 50 --no-pager
+ls -lah "${CHURCHHUB_LOG_DIR:-logs}/"
+```
+
+5. **Listen / exposure:**
+
+```bash
+ss -lntp | grep -E ':80 |:443 |:8000 |:5432 |:6379 '
+```
+
+6. If Sentry is enabled, open the project for the matching `SENTRY_ENVIRONMENT` / `SENTRY_RELEASE`.
+7. Follow the matching subsection below (database / cache / migrations / debug / CSRF).
+
 ### A. Health 503 — database
 
 1. Check provider Postgres status / connections.  

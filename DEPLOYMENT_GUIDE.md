@@ -362,15 +362,40 @@ Explicit restore confirmation (`DESTROY_LOCAL_DATA` + production flag)
 
 Monitor:
 
-Application health
+Application health — `GET /health/live/`, `/health/ready/`, `/health/` with `X-Health-Token`
 
-Database health
+Database health — readiness `database` + `migrations` checks
 
-Server resources
+Redis / cache — readiness `cache` + `redis` checks
 
-Errors
+Server resources — host CPU/disk; log rotation under `CHURCHHUB_LOG_DIR`
 
-Failed jobs
+Errors — optional Sentry (`SENTRY_DSN`); otherwise journal + `application.log`
+
+Failed jobs — Celery worker/beat journals (`churchhub-celery`, `churchhub-celerybeat`)
+
+## Enable Sentry (optional)
+
+```ini
+SENTRY_DSN=https://…@o….ingest.sentry.io/…
+SENTRY_ENVIRONMENT=production
+SENTRY_TRACES_SAMPLE_RATE=0.05
+SENTRY_RELEASE=churchhub@<git-sha-or-tag>   # optional
+```
+
+Leave `SENTRY_DSN` empty to disable.
+
+## Health token (required in production validation)
+
+```ini
+CHURCHHUB_HEALTH_TOKEN=<long-random>
+```
+
+Probe:
+
+```bash
+curl -sH "X-Health-Token: $CHURCHHUB_HEALTH_TOKEN" https://zreta.com/health/ready/
+```
 
 ---
 
@@ -378,13 +403,16 @@ Failed jobs
 
 Maintain logs for:
 
-Application errors
+Application errors (`application.log` / journal `churchhub-web`)
 
-Security events
+Security events (`security.log` — auth failures, `django.request` warnings)
 
-User activity
+User activity / audit (`audit.log` where enabled)
 
-Background jobs
+Background jobs (Celery journals)
+
+Rotation: `CHURCHHUB_LOG_MAX_BYTES` (default 10485760), `CHURCHHUB_LOG_BACKUP_COUNT` (default 10).
+Nginx access logs are separate (`/var/log/nginx/`) — rotate with system logrotate.
 
 ---
 

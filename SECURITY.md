@@ -598,6 +598,29 @@ Access procedures
 
 ---
 
+# Observability & monitoring security
+
+## Health probes
+
+- Endpoints: `/health/`, `/health/live/`, `/health/ready/` (token-gated in production via `CHURCHHUB_HEALTH_TOKEN`).
+- Prefer header `X-Health-Token` (avoid `?token=` in access logs).
+- Production JSON must not include connection strings, passwords, or raw driver errors (`*_detail` is a safe code such as `unavailable`).
+
+## Error tracking (optional Sentry)
+
+- Enabled only when `SENTRY_DSN` is set; unset disables all Sentry network calls.
+- `send_default_pii=False`; `before_send` scrubs password/token/Authorization/cookie/DATABASE_URL-like keys.
+- Optional `SENTRY_RELEASE` for release tracking when configured.
+
+## Logging
+
+- Rotating files: `application.log`, `security.log`, `audit.log` under `CHURCHHUB_LOG_DIR`.
+- Defaults: 10 MB × 10 backups per file (~300 MB max across three channels).
+- `SecretRedactFilter` masks password/token/URL credential patterns in log messages.
+- Never log passwords, session tokens, or TOTP secrets.
+
+---
+
 # Production Security Checklist
 
 Before deployment:

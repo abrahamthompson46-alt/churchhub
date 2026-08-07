@@ -308,12 +308,14 @@ Detail: `docs/WAVE1_BACKUP_RECOVERY_PLAN.md`, `deploy/backup/README.md`, `docs/O
 
 | Tool | How |
 |------|-----|
-| Liveness | `GET /health/live/` (token when configured) |
-| Readiness | `GET /health/ready/` |
-| Full health | `GET /health/` |
-| Metrics JSON | `GET /metrics/` |
-| Sentry | `SENTRY_DSN` (+ Celery/Redis integrations) |
-| Logs | stdout + rotating files (`application.log`, `security.log`, `audit.log`) + systemd journal |
+| Liveness | `GET /health/live/` (`X-Health-Token` when `CHURCHHUB_HEALTH_TOKEN` set) |
+| Readiness | `GET /health/ready/` — DB, migrations, cache, redis, debug-safe |
+| Full health | `GET /health/` — includes redis + celery broker |
+| Metrics JSON | `GET /metrics/` (authenticated operators) |
+| Sentry | Optional `SENTRY_DSN` (+ scrubber; optional `SENTRY_RELEASE`) |
+| Logs | stdout/journal + rotating `application.log` / `security.log` / `audit.log` |
+
+Production health JSON redacts raw exception text. See `docs/WAVE1_OBSERVABILITY_PLAN.md` and OPERATIONS_RUNBOOK §6.0.
 
 ---
 

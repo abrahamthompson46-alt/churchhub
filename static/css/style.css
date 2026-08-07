@@ -2508,7 +2508,7 @@ body.app-body.auth-page {
     color: var(--ch-action);
 }
 
-/* Staff sign-in: keep the card close to square on desktop instead of a tall column */
+/* Staff sign-in: compact centered credentials (avoid wide stretched fields) */
 @media (min-width: 992px) {
     .auth-split--square {
         max-width: 1240px;
@@ -2517,14 +2517,24 @@ body.app-body.auth-page {
     }
 
     .auth-split--square .auth-split-form .auth-card {
-        max-width: 580px;
+        max-width: 420px;
     }
 
     .auth-split--square .auth-card .card-body {
-        padding: 1.5rem 2rem !important;
+        padding: 1.5rem 1.75rem !important;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
 
-    .auth-split--square .auth-tenant-header {
+    .auth-split--square .auth-card .card-body > * {
+        width: 100%;
+        max-width: 20rem;
+    }
+
+    .auth-split--square .auth-card .auth-tenant-header {
+        max-width: 100%;
+        text-align: center;
         padding-bottom: 0.75rem;
         margin-bottom: 0.85rem !important;
     }
@@ -2542,11 +2552,13 @@ body.app-body.auth-page {
     }
 
     .auth-split--square .auth-form-title {
-        font-size: 1.35rem;
+        font-size: 1.25rem;
+        text-align: center;
     }
 
     .auth-split--square .auth-form-title + p {
         margin-bottom: 1rem !important;
+        text-align: center;
     }
 }
 

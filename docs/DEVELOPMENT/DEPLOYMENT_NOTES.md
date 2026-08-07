@@ -277,11 +277,30 @@ sudo bash deploy/firewall/ufw-churchhub.sh --check-exposure
 | Mechanism | Notes |
 |-----------|-------|
 | Render / provider Postgres backups | Enable in dashboard |
-| `manage.py backup_database` / `scripts/backup.sh` | pg_dump gzip |
-| Celery Beat `backup_database_task` | Daily when Beat + Postgres |
+| `manage.py backup_database --verify` | Streaming pg_dump→gzip; optional age encrypt; `0600` files |
+| `manage.py restore_database` | Requires `--confirm DESTROY_LOCAL_DATA` (+ production flag) |
+| `scripts/backup.sh` | Wrapper; honors `CHURCHHUB_BACKUP_DIR` |
+| Celery Beat `backup_database_task` | Daily ~03:00 when Beat + Postgres |
+| systemd `churchhub-backup.timer` | Daily 03:15 oneshot (optional; see below) |
+| Offsite | `deploy/backup/rclone-sync.sh` — **opt-in** via env |
 | Media | Disk snapshot or S3 versioning |
 
+### Install backup timer (VPS)
+
+```bash
+# Edit WorkingDirectory / paths if using /home/churchhub/apps/churchhub
+sudo cp deploy/systemd/churchhub-backup.service deploy/systemd/churchhub-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now churchhub-backup.timer
+sudo systemctl list-timers | grep churchhub-backup
+journalctl -u churchhub-backup -n 50
+```
+
+**Rollback timer:** `sudo systemctl disable --now churchhub-backup.timer`
+
 **SECRET_KEY rotation:** MFA TOTP secrets are Fernet-derived from `DJANGO_SECRET_KEY` — plan re-enrollment before rotating.
+
+Detail: `docs/WAVE1_BACKUP_RECOVERY_PLAN.md`, `deploy/backup/README.md`, `docs/OPERATIONS_RUNBOOK.md` §5.
 
 ---
 
@@ -289,12 +308,14 @@ sudo bash deploy/firewall/ufw-churchhub.sh --check-exposure
 
 | Tool | How |
 |------|-----|
-| Liveness | `GET /health/live/` (token when configured) |
-| Readiness | `GET /health/ready/` |
-| Full health | `GET /health/` |
-| Metrics JSON | `GET /metrics/` |
-| Sentry | `SENTRY_DSN` (+ Celery/Redis integrations) |
-| Logs | stdout + rotating files (`application.log`, `security.log`, `audit.log`) + systemd journal |
+| Liveness | `GET /health/live/` (`X-Health-Token` when `CHURCHHUB_HEALTH_TOKEN` set) |
+| Readiness | `GET /health/ready/` — DB, migrations, cache, redis, debug-safe |
+| Full health | `GET /health/` — includes redis + celery broker |
+| Metrics JSON | `GET /metrics/` (authenticated operators) |
+| Sentry | Optional `SENTRY_DSN` (+ scrubber; optional `SENTRY_RELEASE`) |
+| Logs | stdout/journal + rotating `application.log` / `security.log` / `audit.log` |
+
+Production health JSON redacts raw exception text. See `docs/WAVE1_OBSERVABILITY_PLAN.md` and OPERATIONS_RUNBOOK §6.0.
 
 ---
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
 
@@ -9,6 +10,29 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+
+logger = logging.getLogger("churchhub")
+
+
+def _expose_health_details() -> bool:
+    """Raw exception detail in JSON only when DEBUG (local diagnosis)."""
+    return bool(getattr(settings, "DEBUG", False))
+
+
+def _safe_detail(exc: BaseException) -> str:
+    """Map failures to non-sensitive codes for production health JSON."""
+    text = str(exc).lower()
+    if "pending migration" in text:
+        return "pending_migrations"
+    if "debug=true" in text or "debug" in text and "production" in text:
+        return "misconfigured"
+    if "redis_url is required" in text or "redis" in text and "required" in text:
+        return "misconfigured"
+    if "timeout" in text or "timed out" in text:
+        return "timeout"
+    if "password" in text or "authentication" in text or "auth failed" in text:
+        return "unavailable"
+    return "unavailable"
 
 
 def check_database():
@@ -83,13 +107,17 @@ def check_celery_broker():
 def _run_named_checks(checks: tuple[tuple[str, Callable], ...]):
     payload = {"status": "ok", "service": "churchhub", "checks": {}}
     failures = []
+    expose = _expose_health_details()
     for name, checker in checks:
         payload["checks"][name] = "unknown"
         try:
             payload["checks"][name] = checker()
         except Exception as exc:
+            logger.error("Health check %s failed: %s", name, exc, exc_info=True)
             payload["checks"][name] = "error"
-            payload["checks"][f"{name}_detail"] = str(exc)
+            payload["checks"][f"{name}_detail"] = (
+                str(exc) if expose else _safe_detail(exc)
+            )
             failures.append(name)
     if failures:
         payload["status"] = "degraded"
@@ -134,14 +162,17 @@ def run_health_checks():
         ("cache", check_cache),
         ("migrations", check_migrations),
         ("debug", check_debug_safe),
+        ("redis", check_redis_configured),
     ]
-    # Include celery broker status as informational in full health
     payload, status = _run_named_checks(tuple(checks))
     try:
         payload["checks"]["celery_broker"] = check_celery_broker()
     except Exception as exc:
+        logger.error("Health check celery_broker failed: %s", exc, exc_info=True)
         payload["checks"]["celery_broker"] = "error"
-        payload["checks"]["celery_broker_detail"] = str(exc)
+        payload["checks"]["celery_broker_detail"] = (
+            str(exc) if _expose_health_details() else _safe_detail(exc)
+        )
         payload["status"] = "degraded"
         status = 503
     payload["check_type"] = "health"

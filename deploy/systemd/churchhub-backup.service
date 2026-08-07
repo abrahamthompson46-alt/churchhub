@@ -1,0 +1,31 @@
+[Unit]
+Description=ChurchHub PostgreSQL backup (oneshot)
+Documentation=file:/opt/churchhub/docs/WAVE1_BACKUP_RECOVERY_PLAN.md
+After=network-online.target postgresql.service
+Wants=network-online.target postgresql.service
+
+[Service]
+Type=oneshot
+User=churchhub
+Group=churchhub
+# Substitute /home/churchhub/apps/churchhub on zreta if not using /opt/churchhub
+WorkingDirectory=/opt/churchhub
+EnvironmentFile=-/opt/churchhub/.env
+Environment=DJANGO_SETTINGS_MODULE=church_system.settings
+Environment=DJANGO_ENV=production
+# Ensure backup dir exists (CHURCHHUB_BACKUP_DIR may override path in .env)
+ExecStartPre=/usr/bin/mkdir -p /opt/churchhub/backups
+ExecStart=/opt/churchhub/.venv/bin/python manage.py backup_database --verify
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=churchhub-backup
+PrivateTmp=true
+NoNewPrivileges=true
+# Allow writes to default backup location (extend if CHURCHHUB_BACKUP_DIR is elsewhere)
+ReadWritePaths=/opt/churchhub/backups /opt/churchhub/logs /opt/churchhub/var
+
+[Install]
+WantedBy=multi-user.target

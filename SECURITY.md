@@ -559,15 +559,28 @@ Log execution.
 
 Backups must be:
 
-Encrypted
+Encrypted (optional age — `CHURCHHUB_BACKUP_ENCRYPT` + `CHURCHHUB_BACKUP_AGE_RECIPIENT`)
 
-Access-controlled
+Access-controlled (directory mode `0700`, files `0600`; not world-readable)
 
-Verified
+Verified (`manage.py backup_database --verify` + sibling `.sha256`)
 
-Stored securely
+Stored securely (local `CHURCHHUB_BACKUP_DIR`; optional rclone offsite — opt-in only)
 
-Regularly tested
+Regularly tested (`manage.py restore_database` on **staging**, never casually on production)
+
+## Backup & restore commands (Current)
+
+```bash
+python manage.py backup_database --verify
+python manage.py restore_database \
+  --input /var/backups/churchhub/churchhub_YYYYMMDD_HHMMSS.sql.gz \
+  --confirm DESTROY_LOCAL_DATA
+# Production target also requires: --i-understand-production --no-input
+```
+
+Offsite upload never runs unless `CHURCHHUB_BACKUP_POST_HOOK` / rclone remote is configured.
+See `deploy/backup/README.md` and `docs/WAVE1_BACKUP_RECOVERY_PLAN.md`.
 
 ---
 
@@ -582,6 +595,29 @@ Backup restoration tests
 Emergency contacts
 
 Access procedures
+
+---
+
+# Observability & monitoring security
+
+## Health probes
+
+- Endpoints: `/health/`, `/health/live/`, `/health/ready/` (token-gated in production via `CHURCHHUB_HEALTH_TOKEN`).
+- Prefer header `X-Health-Token` (avoid `?token=` in access logs).
+- Production JSON must not include connection strings, passwords, or raw driver errors (`*_detail` is a safe code such as `unavailable`).
+
+## Error tracking (optional Sentry)
+
+- Enabled only when `SENTRY_DSN` is set; unset disables all Sentry network calls.
+- `send_default_pii=False`; `before_send` scrubs password/token/Authorization/cookie/DATABASE_URL-like keys.
+- Optional `SENTRY_RELEASE` for release tracking when configured.
+
+## Logging
+
+- Rotating files: `application.log`, `security.log`, `audit.log` under `CHURCHHUB_LOG_DIR`.
+- Defaults: 10 MB × 10 backups per file (~300 MB max across three channels).
+- `SecretRedactFilter` masks password/token/URL credential patterns in log messages.
+- Never log passwords, session tokens, or TOTP secrets.
 
 ---
 

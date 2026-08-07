@@ -146,8 +146,10 @@ def purge_old_notifications_task(self, read_days=90, unread_days=180):
 
 
 @shared_task(bind=True, max_retries=1, default_retry_delay=600)
-def backup_database_task(self, output_dir="backups", retention=30):
+def backup_database_task(self, output_dir=None, retention=None):
     """Celery Beat: invoke manage.py backup_database for PostgreSQL."""
+    import os
+
     from django.conf import settings
 
     engine = settings.DATABASES["default"]["ENGINE"]
@@ -160,11 +162,17 @@ def backup_database_task(self, output_dir="backups", retention=30):
         sys.executable,
         str(manage),
         "backup_database",
-        "--output-dir",
-        str(output_dir),
-        "--retention",
-        str(retention),
+        "--verify",
     ]
+    # Prefer explicit args; otherwise backup_database reads CHURCHHUB_BACKUP_* env.
+    resolved_dir = output_dir or os.environ.get("CHURCHHUB_BACKUP_DIR")
+    if resolved_dir:
+        cmd.extend(["--output-dir", str(resolved_dir)])
+    if retention is not None:
+        cmd.extend(["--retention", str(retention)])
+    elif os.environ.get("CHURCHHUB_BACKUP_RETENTION_DAYS"):
+        cmd.extend(["--retention", os.environ["CHURCHHUB_BACKUP_RETENTION_DAYS"].strip()])
+
     try:
         completed = subprocess.run(
             cmd,

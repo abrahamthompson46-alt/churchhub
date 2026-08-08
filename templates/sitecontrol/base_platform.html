@@ -83,6 +83,7 @@
                 </div>
             </div>
             <div class="platform-topbar-actions">
+                {% block page_actions %}{% endblock %}
                 {% if platform_denominations %}
                 <div class="dropdown">
                     <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">

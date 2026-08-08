@@ -247,23 +247,55 @@ def get_email_branding_context(request=None, *, preheader: str = "") -> dict:
     }
 
 
+def _invitation_target_label(invitation, site_name):
+    """Return a safe organization label for church and hierarchy invitations."""
+    candidates = (
+        getattr(invitation, "church", None),
+        getattr(invitation, "scope_district", None),
+        getattr(invitation, "scope_zone", None),
+        getattr(invitation, "scope_conference", None),
+        getattr(invitation, "scope_union", None),
+        getattr(invitation, "scope_general_conference", None),
+        getattr(invitation, "denomination", None),
+    )
+    for target in candidates:
+        if target:
+            return (
+                getattr(target, "display_name", "")
+                or getattr(target, "name", "")
+                or str(target)
+            )
+    try:
+        return invitation.get_scope_level_display()
+    except (AttributeError, TypeError, ValueError):
+        return site_name
+
+
 def send_user_invitation_email(invitation, request=None, *, fail_silently=True):
     """Email invitation link to a new institution user."""
     accept_path = reverse("accounts:accept_invite", kwargs={"token": invitation.token})
     accept_url = build_absolute_uri(request, accept_path)
     site = get_site_settings()
+    organization_name = _invitation_target_label(invitation, site.site_name)
+    inviter = getattr(invitation, "invited_by", None)
+    invited_by = (
+        (inviter.get_full_name() or inviter.username)
+        if inviter
+        else f"{site.site_name} administrator"
+    )
     context = {
         **get_email_branding_context(
             request,
-            preheader=f"Accept your invitation to {invitation.church.name}",
+            preheader=f"Accept your invitation to {organization_name}",
         ),
         "invitation": invitation,
         "accept_url": accept_url,
-        "church_name": invitation.church.name,
-        "invited_by": invitation.invited_by.get_full_name() or invitation.invited_by.username,
+        "organization_name": organization_name,
+        "church_name": organization_name,
+        "invited_by": invited_by,
         "expires_at": invitation.expires_at,
     }
-    subject = f"You're invited to {site.site_name} — {invitation.church.name}"
+    subject = f"You're invited to {site.site_name} — {organization_name}"
     text_body = render_to_string("emails/user_invitation.txt", context)
     html_body = render_to_string("emails/user_invitation.html", context)
     return send_platform_email(

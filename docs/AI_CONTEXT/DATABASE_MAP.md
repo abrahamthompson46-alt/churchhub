@@ -329,6 +329,10 @@ Distinct from `sitecontrol.PlatformAnnouncement`.
 | `PlatformAnnouncement` | Platform-wide announcements |
 | `TenantApplication` | Public/apply workflow; status PENDING/APPROVED/REJECTED/WITHDRAWN; types EXISTING_DISTRICT/NEW_HIERARCHY |
 | `Denomination` | SaaS tenant boundary; branding; feature flags; defaults |
+| `MarketingSettings` | Singleton public inquiry, privacy consent, retention, website and sales-notification settings |
+| `MarketingCampaign` | UUID campaign; status/period and UTM attribution metadata |
+| `MarketingLead` | UUID platform sales inquiry; optional denomination/campaign; consent snapshot, assignment, lifecycle, notification delivery and anonymization metadata |
+| `MarketingAsset` | UUID approval-controlled HTTPS link to externally hosted collateral |
 
 ---
 

@@ -132,7 +132,7 @@ def pending_invitations_for_church(church, *, limit=20):
     )
 
 
-def pending_invitation_for_email(*, email, church=None):
+def pending_invitation_for_email(*, email, church=None, denomination=None):
     qs = UserInvitation.objects.filter(
         email=email,
         is_accepted=False,
@@ -140,6 +140,10 @@ def pending_invitation_for_email(*, email, church=None):
     )
     if church:
         qs = qs.filter(church=church)
+    elif denomination:
+        qs = qs.filter(denomination=denomination, church__isnull=True)
+    else:
+        qs = qs.filter(church__isnull=True, denomination__isnull=True)
     return qs.first()
 
 

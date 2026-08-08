@@ -1,0 +1,16 @@
+{% extends "emails/base_email.html" %}
+
+{% block email_title %}New marketing inquiry — {{ site_name }}{% endblock %}
+
+{% block email_content %}
+<h1 style="margin:0 0 16px;font-size:22px;color:#1e293b;">New marketing inquiry</h1>
+<p style="margin:0 0 16px;color:#334155;">A prospect submitted the ChurchHub inquiry form.</p>
+<table role="presentation" width="100%" style="font-size:14px;color:#334155;">
+  <tr><td style="padding:6px 0;font-weight:600;width:130px;">Contact</td><td>{{ lead.contact_name }}</td></tr>
+  <tr><td style="padding:6px 0;font-weight:600;">Email</td><td>{{ lead.contact_email }}</td></tr>
+  <tr><td style="padding:6px 0;font-weight:600;">Phone</td><td>{{ lead.contact_phone|default:"—" }}</td></tr>
+  <tr><td style="padding:6px 0;font-weight:600;">Organization</td><td>{{ lead.organization_name|default:"—" }}</td></tr>
+  <tr><td style="padding:6px 0;font-weight:600;">Campaign</td><td>{{ lead.campaign.name|default:lead.utm_campaign|default:"Direct" }}</td></tr>
+</table>
+<p style="margin:20px 0 0;color:#475569;">Open Platform Control → Marketing Hub to review the message and record follow-up.</p>
+{% endblock %}

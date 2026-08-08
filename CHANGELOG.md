@@ -7,6 +7,29 @@ Versioning per [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- Owner-only Marketing Hub in Platform Control with campaign attribution, lead workflow, conversion summaries, approved collateral links, and copy-ready website CTAs.
+- CSRF-protected public `/contact/` inquiry form with explicit consent, honeypot protection, proxy-aware throttling, denomination validation, branded sales notifications, and privacy-safe platform audit events.
+- Audited lead export, closed-lead anonymization, retention controls, durable notification status, and retryable Celery delivery.
+
+### Security
+
+- Dedicated `manage_marketing` platform capability is restricted to Platform Owners.
+- Marketing collateral accepts HTTPS links only; lead PII is excluded from audit details and application logs.
+- Public inquiry activation now requires an HTTPS privacy policy and consent configuration; throttling combines validated IP, hashed email, campaign and global limits.
+- Forwarded client IPs are accepted only from explicitly trusted proxy addresses.
+
+### Fixed
+
+- Institution hierarchy-admin invitations no longer fail email rendering when no home church is assigned.
+- Submitting an already-pending invitation now refreshes and resends it instead of silently leaving the recipient without another delivery attempt.
+- Churchless pending-invitation lookup is denomination-scoped.
+
+---
+
 ## [1.0.0] — 2026-07-22
 
 ### Added — General Availability

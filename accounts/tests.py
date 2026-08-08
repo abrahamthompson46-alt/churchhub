@@ -561,8 +561,78 @@ class ViewTests(ChurchHubTestMixin, TestCase):
         self.assertEqual(response.status_code, 302, getattr(response, "context", None) and response.context.get("form") and response.context["form"].errors)
         self.assertTrue(UserInvitation.objects.filter(username="invited").exists())
 
+    def test_duplicate_pending_invite_is_resent(self):
+        from unittest.mock import patch
+
+        invitation = create_invitation(
+            email="retry@test.com",
+            username="retry_invited",
+            role=UserRole.SECRETARY,
+            church=self.church,
+            invited_by=self.admin,
+        )
+        self._login("admin")
+        with patch(
+            "accounts.views.resend_invitation",
+            return_value=(invitation, True),
+        ) as resend:
+            response = self.client.post(
+                reverse("accounts:invite_user"),
+                {
+                    "email": "retry@test.com",
+                    "username": "retry_invited",
+                    "role": UserRole.SECRETARY,
+                    "scope_level": "CHURCH",
+                    "scope_unit": str(self.church.pk),
+                    "church": str(self.church.pk),
+                },
+            )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("accounts:invite_detail", args=[invitation.pk]))
+        resend.assert_called_once()
+
+    def test_churchless_pending_invite_lookup_is_denomination_scoped(self):
+        from accounts import selectors
+        from sitecontrol.models import Denomination
+
+        first = Denomination.objects.create(name="First", code="first-invite")
+        second = Denomination.objects.create(name="Second", code="second-invite")
+        expiry = timezone.now() + timedelta(hours=1)
+        first_invite = UserInvitation.objects.create(
+            email="shared@test.com",
+            username="first_shared",
+            role=UserRole.CONFERENCE_ADMIN,
+            scope_level="DENOMINATION",
+            denomination=first,
+            invited_by=self.admin,
+            expires_at=expiry,
+        )
+        second_invite = UserInvitation.objects.create(
+            email="shared@test.com",
+            username="second_shared",
+            role=UserRole.CONFERENCE_ADMIN,
+            scope_level="DENOMINATION",
+            denomination=second,
+            invited_by=self.admin,
+            expires_at=expiry,
+        )
+        self.assertEqual(
+            selectors.pending_invitation_for_email(
+                email="shared@test.com",
+                denomination=first,
+            ),
+            first_invite,
+        )
+        self.assertEqual(
+            selectors.pending_invitation_for_email(
+                email="shared@test.com",
+                denomination=second,
+            ),
+            second_invite,
+        )
+
     def test_local_pastor_cannot_invite_district_pastor_via_view(self):
-        pastor = User.objects.create_user(
+        User.objects.create_user(
             username="lp_view",
             password="pass12345",
             role=UserRole.LOCAL_PASTOR,

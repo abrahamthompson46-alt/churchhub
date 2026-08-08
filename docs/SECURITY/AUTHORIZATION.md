@@ -255,13 +255,15 @@ flowchart TD
 
 | `platform_role` | Capabilities (summary) |
 |-----------------|------------------------|
-| `OWNER` | All |
+| `OWNER` | All, including owner-only Marketing Hub management and PII export (`manage_marketing`, `export_marketing`) |
 | `SECURITY` | Security, operators, breakglass, audit/export, announcements, registration, ops |
 | `BILLING` | Plans, subscriptions, billing view, tenants, audit view |
 | `SUPPORT` | Tenants, applications, announcements, audit view, impersonate |
 | `READONLY` | View + audit/billing view |
 
 Break-glass: Django superuser or OWNER → full capability set. Impersonation audited (see AUDIT_COMPLIANCE).
+
+Marketing leads contain prospect contact information and are therefore restricted to `manage_marketing`; CSV export additionally requires `export_marketing`. These capabilities are not granted to SECURITY, BILLING, SUPPORT, or READONLY roles. Sidebar visibility is convenience only; every Marketing Hub view enforces the capability server-side.
 
 ---
 

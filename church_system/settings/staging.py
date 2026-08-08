@@ -35,6 +35,7 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = _https_mode
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     USE_X_FORWARDED_HOST = True
+    TRUST_X_FORWARDED_FOR = env_flag("CHURCHHUB_TRUST_X_FORWARDED_FOR", True)
 
 if os.environ.get("CHURCHHUB_ALLOW_SQLITE", "").lower() not in ("true", "1", "yes"):
     DATABASES = configure_databases(require_managed=True)

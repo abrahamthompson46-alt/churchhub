@@ -1,0 +1,122 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block title %}Marketing Hub — Platform{% endblock %}
+{% block page_title %}Marketing Hub{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Campaigns, inquiries, conversion and approved sales collateral.</p>{% endblock %}
+
+{% block page_actions %}
+<div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'sitecontrol:marketing_campaign_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New campaign</a>
+    <a href="{% url 'sitecontrol:marketing_settings' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-gear me-1"></i>Settings</a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if not marketing_settings.public_inquiry_enabled %}
+<div class="platform-alert platform-alert--warning mb-3">
+    <i class="bi bi-pause-circle"></i>
+    <div><strong>Public inquiries are paused.</strong> Enable them in <a href="{% url 'sitecontrol:marketing_settings' %}">Marketing Settings</a>.</div>
+</div>
+{% endif %}
+
+<div class="platform-stat-grid">
+    <div class="platform-stat-card"><div class="label">Total leads</div><div class="value">{{ counts.total_leads }}</div></div>
+    <div class="platform-stat-card"><div class="label">New</div><div class="value {% if counts.new_leads %}text-warning{% endif %}">{{ counts.new_leads }}</div></div>
+    <div class="platform-stat-card"><div class="label">Qualified</div><div class="value">{{ counts.qualified_leads }}</div></div>
+    <div class="platform-stat-card"><div class="label">Converted</div><div class="value text-success">{{ counts.converted_leads }}</div></div>
+    <div class="platform-stat-card"><div class="label">Conversion</div><div class="value">{{ conversion_rate }}%</div></div>
+    <div class="platform-stat-card"><div class="label">Active campaigns</div><div class="value">{{ counts.active_campaigns }}</div></div>
+    <div class="platform-stat-card"><div class="label">Approved assets</div><div class="value">{{ counts.approved_assets }}</div></div>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <a href="{% url 'sitecontrol:marketing_leads' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-people me-1"></i>All leads</a>
+    <a href="{% url 'sitecontrol:marketing_campaigns' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-bullseye me-1"></i>Campaigns</a>
+    <a href="{% url 'sitecontrol:marketing_assets' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-collection me-1"></i>Asset library</a>
+    <a href="{{ inquiry_url }}" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right me-1"></i>Preview inquiry form</a>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-7">
+        <div class="platform-card platform-card--compact">
+            <div class="platform-card-header">
+                <span>Recent inquiries</span>
+                <a href="{% url 'sitecontrol:marketing_leads' %}" class="small">View all →</a>
+            </div>
+            <div class="table-responsive">
+                <table class="platform-table mb-0">
+                    <thead><tr><th>Contact</th><th>Organization</th><th>Campaign</th><th>Status</th><th>Received</th></tr></thead>
+                    <tbody>
+                    {% for lead in recent_leads %}
+                    <tr>
+                        <td><a href="{% url 'sitecontrol:marketing_lead_detail' lead.pk %}">{{ lead.contact_name }}</a><br><span class="small text-muted">{{ lead.contact_email }}</span></td>
+                        <td>{{ lead.organization_name|default:"—" }}</td>
+                        <td>{{ lead.campaign.name|default:lead.utm_campaign|default:"Direct" }}</td>
+                        <td><span class="badge bg-{% if lead.status == 'CONVERTED' %}success{% elif lead.status == 'NEW' %}warning text-dark{% else %}secondary{% endif %}">{{ lead.get_status_display }}</span></td>
+                        <td class="small text-muted text-nowrap">{{ lead.created_at|date:"M j, Y" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="text-muted">No inquiries yet. Copy a website button below to begin.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="platform-card platform-card--compact">
+            <div class="platform-card-header">Website buttons</div>
+            <div class="platform-card-body">
+                <label class="form-label fw-semibold" for="demo-button-code">Request a demo</label>
+                <textarea id="demo-button-code" class="form-control form-control-sm font-monospace mb-2" rows="3" readonly>{{ demo_button_html }}</textarea>
+                <button type="button" class="btn btn-outline-primary btn-sm mb-3" data-copy-target="demo-button-code">Copy HTML</button>
+
+                <label class="form-label fw-semibold" for="registration-button-code">Register a church</label>
+                <textarea id="registration-button-code" class="form-control form-control-sm font-monospace mb-2" rows="3" readonly>{{ registration_button_html }}</textarea>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-copy-target="registration-button-code">Copy HTML</button>
+                <p class="small text-muted mt-3 mb-0">Paste these links into your existing website. The inquiry form remains hosted securely by ChurchHub.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="platform-card platform-card--compact mt-3">
+    <div class="platform-card-header">
+        <span>Campaign links</span>
+        <a href="{% url 'sitecontrol:marketing_campaigns' %}" class="small">Manage →</a>
+    </div>
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead><tr><th>Campaign</th><th>Source / medium</th><th>Leads</th><th>Converted</th><th>Tracked link</th></tr></thead>
+            <tbody>
+            {% for row in campaigns %}
+            <tr>
+                <td><strong>{{ row.campaign.name }}</strong><br><span class="badge bg-secondary">{{ row.campaign.get_status_display }}</span></td>
+                <td>{{ row.campaign.source|default:"direct" }} / {{ row.campaign.medium|default:"none" }}</td>
+                <td>{{ row.campaign.lead_count }}</td>
+                <td>{{ row.campaign.converted_count }}</td>
+                <td><input class="form-control form-control-sm" value="{{ row.url }}" readonly aria-label="Tracked campaign link"></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-muted">No campaigns configured.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('[data-copy-target]').forEach(function (button) {
+    button.addEventListener('click', function () {
+        const field = document.getElementById(button.dataset.copyTarget);
+        navigator.clipboard.writeText(field.value).then(function () {
+            const original = button.textContent;
+            button.textContent = 'Copied';
+            setTimeout(function () { button.textContent = original; }, 1500);
+        });
+    });
+});
+</script>
+{% endblock %}

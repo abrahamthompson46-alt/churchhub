@@ -1,0 +1,34 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block title %}Marketing Settings — Platform{% endblock %}
+{% block page_title %}Marketing Settings{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Control public inquiry intake, consent and sales notifications.</p>{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-header">Inquiry configuration</div>
+    <div class="platform-card-body">
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+            {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+            {% for field in form.visible_fields %}
+            <div class="mb-3">
+                {% if field.field.widget.input_type == "checkbox" %}
+                <div class="form-check">{{ field }}<label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label></div>
+                {% else %}
+                <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% endif %}
+                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Save settings</button>
+                <a href="{% url 'sitecontrol:marketing_hub' %}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

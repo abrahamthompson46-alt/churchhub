@@ -136,6 +136,57 @@ class EmailConfigTests(TestCase):
         self.assertIn("invited", mail.outbox[0].subject.lower())
         self.assertEqual(mail.outbox[0].to, ["newmember@example.com"])
 
+    def test_churchless_tree_admin_invitation_email_sends(self):
+        from django.core import mail
+        from unittest.mock import patch
+
+        from accounts.services import create_invitation, send_invitation_email
+        from permissions.org_scope import OrgScopeLevel
+        from permissions.roles import UserRole
+        from sitecontrol.models import Denomination
+        from sitecontrol.services import clear_settings_cache
+
+        denomination = Denomination.objects.create(
+            name="Regional Fellowship",
+            display_name="Regional Fellowship",
+            code="regional-fellowship",
+            is_active=True,
+        )
+        inviter = User.objects.create_user(
+            username="tenant_super_admin",
+            password="pass12345",
+            role=UserRole.SUPER_ADMIN,
+            denomination=denomination,
+        )
+        site = SiteSettings.load()
+        site.smtp_host = "smtp.example.com"
+        site.default_from_email = "noreply@example.com"
+        site.save()
+        clear_settings_cache()
+
+        invitation = create_invitation(
+            email="conference.admin@example.com",
+            username="conference_admin",
+            role=UserRole.CONFERENCE_ADMIN,
+            church=None,
+            denomination=denomination,
+            scope_level=OrgScopeLevel.DENOMINATION,
+            invited_by=inviter,
+        )
+        with patch("church_system.email_service.get_platform_connection") as mock_conn:
+            from django.core.mail import get_connection
+
+            mock_conn.return_value = get_connection(
+                "django.core.mail.backends.locmem.EmailBackend"
+            )
+            sent = send_invitation_email(invitation, fail_silently=False)
+
+        self.assertTrue(sent)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Regional Fellowship", mail.outbox[0].subject)
+        self.assertIn("Regional Fellowship", mail.outbox[0].body)
+        self.assertIn(str(invitation.token), mail.outbox[0].body)
+
     def test_get_platform_connection_uses_smtp_backend_not_platform_wrapper(self):
         """Regression: must not recurse when EMAIL_BACKEND is PlatformSMTPEmailBackend."""
         from django.core.mail.backends.smtp import EmailBackend

@@ -54,6 +54,15 @@ CSRF_TRUSTED_ORIGINS = [
     for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+TRUST_X_FORWARDED_FOR = env_flag("CHURCHHUB_TRUST_X_FORWARDED_FOR", False)
+TRUSTED_PROXY_IPS = [
+    value.strip()
+    for value in os.environ.get(
+        "CHURCHHUB_TRUSTED_PROXY_IPS",
+        "127.0.0.1,::1",
+    ).split(",")
+    if value.strip()
+]
 if ON_PYTHONANYWHERE and not CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS = [
         "https://churchhub.pythonanywhere.com",

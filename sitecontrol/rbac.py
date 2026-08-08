@@ -39,6 +39,8 @@ CAP_VIEW_BILLING = "view_billing"
 CAP_OPS = "manage_ops"
 CAP_IMPERSONATE = "impersonate"
 CAP_MANAGE_DATA_IMPORT = "manage_data_import"
+CAP_MANAGE_MARKETING = "manage_marketing"
+CAP_EXPORT_MARKETING = "export_marketing"
 
 ALL_CAPABILITIES = frozenset({
     CAP_VIEW,
@@ -61,6 +63,8 @@ ALL_CAPABILITIES = frozenset({
     CAP_OPS,
     CAP_IMPERSONATE,
     CAP_MANAGE_DATA_IMPORT,
+    CAP_MANAGE_MARKETING,
+    CAP_EXPORT_MARKETING,
 })
 
 ROLE_CAPABILITIES = {
@@ -135,6 +139,21 @@ NAV_ITEM_CAPABILITIES = {
     "sitecontrol:import_hub": CAP_MANAGE_DATA_IMPORT,
     "sitecontrol:import_members": CAP_MANAGE_DATA_IMPORT,
     "sitecontrol:import_transactions": CAP_MANAGE_DATA_IMPORT,
+    "sitecontrol:marketing_hub": CAP_MANAGE_MARKETING,
+    "sitecontrol:marketing_settings": CAP_MANAGE_MARKETING,
+    "sitecontrol:marketing_campaigns": CAP_MANAGE_MARKETING,
+    "sitecontrol:marketing_campaign_add": CAP_MANAGE_MARKETING,
+    "sitecontrol:marketing_campaign_edit": CAP_MANAGE_MARKETING,
+    "sitecontrol:marketing_campaign_archive": CAP_MANAGE_MARKETING,
+    "sitecontrol:marketing_leads": CAP_MANAGE_MARKETING,
+    "sitecontrol:marketing_lead_detail": CAP_MANAGE_MARKETING,
+    "sitecontrol:marketing_assets": CAP_MANAGE_MARKETING,
+    "sitecontrol:marketing_asset_add": CAP_MANAGE_MARKETING,
+    "sitecontrol:marketing_asset_edit": CAP_MANAGE_MARKETING,
+    "sitecontrol:marketing_asset_archive": CAP_MANAGE_MARKETING,
+    "sitecontrol:marketing_lead_export": CAP_EXPORT_MARKETING,
+    "sitecontrol:marketing_lead_anonymize": CAP_MANAGE_MARKETING,
+    "sitecontrol:marketing_retention_run": CAP_MANAGE_MARKETING,
 }
 
 

@@ -43,6 +43,18 @@ PLATFORM_NAV = [
         ],
     },
     {
+        "id": "growth",
+        "label": "Growth",
+        "icon": "bi-graph-up-arrow",
+        "items": [
+            {
+                "label": "Marketing Hub",
+                "url_name": "sitecontrol:marketing_hub",
+                "icon": "bi-megaphone-fill",
+            },
+        ],
+    },
+    {
         "id": "config",
         "label": "Configuration",
         "icon": "bi-sliders2-vertical",

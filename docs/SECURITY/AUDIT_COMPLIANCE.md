@@ -118,11 +118,13 @@ Critical for reconstructing why a user could (or could not) perform an action. S
 
 **Model:** `sitecontrol.PlatformAuditLog` — **immutable**
 
-Covers (non-exhaustive): settings/plan/subscription/tenant lifecycle, operator changes, maintenance, registration applications, provisioning, payment methods, denomination admin, audit export, email tests, **IMPERSONATE_START/END**, **BREAKGLASS_GRANT**.
+Covers (non-exhaustive): settings/plan/subscription/tenant lifecycle, operator changes, maintenance, registration applications, provisioning, payment methods, denomination admin, owner marketing settings/campaigns/leads/assets, audit export, email tests, **IMPERSONATE_START/END**, **BREAKGLASS_GRANT**.
 
 Writer: `sitecontrol.services.log_platform_action` (and related services).
 
 Platform IP allowlist and maintenance toggles should appear when changed through platform UI/services.
+
+Marketing audit details intentionally contain workflow metadata only (record IDs, status transitions, campaign ID, duplicate flag, changed field names, delivery state, export count, and anonymization count). Prospect names, email addresses, phone numbers, messages, consent text, and internal notes are not copied into `PlatformAuditLog` or application logs. Anonymous inquiry and delivery audit rows may have no actor and use the trusted-proxy-aware client IP helper. Lead export, notification outcome, individual anonymization, and retention runs are audited.
 
 See `docs/MODULE_SPECIFICATIONS/SITE_CONTROL/site_control_spec.md`.
 

@@ -243,9 +243,41 @@ def invite_user(request):
         existing = selectors.pending_invitation_for_email(
             email=data["email"],
             church=data.get("church"),
+            denomination=data.get("denomination"),
         )
         if existing and existing.is_valid:
-            flash_warning(request, "Use the existing invite link or wait for it to expire.", title="Invitation pending")
+            try:
+                _invitation, emailed = resend_invitation(
+                    existing,
+                    performed_by=request.user,
+                    ip_address=get_client_ip(request),
+                    request=request,
+                    fail_silently=False,
+                )
+            except Exception as exc:
+                flash_warning(
+                    request,
+                    (
+                        f"The pending invitation was refreshed, but email delivery failed "
+                        f"({exc}). Share the link from the invitation details and verify "
+                        "Platform → Email."
+                    ),
+                    title="Invitation refreshed — email failed",
+                )
+            else:
+                if emailed:
+                    flash_success(
+                        request,
+                        f"Invitation resent to {existing.email}.",
+                        title="Invitation resent",
+                    )
+                else:
+                    flash_warning(
+                        request,
+                        "The invitation was refreshed but SMTP did not accept the email.",
+                        title="Invitation not delivered",
+                    )
+            return redirect("accounts:invite_detail", pk=existing.pk)
         else:
             church = data.get("church")
             allowed, message = (True, "")

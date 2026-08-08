@@ -1,0 +1,29 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block title %}{% if campaign %}Edit{% else %}New{% endif %} Campaign — Platform{% endblock %}
+{% block page_title %}{% if campaign %}Edit campaign{% else %}New campaign{% endif %}{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Use clear UTM values so every inquiry has trustworthy attribution.</p>{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-body">
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+            <div class="row g-3">
+                {% for field in form %}
+                <div class="{% if field.name == 'name' or field.name == 'campaign_tag' %}col-md-8{% elif field.name == 'slug' or field.name == 'status' %}col-md-4{% else %}col-md-6{% endif %}">
+                    <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary">Save campaign</button>
+                <a href="{% url 'sitecontrol:marketing_campaigns' %}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

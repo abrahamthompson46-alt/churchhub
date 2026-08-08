@@ -1,0 +1,9 @@
+New ChurchHub marketing inquiry
+
+Contact: {{ lead.contact_name }}
+Email: {{ lead.contact_email }}
+Phone: {{ lead.contact_phone|default:"—" }}
+Organization: {{ lead.organization_name|default:"—" }}
+Campaign: {{ lead.campaign.name|default:lead.utm_campaign|default:"Direct" }}
+
+Open Platform Control → Marketing Hub to review the message and record follow-up.

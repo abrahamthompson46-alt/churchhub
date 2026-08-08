@@ -141,6 +141,7 @@ def dashboard(request):
                 "sitecontrol:ops_health",
                 "sitecontrol:application_list",
                 "sitecontrol:subscription_list",
+                "sitecontrol:marketing_hub",
             }:
                 quick_actions.append(item)
     return render(request, "sitecontrol/dashboard.html", {

@@ -1,0 +1,64 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block title %}Marketing Inquiry — Platform{% endblock %}
+{% block page_title %}Marketing Inquiry{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Owner-only lead details and follow-up workflow.</p>{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="platform-card">
+            <div class="platform-card-header">Inquiry details</div>
+            <div class="platform-card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Contact</dt><dd class="col-sm-8">{{ lead.contact_name }}</dd>
+                    <dt class="col-sm-4">Email</dt><dd class="col-sm-8"><a href="mailto:{{ lead.contact_email }}">{{ lead.contact_email }}</a></dd>
+                    <dt class="col-sm-4">Phone</dt><dd class="col-sm-8">{{ lead.contact_phone|default:"—" }}</dd>
+                    <dt class="col-sm-4">Organization</dt><dd class="col-sm-8">{{ lead.organization_name|default:"—" }}</dd>
+                    <dt class="col-sm-4">Denomination</dt><dd class="col-sm-8">{{ lead.denomination.display_name|default:"—" }}</dd>
+                    <dt class="col-sm-4">Campaign</dt><dd class="col-sm-8">{{ lead.campaign.name|default:"Direct / unassigned" }}</dd>
+                    <dt class="col-sm-4">Attribution</dt><dd class="col-sm-8">{{ lead.utm_source|default:"direct" }} / {{ lead.utm_medium|default:"none" }} / {{ lead.utm_campaign|default:"—" }}</dd>
+                    <dt class="col-sm-4">Received</dt><dd class="col-sm-8">{{ lead.created_at|date:"M j, Y H:i" }}</dd>
+                    <dt class="col-sm-4">Sales notification</dt><dd class="col-sm-8">{{ lead.get_notification_status_display }}{% if lead.notification_attempts %} ({{ lead.notification_attempts }} attempt{{ lead.notification_attempts|pluralize }}){% endif %}</dd>
+                    {% if lead.anonymized_at %}<dt class="col-sm-4">Privacy status</dt><dd class="col-sm-8"><span class="badge bg-secondary">Anonymized {{ lead.anonymized_at|date:"M j, Y" }}</span></dd>{% endif %}
+                    <dt class="col-sm-4">Message</dt><dd class="col-sm-8">{{ lead.message|default:"No message provided."|linebreaksbr }}</dd>
+                </dl>
+            </div>
+        </div>
+        <div class="platform-card mt-3">
+            <div class="platform-card-header">Consent evidence</div>
+            <div class="platform-card-body">
+                <p class="mb-2"><span class="badge bg-success">Consent recorded</span> {{ lead.consented_at|date:"M j, Y H:i" }}</p>
+                <p class="small text-muted mb-1">{{ lead.consent_text }}</p>
+                <p class="small text-muted mb-0">Submission IP: {{ lead.ip_address|default:"Unavailable" }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="platform-card">
+            <div class="platform-card-header">Follow-up</div>
+            <div class="platform-card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-primary">Save follow-up</button>
+                    <a href="{% url 'sitecontrol:marketing_leads' %}" class="btn btn-outline-secondary">Back</a>
+                </form>
+                {% if lead.status == "CLOSED" and not lead.anonymized_at %}
+                <hr>
+                <form method="post" action="{% url 'sitecontrol:marketing_lead_anonymize' lead.pk %}" onsubmit="return confirm('Permanently anonymize this lead’s personal data? This cannot be undone.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Anonymize personal data</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

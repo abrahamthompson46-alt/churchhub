@@ -9,6 +9,7 @@ from church_system.auth import ChurchHubLoginView
 from church_system.media_views import protected_media
 from church_system.views import health_check, live_check, metrics_check, ready_check
 from sitecontrol.views_registration import church_apply, church_apply_success
+from sitecontrol.views_marketing import marketing_inquiry, marketing_inquiry_success
 
 urlpatterns = [
     path("health/", health_check, name="health_check"),
@@ -17,6 +18,12 @@ urlpatterns = [
     path("metrics/", metrics_check, name="metrics"),
     path("apply/", church_apply, name="church_apply"),
     path("apply/success/", church_apply_success, name="church_apply_success"),
+    path("contact/", marketing_inquiry, name="marketing_inquiry"),
+    path(
+        "contact/success/",
+        marketing_inquiry_success,
+        name="marketing_inquiry_success",
+    ),
     path("", RedirectView.as_view(pattern_name="login", permanent=False)),
     path(
         "accounts/login/",

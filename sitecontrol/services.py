@@ -148,7 +148,9 @@ def build_platform_setup_checklist():
 
 
 def log_platform_action(request, action, summary, *, target_model="", target_id="", details=None, denomination=None):
-    ip = request.META.get("REMOTE_ADDR")
+    from church_system.client_ip import get_client_ip
+
+    ip = get_client_ip(request)
     if denomination is None:
         denomination = getattr(request, "denomination", None)
     repo.create_platform_audit(

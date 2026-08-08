@@ -18,13 +18,52 @@ def send_invitation_email_task(self, invitation_id):
     from accounts.models import UserInvitation
     from church_system.email_service import send_user_invitation_email
 
-    invitation = UserInvitation.objects.select_related("church", "invited_by").get(
-        pk=invitation_id
-    )
+    try:
+        invitation = UserInvitation.objects.select_related(
+            "church",
+            "invited_by",
+            "denomination",
+            "scope_district",
+            "scope_zone",
+            "scope_conference",
+            "scope_union",
+            "scope_general_conference",
+        ).get(pk=invitation_id)
+    except UserInvitation.DoesNotExist:
+        return {"status": "skipped", "reason": "invitation missing"}
     if not invitation.is_valid:
         return {"status": "skipped", "reason": "invitation invalid"}
-    sent = send_user_invitation_email(invitation, request=None, fail_silently=False)
-    return {"status": "sent" if sent else "skipped", "email": invitation.email}
+    try:
+        sent = send_user_invitation_email(
+            invitation,
+            request=None,
+            fail_silently=False,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Invitation email task failed for invitation %s; retrying.",
+            invitation_id,
+        )
+        raise self.retry(exc=exc)
+    return {
+        "status": "sent" if sent else "skipped",
+        "invitation_id": str(invitation.pk),
+    }
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_marketing_lead_notification_task(self, lead_id):
+    from sitecontrol.marketing_services import deliver_lead_notification
+
+    try:
+        sent = deliver_lead_notification(lead_id, raise_on_error=True)
+    except Exception as exc:
+        logger.warning(
+            "Marketing lead notification task failed for lead %s; retrying.",
+            lead_id,
+        )
+        raise self.retry(exc=exc)
+    return {"status": "sent" if sent else "skipped", "lead_id": str(lead_id)}
 
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=120)

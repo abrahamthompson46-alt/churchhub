@@ -1,0 +1,66 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block title %}Marketing Leads — Platform{% endblock %}
+{% block page_title %}Marketing Leads{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Review consented inquiries and move them through the sales workflow.</p>{% endblock %}
+{% block page_actions %}
+<form method="post" action="{% url 'sitecontrol:marketing_lead_export' %}" class="d-inline">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-download me-1"></i>Export CSV</button>
+</form>
+<form method="post" action="{% url 'sitecontrol:marketing_retention_run' %}" class="d-inline" onsubmit="return confirm('Anonymize closed leads older than the configured retention period?');">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-shield-x me-1"></i>Run retention</button>
+</form>
+{% endblock %}
+
+{% block content %}
+<div class="platform-card platform-card--compact mb-3">
+    <div class="platform-card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label small" for="lead-search">Search</label>
+                <input id="lead-search" name="q" value="{{ query }}" class="form-control form-control-sm" placeholder="Name, email or organization">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small" for="lead-status">Status</label>
+                <select id="lead-status" name="status" class="form-select form-select-sm">
+                    <option value="">All statuses</option>
+                    {% for value, label in status_choices %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3"><button class="btn btn-primary btn-sm">Filter</button> <a href="{% url 'sitecontrol:marketing_leads' %}" class="btn btn-outline-secondary btn-sm">Reset</a></div>
+        </form>
+    </div>
+</div>
+
+<div class="platform-card">
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead><tr><th>Contact</th><th>Organization</th><th>Denomination</th><th>Campaign</th><th>Owner</th><th>Status</th><th>Received</th></tr></thead>
+            <tbody>
+            {% for lead in page_obj %}
+            <tr>
+                <td><a href="{% url 'sitecontrol:marketing_lead_detail' lead.pk %}"><strong>{{ lead.contact_name }}</strong></a><br><span class="small text-muted">{{ lead.contact_email }}</span></td>
+                <td>{{ lead.organization_name|default:"—" }}</td>
+                <td>{{ lead.denomination.display_name|default:"—" }}</td>
+                <td>{{ lead.campaign.name|default:lead.utm_campaign|default:"Direct" }}</td>
+                <td>{{ lead.assigned_to.get_full_name|default:lead.assigned_to.username|default:"Unassigned" }}</td>
+                <td><span class="badge bg-{% if lead.status == 'CONVERTED' %}success{% elif lead.status == 'NEW' %}warning text-dark{% else %}secondary{% endif %}">{{ lead.get_status_display }}</span></td>
+                <td class="small text-muted text-nowrap">{{ lead.created_at|date:"M j, Y H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-muted">No leads match these filters.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if page_obj.has_other_pages %}
+    <div class="platform-card-body py-2 d-flex justify-content-between">
+        {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}&status={{ status_filter }}&q={{ query|urlencode }}">← Previous</a>{% else %}<span></span>{% endif %}
+        <span class="small text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}&status={{ status_filter }}&q={{ query|urlencode }}">Next →</a>{% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

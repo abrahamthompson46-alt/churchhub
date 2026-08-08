@@ -39,6 +39,7 @@ if SECRET_KEY == _INSECURE_SECRET:
 # Trust Nginx / TLS terminator for scheme and host.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
+TRUST_X_FORWARDED_FOR = env_flag("CHURCHHUB_TRUST_X_FORWARDED_FOR", True)
 
 # Clickjacking / XSS-related headers (also set in base).
 X_FRAME_OPTIONS = "DENY"

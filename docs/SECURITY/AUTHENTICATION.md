@@ -268,6 +268,8 @@ sequenceDiagram
 | Accept URL | `/accounts/invite/accept/<uuid:token>/` |
 | Validity | Not accepted (single-use), not expired, not revoked (`UserInvitation.is_valid`) |
 | Default validity | **1 hour** (`accounts.services.INVITATION_VALIDITY`); resend issues a **new token** + fresh 1-hour window |
+| Hierarchy admins | Invitations may have no home church; email branding falls back through assigned hierarchy/denomination scope |
+| Pending duplicate | Re-submitting a valid pending invitation refreshes its token and retries email delivery |
 | Activation toggle | `activate_user` / `deactivate_user` set `is_active` |
 | Audit | INVITE_*, USER_CREATE on `UserActivityLog` |
 | Gates | `sitecontrol` invite limits / `institution_invites_allowed()` |

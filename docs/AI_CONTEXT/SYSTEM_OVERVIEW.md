@@ -83,7 +83,7 @@ From `church_system/settings.py` `INSTALLED_APPS`:
 | `payroll` | Employees, payroll runs, statutory rules → posts journals |
 | `assets` | Fixed assets, depreciation, maintenance |
 | `portal` | Member-linked self-service views |
-| `sitecontrol` | Platform SaaS: denominations, subscriptions, applications, settings |
+| `sitecontrol` | Platform SaaS: denominations, subscriptions, applications, owner marketing, settings |
 
 ---
 
@@ -95,6 +95,7 @@ Defined in `church_system/urls.py`:
 |--------|-----|
 | `/health/` | Health check |
 | `/apply/` | Public tenant application |
+| `/contact/` | Public marketing inquiry |
 | `/admin/` | Django admin |
 | `/dashboard/` | `dashboard` |
 | `/members/` | `members` |

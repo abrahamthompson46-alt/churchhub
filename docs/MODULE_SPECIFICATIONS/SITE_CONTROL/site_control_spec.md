@@ -2,7 +2,7 @@
 
 **App:** `sitecontrol` (`SitecontrolConfig`)  
 **Mount:** `/platform/` (namespace `sitecontrol`)  
-**Public registration:** `/apply/`, `/apply/success/` (wired in root `urls.py`)  
+**Public registration and inquiry:** `/apply/`, `/apply/success/`, `/contact/`, `/contact/success/` (wired in root `urls.py`)
 **Companions:** `docs/ARCHITECTURE/MULTI_TENANCY.md`, `docs/SECURITY/*`, `AGENTS.md` §4  
 **Source of truth:** Live Django code
 
@@ -16,7 +16,7 @@
 
 ## 1. Purpose and responsibilities
 
-Platform **control tower**: site settings, denomination SaaS wall, subscription plans/features, tenant lifecycle (provision/suspend/offboard), operator RBAC, registration applications, platform announcements, audit, maintenance, login rate limit, impersonation.
+Platform **control tower**: site settings, denomination SaaS wall, subscription plans/features, tenant lifecycle (provision/suspend/offboard), operator RBAC, registration applications, owner marketing campaigns/leads/assets, platform announcements, audit, maintenance, login rate limit, impersonation.
 
 | Owns | Does not own |
 |------|----------------|
@@ -49,6 +49,10 @@ erDiagram
 - **PlatformAnnouncement** — platform banner content  
 - **TenantApplication** — public apply workflow  
 - **Denomination** — SaaS isolation wall, terminology, branding/seeds  
+- **MarketingSettings** — singleton inquiry, consent, privacy, retention, and sales-notification controls
+- **MarketingCampaign** — owner-created attribution campaigns and tracked inquiry URLs
+- **MarketingLead** — consented platform prospect inquiries with optional denomination/campaign attribution, durable notification status, and anonymization evidence
+- **MarketingAsset** — approval-controlled HTTPS links to externally hosted collateral
 
 **Managers:** none custom. Access helpers in `platform_access.py`, `rbac.py`. Reads via `selectors.py`; writes via `repositories.py` (P1-2 layered).
 
@@ -64,6 +68,12 @@ erDiagram
 6. Denomination context scopes platform operators who are not global.  
 7. Tenant suspend/reactivate/offboard via services; applications approve → provision church + invite.  
 8. Platform operators identified by `user.is_platform_user` + `platform_role` capabilities.
+9. Marketing management requires owner-only `manage_marketing`; leads are platform data, not church visitor records.
+10. Public inquiries default to disabled and require owner activation after configuring an HTTPS privacy policy, consent, retention, and (when enabled) a sales inbox.
+11. Valid inquiries are throttled by trusted client IP, hashed email, campaign, and global windows; invalid/honeypot forms do not consume quota.
+12. Lead notifications are scheduled after database commit, retain PENDING/SENT/FAILED/DISABLED state, and can use retryable Celery delivery.
+13. Only closed leads may be anonymized. Retention runs anonymize closed leads older than the configured period; lead CSV exports and anonymization are owner-only and audited.
+14. Marketing assets are HTTPS metadata links only; ChurchHub does not expose uploaded collateral through private media.
 
 ---
 
@@ -81,6 +91,9 @@ erDiagram
 | `platform_access.py` | Operator denomination filters (reads via selectors) |
 | `crypto.py` | SMTP secret encrypt/decrypt |
 | `navigation.py` | Platform nav |
+| `marketing_selectors.py` | Campaign/lead/asset reads and dashboard aggregates |
+| `marketing_repositories.py` | Marketing persistence helpers |
+| `marketing_services.py` | Attribution, inquiry submission, throttling, URLs and notifications |
 
 **Layering (P1-2):** Views → services → selectors/repositories → models. Views/forms handle HTTP and forms only; ModelForm CRUD uses `commit=False` + repositories. Platform vs institution lanes, denomination wall, maintenance, middleware, and public `/apply/` are unchanged.
 
@@ -94,7 +107,7 @@ Commands: `seed_denominations`, `expire_subscriptions`, `normalize_user_scopes`.
 
 **Not** institution `permissions` matrix for most `/platform/` routes.
 
-Platform uses **capability RBAC** (`sitecontrol.rbac`): roles OWNER / SECURITY / BILLING / SUPPORT / READONLY → capabilities (`manage_tenants`, `impersonate`, `view_audit`, etc.).
+Platform uses **capability RBAC** (`sitecontrol.rbac`): roles OWNER / SECURITY / BILLING / SUPPORT / READONLY → capabilities (`manage_tenants`, `impersonate`, `view_audit`, etc.). `manage_marketing` is assigned only to OWNER (plus break-glass platform superusers through the existing owner rule).
 
 Entry: `platform_required` / `require_platform_capability` / `can_manage_platform`.
 
@@ -118,19 +131,20 @@ Institution feature gate decorator: `require_feature` in `sitecontrol.checks`.
 | Operators | list/add/edit/deactivate |
 | Impersonate | `impersonate/<user>/`, `impersonate/end/` |
 | Announcements | platform announcements CRUD |
+| Marketing | `marketing/`, settings, campaigns, leads/export/retention/anonymization and approved asset links |
 | Hierarchy view | `organization/` |
 
-Public: `/apply/`, `/apply/success/`.
+Public: `/apply/`, `/apply/success/`, `/contact/`, `/contact/success/`.
 
 ---
 
 ## 7. Forms / Views / Templates
 
-**Forms:** SiteSettings*, Registration*, TenantApplication*, Billing*, Plan/Subscription*, PlatformOperator*, Denomination*, PlatformAnnouncement*, provisioning forms (`forms.py`, `denomination_forms.py`).
+**Forms:** SiteSettings*, Registration*, TenantApplication*, Billing*, Plan/Subscription*, PlatformOperator*, Denomination*, PlatformAnnouncement*, provisioning forms (`forms.py`, `denomination_forms.py`), and marketing settings/campaign/lead/asset/public inquiry forms (`marketing_forms.py`).
 
-**Views:** `views.py`, `views_registration.py`, `views_denominations.py`.
+**Views:** `views.py`, `views_registration.py`, `views_denominations.py`, `views_marketing.py`.
 
-**Templates:** `templates/sitecontrol/` (and apply templates).
+**Templates:** `templates/sitecontrol/` (plus registration and public inquiry templates).
 
 ---
 
@@ -187,6 +201,10 @@ flowchart LR
 - `tenant_reprovision_financials` may re-seed financial defaults (accounts/ledger) — operational, not day-to-day GL.  
 - Subscription billing is SaaS entitlement, not church treasury accounting.
 
+### Marketing Hub migration note
+
+`sitecontrol.0019` and `0020` are additive and require no data migration or planned downtime. Run both before enabling public inquiries. Reversing them removes marketing records or hardening metadata; after launch, export/preserve lead data before any rollback.
+
 ---
 
 ## 12. Security considerations
@@ -198,6 +216,11 @@ flowchart LR
 - Django admin requires platform superuser path (`can_access_django_admin`); church/unit ModelAdmin querysets additionally use `admin_custom.tenancy` (OWNER global; other roles limited to `managed_denominations`).  
 - Never commit SMTP passwords; prefer encrypted field.  
 - Maintenance and login lockout protect availability/auth.
+- Marketing lead PII is owner-only, excluded from audit JSON/log messages, and captured only after explicit consent.
+- Public inquiry POSTs use Django CSRF, a honeypot, and shared-cache limits keyed by trusted IP plus hashed email/campaign/global dimensions.
+- Public intake cannot be enabled through the owner form without an HTTPS privacy policy, consent wording, and a sales inbox when notifications are enabled.
+- CSV values are neutralized against spreadsheet formulas; exports and anonymization create redacted platform audit events.
+- Marketing asset URLs are HTTPS-only and do not weaken protected media.
 
 ---
 

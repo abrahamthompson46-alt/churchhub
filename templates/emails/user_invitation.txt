@@ -1,6 +1,6 @@
 You're invited to {{ site_name }}
 
-{{ invited_by }} has invited you to join {{ church_name }} on {{ site_name }}.
+{{ invited_by }} has invited you to join {{ organization_name }} on {{ site_name }}.
 
 Accept your invitation and set your password:
 {{ accept_url }}

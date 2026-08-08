@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Request a ChurchHub Demo — {{ site_name }}{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<div class="auth-split">
+    <aside class="auth-split-brand">
+        <div class="auth-split-brand-inner">
+            <div class="brand-mark mb-4"><i class="bi bi-graph-up-arrow"></i></div>
+            <h2 class="auth-split-title">Grow with confidence</h2>
+            <p class="auth-split-tagline">See how ChurchHub brings membership, administration, finance and reporting together securely.</p>
+            <ul class="auth-feature-list mt-4">
+                <li><i class="bi bi-check-circle"></i> Request a guided demonstration</li>
+                <li><i class="bi bi-check-circle"></i> Discuss your organization’s needs</li>
+                <li><i class="bi bi-check-circle"></i> Get help planning onboarding</li>
+            </ul>
+        </div>
+    </aside>
+    <section class="auth-split-form">
+        <div class="auth-card card">
+            <div class="card-body p-4 p-md-5">
+                <h1 class="h4 fw-bold mb-1">Request a demo</h1>
+                <p class="text-muted small mb-4">Tell us how to reach you. A platform representative will follow up.</p>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                    {% if form.non_field_errors %}<div class="alert alert-danger small">{{ form.non_field_errors }}</div>{% endif %}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.contact_name.id_for_label }}">Full name</label>
+                            {{ form.contact_name }}
+                            {% for error in form.contact_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.contact_email.id_for_label }}">Email</label>
+                            {{ form.contact_email }}
+                            {% for error in form.contact_email.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.contact_phone.id_for_label }}">Phone (optional)</label>
+                            {{ form.contact_phone }}
+                            {% for error in form.contact_phone.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.organization_name.id_for_label }}">Church or organization</label>
+                            {{ form.organization_name }}
+                            {% for error in form.organization_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="{{ form.denomination.id_for_label }}">Denomination (optional)</label>
+                            {{ form.denomination }}
+                            {% for error in form.denomination.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="{{ form.message.id_for_label }}">How can we help?</label>
+                            {{ form.message }}
+                            {% for error in form.message.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ form.consent }}
+                                <label class="form-check-label small" for="{{ form.consent.id_for_label }}">{{ form.consent.label }}</label>
+                            </div>
+                            {% for error in form.consent.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                            {% if marketing_settings.privacy_policy_url %}
+                            <p class="small mt-1 mb-0"><a href="{{ marketing_settings.privacy_policy_url }}" target="_blank" rel="noopener">Read our privacy policy</a>.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2 mt-4">Send request</button>
+                </form>
+                <p class="text-center mt-3 mb-0 small">
+                    Ready to begin? <a href="{% url 'church_apply' %}">Register your church</a>
+                </p>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block title %}Marketing Campaigns — Platform{% endblock %}
+{% block page_title %}Marketing Campaigns{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Create trackable links for your website, social media and email promotions.</p>{% endblock %}
+{% block page_actions %}<a href="{% url 'sitecontrol:marketing_campaign_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New campaign</a>{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead><tr><th>Name</th><th>Status</th><th>Attribution</th><th>Period</th><th>Results</th><th>Tracked URL</th><th></th></tr></thead>
+            <tbody>
+            {% for row in campaigns %}
+            <tr>
+                <td><strong>{{ row.campaign.name }}</strong><br><span class="small text-muted">{{ row.campaign.slug }}</span></td>
+                <td><span class="badge bg-{% if row.campaign.status == 'ACTIVE' %}success{% elif row.campaign.status == 'DRAFT' %}warning text-dark{% else %}secondary{% endif %}">{{ row.campaign.get_status_display }}</span></td>
+                <td>{{ row.campaign.source|default:"direct" }} / {{ row.campaign.medium|default:"none" }}<br><span class="small text-muted">{{ row.campaign.campaign_tag|default:"—" }}</span></td>
+                <td class="small">{{ row.campaign.starts_at|date:"M j, Y"|default:"Any time" }}<br>{{ row.campaign.ends_at|date:"M j, Y"|default:"No end" }}</td>
+                <td>{{ row.campaign.lead_count }} leads<br><span class="small text-success">{{ row.campaign.converted_count }} converted</span></td>
+                <td style="min-width:260px"><input class="form-control form-control-sm" value="{{ row.url }}" readonly></td>
+                <td class="text-nowrap">
+                    <a href="{% url 'sitecontrol:marketing_campaign_edit' row.campaign.pk %}" class="btn btn-outline-primary btn-sm">Edit</a>
+                    {% if row.campaign.status != "ARCHIVED" %}
+                    <form method="post" action="{% url 'sitecontrol:marketing_campaign_archive' row.campaign.pk %}" class="d-inline" onsubmit="return confirm('Archive this campaign?');">
+                        {% csrf_token %}<button type="submit" class="btn btn-outline-danger btn-sm">Archive</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-muted">No campaigns yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

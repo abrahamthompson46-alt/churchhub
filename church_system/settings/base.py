@@ -1,10 +1,11 @@
-"""Shared Django settings for ChurchHub (all environments)."""
+"""Shared Django settings for ChurchHub."""
 
 from __future__ import annotations
 
 import os
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 from church_system.debug_config import is_production_like_env, resolve_debug
 from church_system.env import (
@@ -17,15 +18,21 @@ from church_system.env import (
 from church_system.storage import apply_s3_settings, build_storages
 from church_system.uploads import MAX_REQUEST_UPLOAD_BYTES
 
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Idempotent: settings/__init__.py already loads .env before env selection.
 ensure_dotenv_loaded(BASE_DIR / ".env")
+
+
+# ---------------------------------------------------------------------------
+# Environment
+# ---------------------------------------------------------------------------
 
 DJANGO_ENV = env_str("DJANGO_ENV") or env_str("CHURCHHUB_ENV") or "development"
 
 ON_RENDER = bool(os.environ.get("RENDER"))
 ON_PYTHONANYWHERE = bool(os.environ.get("PYTHONANYWHERE_SITE"))
+
 PRODUCTION_LIKE = is_production_like_env(
     on_render=ON_RENDER,
     on_pythonanywhere=ON_PYTHONANYWHERE,
@@ -34,16 +41,25 @@ PRODUCTION_LIKE = is_production_like_env(
 _INSECURE_SECRET = insecure_secret_default()
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", _INSECURE_SECRET)
 
-HEALTH_CHECK_TOKEN = env_str("CHURCHHUB_HEALTH_TOKEN") or ""
-REQUIRE_PLATFORM_IP_ALLOWLIST = env_flag("CHURCHHUB_REQUIRE_PLATFORM_IP_ALLOWLIST", False)
-
 DEBUG = resolve_debug(production_like=PRODUCTION_LIKE)
+
+HEALTH_CHECK_TOKEN = env_str("CHURCHHUB_HEALTH_TOKEN") or ""
+
+REQUIRE_PLATFORM_IP_ALLOWLIST = env_flag(
+    "CHURCHHUB_REQUIRE_PLATFORM_IP_ALLOWLIST",
+    False,
+)
+
+
+# ---------------------------------------------------------------------------
+# Hosts and CSRF
+# ---------------------------------------------------------------------------
 
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get(
         "DJANGO_ALLOWED_HOSTS",
-        "localhost,127.0.0.1,testserver,162.35.179.20,zreta.com,www.zreta.com,churchhub.zreta.com",
+        "localhost,127.0.0.1,testserver",
     ).split(",")
     if host.strip()
 ]
@@ -52,28 +68,54 @@ CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get(
         "DJANGO_CSRF_TRUSTED_ORIGINS",
-        "http://zreta.com,http://www.zreta.com,https://zreta.com,https://www.zreta.com",
+        "",
     ).split(",")
     if origin.strip()
 ]
 
+TRUST_X_FORWARDED_FOR = env_flag(
+    "CHURCHHUB_TRUST_X_FORWARDED_FOR",
+    False,
+)
+
+TRUSTED_PROXY_IPS = [
+    value.strip()
+    for value in os.environ.get(
+        "CHURCHHUB_TRUSTED_PROXY_IPS",
+        "127.0.0.1,::1",
+    ).split(",")
+    if value.strip()
+]
+
+
 if ON_PYTHONANYWHERE and not CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS = [
         "https://churchhub.pythonanywhere.com",
-        "https://www.churchhub.pythonanywhere.com",
-        "https://ChurchHub.pythonanywhere.com",
     ]
 
-_RENDER_HOST = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip()
+
+_RENDER_HOST = os.environ.get(
+    "RENDER_EXTERNAL_HOSTNAME",
+    "",
+).strip()
+
 if _RENDER_HOST:
     if _RENDER_HOST not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_RENDER_HOST)
+
     _render_origin = f"https://{_RENDER_HOST}"
+
     if _render_origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(_render_origin)
 
+
+# ---------------------------------------------------------------------------
+# Applications
+# ---------------------------------------------------------------------------
+
 INSTALLED_APPS = [
     "admin_custom",
+
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -81,7 +123,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
+
     "church_system.apps.ChurchSystemConfig",
+
     "accounts",
     "permissions",
     "organization",
@@ -102,6 +146,11 @@ INSTALLED_APPS = [
     "sitecontrol.apps.SitecontrolConfig",
 ]
 
+
+# ---------------------------------------------------------------------------
+# Middleware
+# ---------------------------------------------------------------------------
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -109,20 +158,32 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+
     "permissions.middleware.PermissionCacheMiddleware",
+
     "django.contrib.messages.middleware.MessageMiddleware",
+
     "accounts.middleware.MfaEnforcementMiddleware",
     "permissions.middleware.RoleEnforcementMiddleware",
+
     "sitecontrol.denomination_middleware.DenominationContextMiddleware",
     "sitecontrol.middleware.UserScopeMiddleware",
     "sitecontrol.middleware.PlatformSessionMiddleware",
     "sitecontrol.middleware.MaintenanceModeMiddleware",
     "sitecontrol.middleware.LoginRateLimitMiddleware",
+
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+
+# ---------------------------------------------------------------------------
+# Django core
+# ---------------------------------------------------------------------------
+
 ROOT_URLCONF = "church_system.urls"
+
 WSGI_APPLICATION = "church_system.wsgi.application"
+
 
 TEMPLATES = [
     {
@@ -136,6 +197,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.static",
+
                 "church_system.context_processors.church_context",
                 "church_system.context_processors.navigation_context",
                 "church_system.context_processors.permission_context",
@@ -148,25 +210,51 @@ TEMPLATES = [
 ]
 
 
-def configure_databases(*, require_postgres: bool = False, require_managed: bool = False) -> dict:
+# ---------------------------------------------------------------------------
+# Database
+# ---------------------------------------------------------------------------
+
+def configure_databases(
+    *,
+    require_postgres: bool = False,
+    require_managed: bool = False,
+) -> dict:
     """
     Database priority:
-    1. DATABASE_URL (PostgreSQL or MySQL)
-    2. Explicit DB_ENGINE=postgresql | mysql + DB_* vars
-    3. SQLite (local; also allowed on PythonAnywhere free-tier by default)
+
+    1. DATABASE_URL
+    2. DB_ENGINE + DB_* variables
+    3. SQLite for local development
     """
+
     from django.core.exceptions import ImproperlyConfigured
 
     database_url = os.environ.get("DATABASE_URL", "").strip()
-    conn_max_age = env_int("DB_CONN_MAX_AGE", 600)
-    engine = (os.environ.get("DB_ENGINE") or "").strip().lower()
-    # Free-tier PythonAnywhere: SQLite is the default when no managed DB is configured.
-    allow_sqlite_flag = env_flag("CHURCHHUB_ALLOW_SQLITE", None)
+
+    conn_max_age = env_int(
+        "DB_CONN_MAX_AGE",
+        600,
+    )
+
+    engine = (
+        os.environ.get("DB_ENGINE") or ""
+    ).strip().lower()
+
+    allow_sqlite_flag = env_flag(
+        "CHURCHHUB_ALLOW_SQLITE",
+        None,
+    )
+
     if allow_sqlite_flag is None:
         allow_sqlite = ON_PYTHONANYWHERE
     else:
         allow_sqlite = bool(allow_sqlite_flag)
-    must_have_managed = require_managed or require_postgres or ON_RENDER
+
+    must_have_managed = (
+        require_managed
+        or require_postgres
+        or ON_RENDER
+    )
 
     if database_url:
         import dj_database_url
@@ -176,14 +264,42 @@ def configure_databases(*, require_postgres: bool = False, require_managed: bool
             conn_max_age=conn_max_age,
             conn_health_checks=True,
         )
-        engine_name = (db.get("ENGINE") or "").lower()
-        if "postgresql" in engine_name and (ON_RENDER or env_flag("DB_SSL_REQUIRE", False)):
-            db.setdefault("OPTIONS", {}).setdefault("sslmode", "require")
+
+        engine_name = (
+            db.get("ENGINE") or ""
+        ).lower()
+
+        if "postgresql" in engine_name and (
+            ON_RENDER
+            or env_flag("DB_SSL_REQUIRE", False)
+        ):
+            db.setdefault(
+                "OPTIONS",
+                {},
+            ).setdefault(
+                "sslmode",
+                "require",
+            )
+
         if "mysql" in engine_name:
-            opts = db.setdefault("OPTIONS", {})
-            opts.setdefault("charset", "utf8mb4")
-            opts.setdefault("init_command", "SET sql_mode='STRICT_TRANS_TABLES'")
-        return {"default": db}
+            options = db.setdefault(
+                "OPTIONS",
+                {},
+            )
+
+            options.setdefault(
+                "charset",
+                "utf8mb4",
+            )
+
+            options.setdefault(
+                "init_command",
+                "SET sql_mode='STRICT_TRANS_TABLES'",
+            )
+
+        return {
+            "default": db,
+        }
 
     if engine in {"postgresql", "postgres"}:
         return {
@@ -193,7 +309,10 @@ def configure_databases(*, require_postgres: bool = False, require_managed: bool
                 "USER": os.environ.get("DB_USER"),
                 "PASSWORD": os.environ.get("DB_PASSWORD"),
                 "HOST": os.environ.get("DB_HOST"),
-                "PORT": os.environ.get("DB_PORT", "5432"),
+                "PORT": os.environ.get(
+                    "DB_PORT",
+                    "5432",
+                ),
                 "CONN_MAX_AGE": conn_max_age,
                 "CONN_HEALTH_CHECKS": True,
             }
@@ -207,21 +326,25 @@ def configure_databases(*, require_postgres: bool = False, require_managed: bool
                 "USER": os.environ.get("DB_USER"),
                 "PASSWORD": os.environ.get("DB_PASSWORD"),
                 "HOST": os.environ.get("DB_HOST"),
-                "PORT": os.environ.get("DB_PORT", "3306"),
+                "PORT": os.environ.get(
+                    "DB_PORT",
+                    "3306",
+                ),
                 "CONN_MAX_AGE": conn_max_age,
                 "CONN_HEALTH_CHECKS": True,
                 "OPTIONS": {
                     "charset": "utf8mb4",
-                    "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+                    "init_command": (
+                        "SET sql_mode='STRICT_TRANS_TABLES'"
+                    ),
                 },
             }
         }
 
     if must_have_managed and not allow_sqlite:
         raise ImproperlyConfigured(
-            "DATABASE_URL (or DB_ENGINE=postgresql|mysql with DB_*) must be "
-            "configured for this environment. On PythonAnywhere free tier, omit "
-            "DB_ENGINE/DATABASE_URL to use SQLite (db.sqlite3)."
+            "DATABASE_URL or DB_ENGINE=postgresql|mysql "
+            "must be configured for this environment."
         )
 
     return {
@@ -232,94 +355,216 @@ def configure_databases(*, require_postgres: bool = False, require_managed: bool
     }
 
 
-DATABASES = configure_databases(require_postgres=False)
+DATABASES = configure_databases(
+    require_postgres=False,
+)
+
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "accounts.validators.PlatformMinimumLengthValidator"},
-    {"NAME": "accounts.validators.PlatformUppercaseValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+    {
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "UserAttributeSimilarityValidator"
+        ),
+    },
+    {
+        "NAME": (
+            "accounts.validators.PlatformMinimumLengthValidator"
+        ),
+    },
+    {
+        "NAME": (
+            "accounts.validators.PlatformUppercaseValidator"
+        ),
+    },
+    {
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "CommonPasswordValidator"
+        ),
+    },
+    {
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "NumericPasswordValidator"
+        ),
+    },
 ]
 
-LANGUAGE_CODE = "en-us"
-TIME_ZONE = "Africa/Accra"
-USE_I18N = True
-USE_TZ = True
-
-STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
-_static_dir = BASE_DIR / "static"
-STATICFILES_DIRS = [_static_dir] if _static_dir.exists() else []
-
-MEDIA_URL = "/media/"
-_media_root = os.environ.get("MEDIA_ROOT", "").strip()
-MEDIA_ROOT = Path(_media_root) if _media_root else BASE_DIR / "media"
-# When True (typical behind Nginx), protected_media returns X-Accel-Redirect.
-# Local DEBUG defaults False so FileResponse serves files without Nginx.
-MEDIA_X_ACCEL_REDIRECT = bool(
-    env_flag("MEDIA_X_ACCEL_REDIRECT", default=not DEBUG)
-)
-MEDIA_INTERNAL_URL_PREFIX = env_str("MEDIA_INTERNAL_URL_PREFIX", "/internal-media/")
-
-STORAGES = build_storages(compressed_static=True)
-apply_s3_settings(globals())
-
 AUTH_USER_MODEL = "accounts.User"
+
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/dashboard/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"
 
+
+# ---------------------------------------------------------------------------
+# Internationalization
+# ---------------------------------------------------------------------------
+
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "Africa/Accra"
+
+USE_I18N = True
+USE_TZ = True
+
+
+# ---------------------------------------------------------------------------
+# Static and media files
+# ---------------------------------------------------------------------------
+
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+_static_dir = BASE_DIR / "static"
+
+STATICFILES_DIRS = (
+    [_static_dir]
+    if _static_dir.exists()
+    else []
+)
+
+MEDIA_URL = "/media/"
+
+_media_root = os.environ.get(
+    "MEDIA_ROOT",
+    "",
+).strip()
+
+MEDIA_ROOT = (
+    Path(_media_root)
+    if _media_root
+    else BASE_DIR / "media"
+)
+
+MEDIA_X_ACCEL_REDIRECT = env_flag(
+    "MEDIA_X_ACCEL_REDIRECT",
+    default=not DEBUG,
+)
+
+MEDIA_INTERNAL_URL_PREFIX = env_str(
+    "MEDIA_INTERNAL_URL_PREFIX",
+    "/internal-media/",
+)
+
+STORAGES = build_storages(
+    compressed_static=True,
+)
+
+apply_s3_settings(globals())
+
+
+# ---------------------------------------------------------------------------
+# Sessions and cookies
+# ---------------------------------------------------------------------------
+
 SESSION_COOKIE_AGE = 60 * 60 * 4
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
+
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
 
+
+# ---------------------------------------------------------------------------
+# Security
+# ---------------------------------------------------------------------------
+
 X_FRAME_OPTIONS = "DENY"
+
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 
-# Align Django request/file buffering with shared upload limits (nginx is 25m).
+
+# ---------------------------------------------------------------------------
+# Upload limits
+# ---------------------------------------------------------------------------
+
 DATA_UPLOAD_MAX_MEMORY_SIZE = env_int(
-    "DATA_UPLOAD_MAX_MEMORY_SIZE", MAX_REQUEST_UPLOAD_BYTES
-)
-FILE_UPLOAD_MAX_MEMORY_SIZE = env_int(
-    "FILE_UPLOAD_MAX_MEMORY_SIZE", MAX_REQUEST_UPLOAD_BYTES
+    "DATA_UPLOAD_MAX_MEMORY_SIZE",
+    MAX_REQUEST_UPLOAD_BYTES,
 )
 
-REDIS_URL = os.environ.get("REDIS_URL", "").strip()
-SESSION_REDIS = env_flag("CHURCHHUB_SESSION_REDIS", False)
-# Overridden in production/staging after env validation.
+FILE_UPLOAD_MAX_MEMORY_SIZE = env_int(
+    "FILE_UPLOAD_MAX_MEMORY_SIZE",
+    MAX_REQUEST_UPLOAD_BYTES,
+)
+
+
+# ---------------------------------------------------------------------------
+# Redis / caching
+# ---------------------------------------------------------------------------
+
+REDIS_URL = os.environ.get(
+    "REDIS_URL",
+    "",
+).strip()
+
+SESSION_REDIS = env_flag(
+    "CHURCHHUB_SESSION_REDIS",
+    False,
+)
+
 REQUIRE_REDIS = False
 
 if REDIS_URL:
     CACHES = {
         "default": {
-            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "BACKEND": (
+                "django.core.cache.backends.redis.RedisCache"
+            ),
             "LOCATION": REDIS_URL,
-            "KEY_PREFIX": env_str("CACHE_KEY_PREFIX", "churchhub"),
-            "TIMEOUT": env_int("CACHE_DEFAULT_TIMEOUT", 300),
+            "KEY_PREFIX": env_str(
+                "CACHE_KEY_PREFIX",
+                "churchhub",
+            ),
+            "TIMEOUT": env_int(
+                "CACHE_DEFAULT_TIMEOUT",
+                300,
+            ),
         }
     }
-    # cached_db: Redis for speed, DB for durability across Redis flushes
-    if SESSION_REDIS or env_flag("CHURCHHUB_SESSION_CACHE", True):
-        SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
+
+    if (
+        SESSION_REDIS
+        or env_flag(
+            "CHURCHHUB_SESSION_CACHE",
+            True,
+        )
+    ):
+        SESSION_ENGINE = (
+            "django.contrib.sessions.backends.cached_db"
+        )
         SESSION_CACHE_ALIAS = "default"
+
 else:
     CACHES = {
         "default": {
-            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "BACKEND": (
+                "django.core.cache.backends.locmem.LocMemCache"
+            ),
             "LOCATION": "churchhub-default",
         }
     }
 
+
+# ---------------------------------------------------------------------------
+# Public URL
+# ---------------------------------------------------------------------------
+
 def _public_url_is_localhost(url: str) -> bool:
     if not (url or "").strip():
         return True
+
     lower = url.lower()
+
     return (
         "localhost" in lower
         or "127.0.0.1" in lower
@@ -331,115 +576,322 @@ def _public_url_is_localhost(url: str) -> bool:
 CHURCHHUB_PUBLIC_URL = (
     os.environ.get(
         "CHURCHHUB_PUBLIC_URL",
-        f"https://{_RENDER_HOST}" if _RENDER_HOST else "http://localhost:8000",
+        (
+            f"https://{_RENDER_HOST}"
+            if _RENDER_HOST
+            else "http://localhost:8000"
+        ),
     )
     .strip()
     .rstrip("/")
 )
-if ON_PYTHONANYWHERE and _public_url_is_localhost(CHURCHHUB_PUBLIC_URL):
-    _pa_site = (os.environ.get("PYTHONANYWHERE_SITE") or "").strip()
+
+
+if (
+    ON_PYTHONANYWHERE
+    and _public_url_is_localhost(CHURCHHUB_PUBLIC_URL)
+):
+    _pa_site = (
+        os.environ.get(
+            "PYTHONANYWHERE_SITE",
+            "",
+        )
+        .strip()
+    )
+
     if _pa_site:
-        CHURCHHUB_PUBLIC_URL = f"https://{_pa_site.lower()}"
+        CHURCHHUB_PUBLIC_URL = (
+            f"https://{_pa_site.lower()}"
+        )
     elif CSRF_TRUSTED_ORIGINS:
-        CHURCHHUB_PUBLIC_URL = CSRF_TRUSTED_ORIGINS[0].strip().rstrip("/")
+        CHURCHHUB_PUBLIC_URL = (
+            CSRF_TRUSTED_ORIGINS[0]
+            .strip()
+            .rstrip("/")
+        )
+
 
 from church_system.public_urls import (
     is_invalid_pythonanywhere_host,
     normalize_public_site_base,
     resolve_pythonanywhere_public_url,
 )
-from urllib.parse import urlparse as _urlparse
 
-CHURCHHUB_PUBLIC_URL = normalize_public_site_base(CHURCHHUB_PUBLIC_URL)
+
+CHURCHHUB_PUBLIC_URL = normalize_public_site_base(
+    CHURCHHUB_PUBLIC_URL
+)
+
 if ON_PYTHONANYWHERE:
-    CHURCHHUB_PUBLIC_URL = resolve_pythonanywhere_public_url(CHURCHHUB_PUBLIC_URL)
-    _pub_host = (_urlparse(CHURCHHUB_PUBLIC_URL or "").hostname or "").lower()
-    if not CHURCHHUB_PUBLIC_URL or is_invalid_pythonanywhere_host(_pub_host):
-        # Last-resort so WSGI can boot even with a mis-set env var.
-        _pa = (os.environ.get("PYTHONANYWHERE_SITE") or "").strip().lower()
-        if _pa and not is_invalid_pythonanywhere_host(_pa):
-            CHURCHHUB_PUBLIC_URL = f"https://{_pa}"
-        else:
-            CHURCHHUB_PUBLIC_URL = "https://churchhub.pythonanywhere.com"
+    CHURCHHUB_PUBLIC_URL = (
+        resolve_pythonanywhere_public_url(
+            CHURCHHUB_PUBLIC_URL
+        )
+    )
 
-EMAIL_HOST = os.environ.get("EMAIL_HOST", "").strip()
-EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587") or 587)
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "").strip()
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "").strip()
-EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() in ("true", "1", "yes")
-EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "false").lower() in ("true", "1", "yes")
+_pub_host = (
+    urlparse(
+        CHURCHHUB_PUBLIC_URL or ""
+    ).hostname
+    or ""
+).lower()
+
+
+if (
+    not CHURCHHUB_PUBLIC_URL
+    or is_invalid_pythonanywhere_host(_pub_host)
+):
+    _pa = (
+        os.environ.get(
+            "PYTHONANYWHERE_SITE",
+            "",
+        )
+        .strip()
+        .lower()
+    )
+
+    if _pa and not is_invalid_pythonanywhere_host(_pa):
+        CHURCHHUB_PUBLIC_URL = f"https://{_pa}"
+    else:
+        CHURCHHUB_PUBLIC_URL = (
+            "https://churchhub.pythonanywhere.com"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Email
+# ---------------------------------------------------------------------------
+
+EMAIL_HOST = os.environ.get(
+    "EMAIL_HOST",
+    "",
+).strip()
+
+EMAIL_PORT = int(
+    os.environ.get(
+        "EMAIL_PORT",
+        "587",
+    )
+    or 587
+)
+
+EMAIL_HOST_USER = os.environ.get(
+    "EMAIL_HOST_USER",
+    "",
+).strip()
+
+EMAIL_HOST_PASSWORD = os.environ.get(
+    "EMAIL_HOST_PASSWORD",
+    "",
+).strip()
+
+EMAIL_USE_TLS = (
+    os.environ.get(
+        "EMAIL_USE_TLS",
+        "true",
+    ).lower()
+    in ("true", "1", "yes")
+)
+
+EMAIL_USE_SSL = (
+    os.environ.get(
+        "EMAIL_USE_SSL",
+        "false",
+    ).lower()
+    in ("true", "1", "yes")
+)
+
 DEFAULT_FROM_EMAIL = os.environ.get(
     "DEFAULT_FROM_EMAIL",
-    os.environ.get("EMAIL_FROM", ""),
+    os.environ.get(
+        "EMAIL_FROM",
+        "",
+    ),
 ).strip()
-SERVER_EMAIL = DEFAULT_FROM_EMAIL or "root@localhost"
+
+SERVER_EMAIL = (
+    DEFAULT_FROM_EMAIL
+    or "root@localhost"
+)
+
 EMAIL_BACKEND = os.environ.get(
     "EMAIL_BACKEND",
     "church_system.mail.PlatformSMTPEmailBackend",
 )
-CHURCHHUB_ASYNC_EMAIL = os.environ.get("CHURCHHUB_ASYNC_EMAIL", "").lower() in (
-    "true",
-    "1",
-    "yes",
+
+CHURCHHUB_ASYNC_EMAIL = (
+    os.environ.get(
+        "CHURCHHUB_ASYNC_EMAIL",
+        "",
+    ).lower()
+    in ("true", "1", "yes")
 )
 
-_CELERY_BROKER = os.environ.get("CELERY_BROKER_URL", "").strip() or REDIS_URL
-CELERY_BROKER_URL = _CELERY_BROKER or "redis://localhost:6379/1"
-CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
-CELERY_TASK_ALWAYS_EAGER = os.environ.get("CELERY_TASK_ALWAYS_EAGER", "").lower() in (
-    "true",
-    "1",
-    "yes",
-) or "test" in sys.argv
+
+# ---------------------------------------------------------------------------
+# Celery
+# ---------------------------------------------------------------------------
+
+_CELERY_BROKER = (
+    os.environ.get(
+        "CELERY_BROKER_URL",
+        "",
+    ).strip()
+    or REDIS_URL
+)
+
+CELERY_BROKER_URL = (
+    _CELERY_BROKER
+    or "redis://localhost:6379/1"
+)
+
+CELERY_RESULT_BACKEND = os.environ.get(
+    "CELERY_RESULT_BACKEND",
+    CELERY_BROKER_URL,
+)
+
+CELERY_TASK_ALWAYS_EAGER = (
+    os.environ.get(
+        "CELERY_TASK_ALWAYS_EAGER",
+        "",
+    ).lower()
+    in ("true", "1", "yes")
+    or "test" in sys.argv
+)
+
 CELERY_TASK_EAGER_PROPAGATES = True
+
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
+
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_ENABLE_UTC = True
-CELERY_WORKER_PREFETCH_MULTIPLIER = env_int("CELERY_WORKER_PREFETCH_MULTIPLIER", 1)
+
+CELERY_WORKER_PREFETCH_MULTIPLIER = env_int(
+    "CELERY_WORKER_PREFETCH_MULTIPLIER",
+    1,
+)
+
 CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
-CELERY_TASK_DEFAULT_RETRY_DELAY = env_int("CELERY_TASK_DEFAULT_RETRY_DELAY", 60)
-CELERY_TASK_TIME_LIMIT = env_int("CELERY_TASK_TIME_LIMIT", 600)
-CELERY_TASK_SOFT_TIME_LIMIT = env_int("CELERY_TASK_SOFT_TIME_LIMIT", 540)
 
-# Beat schedules — ops may disable via CHURCHHUB_CELERY_BEAT=0
+CELERY_TASK_DEFAULT_RETRY_DELAY = env_int(
+    "CELERY_TASK_DEFAULT_RETRY_DELAY",
+    60,
+)
+
+CELERY_TASK_TIME_LIMIT = env_int(
+    "CELERY_TASK_TIME_LIMIT",
+    600,
+)
+
+CELERY_TASK_SOFT_TIME_LIMIT = env_int(
+    "CELERY_TASK_SOFT_TIME_LIMIT",
+    540,
+)
+
+
+# ---------------------------------------------------------------------------
+# Celery Beat
+# ---------------------------------------------------------------------------
+
 CELERY_BEAT_SCHEDULE = {}
-if env_flag("CHURCHHUB_CELERY_BEAT", True):
+
+if env_flag(
+    "CHURCHHUB_CELERY_BEAT",
+    True,
+):
     from celery.schedules import crontab
 
     CELERY_BEAT_SCHEDULE = {
         "purge-old-notifications-daily": {
-            "task": "church_system.tasks.purge_old_notifications_task",
-            "schedule": crontab(hour=2, minute=15),
-            "options": {"expires": 3600},
+            "task": (
+                "church_system.tasks."
+                "purge_old_notifications_task"
+            ),
+            "schedule": crontab(
+                hour=2,
+                minute=15,
+            ),
+            "options": {
+                "expires": 3600,
+            },
         },
         "database-backup-daily": {
-            "task": "church_system.tasks.backup_database_task",
-            "schedule": crontab(hour=3, minute=0),
-            "options": {"expires": 7200},
+            "task": (
+                "church_system.tasks."
+                "backup_database_task"
+            ),
+            "schedule": crontab(
+                hour=3,
+                minute=0,
+            ),
+            "options": {
+                "expires": 7200,
+            },
         },
         "health-probe-hourly": {
-            "task": "church_system.tasks.health_probe_task",
-            "schedule": crontab(minute=5),
-            "options": {"expires": 600},
+            "task": (
+                "church_system.tasks."
+                "health_probe_task"
+            ),
+            "schedule": crontab(
+                minute=5,
+            ),
+            "options": {
+                "expires": 600,
+            },
         },
     }
 
-LOG_DIR = Path(env_str("CHURCHHUB_LOG_DIR") or str(BASE_DIR / "logs"))
-from church_system.logging_config import build_logging_config  # noqa: E402
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
+LOG_DIR = Path(
+    env_str("CHURCHHUB_LOG_DIR")
+    or str(BASE_DIR / "logs")
+)
+
+from church_system.logging_config import build_logging_config
+
 
 LOGGING = build_logging_config(
     debug=DEBUG,
     log_dir=LOG_DIR,
-    enable_file_logs=env_flag("CHURCHHUB_FILE_LOGS", not DEBUG),
+    enable_file_logs=env_flag(
+        "CHURCHHUB_FILE_LOGS",
+        not DEBUG,
+    ),
 )
 
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-TEST_RUNNER = "church_system.test_runner.ChurchHubDiscoverRunner"
+# ---------------------------------------------------------------------------
+# Django defaults
+# ---------------------------------------------------------------------------
 
-# Cache invalidation keys (document convention for services)
-CACHE_VERSION = env_int("CACHE_VERSION", 1)
-PERMISSION_CACHE_TIMEOUT = env_int("PERMISSION_CACHE_TIMEOUT", 300)
+DEFAULT_AUTO_FIELD = (
+    "django.db.models.BigAutoField"
+)
+
+TEST_RUNNER = (
+    "church_system.test_runner."
+    "ChurchHubDiscoverRunner"
+)
+
+
+# ---------------------------------------------------------------------------
+# Cache / permission settings
+# ---------------------------------------------------------------------------
+
+CACHE_VERSION = env_int(
+    "CACHE_VERSION",
+    1,
+)
+
+PERMISSION_CACHE_TIMEOUT = env_int(
+    "PERMISSION_CACHE_TIMEOUT",
+    300,
+)

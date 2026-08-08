@@ -4,6 +4,7 @@ from . import views
 from . import views_registration
 from . import views_denominations
 from . import views_import
+from . import views_marketing
 
 app_name = "sitecontrol"
 
@@ -81,6 +82,61 @@ urlpatterns = [
     path("announcements/", views.announcement_list, name="announcement_list"),
     path("announcements/add/", views.announcement_edit, name="announcement_add"),
     path("announcements/<uuid:pk>/edit/", views.announcement_edit, name="announcement_edit"),
+    path("marketing/", views_marketing.marketing_hub, name="marketing_hub"),
+    path("marketing/settings/", views_marketing.marketing_settings, name="marketing_settings"),
+    path("marketing/campaigns/", views_marketing.marketing_campaigns, name="marketing_campaigns"),
+    path(
+        "marketing/campaigns/add/",
+        views_marketing.marketing_campaign_edit,
+        name="marketing_campaign_add",
+    ),
+    path(
+        "marketing/campaigns/<uuid:pk>/edit/",
+        views_marketing.marketing_campaign_edit,
+        name="marketing_campaign_edit",
+    ),
+    path(
+        "marketing/campaigns/<uuid:pk>/archive/",
+        views_marketing.marketing_campaign_archive,
+        name="marketing_campaign_archive",
+    ),
+    path("marketing/leads/", views_marketing.marketing_leads, name="marketing_leads"),
+    path(
+        "marketing/leads/export/",
+        views_marketing.marketing_lead_export,
+        name="marketing_lead_export",
+    ),
+    path(
+        "marketing/leads/retention/",
+        views_marketing.marketing_retention_run,
+        name="marketing_retention_run",
+    ),
+    path(
+        "marketing/leads/<uuid:pk>/",
+        views_marketing.marketing_lead_detail,
+        name="marketing_lead_detail",
+    ),
+    path(
+        "marketing/leads/<uuid:pk>/anonymize/",
+        views_marketing.marketing_lead_anonymize,
+        name="marketing_lead_anonymize",
+    ),
+    path("marketing/assets/", views_marketing.marketing_assets, name="marketing_assets"),
+    path(
+        "marketing/assets/add/",
+        views_marketing.marketing_asset_edit,
+        name="marketing_asset_add",
+    ),
+    path(
+        "marketing/assets/<uuid:pk>/edit/",
+        views_marketing.marketing_asset_edit,
+        name="marketing_asset_edit",
+    ),
+    path(
+        "marketing/assets/<uuid:pk>/archive/",
+        views_marketing.marketing_asset_archive,
+        name="marketing_asset_archive",
+    ),
     path("import/", views_import.import_hub, name="import_hub"),
     path("import/members/", views_import.import_members, name="import_members"),
     path("import/members/template/", views_import.import_member_template, name="import_member_template"),

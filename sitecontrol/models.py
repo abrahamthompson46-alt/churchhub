@@ -446,6 +446,18 @@ class PlatformAuditLog(models.Model):
         ("BREAKGLASS_GRANT", "Break-glass Access Granted"),
         ("MEMBER_IMPORT", "Member Bulk Import"),
         ("TRANSACTION_IMPORT", "Receipt Bulk Import"),
+        ("MARKETING_SETTINGS", "Marketing Settings Updated"),
+        ("MARKETING_CAMPAIGN_CREATE", "Marketing Campaign Created"),
+        ("MARKETING_CAMPAIGN_UPDATE", "Marketing Campaign Updated"),
+        ("MARKETING_CAMPAIGN_ARCHIVE", "Marketing Campaign Archived"),
+        ("MARKETING_LEAD_SUBMIT", "Marketing Lead Submitted"),
+        ("MARKETING_LEAD_UPDATE", "Marketing Lead Updated"),
+        ("MARKETING_ASSET_CREATE", "Marketing Asset Created"),
+        ("MARKETING_ASSET_UPDATE", "Marketing Asset Updated"),
+        ("MARKETING_ASSET_ARCHIVE", "Marketing Asset Archived"),
+        ("MARKETING_LEAD_NOTIFY", "Marketing Lead Notification Updated"),
+        ("MARKETING_LEAD_EXPORT", "Marketing Leads Exported"),
+        ("MARKETING_LEAD_ANONYMIZE", "Marketing Lead Anonymized"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -525,6 +537,218 @@ class PlatformAnnouncement(models.Model):
         if self.ends_at and now > self.ends_at:
             return False
         return True
+
+
+class MarketingSettings(models.Model):
+    """Singleton settings for public marketing inquiry intake."""
+
+    singleton_id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    public_inquiry_enabled = models.BooleanField(
+        default=False,
+        help_text="Enable only after sales email, consent, and privacy settings are reviewed.",
+    )
+    sales_notification_email = models.EmailField(blank=True)
+    marketing_site_url = models.URLField(blank=True)
+    privacy_policy_url = models.URLField(blank=True)
+    consent_text = models.TextField(
+        default=(
+            "I agree that ChurchHub may use these details to respond to my inquiry. "
+            "I can request deletion by contacting the platform."
+        )
+    )
+    notify_on_new_lead = models.BooleanField(default=True)
+    lead_retention_days = models.PositiveIntegerField(
+        default=365,
+        validators=[MinValueValidator(30), MaxValueValidator(2555)],
+        help_text="Closed leads older than this may be anonymized (30–2555 days).",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "marketing settings"
+
+    def save(self, *args, **kwargs):
+        self.singleton_id = 1
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return "Marketing settings"
+
+
+class MarketingCampaign(models.Model):
+    """Owner-managed attribution campaign for public inquiries."""
+
+    STATUS_CHOICES = [
+        ("DRAFT", "Draft"),
+        ("ACTIVE", "Active"),
+        ("ARCHIVED", "Archived"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=160)
+    slug = models.SlugField(max_length=80, unique=True)
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="DRAFT")
+    source = models.CharField(max_length=80, blank=True)
+    medium = models.CharField(max_length=80, blank=True)
+    campaign_tag = models.CharField(max_length=100, blank=True)
+    starts_at = models.DateTimeField(null=True, blank=True)
+    ends_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketing_campaigns_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def is_live(self):
+        if self.status != "ACTIVE":
+            return False
+        now = timezone.now()
+        return not ((self.starts_at and now < self.starts_at) or (self.ends_at and now > self.ends_at))
+
+
+class MarketingLead(models.Model):
+    """A consented platform-level sales inquiry; never church operational data."""
+
+    STATUS_CHOICES = [
+        ("NEW", "New"),
+        ("CONTACTED", "Contacted"),
+        ("QUALIFIED", "Qualified"),
+        ("CONVERTED", "Converted"),
+        ("CLOSED", "Closed"),
+    ]
+    NOTIFICATION_STATUS_CHOICES = [
+        ("PENDING", "Pending"),
+        ("SENT", "Sent"),
+        ("FAILED", "Failed"),
+        ("DISABLED", "Disabled"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="NEW")
+    contact_name = models.CharField(max_length=120)
+    contact_email = models.EmailField()
+    contact_phone = models.CharField(max_length=30, blank=True)
+    organization_name = models.CharField(max_length=200, blank=True)
+    message = models.TextField(blank=True)
+    denomination = models.ForeignKey(
+        "Denomination",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketing_leads",
+    )
+    campaign = models.ForeignKey(
+        MarketingCampaign,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="leads",
+    )
+    utm_source = models.CharField(max_length=80, blank=True)
+    utm_medium = models.CharField(max_length=80, blank=True)
+    utm_campaign = models.CharField(max_length=100, blank=True)
+    consent_given = models.BooleanField(default=False)
+    consent_text = models.TextField()
+    consented_at = models.DateTimeField()
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketing_leads_assigned",
+    )
+    internal_notes = models.TextField(blank=True)
+    notification_status = models.CharField(
+        max_length=10,
+        choices=NOTIFICATION_STATUS_CHOICES,
+        default="DISABLED",
+    )
+    notification_attempts = models.PositiveSmallIntegerField(default=0)
+    notification_error_code = models.CharField(max_length=80, blank=True)
+    notified_at = models.DateTimeField(null=True, blank=True)
+    anonymized_at = models.DateTimeField(null=True, blank=True)
+    anonymized_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketing_leads_anonymized",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "-created_at"]),
+            models.Index(fields=["contact_email"]),
+            models.Index(fields=["campaign", "-created_at"]),
+            models.Index(fields=["denomination", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.contact_name} ({self.get_status_display()})"
+
+
+class MarketingAsset(models.Model):
+    """Approved link to collateral hosted on the owner's public website."""
+
+    TYPE_CHOICES = [
+        ("BROCHURE", "Brochure"),
+        ("PRESENTATION", "Presentation"),
+        ("VIDEO", "Video"),
+        ("SCREENSHOT", "Screenshot"),
+        ("DATASHEET", "Datasheet"),
+        ("OTHER", "Other"),
+    ]
+    STATUS_CHOICES = [
+        ("INTERNAL", "Internal"),
+        ("REVIEW", "Review Required"),
+        ("APPROVED", "Approved for External Use"),
+        ("ARCHIVED", "Archived"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=160)
+    description = models.TextField(blank=True)
+    asset_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default="OTHER")
+    audience = models.CharField(max_length=120, blank=True)
+    public_url = models.URLField()
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="REVIEW")
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketing_assets_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "title"]
+        indexes = [
+            models.Index(fields=["status", "sort_order"]),
+        ]
+
+    def __str__(self):
+        return self.title
 
 
 class TenantApplication(models.Model):

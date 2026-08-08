@@ -69,6 +69,8 @@ flowchart LR
 | `REDIS_URL` | **Required in production** validation |
 | `DJANGO_ALLOWED_HOSTS` / `DJANGO_CSRF_TRUSTED_ORIGINS` | Host + CSRF |
 | `CHURCHHUB_PUBLIC_URL` | Absolute URL for emails |
+| `CHURCHHUB_TRUST_X_FORWARDED_FOR` | Trust forwarded client IPs only behind the configured reverse proxy (production default: true) |
+| `CHURCHHUB_TRUSTED_PROXY_IPS` | Comma-separated proxy IPs/CIDRs allowed to supply `X-Forwarded-For` (default: loopback) |
 | `CHURCHHUB_FILE_LOGS` / `CHURCHHUB_LOG_DIR` | Rotating application/security/audit logs |
 | `SENTRY_DSN` | Error reporting |
 | `AWS_*` / `S3_BUCKET` | Optional object storage for media |
@@ -192,11 +194,15 @@ sudo nginx -t && sudo systemctl reload nginx
 | `DJANGO_ALLOWED_HOSTS` | `zreta.com,www.zreta.com` |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | `https://zreta.com,https://www.zreta.com` |
 | `CHURCHHUB_PUBLIC_URL` | `https://zreta.com` |
+| `CHURCHHUB_TRUST_X_FORWARDED_FOR` | `true` |
+| `CHURCHHUB_TRUSTED_PROXY_IPS` | `127.0.0.1,::1` when Gunicorn is reachable only through local Nginx |
 
 5. `systemctl restart churchhub-web` and `sudo systemctl reload nginx`.
 6. Verify: HTTP→301 HTTPS; login `Set-Cookie` includes `Secure`; Django shell prints `SECURE_SSL_REDIRECT True` and `SESSION_COOKIE_SECURE True`.
 
 **Root cause reminder:** `production.py` ties `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` / HSTS to `SECURE_SSL_REDIRECT`. Leaving `false` from Phase A HTTP looks like “production settings not loaded.”
+
+Nginx must overwrite forwarded headers; never expose Gunicorn directly while forwarded-IP trust is enabled. If the reverse proxy uses a non-loopback address, add only that proxy address/CIDR to `CHURCHHUB_TRUSTED_PROXY_IPS`.
 
 ### Phase B+ — Private media (auth + X-Accel-Redirect)
 

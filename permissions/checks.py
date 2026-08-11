@@ -171,6 +171,18 @@ def can_manage_overrides(user): return _p(user, "manage_overrides")
 def can_view_permission_audit(user): return _p(user, "view_permission_audit")
 def can_export_permission_matrix(user): return _p(user, "export_permission_matrix")
 
+
+def can_manage_institution_branding(user):
+    """Institution Super Admins may edit tenant branding when the platform allows it."""
+    from church_system.denomination_scope import get_user_denomination
+    from permissions.superadmin import is_superadmin
+
+    if not is_superadmin(user):
+        return False
+    denomination = get_user_denomination(user)
+    return bool(denomination and denomination.allow_institution_branding)
+
+
 # ── Dashboard ─────────────────────────────────────────────────────
 def can_view_dashboard(user): return _p(user, "view_dashboard")
 def can_view_dashboard_finance(user): return _p(user, "view_dashboard_finance")

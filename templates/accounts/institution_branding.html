@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Institution Branding — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Administration" page_title="Institution branding" %}
+
+    <p class="text-muted mb-4">
+        Update the logo, display name, and colors used for
+        <strong>{{ denomination.display_name|default:denomination.name }}</strong>
+        across login, staff dashboards, and the member portal.
+    </p>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="panel">
+                <div class="panel-header">Brand identity</div>
+                <div class="panel-body">
+                    <form method="post" enctype="multipart/form-data" novalidate>
+                        {% csrf_token %}
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+                        <div class="row g-3">
+                            {% for field in form %}
+                            <div class="{% if field.name == 'logo' or field.name == 'tagline' or field.name == 'display_name' %}col-12{% else %}col-md-4{% endif %}">
+                                <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                                {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if denomination.logo %}
+                        <div class="mt-3">
+                            <div class="form-text mb-2">Current logo</div>
+                            <img src="{{ denomination.logo.url }}" alt="" style="max-height: 64px;">
+                        </div>
+                        {% endif %}
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary">Save branding</button>
+                            <a href="{% url 'accounts:profile' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            {% include "sitecontrol/includes/branding_preview.html" with preview=preview_branding preview_name=denomination.display_name|default:denomination.name %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    ["id_primary_color", "id_accent_color", "id_highlight_color"].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("input", function () {
+            var root = document.documentElement;
+            if (id === "id_primary_color") root.style.setProperty("--ch-brand", el.value);
+            if (id === "id_accent_color") {
+                root.style.setProperty("--ch-action", el.value);
+                root.style.setProperty("--ch-primary", el.value);
+            }
+            if (id === "id_highlight_color") root.style.setProperty("--ch-accent", el.value);
+        });
+    });
+})();
+</script>
+{% endblock %}

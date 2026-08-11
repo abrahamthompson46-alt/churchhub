@@ -48,7 +48,7 @@ erDiagram
 - **PlatformAuditLog** — immutable-style platform actions  
 - **PlatformAnnouncement** — platform banner content  
 - **TenantApplication** — public apply workflow  
-- **Denomination** — SaaS isolation wall, terminology, branding/seeds  
+- **Denomination** — SaaS isolation wall, terminology, branding/seeds; `allow_institution_branding` (default True) gates Super Admin self-service identity branding  
 - **MarketingSettings** — singleton inquiry, consent, privacy, retention, and sales-notification controls
 - **MarketingCampaign** — owner-created attribution campaigns and tracked inquiry URLs
 - **MarketingLead** — consented platform prospect inquiries with optional denomination/campaign attribution, durable notification status, and anonymization evidence
@@ -74,6 +74,7 @@ erDiagram
 12. Lead notifications are scheduled after database commit, retain PENDING/SENT/FAILED/DISABLED state, and can use retryable Celery delivery.
 13. Only closed leads may be anonymized. Retention runs anonymize closed leads older than the configured period; lead CSV exports and anonymization are owner-only and audited.
 14. Marketing assets are HTTPS metadata links only; ChurchHub does not expose uploaded collateral through private media.
+15. Platform owners control `Denomination.allow_institution_branding` (default True). When enabled, institution Super Admins may update logo, display name, tagline, and colors via `/accounts/settings/branding/` for their own denomination only.
 
 ---
 

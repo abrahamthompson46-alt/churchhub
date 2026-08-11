@@ -878,6 +878,10 @@ class Denomination(models.Model):
         default=True,
         help_text="Allow /apply/ registrations scoped to this denomination.",
     )
+    allow_institution_branding = models.BooleanField(
+        default=True,
+        help_text="Allow institution Super Admins to update logo and brand colors.",
+    )
     registration_intro = models.TextField(blank=True)
     default_plan = models.ForeignKey(
         "SubscriptionPlan",

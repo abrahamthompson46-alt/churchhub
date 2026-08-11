@@ -32,6 +32,7 @@ __all__ = [
     "activate_user",
     "update_user_role",
     "update_user_profile",
+    "update_institution_branding",
     "INVITATION_VALIDITY",
 ]
 
@@ -411,3 +412,37 @@ def update_user_profile(user, cleaned_data, performed_by=None, ip_address=None):
             details={"old_email": old_email, "new_email": user.email},
         )
     return user
+
+
+def update_institution_branding(form, *, actor, ip_address=None):
+    """
+    Persist institution identity branding for the actor's denomination.
+
+    The form must already be bound to the server-resolved denomination instance.
+    """
+    from church_system.denomination_scope import get_user_denomination
+    from permissions.checks import can_manage_institution_branding
+    from sitecontrol.branding_services import clear_branding_caches
+
+    if not can_manage_institution_branding(actor):
+        raise PermissionError("You are not allowed to update institution branding.")
+
+    denomination = get_user_denomination(actor)
+    if denomination is None or form.instance.pk != denomination.pk:
+        raise PermissionError("Branding updates are limited to your own institution.")
+
+    changed_fields = sorted(form.changed_data)
+    denomination = form.save()
+    clear_branding_caches()
+    if changed_fields:
+        log_activity(
+            actor,
+            "INSTITUTION_BRANDING_UPDATE",
+            performed_by=actor,
+            ip_address=ip_address,
+            details={
+                "denomination_id": str(denomination.pk),
+                "changed_fields": changed_fields,
+            },
+        )
+    return denomination

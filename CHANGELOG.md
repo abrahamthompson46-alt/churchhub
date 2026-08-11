@@ -11,12 +11,14 @@ Versioning per [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Institution Super Admins can update logo, display name, tagline, and brand colors at `/accounts/settings/branding/` when the platform enables `allow_institution_branding` for their denomination (default on).
 - Owner-only Marketing Hub in Platform Control with campaign attribution, lead workflow, conversion summaries, approved collateral links, and copy-ready website CTAs.
 - CSRF-protected public `/contact/` inquiry form with explicit consent, honeypot protection, proxy-aware throttling, denomination validation, branded sales notifications, and privacy-safe platform audit events.
 - Audited lead export, closed-lead anonymization, retention controls, durable notification status, and retryable Celery delivery.
 
 ### Security
 
+- Platform Owners control per-tenant institution branding self-service; institution edits are limited to the actor’s denomination and audited without media paths.
 - Dedicated `manage_marketing` platform capability is restricted to Platform Owners.
 - Marketing collateral accepts HTTPS links only; lead PII is excluded from audit details and application logs.
 - Public inquiry activation now requires an HTTPS privacy policy and consent configuration; throttling combines validated IP, hashed email, campaign and global limits.

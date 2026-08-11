@@ -20,12 +20,14 @@ from accounts import repositories as repo
 from accounts import selectors
 from accounts.forms import (
     AcceptInvitationForm,
+    InstitutionBrandingForm,
     ProfileForm,
     UserInviteForm,
     UserManageForm,
 )
 from accounts.models import UserActivityLog
 from accounts.permissions import (
+    can_manage_institution_branding,
     can_manage_permissions,
     can_manage_users,
     can_view_activity_logs,
@@ -43,6 +45,7 @@ from accounts.services import (
     resend_invitation,
     revoke_invitation,
     send_invitation_email,
+    update_institution_branding,
     update_user_profile,
 )
 from sitecontrol.services import can_add_user_to_church
@@ -448,6 +451,55 @@ def accept_invite(request, token):
         "invitation": invitation,
         "form": form,
     })
+
+
+@login_required
+def institution_branding(request):
+    if not can_manage_institution_branding(request.user):
+        raise PermissionDenied(
+            "Institution branding is not available for your account. "
+            "Contact the platform administrator if you need access."
+        )
+
+    from church_system.denomination_scope import get_user_denomination
+    from sitecontrol.branding_services import resolve_institution_branding
+
+    denomination = get_user_denomination(request.user)
+    if denomination is None:
+        raise PermissionDenied("No institution branding context is available.")
+
+    form = InstitutionBrandingForm(
+        request.POST or None,
+        request.FILES or None,
+        instance=denomination,
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            update_institution_branding(
+                form,
+                actor=request.user,
+                ip_address=get_client_ip(request),
+            )
+        except PermissionError as exc:
+            flash_error(request, str(exc), title="Branding not saved")
+        else:
+            flash_success(
+                request,
+                "Institution branding updated. Changes appear on the next page load.",
+                title="Branding saved",
+            )
+            return redirect("accounts:institution_branding")
+
+    preview_branding = resolve_institution_branding(denomination=denomination)
+    return render(
+        request,
+        "accounts/institution_branding.html",
+        {
+            "form": form,
+            "denomination": denomination,
+            "preview_branding": preview_branding,
+        },
+    )
 
 
 @login_required

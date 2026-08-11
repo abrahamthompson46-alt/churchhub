@@ -328,7 +328,7 @@ Distinct from `sitecontrol.PlatformAnnouncement`.
 | `PlatformAuditLog` | Immutable platform audit |
 | `PlatformAnnouncement` | Platform-wide announcements |
 | `TenantApplication` | Public/apply workflow; status PENDING/APPROVED/REJECTED/WITHDRAWN; types EXISTING_DISTRICT/NEW_HIERARCHY |
-| `Denomination` | SaaS tenant boundary; branding; feature flags; defaults |
+| `Denomination` | SaaS tenant boundary; branding; feature flags; `allow_institution_branding`; defaults |
 | `MarketingSettings` | Singleton public inquiry, privacy consent, retention, website and sales-notification settings |
 | `MarketingCampaign` | UUID campaign; status/period and UTM attribution metadata |
 | `MarketingLead` | UUID platform sales inquiry; optional denomination/campaign; consent snapshot, assignment, lifecycle, notification delivery and anonymization metadata |

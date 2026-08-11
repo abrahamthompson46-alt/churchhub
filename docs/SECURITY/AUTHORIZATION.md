@@ -49,6 +49,7 @@ flowchart TD
 |-------|----------|
 | Engine | `permissions.services.user_has_permission` |
 | Superadmin | `permissions.superadmin.is_superadmin` — institution `is_superuser` **or** `role == SUPER_ADMIN`; **excludes** `is_platform_user` |
+| Institution branding | `permissions.checks.can_manage_institution_branding` — superadmin + resolved denomination with `allow_institution_branding` |
 | Cache | `PermissionCacheMiddleware` → bind/clear per-request cache |
 | Registry | `permissions/registry.py` (~100 codenames) |
 | Matrix models | `Permission`, `RolePermission` |
@@ -90,7 +91,7 @@ Categories include Members, Meetings, Transactions/Finance, Ledger, Remittance, 
 
 | Role code | Typical scope |
 |-----------|---------------|
-| `SUPER_ADMIN` | Full institution (superadmin path) |
+| `SUPER_ADMIN` | Full institution (superadmin path); may edit institution branding when `Denomination.allow_institution_branding` is enabled |
 | `GENERAL_OVERSEER` | Top hierarchy |
 | `UNION_ADMIN` | Union subtree |
 | `CONFERENCE_ADMIN` | Conference subtree |

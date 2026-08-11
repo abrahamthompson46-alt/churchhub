@@ -6,6 +6,7 @@ app_name = "accounts"
 
 urlpatterns = [
     path("profile/", views.profile, name="profile"),
+    path("settings/branding/", views.institution_branding, name="institution_branding"),
     path("mfa/enroll/", mfa_views.mfa_enroll, name="mfa_enroll"),
     path("mfa/verify/", mfa_views.mfa_verify, name="mfa_verify"),
     path("mfa/send-email/", mfa_views.mfa_send_email, name="mfa_send_email"),

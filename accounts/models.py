@@ -259,6 +259,7 @@ class UserActivityLog(models.Model):
         ("MFA_RECOVERY", "MFA Recovery Code Used"),
         ("MFA_EMAIL", "MFA Email Code Used"),
         ("MFA_TRUSTED_DEVICE", "MFA Trusted Device Login"),
+        ("INSTITUTION_BRANDING_UPDATE", "Institution Branding Updated"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

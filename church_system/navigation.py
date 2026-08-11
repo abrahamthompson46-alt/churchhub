@@ -26,6 +26,7 @@ from permissions.checks import (
     can_manage_finances,
     can_manage_giving,
     can_manage_gl_categories,
+    can_manage_institution_branding,
     can_manage_leadership,
     can_manage_ledger_entries,
     can_manage_meetings,
@@ -544,6 +545,11 @@ def get_main_navigation(user, active_church=None):
         ucc_items.append(_item("Permission Audit", "permissions:audit_log", "bi-journal-check"))
     if ucc_items:
         settings_sections.append(_section("Users & access", ucc_items, "users"))
+
+    if can_manage_institution_branding(user):
+        settings_sections.append(_section("Institution", [
+            _item("Institution branding", "accounts:institution_branding", "bi-palette"),
+        ], "institution"))
 
     if can_manage_working_day(user):
         settings_sections.append(_section("Treasury & calendar", [

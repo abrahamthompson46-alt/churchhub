@@ -12,6 +12,7 @@ from permissions.org_scope import (
 )
 from permissions.roles import UserRole
 from permissions.scoping import get_manageable_churches
+from sitecontrol.models import Denomination
 
 from .models import User
 
@@ -415,3 +416,49 @@ class UserManageForm(forms.ModelForm):
             repo.save_user(user)
             self.save_m2m()
         return user
+
+
+class InstitutionBrandingForm(forms.ModelForm):
+    """Institution Super Admin edits for tenant identity branding only."""
+
+    class Meta:
+        model = Denomination
+        fields = (
+            "display_name",
+            "tagline",
+            "logo",
+            "primary_color",
+            "accent_color",
+            "highlight_color",
+        )
+        widgets = {
+            "display_name": forms.TextInput(attrs=input_attrs()),
+            "tagline": forms.TextInput(attrs=input_attrs()),
+            "primary_color": forms.TextInput(attrs={**input_attrs(), "type": "color"}),
+            "accent_color": forms.TextInput(attrs={**input_attrs(), "type": "color"}),
+            "highlight_color": forms.TextInput(attrs={**input_attrs(), "type": "color"}),
+        }
+        help_texts = {
+            "display_name": "Name shown on login and navigation for your institution.",
+            "tagline": "Short line under the institution name.",
+            "primary_color": "Navbar and chrome color.",
+            "accent_color": "Buttons and primary links.",
+            "highlight_color": "Secondary accent across dashboards and portal.",
+        }
+
+    def clean_logo(self):
+        from church_system.uploads import validate_upload
+
+        logo = self.cleaned_data.get("logo")
+        if logo:
+            validate_upload(logo, kind="branding")
+        return logo
+
+    def save(self, commit=True):
+        from sitecontrol.branding_services import apply_branding_to_form_instance
+
+        instance = super().save(commit=False)
+        apply_branding_to_form_instance(self, instance)
+        if commit:
+            instance.save()
+        return instance

@@ -139,6 +139,7 @@ class DenominationBrandingForm(forms.ModelForm):
             "highlight_color",
             "registration_intro",
             "allow_public_registration",
+            "allow_institution_branding",
             "default_plan",
             "default_role",
         )
@@ -150,6 +151,7 @@ class DenominationBrandingForm(forms.ModelForm):
             "accent_color": forms.TextInput(attrs={**input_attrs(), "type": "color"}),
             "highlight_color": forms.TextInput(attrs={**input_attrs(), "type": "color"}),
             "allow_public_registration": forms.CheckboxInput(attrs=checkbox_attrs()),
+            "allow_institution_branding": forms.CheckboxInput(attrs=checkbox_attrs()),
             "default_plan": forms.Select(attrs=select_attrs()),
             "default_role": forms.Select(attrs=select_attrs(), choices=UserRole.CHOICES),
         }
@@ -157,7 +159,19 @@ class DenominationBrandingForm(forms.ModelForm):
             "primary_color": "Navbar and chrome for this tenant.",
             "accent_color": "Buttons and primary links.",
             "highlight_color": "Secondary accent across dashboards and portal.",
+            "allow_institution_branding": (
+                "When enabled, institution Super Admins can update logo, "
+                "display name, tagline, and colors from the staff app."
+            ),
         }
+
+    def clean_logo(self):
+        from church_system.uploads import validate_upload
+
+        logo = self.cleaned_data.get("logo")
+        if logo:
+            validate_upload(logo, kind="branding")
+        return logo
 
     def save(self, commit=True):
         from sitecontrol.branding_services import apply_branding_to_form_instance

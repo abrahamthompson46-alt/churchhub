@@ -12,11 +12,16 @@ from accounts.mfa import (
     SESSION_MFA_PENDING_USER,
     TRUSTED_DEVICE_DAYS,
     attach_trusted_device_cookie,
+    clear_mfa_failures,
+    clear_mfa_session,
     create_trusted_device,
     enable_mfa_for_user,
     generate_recovery_codes,
     generate_totp_secret,
     mark_mfa_verified,
+    mfa_pending_expired,
+    mfa_verify_allowed,
+    record_mfa_failure,
     request_has_trusted_device,
     send_mfa_email_otp,
     totp_provisioning_uri,
@@ -91,12 +96,29 @@ def mfa_enroll(request):
 
     error = ""
     if request.method == "POST" and not regenerate:
+        ip = get_client_ip(request)
+        allowed, lock_msg = mfa_verify_allowed(user, ip)
+        if not allowed:
+            error = lock_msg
+            return render(
+                request,
+                "accounts/mfa_enroll.html",
+                {
+                    "secret": secret,
+                    "provisioning_uri": totp_provisioning_uri(user, secret),
+                    "qr_data_uri": totp_qr_data_uri(user, secret),
+                    "error": error,
+                    "trusted_device_days": TRUSTED_DEVICE_DAYS,
+                },
+                status=429,
+            )
         token = request.POST.get("token", "")
         if verify_totp(secret, token):
             codes = generate_recovery_codes()
             enable_mfa_for_user(user, secret, codes)
             mark_mfa_verified(request)
             request.session.pop(SESSION_MFA_ENROLL_SECRET, None)
+            clear_mfa_failures(user, ip)
             log_activity(user, "MFA_ENROLL", ip_address=get_client_ip(request))
             flash_success(request, "Multi-factor authentication is now enabled.")
             response = render(
@@ -112,6 +134,22 @@ def mfa_enroll(request):
                 device_token = create_trusted_device(user, request)
                 attach_trusted_device_cookie(response, device_token)
             return response
+        record_mfa_failure(user, ip)
+        still_ok, lock_msg = mfa_verify_allowed(user, ip)
+        if not still_ok:
+            error = lock_msg
+            return render(
+                request,
+                "accounts/mfa_enroll.html",
+                {
+                    "secret": secret,
+                    "provisioning_uri": totp_provisioning_uri(user, secret),
+                    "qr_data_uri": totp_qr_data_uri(user, secret),
+                    "error": error,
+                    "trusted_device_days": TRUSTED_DEVICE_DAYS,
+                },
+                status=429,
+            )
         error = (
             "Invalid authenticator code. Use the code for the QR currently on this "
             "page (do not use an older entry). Check the server clock if it keeps failing."
@@ -132,6 +170,9 @@ def mfa_enroll(request):
 
 @require_http_methods(["GET", "POST"])
 def mfa_verify(request):
+    if mfa_pending_expired(request):
+        clear_mfa_session(request)
+        return redirect("login")
     user = _challenge_user(request)
     if user is None:
         return redirect("login")
@@ -152,24 +193,38 @@ def mfa_verify(request):
 
     error = ""
     info = ""
+    status = 200
     if request.method == "POST":
-        action = request.POST.get("action") or "verify"
-        if action == "send_email":
-            ok, message = send_mfa_email_otp(user, fail_silently=True)
-            if ok:
-                info = message
-            else:
-                error = message
+        ip = get_client_ip(request)
+        allowed, lock_msg = mfa_verify_allowed(user, ip)
+        if not allowed:
+            error = lock_msg
+            status = 429
         else:
-            token = request.POST.get("token", "")
-            ok, method = verify_user_mfa(user, token)
-            if ok:
-                remember = bool(request.POST.get("remember_device"))
-                flash_success(request, "Signed in with multi-factor authentication.")
-                return _complete_mfa_login(
-                    request, user, method=method, remember_device=remember
-                )
-            error = "Invalid code. Use your authenticator app, email code, or a recovery code."
+            action = request.POST.get("action") or "verify"
+            if action == "send_email":
+                ok, message = send_mfa_email_otp(user, fail_silently=True)
+                if ok:
+                    info = message
+                else:
+                    error = message
+            else:
+                token = request.POST.get("token", "")
+                ok, method = verify_user_mfa(user, token)
+                if ok:
+                    remember = bool(request.POST.get("remember_device"))
+                    clear_mfa_failures(user, ip)
+                    flash_success(request, "Signed in with multi-factor authentication.")
+                    return _complete_mfa_login(
+                        request, user, method=method, remember_device=remember
+                    )
+                record_mfa_failure(user, ip)
+                still_ok, _ = mfa_verify_allowed(user, ip)
+                if not still_ok:
+                    error = "Too many attempts. Try again later."
+                    status = 429
+                else:
+                    error = "Invalid code. Use your authenticator app, email code, or a recovery code."
 
     return render(
         request,
@@ -182,6 +237,7 @@ def mfa_verify(request):
             "can_email_otp": user_can_receive_email_otp(user),
             "trusted_device_days": TRUSTED_DEVICE_DAYS,
         },
+        status=status,
     )
 
 
@@ -191,6 +247,11 @@ def mfa_send_email(request):
     user = _challenge_user(request)
     if user is None:
         return redirect("login")
+    ip = get_client_ip(request)
+    allowed, lock_msg = mfa_verify_allowed(user, ip)
+    if not allowed:
+        flash_error(request, lock_msg)
+        return redirect("accounts:mfa_verify")
     ok, message = send_mfa_email_otp(user, fail_silently=True)
     if ok:
         flash_success(request, message)

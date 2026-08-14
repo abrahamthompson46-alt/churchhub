@@ -25,6 +25,7 @@ from permissions.checks import (
     can_void_transactions,
     can_view_audit_log,
     can_view_pending_approvals,
+    can_view_reconciliation,
     can_view_transactions,
 )
 from church_system.church_scope import get_active_church, require_church
@@ -81,6 +82,8 @@ from transactions.services import (
 
 
 def _finance_required(view_func):
+    """Read-oriented finance gate (INV-FIN-01). Must not wrap GL/recon writes."""
+
     @login_required
     def _wrapped(request, *args, **kwargs):
         if not (
@@ -89,6 +92,39 @@ def _finance_required(view_func):
             or can_manage_receipts(request.user)
             or can_manage_expenses(request.user)
         ):
+            raise PermissionDenied
+        return view_func(request, *args, **kwargs)
+    return _wrapped
+
+
+def _remittance_write_required(view_func):
+    """District remittance payment requires manage_finances (INV-FIN-01)."""
+
+    @login_required
+    def _wrapped(request, *args, **kwargs):
+        if not can_manage_finances(request.user):
+            raise PermissionDenied
+        return view_func(request, *args, **kwargs)
+    return _wrapped
+
+
+def _reconciliation_view_required(view_func):
+    @login_required
+    def _wrapped(request, *args, **kwargs):
+        if not (
+            can_view_reconciliation(request.user)
+            or can_manage_reconciliation(request.user)
+            or can_finalize_reconciliation(request.user)
+        ):
+            raise PermissionDenied
+        return view_func(request, *args, **kwargs)
+    return _wrapped
+
+
+def _reconciliation_manage_required(view_func):
+    @login_required
+    def _wrapped(request, *args, **kwargs):
+        if not can_manage_reconciliation(request.user):
             raise PermissionDenied
         return view_func(request, *args, **kwargs)
     return _wrapped
@@ -426,7 +462,7 @@ def audit_log(request):
     return render(request, "transactions/audit_log.html", {"logs": logs, "page_obj": logs})
 
 
-@_finance_required
+@_remittance_write_required
 def record_remittance_view(request):
     """GET: remittance payment form. POST: record district remittance (also used from cut-off)."""
     church = require_church(request)
@@ -734,7 +770,7 @@ def period_unlock(request):
     return redirect(f"{reverse('transactions:period_list')}?year={year}")
 
 
-@_finance_required
+@_reconciliation_view_required
 def reconciliation_list(request):
     reconciliations_qs = selectors.reconciliations_qs(request)
     paginator = Paginator(reconciliations_qs, 25)
@@ -745,7 +781,7 @@ def reconciliation_list(request):
     })
 
 
-@_finance_required
+@_reconciliation_manage_required
 def reconciliation_create(request):
     church = require_church(request)
     form = BankReconciliationForm(request.POST or None, church=church)
@@ -766,7 +802,7 @@ def reconciliation_create(request):
     return render(request, "transactions/reconciliation_form.html", {"form": form})
 
 
-@_finance_required
+@_reconciliation_view_required
 def reconciliation_detail(request, pk):
     recon = selectors.reconciliation_for_request(request, pk)
     items = selectors.reconciliation_items(recon)
@@ -774,6 +810,8 @@ def reconciliation_detail(request, pk):
     if request.method == "POST" and not recon.is_reconciled:
         action = request.POST.get("action")
         if action == "match":
+            if not can_manage_reconciliation(request.user):
+                raise PermissionDenied
             matched_ids = request.POST.getlist("matched_lines")
             try:
                 update_reconciliation_matches(recon, matched_ids, request.user)
@@ -800,4 +838,5 @@ def reconciliation_detail(request, pk):
         "matched_total": matched_total,
         "difference": difference,
         "can_finalize": can_finalize_reconciliation(request.user) and not recon.is_reconciled,
+        "can_match": can_manage_reconciliation(request.user) and not recon.is_reconciled,
     })

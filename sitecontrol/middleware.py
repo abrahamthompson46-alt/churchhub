@@ -163,6 +163,8 @@ class LoginRateLimitMiddleware:
     """Throttle failed auth POSTs: staff login, portal login, password reset, and /apply/."""
 
     LOGIN_PATHS = frozenset({"/accounts/login", "/portal/login"})
+    # MFA verify is throttled in accounts.mfa (per-user + per-IP), not here:
+    # this limiter keys on posted username, which /accounts/mfa does not receive.
     RESET_REQUEST_PATHS = frozenset({"/accounts/password_reset", "/portal/password/reset"})
     APPLY_PATH = "/apply"
     PORTAL_LOGIN_MAX_ATTEMPTS = 3

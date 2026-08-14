@@ -11,6 +11,7 @@ from django.http import FileResponse, Http404, HttpResponse
 from django.views.decorators.http import require_GET
 
 from church_system.media_access import is_public_media_path, normalize_media_relative_path
+from church_system.media_authorization import user_may_access_media
 
 
 def _media_file(relative_path: str) -> Path:
@@ -49,7 +50,7 @@ def protected_media(request, path: str):
     Serve MEDIA files.
 
     Public branding paths: anonymous OK.
-    All other paths: authenticated session required (login redirect).
+    Private paths: object- and tenant-scoped (INV-MED-01). Unauthorized → 404.
     """
     relative = normalize_media_relative_path(path)
     if not relative:
@@ -60,5 +61,9 @@ def protected_media(request, path: str):
 
     if not request.user.is_authenticated:
         return redirect_to_login(request.get_full_path())
+
+    if not user_may_access_media(request.user, relative):
+        # INV-MED-02 / INV-MED-04: 404, no bytes, no successful download audit.
+        raise Http404("Media not found.")
 
     return _deliver(relative)

@@ -93,6 +93,7 @@ These are the 14 August 2026 audit pack. They do **not** replace `SECURITY/*.md`
 | [SECURITY_REMEDIATION_ROADMAP.md](../SECURITY_REMEDIATION_ROADMAP.md) | P0–P3 plan |
 | [SECURITY_PHASE2_ANNOUNCEMENTS_DESIGN.md](../SECURITY_PHASE2_ANNOUNCEMENTS_DESIGN.md) | Phase 2 CH-SEC-002/008 design + implementation notes |
 | [SECURITY_PHASE3_FINANCIAL_DESIGN.md](../SECURITY_PHASE3_FINANCIAL_DESIGN.md) | Phase 3 financial integrity / maker-checker design + implementation contract |
+| [SECURITY_PHASE4_MEDIA_TENANCY_DESIGN.md](../SECURITY_PHASE4_MEDIA_TENANCY_DESIGN.md) | Phase 4 media URL gate, unanchored tenancy, platform stats (Option A) |
 
 ### API — `docs/API/`
 

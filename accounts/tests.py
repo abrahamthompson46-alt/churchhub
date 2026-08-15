@@ -164,11 +164,17 @@ class RoleAssignmentTests(ChurchHubTestMixin, TestCase):
 
 class ManageableScopeTests(ChurchHubTestMixin, TestCase):
     def setUp(self):
+        from sitecontrol.models import Denomination
+
+        self.denom = Denomination.objects.create(code="acct-sa", name="Accounts SA Denom")
+        self.conference.denomination = self.denom
+        self.conference.save(update_fields=["denomination"])
         self.super_admin = User.objects.create_superuser(
             username="sa",
             password="pass12345",
             email="sa@test.com",
             role=UserRole.SUPER_ADMIN,
+            denomination=self.denom,
         )
         self.pastor = User.objects.create_user(
             username="pastor",

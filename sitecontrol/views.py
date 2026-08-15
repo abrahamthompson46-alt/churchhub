@@ -102,8 +102,8 @@ def _require_tenant_access(request, church):
 @platform_required
 @require_platform_capability(CAP_VIEW)
 def dashboard(request):
-    stats = platform_stats()
-    alerts = tenant_health_alerts()
+    stats = platform_stats(request.user)
+    alerts = tenant_health_alerts(request.user)
     recent = filter_subscriptions_for_operator(
         selectors.subscription_detail_qs(),
         request.user,
@@ -213,8 +213,8 @@ def setup_checklist(request):
 @platform_required
 @require_platform_capability(CAP_VIEW)
 def health(request):
-    alerts = tenant_health_alerts()
-    stats = platform_stats()
+    alerts = tenant_health_alerts(request.user)
+    stats = platform_stats(request.user)
     ops_signals = _ops_signals()
     return render(request, "sitecontrol/health.html", {
         "alerts": alerts,

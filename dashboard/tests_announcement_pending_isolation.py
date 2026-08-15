@@ -63,16 +63,19 @@ class PendingAnnouncementsForAdminIsolationTests(TestCase):
             denomination=cls.denom_a,
         )
         # Unanchored Django superuser — must fail closed (no denomination).
+        # Persist via QuerySet.update to simulate legacy rows (save() rejects this).
         cls.unanchored_super = User.objects.create_superuser(
             username="dash_ann_unanchored",
             password="pass12345",
             email="unanchored@example.com",
         )
-        cls.unanchored_super.role = UserRole.SUPER_ADMIN
-        cls.unanchored_super.denomination = None
-        cls.unanchored_super.church = None
-        cls.unanchored_super.is_platform_user = False
-        cls.unanchored_super.save()
+        User.objects.filter(pk=cls.unanchored_super.pk).update(
+            role=UserRole.SUPER_ADMIN,
+            denomination_id=None,
+            church_id=None,
+            is_platform_user=False,
+        )
+        cls.unanchored_super.refresh_from_db()
 
         cls.pending_a = Announcement.objects.create(
             title="Pending A",

@@ -57,3 +57,39 @@ def filter_subscriptions_for_operator(qs, user):
     return qs.filter(
         church__district__zone__conference__denomination__in=user.managed_denominations.all()
     )
+
+
+def filter_applications_for_operator(qs, user):
+    if operator_has_global_access(user):
+        return qs
+    return qs.filter(denomination__in=user.managed_denominations.all())
+
+
+def filter_conferences_for_operator(qs, user):
+    if operator_has_global_access(user):
+        return qs
+    return qs.filter(denomination__in=user.managed_denominations.all())
+
+
+def filter_zones_for_operator(qs, user):
+    if operator_has_global_access(user):
+        return qs
+    return qs.filter(conference__denomination__in=user.managed_denominations.all())
+
+
+def filter_districts_for_operator(qs, user):
+    if operator_has_global_access(user):
+        return qs
+    return qs.filter(zone__conference__denomination__in=user.managed_denominations.all())
+
+
+def filter_institution_users_for_operator(qs, user):
+    from django.db.models import Q
+
+    if operator_has_global_access(user):
+        return qs
+    denoms = user.managed_denominations.all()
+    return qs.filter(
+        Q(denomination__in=denoms)
+        | Q(church__district__zone__conference__denomination__in=denoms)
+    )

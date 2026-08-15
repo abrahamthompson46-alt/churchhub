@@ -1,4 +1,8 @@
-"""Authenticated (and public-branding) media delivery with optional X-Accel-Redirect."""
+"""Authenticated (and public-branding) media delivery with optional X-Accel-Redirect.
+
+Uses ``default_storage`` so filesystem and S3-backed keys both work after ACL
+(CH-SEC-001). Private bytes are never returned without ``user_may_access_media``.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +11,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
+from django.core.files.storage import default_storage
 from django.http import FileResponse, Http404, HttpResponse
 from django.views.decorators.http import require_GET
 
@@ -14,34 +19,48 @@ from church_system.media_access import is_public_media_path, normalize_media_rel
 from church_system.media_authorization import user_may_access_media
 
 
-def _media_file(relative_path: str) -> Path:
-    root = Path(settings.MEDIA_ROOT).resolve()
-    candidate = (root / relative_path).resolve()
-    try:
-        candidate.relative_to(root)
-    except ValueError as exc:
-        raise Http404("Invalid media path.") from exc
-    if not candidate.is_file():
-        raise Http404("Media not found.")
-    return candidate
-
-
-def _content_type(path: Path) -> str:
-    guessed, _ = mimetypes.guess_type(str(path))
+def _content_type(relative_path: str) -> str:
+    guessed, _ = mimetypes.guess_type(relative_path)
     return guessed or "application/octet-stream"
 
 
+def _try_x_accel(relative_path: str) -> HttpResponse | None:
+    """Filesystem + Nginx internal redirect only; skip for remote storage."""
+    if not getattr(settings, "MEDIA_X_ACCEL_REDIRECT", False):
+        return None
+    try:
+        abs_path = Path(default_storage.path(relative_path)).resolve()
+    except (NotImplementedError, AttributeError, ValueError, OSError):
+        return None
+    root = Path(settings.MEDIA_ROOT).resolve()
+    try:
+        abs_path.relative_to(root)
+    except ValueError:
+        return None
+    if not abs_path.is_file():
+        return None
+    internal_prefix = getattr(
+        settings, "MEDIA_INTERNAL_URL_PREFIX", "/internal-media/"
+    ).rstrip("/")
+    response = HttpResponse(content_type=_content_type(relative_path))
+    response["X-Accel-Redirect"] = f"{internal_prefix}/{relative_path}"
+    response["Content-Disposition"] = f'inline; filename="{abs_path.name}"'
+    return response
+
+
 def _deliver(relative_path: str) -> HttpResponse:
-    path = _media_file(relative_path)
-    if getattr(settings, "MEDIA_X_ACCEL_REDIRECT", False):
-        internal_prefix = getattr(
-            settings, "MEDIA_INTERNAL_URL_PREFIX", "/internal-media/"
-        ).rstrip("/")
-        response = HttpResponse(content_type=_content_type(path))
-        response["X-Accel-Redirect"] = f"{internal_prefix}/{relative_path}"
-        response["Content-Disposition"] = f'inline; filename="{path.name}"'
-        return response
-    return FileResponse(path.open("rb"), content_type=_content_type(path))
+    if not default_storage.exists(relative_path):
+        raise Http404("Media not found.")
+    accel = _try_x_accel(relative_path)
+    if accel is not None:
+        return accel
+    handle = default_storage.open(relative_path, "rb")
+    filename = Path(relative_path).name
+    return FileResponse(
+        handle,
+        content_type=_content_type(relative_path),
+        filename=filename,
+    )
 
 
 @require_GET

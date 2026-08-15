@@ -9,7 +9,9 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 
 **Remediation checkpoints:**
 - Phase 1 (`44f5575`): media ACL (CH-SEC-001 partial), MFA throttle, remittance/recon write gates
-- Phase 2 (working tree on `feature/sec-phase1-media-mfa-finance`): CH-SEC-002 / CH-SEC-008 announcement denomination isolation
+- Phase 2 (`484abe8`): CH-SEC-002 / CH-SEC-008 announcement denomination isolation
+- Phase 3 (`71aa74c`): financial integrity / maker-checker (CH-SEC-004/005/006/011/012/013/L3)
+- Phase 4 (working tree on `feature/sec-phase1-media-mfa-finance`): CH-SEC-L1 fail-closed tenancy, CH-SEC-001 S3/`FileField.url` gate, CH-SEC-009 platform stats Option A
 
 ---
 
@@ -17,7 +19,7 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 
 | ID | Sev | Audit status | Remediation | Title | Cross-tenant | Auth required |
 |----|-----|--------------|-------------|-------|--------------|---------------|
-| CH-SEC-001 | HIGH | CONFIRMED | PARTIALLY FIXED | Private media lacks object/tenant authorization | Yes | Yes |
+| CH-SEC-001 | HIGH | CONFIRMED | FIXED (Phase 4) | Private media lacks object/tenant authorization | Yes | Yes |
 | CH-SEC-002 | HIGH | CONFIRMED | FIXED | General announcements cross denomination wall | Yes | Yes |
 | CH-SEC-003 | HIGH | CONFIRMED | FIXED (Phase 1) | MFA verification not throttled | No | Post-password |
 | CH-SEC-004 | HIGH | CONFIRMED | FIXED (Phase 3) | Tenant district reassignment skips `Church.clean()` | Yes | Platform |
@@ -25,7 +27,7 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 | CH-SEC-006 | HIGH | CONFIRMED | FIXED (Phase 3) | Contribution posting has no idempotency | No | Staff |
 | CH-SEC-007 | HIGH | CONFIRMED | FIXED (Phase 1) | Remittance/bank-rec use read-oriented wrapper | No | Staff |
 | CH-SEC-008 | MEDIUM | CONFIRMED | FIXED | Announcement detail IDOR for approvers | Yes | Staff |
-| CH-SEC-009 | MEDIUM | CONFIRMED | OPEN | Platform dashboard stats not denomination-scoped | Yes | Platform |
+| CH-SEC-009 | MEDIUM | CONFIRMED | FIXED (Phase 4) | Platform dashboard stats not denomination-scoped | Yes | Platform |
 | CH-SEC-010 | MEDIUM | CONFIRMED | OPEN | Portal login account enumeration | N/A | No |
 | CH-SEC-011 | MEDIUM | CONFIRMED | FIXED (Phase 3) | Welfare same-user approval | No | Staff |
 | CH-SEC-012 | MEDIUM | CONFIRMED | FIXED (Phase 3) | Concurrent void can double-reverse | No | Staff |
@@ -39,7 +41,7 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 | CH-SEC-020 | LOW | CONFIRMED | OPEN | Django pin drift 6.0 vs 5.1.15 | N/A | N/A |
 | CH-SEC-021 | LOW | CONFIRMED | OPEN | Compose publishes DB/Redis + default passwords | Dev | N/A |
 | CH-SEC-022 | LOW | CONFIRMED | OPEN | Django HSTS 1h vs Nginx 1y | N/A | N/A |
-| CH-SEC-L1 | HIGH | LIKELY | OPEN | Unanchored SUPER_ADMIN is global | Yes | If user exists |
+| CH-SEC-L1 | HIGH | LIKELY | FIXED (Phase 4) | Unanchored SUPER_ADMIN is global | Yes | If user exists |
 | CH-SEC-L2 | MEDIUM | LIKELY | OPEN | Upload validation is MIME/extension only | Maybe | Yes |
 | CH-SEC-L3 | MEDIUM | LIKELY | FIXED (Phase 3) | Settlement/district remittance races | No | Staff |
 | CH-SEC-L4 | LOW | LIKELY | OPEN | Password-reset paths skip trusted-device revoke | No | Yes |
@@ -68,8 +70,8 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 16. **Crosses tenant boundaries:** Yes  
 17. **Confidence:** High  
 
-**Remediation (Phase 1):** `user_may_access_media` + `protected_media` 404 for unauthorized paths — **PARTIALLY FIXED**.  
-**Still OPEN under CH-SEC-001:** direct S3/`FileField.url` bypass when storage is public (INV-MED-03). Phase 2 announcement images authorize via `Announcement.denomination`, not creator heuristic.
+**Remediation (Phase 1):** `user_may_access_media` + `protected_media` 404 for unauthorized paths.  
+**Remediation (Phase 4):** **FIXED.** `ChurchHubFileSystemStorage` / `ChurchHubS3Boto3Storage` force `.url` → `/media/<key>` (never public S3/CDN URLs). `protected_media` delivers via `default_storage.open` after ACL. Public branding remains anonymous via the same gate; exports remain owner-only. Tests: `church_system/tests_media_access.py`, `church_system/tests_phase4_media_storage.py`. Residual ops risk: bucket policy must still deny public `GetObject` on private prefixes if objects are uploaded outside this app.
 
 ---
 
@@ -227,6 +229,8 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 **Test:** Operator limited to denom A must not see denom B church names or denom B counts.  
 **Auth:** Platform. **Cross-tenant:** Yes. **Confidence:** High.
 
+**Remediation (Phase 4):** **FIXED (Option A).** `platform_stats(user)` / `tenant_health_alerts(user)` scope tenant KPIs and over-limit names to `managed_denominations` unless `operator_has_global_access` (OWNER / break-glass). Dashboard and health views pass `request.user`. Tests: `sitecontrol/tests_phase4_platform_stats.py`.
+
 ---
 
 ## CH-SEC-010 — MEDIUM — CONFIRMED
@@ -349,6 +353,8 @@ Failed logins lock by submitted identifier (`sitecontrol/middleware.py` 260–33
 ## LIKELY
 
 **CH-SEC-L1 HIGH:** `get_manageable_churches` returns all churches when superadmin has no church/denomination (`permissions/scoping.py` 16–31). `User.clean()` would block; `save()` skips it.  
+
+**Remediation (Phase 4):** **FIXED.** Unanchored institution `is_superadmin` / break-glass `is_superuser` → empty manageable churches; unanchored superadmin users → self-only. `User.save()` rejects new unanchored SUPER_ADMIN / DENOMINATION-scope rows (legacy rows via `QuerySet.update` still fail closed at read time). Tests: `permissions/tests_phase4_tenancy.py`. Residual: inventory/quarantine historical unanchored SUPER_ADMIN rows in ops.  
 **CH-SEC-L2 MEDIUM:** `validate_upload` does not check magic bytes (`church_system/uploads.py` 100–138).  
 **CH-SEC-L3 MEDIUM:** Settlement posting and district remittance duplicate checks are query-based without row locks.  
 

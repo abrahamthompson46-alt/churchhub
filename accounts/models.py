@@ -234,6 +234,44 @@ class User(AbstractUser):
                 self.scope_level = role_default
             if not self.is_superuser:
                 self.is_staff = False
+            # Keep denomination aligned with church when church is set.
+            if self.church_id and self.church:
+                church_denom = getattr(self.church, "denomination", None)
+                if church_denom and self.denomination_id != church_denom.pk:
+                    self.denomination = church_denom
+
+        # CH-SEC-L1: refuse persisting unanchored denomination-scoped / SUPER_ADMIN
+        # institution users. Do not call full_clean() for all roles (would break
+        # legacy create_superuser fixtures that are MEMBER+is_superuser without church).
+        # Ops should quarantine historical unanchored SUPER_ADMIN rows separately.
+        update_fields = kwargs.get("update_fields")
+        tenancy_touched = update_fields is None or any(
+            f in update_fields
+            for f in (
+                "role",
+                "denomination",
+                "church",
+                "is_platform_user",
+                "scope_level",
+            )
+        )
+        if tenancy_touched and not getattr(self, "is_platform_user", False):
+            from django.core.exceptions import ValidationError
+
+            level = self.scope_level or OrgScopeLevel.default_for_role(self.role)
+            needs_denom_anchor = (
+                level == OrgScopeLevel.DENOMINATION
+                or self.role == UserRole.SUPER_ADMIN
+            )
+            if needs_denom_anchor and not self.denomination_id and not self.church_id:
+                raise ValidationError(
+                    {
+                        "denomination": (
+                            "Denomination-scoped users and institution SUPER_ADMIN "
+                            "must be assigned a denomination or a church."
+                        )
+                    }
+                )
         super().save(*args, **kwargs)
 
 

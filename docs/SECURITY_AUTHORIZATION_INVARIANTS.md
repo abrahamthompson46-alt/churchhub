@@ -625,8 +625,8 @@ Inspection of **this workspace** (including uncommitted files) vs the MUST rules
 | INV-MFA-01 … INV-MFA-08 | **Aligned on this working tree:** per-user/per-IP cache lock, pending TTL, TOTP replay cache, enroll/verify 429, `LOGIN_PATHS` still excludes `/accounts/mfa`. **Audit baseline `main` contradicted this.** |
 | INV-FIN-01 / INV-FIN-03 / INV-FIN-04 remittance & recon | **Aligned on this working tree:** `_remittance_write_required` (`manage_finances`); recon list/detail GET uses view/manage/finalize; recon create/match POST uses `manage_reconciliation`. **Audit baseline `main` used `_finance_required` (OR `view_transactions`) on remittance POST and recon writes.** |
 | INV-FIN-02 ledger | `ledger_finance_required` still ORs `view_ledger` onto posting views (`ledger/views.py`). |
-| INV-TEN-07 / INV-ANN-01 | `announcements_for_church_ids` ORs all `visibility=general`. `visible_announcements` sets `scoped = qs` when `can_view_all_churches` or `is_superadmin`. General rows have `church=None` and **no denomination FK**. |
-| INV-OBJ-02 / INV-ANN-03 | `announcement_detail` uses global PK + `can_approve_announcements(user)` (capability, not object). |
+| INV-TEN-07 / INV-ANN-01 | **Aligned on this working tree (Phase 2):** `Announcement.denomination` FK; selectors require denomination predicate; `visible_announcements` never uses unfiltered `scoped = qs`. **Audit baseline / Phase 1 contradicted this.** Quarantined NULL-denomination rows remain fail-closed. |
+| INV-OBJ-02 / INV-ANN-03 | **Aligned on this working tree (Phase 2):** denomination-scoped object load + object-scoped `can_approve_announcement`. **Audit baseline contradicted this.** |
 | INV-TEN-05 | `repo.save_church` → `Model.save()` skips `Church.clean()`. |
 | INV-TEN-02 / INV-TEN-18 | `get_manageable_churches`: unanchored superadmin returns **all** churches. `User.clean()` would block; `save()` does not `full_clean()`. |
 | INV-DATE-01 / INV-SOD-01 | Asset depreciation/disposal skip working day and `approve_module_journal`; register updates while GL is PENDING. |

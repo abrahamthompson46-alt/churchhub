@@ -173,18 +173,24 @@ def _announcement_image(user, path: str) -> bool:
     from permissions.checks import can_view_announcements
 
     qs = AnnouncementImage.objects.filter(image=path).select_related(
-        "announcement__church", "announcement__created_by"
+        "announcement__church",
+        "announcement__denomination",
+        "announcement__created_by",
     )
     for image in qs:
         announcement = image.announcement
+        # INV-ANN-01 / INV-DENY-01: announcement.denomination is authoritative.
+        if not announcement.denomination_id:
+            continue
+        user_denom = get_user_denomination(user)
+        if not user_denom or user_denom.pk != announcement.denomination_id:
+            continue
         if announcement.created_by_id == user.pk:
-            if announcement.church_id:
-                return _church_in_scope(user, announcement.church)
-            creator_denom = get_user_denomination(announcement.created_by)
-            user_denom = get_user_denomination(user)
-            return bool(
-                user_denom and creator_denom and user_denom.pk == creator_denom.pk
-            )
+            if announcement.visibility == "church":
+                if _church_in_scope(user, announcement.church):
+                    return True
+                continue
+            return True
         if can_approve_announcement(user, announcement):
             return True
         if not can_view_announcements(user):
@@ -197,15 +203,8 @@ def _announcement_image(user, path: str) -> bool:
             if _church_in_scope(user, announcement.church):
                 return True
             continue
-        # general: denomination via creator until Announcement.denomination exists
-        user_denom = get_user_denomination(user)
-        creator_denom = (
-            get_user_denomination(announcement.created_by)
-            if announcement.created_by_id
-            else None
-        )
-        if user_denom and creator_denom and user_denom.pk == creator_denom.pk:
-            return True
+        # general: same denomination already verified above
+        return True
     return False
 
 

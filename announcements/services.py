@@ -6,11 +6,11 @@ from django.utils import timezone
 
 from announcements import repositories as repo
 from announcements import selectors
+from church_system.denomination_scope import get_church_denomination, get_user_denomination
 from permissions.checks import (
     can_approve_announcements,
     can_archive_announcements,
     can_create_announcements,
-    can_view_all_churches,
 )
 from permissions.scoping import get_manageable_churches
 from permissions.scoping_checks import (
@@ -18,7 +18,6 @@ from permissions.scoping_checks import (
     is_top_level_approver,
     pending_for_church_scope,
 )
-from permissions.superadmin import is_superadmin
 
 from .models import MAX_PINNED_PER_CHURCH, Announcement
 
@@ -37,9 +36,21 @@ def _log_audit(announcement, action, user, details=None):
     )
 
 
+def _same_denomination(user, announcement) -> bool:
+    """INV-ANN-01 / INV-DENY-01: missing either side fails closed."""
+    if not announcement or not announcement.denomination_id:
+        return False
+    user_denom = get_user_denomination(user)
+    if not user_denom:
+        return False
+    return user_denom.pk == announcement.denomination_id
+
+
 def can_approve_announcement(user, announcement):
     """Check if user may approve/reject this specific announcement."""
     if not can_approve_announcements(user):
+        return False
+    if not _same_denomination(user, announcement):
         return False
     if announcement.visibility == "general":
         return is_top_level_approver(user)
@@ -50,6 +61,8 @@ def can_approve_announcement(user, announcement):
 
 def can_edit_announcement(user, announcement):
     if announcement.is_archived or announcement.is_rejected:
+        return False
+    if not _same_denomination(user, announcement):
         return False
     if can_approve_announcement(user, announcement):
         return True
@@ -62,6 +75,8 @@ def can_edit_announcement(user, announcement):
 
 def can_archive_announcement(user, announcement):
     if announcement.is_archived:
+        return False
+    if not _same_denomination(user, announcement):
         return False
     if not can_archive_announcements(user) and announcement.created_by_id != user.id:
         return False
@@ -76,6 +91,10 @@ def can_archive_announcement(user, announcement):
 def pending_for_user(user):
     """Pending announcements this user is allowed to review (excludes own submissions)."""
     qs = selectors.pending_announcements_base_qs()
+    denom = get_user_denomination(user)
+    if not denom:
+        return qs.none()
+    qs = qs.filter(denomination_id=denom.pk)
     if is_top_level_approver(user):
         return qs.exclude(created_by=user)
     scoped = pending_for_church_scope(
@@ -108,26 +127,17 @@ def user_matches_announcement_audience(user, announcement) -> bool:
 
 
 def visible_announcements(user, *, include_scheduled=False):
-    """Approved, non-archived, non-expired announcements for the user + audience."""
+    """
+    Approved, non-archived, non-expired announcements for the user + audience.
+
+    INV-ANN-02: view_all_churches / institution superadmin never receive an
+    unfiltered queryset — always bound to the user's denomination.
+    """
     qs = selectors.approved_announcements_base_qs()
     qs = selectors.apply_publish_at_filter(qs, include_scheduled=include_scheduled)
     qs = qs.prefetch_related("target_department_links")
 
-    if can_view_all_churches(user) or is_superadmin(user):
-        scoped = qs
-    else:
-        churches = get_manageable_churches(user)
-        church_ids = list(churches.values_list("pk", flat=True))
-        if church_ids:
-            scoped = selectors.announcements_for_church_ids(qs, church_ids)
-        else:
-            from church_system.church_scope import get_user_church
-
-            church = get_user_church(user)
-            if church:
-                scoped = selectors.announcements_for_church(qs, church)
-            else:
-                scoped = selectors.general_visibility_only(qs)
+    scoped = selectors.announcements_for_user_scope(qs, user)
 
     member = getattr(user, "member", None)
     member_dept_id = getattr(member, "department_id", None) if member else None
@@ -151,9 +161,11 @@ def visible_announcements(user, *, include_scheduled=False):
     return scoped.filter(pk__in=matched_ids)
 
 
-def _assert_pin_limit(church, excluding_pk=None):
+def _assert_pin_limit(church, *, denomination=None, excluding_pk=None):
     if not church:
-        qs = selectors.pinned_general_approved_qs(excluding_pk=excluding_pk)
+        qs = selectors.pinned_general_approved_qs(
+            denomination=denomination, excluding_pk=excluding_pk
+        )
     else:
         qs = selectors.pinned_church_approved_qs(church, excluding_pk=excluding_pk)
     if qs.count() >= MAX_PINNED_PER_CHURCH:
@@ -161,6 +173,27 @@ def _assert_pin_limit(church, excluding_pk=None):
             f"At most {MAX_PINNED_PER_CHURCH} pinned announcements are allowed. "
             "Unpin another announcement first."
         )
+
+
+def _resolve_create_denomination(user, *, visibility, church):
+    if visibility == "general":
+        denom = get_user_denomination(user)
+        if not denom:
+            raise AnnouncementServiceError(
+                "Denomination is required for general announcements."
+            )
+        return denom
+    denom = get_church_denomination(church)
+    if not denom:
+        raise AnnouncementServiceError(
+            "Church has no denomination; cannot create announcements."
+        )
+    user_denom = get_user_denomination(user)
+    if user_denom and user_denom.pk != denom.pk:
+        raise AnnouncementServiceError(
+            "Cannot create announcements outside your denomination."
+        )
+    return denom
 
 
 def create_announcement(
@@ -199,7 +232,7 @@ def create_announcement(
         church = None
         if not is_top_level_approver(user):
             raise AnnouncementServiceError(
-                "Only top-level leadership can create general (conference-wide) announcements."
+                "Only top-level leadership can create general (denomination-wide) announcements."
             )
     else:
         if not church:
@@ -211,6 +244,8 @@ def create_announcement(
         manageable = get_manageable_churches(user)
         if not selectors.manageable_church_exists(manageable, church.pk):
             raise AnnouncementServiceError("You cannot post announcements for that church.")
+
+    denomination = _resolve_create_denomination(user, visibility=visibility, church=church)
 
     # SoD: default is pending — do not auto-approve the creator's own submission.
     if auto_approve is None:
@@ -227,7 +262,7 @@ def create_announcement(
     departments = list(target_departments or [])
 
     if is_pinned and auto_approve:
-        _assert_pin_limit(church)
+        _assert_pin_limit(church, denomination=denomination)
 
     with db_transaction.atomic():
         fields = dict(
@@ -235,6 +270,7 @@ def create_announcement(
             content=content,
             visibility=visibility,
             church=church,
+            denomination=denomination,
             event_date=event_date,
             publish_at=publish_at,
             auto_expire=bool(auto_expire),
@@ -265,6 +301,7 @@ def create_announcement(
                 "visibility": ann.visibility,
                 "auto_approved": auto_approve,
                 "church_id": str(ann.church_id) if ann.church_id else None,
+                "denomination_id": str(ann.denomination_id) if ann.denomination_id else None,
                 "target_roles": roles,
                 "target_department_ids": [str(d.pk) for d in departments],
             },
@@ -298,6 +335,7 @@ def update_announcement(
         "visibility": announcement.visibility,
         "is_pinned": announcement.is_pinned,
         "is_approved": announcement.is_approved,
+        "denomination_id": announcement.denomination_id,
     }
     was_approved = announcement.is_approved
     editor_is_approver = can_approve_announcement(user, announcement)
@@ -316,6 +354,46 @@ def update_announcement(
             if not selectors.manageable_church_exists(manageable, church.pk):
                 raise AnnouncementServiceError("Invalid church for this announcement.")
             announcement.church = church
+
+    # Re-resolve denomination from authoritative sources (never from creator).
+    if announcement.visibility == "general":
+        announcement.church = None
+        if not is_top_level_approver(user):
+            raise AnnouncementServiceError(
+                "Only top-level leadership can set general (denomination-wide) visibility."
+            )
+        denom = get_user_denomination(user)
+        if not denom:
+            raise AnnouncementServiceError(
+                "Denomination is required for general announcements."
+            )
+        if (
+            announcement.denomination_id
+            and announcement.denomination_id != denom.pk
+        ):
+            raise AnnouncementServiceError(
+                "Cannot move an announcement to another denomination."
+            )
+        announcement.denomination = denom
+    else:
+        if not announcement.church_id:
+            raise AnnouncementServiceError(
+                "Church is required for church-scoped announcements."
+            )
+        church_denom = get_church_denomination(announcement.church)
+        if not church_denom:
+            raise AnnouncementServiceError(
+                "Church has no denomination; cannot update announcement."
+            )
+        if (
+            announcement.denomination_id
+            and announcement.denomination_id != church_denom.pk
+        ):
+            raise AnnouncementServiceError(
+                "Cannot move an announcement to another denomination."
+            )
+        announcement.denomination = church_denom
+
     if event_date is not None:
         announcement.event_date = event_date
     if publish_at is not None:
@@ -327,7 +405,11 @@ def update_announcement(
 
     if is_pinned is not None and editor_is_approver:
         if is_pinned and not announcement.is_pinned:
-            _assert_pin_limit(announcement.church, excluding_pk=announcement.pk)
+            _assert_pin_limit(
+                announcement.church,
+                denomination=announcement.denomination,
+                excluding_pk=announcement.pk,
+            )
         announcement.is_pinned = bool(is_pinned)
 
     if was_approved and require_reapproval and not editor_is_approver:
@@ -353,6 +435,7 @@ def update_announcement(
                 "visibility": announcement.visibility,
                 "is_pinned": announcement.is_pinned,
                 "is_approved": announcement.is_approved,
+                "denomination_id": announcement.denomination_id,
             }},
         )
         if is_pinned is True:
@@ -370,7 +453,11 @@ def approve_announcement(announcement, user):
     if announcement.is_approved and not announcement.is_rejected:
         raise AnnouncementServiceError("Announcement is already approved.")
     if announcement.is_pinned:
-        _assert_pin_limit(announcement.church, excluding_pk=announcement.pk)
+        _assert_pin_limit(
+            announcement.church,
+            denomination=announcement.denomination,
+            excluding_pk=announcement.pk,
+        )
 
     with db_transaction.atomic():
         announcement.is_approved = True

@@ -3,43 +3,48 @@
 **Audit date:** 14 August 2026  
 **Commit:** `8eb5730f91b18212e17f48b3550afa952492437b` (`main`)  
 **Status vocabulary:** CONFIRMED / LIKELY / POTENTIAL  
+**Remediation vocabulary:** OPEN / PARTIALLY FIXED / FIXED (does not erase historical findings)
 
 This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
+
+**Remediation checkpoints:**
+- Phase 1 (`44f5575`): media ACL (CH-SEC-001 partial), MFA throttle, remittance/recon write gates
+- Phase 2 (working tree on `feature/sec-phase1-media-mfa-finance`): CH-SEC-002 / CH-SEC-008 announcement denomination isolation
 
 ---
 
 ## Inventory
 
-| ID | Sev | Status | Title | Cross-tenant | Auth required |
-|----|-----|--------|-------|--------------|---------------|
-| CH-SEC-001 | HIGH | CONFIRMED | Private media lacks object/tenant authorization | Yes | Yes |
-| CH-SEC-002 | HIGH | CONFIRMED | General announcements cross denomination wall | Yes | Yes |
-| CH-SEC-003 | HIGH | CONFIRMED | MFA verification not throttled | No | Post-password |
-| CH-SEC-004 | HIGH | CONFIRMED | Tenant district reassignment skips `Church.clean()` | Yes | Platform |
-| CH-SEC-005 | HIGH | CONFIRMED | Asset journals pending; working day skipped | No | Staff |
-| CH-SEC-006 | HIGH | CONFIRMED | Contribution posting has no idempotency | No | Staff |
-| CH-SEC-007 | HIGH | CONFIRMED | Remittance/bank-rec use read-oriented wrapper | No | Staff |
-| CH-SEC-008 | MEDIUM | CONFIRMED | Announcement detail IDOR for approvers | Yes | Staff |
-| CH-SEC-009 | MEDIUM | CONFIRMED | Platform dashboard stats not denomination-scoped | Yes | Platform |
-| CH-SEC-010 | MEDIUM | CONFIRMED | Portal login account enumeration | N/A | No |
-| CH-SEC-011 | MEDIUM | CONFIRMED | Welfare same-user approval | No | Staff |
-| CH-SEC-012 | MEDIUM | CONFIRMED | Concurrent void can double-reverse | No | Staff |
-| CH-SEC-013 | MEDIUM | CONFIRMED | Incomplete idempotency keys reusable | No | Staff |
-| CH-SEC-014 | MEDIUM | CONFIRMED | UserActivityLog deletable in admin | No | Break-glass |
-| CH-SEC-015 | MEDIUM | CONFIRMED | Email+DOB first-login credential | No | Public portal |
-| CH-SEC-016 | MEDIUM | CONFIRMED | Some financial CSVs unaudited | No | Staff |
-| CH-SEC-017 | LOW | CONFIRMED | GET logout CSRF | No | Victim session |
-| CH-SEC-018 | LOW | CONFIRMED | GET church switch | No | Staff |
-| CH-SEC-019 | LOW | CONFIRMED | Identifier lockout DoS | N/A | No |
-| CH-SEC-020 | LOW | CONFIRMED | Django pin drift 6.0 vs 5.1.15 | N/A | N/A |
-| CH-SEC-021 | LOW | CONFIRMED | Compose publishes DB/Redis + default passwords | Dev | N/A |
-| CH-SEC-022 | LOW | CONFIRMED | Django HSTS 1h vs Nginx 1y | N/A | N/A |
-| CH-SEC-L1 | HIGH | LIKELY | Unanchored SUPER_ADMIN is global | Yes | If user exists |
-| CH-SEC-L2 | MEDIUM | LIKELY | Upload validation is MIME/extension only | Maybe | Yes |
-| CH-SEC-L3 | MEDIUM | LIKELY | Settlement/district remittance races | No | Staff |
-| CH-SEC-L4 | LOW | LIKELY | Password-reset paths skip trusted-device revoke | No | Yes |
-| CH-SEC-P1 | LOW | POTENTIAL | Health token compared without `compare_digest` | N/A | No |
-| CH-SEC-P2 | INFO | POTENTIAL | Nginx template hostnames vs `mychurch.zreta.com` | N/A | N/A |
+| ID | Sev | Audit status | Remediation | Title | Cross-tenant | Auth required |
+|----|-----|--------------|-------------|-------|--------------|---------------|
+| CH-SEC-001 | HIGH | CONFIRMED | PARTIALLY FIXED | Private media lacks object/tenant authorization | Yes | Yes |
+| CH-SEC-002 | HIGH | CONFIRMED | FIXED | General announcements cross denomination wall | Yes | Yes |
+| CH-SEC-003 | HIGH | CONFIRMED | FIXED (Phase 1) | MFA verification not throttled | No | Post-password |
+| CH-SEC-004 | HIGH | CONFIRMED | OPEN | Tenant district reassignment skips `Church.clean()` | Yes | Platform |
+| CH-SEC-005 | HIGH | CONFIRMED | OPEN | Asset journals pending; working day skipped | No | Staff |
+| CH-SEC-006 | HIGH | CONFIRMED | OPEN | Contribution posting has no idempotency | No | Staff |
+| CH-SEC-007 | HIGH | CONFIRMED | FIXED (Phase 1) | Remittance/bank-rec use read-oriented wrapper | No | Staff |
+| CH-SEC-008 | MEDIUM | CONFIRMED | FIXED | Announcement detail IDOR for approvers | Yes | Staff |
+| CH-SEC-009 | MEDIUM | CONFIRMED | OPEN | Platform dashboard stats not denomination-scoped | Yes | Platform |
+| CH-SEC-010 | MEDIUM | CONFIRMED | OPEN | Portal login account enumeration | N/A | No |
+| CH-SEC-011 | MEDIUM | CONFIRMED | OPEN | Welfare same-user approval | No | Staff |
+| CH-SEC-012 | MEDIUM | CONFIRMED | OPEN | Concurrent void can double-reverse | No | Staff |
+| CH-SEC-013 | MEDIUM | CONFIRMED | OPEN | Incomplete idempotency keys reusable | No | Staff |
+| CH-SEC-014 | MEDIUM | CONFIRMED | OPEN | UserActivityLog deletable in admin | No | Break-glass |
+| CH-SEC-015 | MEDIUM | CONFIRMED | OPEN | Email+DOB first-login credential | No | Public portal |
+| CH-SEC-016 | MEDIUM | CONFIRMED | OPEN | Some financial CSVs unaudited | No | Staff |
+| CH-SEC-017 | LOW | CONFIRMED | OPEN | GET logout CSRF | No | Victim session |
+| CH-SEC-018 | LOW | CONFIRMED | OPEN | GET church switch | No | Staff |
+| CH-SEC-019 | LOW | CONFIRMED | OPEN | Identifier lockout DoS | N/A | No |
+| CH-SEC-020 | LOW | CONFIRMED | OPEN | Django pin drift 6.0 vs 5.1.15 | N/A | N/A |
+| CH-SEC-021 | LOW | CONFIRMED | OPEN | Compose publishes DB/Redis + default passwords | Dev | N/A |
+| CH-SEC-022 | LOW | CONFIRMED | OPEN | Django HSTS 1h vs Nginx 1y | N/A | N/A |
+| CH-SEC-L1 | HIGH | LIKELY | OPEN | Unanchored SUPER_ADMIN is global | Yes | If user exists |
+| CH-SEC-L2 | MEDIUM | LIKELY | OPEN | Upload validation is MIME/extension only | Maybe | Yes |
+| CH-SEC-L3 | MEDIUM | LIKELY | OPEN | Settlement/district remittance races | No | Staff |
+| CH-SEC-L4 | LOW | LIKELY | OPEN | Password-reset paths skip trusted-device revoke | No | Yes |
+| CH-SEC-P1 | LOW | POTENTIAL | OPEN | Health token compared without `compare_digest` | N/A | No |
+| CH-SEC-P2 | INFO | POTENTIAL | OPEN | Nginx template hostnames vs `mychurch.zreta.com` | N/A | N/A |
 
 ---
 
@@ -63,6 +68,9 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 16. **Crosses tenant boundaries:** Yes  
 17. **Confidence:** High  
 
+**Remediation (Phase 1):** `user_may_access_media` + `protected_media` 404 for unauthorized paths — **PARTIALLY FIXED**.  
+**Still OPEN under CH-SEC-001:** direct S3/`FileField.url` bypass when storage is public (INV-MED-03). Phase 2 announcement images authorize via `Announcement.denomination`, not creator heuristic.
+
 ---
 
 ## CH-SEC-002 — HIGH — CONFIRMED
@@ -84,6 +92,8 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 15. **Auth required:** Yes  
 16. **Crosses tenant boundaries:** Yes  
 17. **Confidence:** High  
+
+**Remediation (Phase 2):** **FIXED.** Explicit `Announcement.denomination` FK; selectors/services fail closed on NULL; `visible_announcements` / pending / pin limits are denomination-bound; `view_all_churches` no longer means all denominations. Migration `0005_announcement_denomination` backfills from church only and quarantines unresolvable generals (no creator guess). Tests: `announcements/tests_denomination_isolation.py`.
 
 ---
 
@@ -199,6 +209,8 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 **Remediation:** Load via scoped queryset; never use capability-alone for `can_see`.  
 **Test:** Approver in church A cannot GET detail of pending announcement in church B.  
 **Auth:** Yes. **Cross-tenant:** Yes. **Confidence:** High.
+
+**Remediation (Phase 2):** **FIXED.** Detail/edit/approve/reject/archive load via `get_announcement_in_user_denomination_or_404`; `can_see` uses object-scoped `can_approve_announcement` (not capability-alone). Cross-denomination PKs return 404.
 
 ---
 

@@ -18,13 +18,14 @@ class AnnouncementAdmin(admin.ModelAdmin):
         "title",
         "status",
         "visibility",
+        "denomination",
         "church",
         "is_pinned",
         "created_by",
         "approved_by",
         "created_at",
     )
-    list_filter = ("status", "visibility", "is_pinned", "is_archived", "church")
+    list_filter = ("status", "visibility", "is_pinned", "is_archived", "denomination", "church")
     search_fields = ("title", "content", "created_by__username")
     readonly_fields = (
         "status",
@@ -41,6 +42,7 @@ class AnnouncementAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
         "created_by",
+        "denomination",
     )
     inlines = [AnnouncementImageInline]
     actions = ["action_approve", "action_reject", "action_archive"]
@@ -53,6 +55,7 @@ class AnnouncementAdmin(admin.ModelAdmin):
                     "title",
                     "content",
                     "visibility",
+                    "denomination",
                     "church",
                     "event_date",
                     "publish_at",
@@ -83,12 +86,28 @@ class AnnouncementAdmin(admin.ModelAdmin):
     )
 
     def get_queryset(self, request):
+        from django.db.models import Q
+
+        from church_system.denomination_scope import get_user_denomination
+        from admin_custom.tenancy import admin_operator_is_global, scoped_admin_churches
+
         qs = (
             super()
             .get_queryset(request)
-            .select_related("church", "created_by", "approved_by")
+            .select_related("church", "created_by", "approved_by", "denomination")
         )
-        return filter_admin_qs_by_church(qs, request.user)
+        if admin_operator_is_global(request.user):
+            return qs
+        denom = get_user_denomination(request.user)
+        if not denom:
+            return qs.none()
+        churches = scoped_admin_churches(request.user)
+        return qs.filter(
+            denomination_id=denom.pk
+        ).filter(
+            Q(visibility="general")
+            | Q(visibility="church", church__in=churches)
+        )
 
     def has_add_permission(self, request):
         return False

@@ -3,7 +3,7 @@
 from decimal import Decimal
 
 from django.db.models import Sum
-from django.db import transaction as db_transaction
+from django.db import IntegrityError, transaction as db_transaction
 from django.utils import timezone
 
 from organization.services import get_church_financial_chain
@@ -583,12 +583,25 @@ def create_settlement_draft(from_unit_type, from_unit_id, offering_type, period_
     """
     Create a draft settlement batch between hierarchy levels.
 
-    Church settlements use remittance payable balances; higher levels apply
-    SETTLEMENT_FROM_BELOW policy on amounts received from below.
+    CH-SEC-L3: lock any existing period rows and enforce one active
+    (DRAFT/POSTED) batch per business key.
     """
+    from remittance.models import SettlementBatch
+
     to_unit_type, to_unit_id = _parent_unit(from_unit_type, from_unit_id)
     if not to_unit_type:
         raise RemittancePolicyError("No parent unit exists for this settlement.")
+
+    # Serialize concurrent creates for the same obligation key.
+    list(
+        SettlementBatch.objects.select_for_update().filter(
+            from_unit_type=from_unit_type,
+            from_unit_id=from_unit_id,
+            offering_type=offering_type,
+            period_start=period_start,
+            period_end=period_end,
+        )
+    )
 
     if from_unit_type == "CHURCH":
         church = church or selectors.church_by_pk(from_unit_id)
@@ -621,20 +634,25 @@ def create_settlement_draft(from_unit_type, from_unit_id, offering_type, period_
     ):
         raise RemittancePolicyError("A settlement batch already exists for this period.")
 
-    return repo.create_settlement_batch(
-        offering_type=offering_type,
-        from_unit_type=from_unit_type,
-        from_unit_id=from_unit_id,
-        to_unit_type=to_unit_type,
-        to_unit_id=to_unit_id,
-        period_start=period_start,
-        period_end=period_end,
-        gross_received=gross,
-        retain_amount=retain,
-        remit_amount=remit,
-        status="DRAFT",
-        created_by=user,
-    )
+    try:
+        return repo.create_settlement_batch(
+            offering_type=offering_type,
+            from_unit_type=from_unit_type,
+            from_unit_id=from_unit_id,
+            to_unit_type=to_unit_type,
+            to_unit_id=to_unit_id,
+            period_start=period_start,
+            period_end=period_end,
+            gross_received=gross,
+            retain_amount=retain,
+            remit_amount=remit,
+            status="DRAFT",
+            created_by=user,
+        )
+    except IntegrityError as exc:
+        raise RemittancePolicyError(
+            "A settlement batch already exists for this period."
+        ) from exc
 
 
 def user_can_edit_remittance_policy(user, policy, active_church=None):
@@ -663,6 +681,7 @@ def user_can_edit_remittance_policy(user, policy, active_church=None):
 @db_transaction.atomic
 def post_settlement_batch(batch, user):
     """Post settlement to the ledger and mark the batch as posted."""
+    from remittance.models import SettlementBatch
     from transactions.services import (
         _get_account,
         _log_audit,
@@ -671,8 +690,12 @@ def post_settlement_batch(batch, user):
         validate_transaction_balance,
     )
 
-    if batch.status != "DRAFT":
+    locked = SettlementBatch.objects.select_for_update().get(pk=batch.pk)
+    if locked.status == "POSTED":
+        return locked
+    if locked.status != "DRAFT":
         raise RemittancePolicyError("Only draft batches can be posted.")
+    batch = locked
 
     if batch.from_unit_type == "CHURCH":
         church = selectors.church_by_pk(batch.from_unit_id)
@@ -721,7 +744,7 @@ def post_settlement_batch(batch, user):
             fund=f"{batch.offering_type}_TRUST",
         )
         validate_transaction_balance(trx)
-        approve_module_journal(trx, user)
+        trx = approve_module_journal(trx, user)
         if trx.approval_status != "APPROVED":
             raise RemittancePolicyError(
                 "Settlement journal requires approval by an officer other than "

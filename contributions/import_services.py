@@ -123,6 +123,18 @@ def commit_campaign_import(campaign, performed_by, uploaded) -> ImportBatchResul
         try:
             data = _map_row(raw, IMPORT_ALIASES, IMPORT_CANONICAL)
             member, amount, txn_date, payment, notes = _validate_row(campaign, data)
+            from contributions.services import contribution_idempotency_key
+
+            line_key = contribution_idempotency_key(
+                "import",
+                campaign.pk,
+                row_number,
+                member.pk,
+                amount,
+                txn_date,
+                payment,
+                notes,
+            )
             record_member_contribution(
                 campaign,
                 member=member,
@@ -131,6 +143,7 @@ def commit_campaign_import(campaign, performed_by, uploaded) -> ImportBatchResul
                 contribution_date=txn_date,
                 notes=notes,
                 payment_account_type=payment,
+                idempotency_key=line_key,
             )
             result.rows.append(
                 ImportRowResult(row_number, True, "Contribution recorded.", label=member.full_name)

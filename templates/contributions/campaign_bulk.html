@@ -9,6 +9,7 @@
 
     <form method="post">
         {% csrf_token %}
+        {{ bulk_form.idempotency_key }}
         <div class="filter-bar mb-3 d-flex flex-wrap gap-3 align-items-end">
             <div>
                 <label class="form-label">Date</label>

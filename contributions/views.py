@@ -1,6 +1,7 @@
 """Dashboard views for contribution campaigns."""
 
 from functools import wraps
+import uuid
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -168,7 +169,10 @@ def campaign_detail(request, pk):
     summary = build_campaign_summary(campaign)
     member_totals = list(selectors.campaign_member_totals(campaign))
     non_contributors = selectors.members_without_contribution(campaign)[:50]
-    record_form = RecordContributionForm(church=church)
+    record_form = RecordContributionForm(
+        church=church,
+        initial={"idempotency_key": str(uuid.uuid4())},
+    )
     can_record = (
         can_record_contributions(request.user)
         or can_manage_contribution_campaigns(request.user)
@@ -230,6 +234,7 @@ def campaign_record_contribution(request, pk):
             contribution_date=form.cleaned_data["contribution_date"],
             notes=form.cleaned_data.get("notes") or "",
             payment_account_type=form.cleaned_data["payment_account_type"],
+            idempotency_key=form.cleaned_data["idempotency_key"],
         )
         flash_success(request, "Contribution recorded and receipt posted.")
     except (ContributionServiceError, Exception) as exc:
@@ -279,7 +284,10 @@ def campaign_bulk_entry(request, pk):
     if not campaign.is_open:
         flash_error(request, "Bulk entry is only available while the campaign is open.")
         return redirect("contributions:campaign_detail", pk=campaign.pk)
-    bulk_form = BulkContributionForm(request.POST or None)
+    bulk_form = BulkContributionForm(
+        request.POST or None,
+        initial={"idempotency_key": str(uuid.uuid4())},
+    )
     rows = build_bulk_entry_rows(campaign)
     if request.method == "POST" and bulk_form.is_valid():
         from decimal import Decimal, InvalidOperation
@@ -303,6 +311,7 @@ def campaign_bulk_entry(request, pk):
                 performed_by=request.user,
                 contribution_date=bulk_form.cleaned_data["contribution_date"],
                 payment_account_type=bulk_form.cleaned_data["payment_account_type"],
+                batch_idempotency_key=bulk_form.cleaned_data["idempotency_key"],
             )
             flash_success(request, f"Recorded {len(created)} contribution(s).")
             return redirect("contributions:campaign_detail", pk=campaign.pk)

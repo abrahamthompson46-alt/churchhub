@@ -41,6 +41,8 @@ def create_org_audit(
 
 
 def save_church(church, *, update_fields=None):
+    """Persist a church after model validation (INV-TEN-05 / CH-SEC-004)."""
+    church.full_clean()
     if update_fields is not None:
         church.save(update_fields=update_fields)
     else:
@@ -49,11 +51,15 @@ def save_church(church, *, update_fields=None):
 
 
 def get_or_create_church(*, district, code, defaults):
-    return Church.objects.get_or_create(
+    church, created = Church.objects.get_or_create(
         district=district,
         code=code,
         defaults=defaults,
     )
+    if created:
+        church.full_clean()
+        church.save()
+    return church, created
 
 
 def create_conference(**fields):

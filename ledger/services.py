@@ -529,6 +529,7 @@ def post_ledger_entry(church, user, draft, idempotency_key=None):
       DR debit account  (+amount)
       CR credit account (-amount)
     """
+    from permissions.checks import can_manage_finances, can_manage_ledger_entries
     from transactions.idempotency import (
         IdempotencyReplay,
         MissingIdempotencyKey,
@@ -536,6 +537,11 @@ def post_ledger_entry(church, user, draft, idempotency_key=None):
         complete_financial_idempotency,
         normalize_idempotency_key,
     )
+
+    if not (can_manage_ledger_entries(user) or can_manage_finances(user)):
+        raise PermissionError(
+            "Ledger write requires manage_ledger_entries or manage_finances."
+        )
 
     idem_record = None
     key = normalize_idempotency_key(idempotency_key)

@@ -53,11 +53,24 @@ SESSION_DRAFT_KEY = "ledger_entry_draft"
 
 
 def ledger_finance_required(view_func):
-    """Ledger feature + view/post permission."""
+    """Ledger feature + read access (view_ledger or write perms)."""
 
     @login_required
     @require_feature("ledger")
     @any_permission_required("view_ledger", "manage_ledger_entries", "manage_finances")
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
+
+def ledger_write_required(view_func):
+    """INV-FIN-02: mutations require write permission — never view_ledger alone."""
+
+    @login_required
+    @require_feature("ledger")
+    @any_permission_required("manage_ledger_entries", "manage_finances")
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
         return view_func(request, *args, **kwargs)
@@ -346,14 +359,9 @@ def category_report(request):
     })
 
 
-@ledger_finance_required
+@ledger_write_required
 @require_http_methods(["GET", "POST"])
 def entry_create(request):
-    from permissions.checks import can_manage_ledger_entries
-
-    if not can_manage_ledger_entries(request.user):
-        from django.core.exceptions import PermissionDenied
-        raise PermissionDenied
     church = require_church(request)
     if request.method == "POST":
         form = LedgerEntryForm(request.POST, church=church)
@@ -390,7 +398,7 @@ def entry_create(request):
     })
 
 
-@ledger_finance_required
+@ledger_write_required
 @require_http_methods(["GET", "POST"])
 def entry_confirm(request):
     church = require_church(request)
@@ -403,6 +411,16 @@ def entry_confirm(request):
         if request.POST.get("action") == "back":
             del request.session[SESSION_DRAFT_KEY]
             return redirect("ledger:entry")
+
+        # INV-FIN-02: re-check write authorization at mutation time (not draft-only).
+        from permissions.checks import can_manage_finances, can_manage_ledger_entries
+
+        if not (
+            can_manage_ledger_entries(request.user) or can_manage_finances(request.user)
+        ):
+            from django.core.exceptions import PermissionDenied
+
+            raise PermissionDenied
 
         idem_key = request.POST.get("idempotency_key") or str(uuid.uuid4())
         try:

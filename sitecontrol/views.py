@@ -734,9 +734,23 @@ def tenant_set_user_role(request, pk, user_id):
 def tenant_edit(request, pk):
     church = selectors.get_church_or_404(selectors.church_tenant_access_qs(), pk)
     _require_tenant_access(request, church)
-    form = TenantChurchForm(request.POST or None, instance=church)
+    form = TenantChurchForm(request.POST or None, instance=church, user=request.user)
     if request.method == "POST" and form.is_valid():
         obj = form.save(commit=False)
+        # Defense in depth: destination must stay in the same denomination.
+        if obj.district_id and church.district_id != obj.district_id:
+            old_denom = church.conference.denomination_id if church.conference else None
+            new_denom = (
+                obj.district.zone.conference.denomination_id
+                if obj.district_id
+                else None
+            )
+            if old_denom and new_denom and old_denom != new_denom:
+                flash_error(
+                    request,
+                    "Cannot move a church to a district in another denomination.",
+                )
+                return redirect("sitecontrol:tenant_edit", pk=church.pk)
         repo.save_church(obj)
         log_platform_action(
             request, "TENANT_UPDATE", f"Tenant '{church.name}' updated",

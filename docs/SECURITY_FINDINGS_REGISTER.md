@@ -20,16 +20,16 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 | CH-SEC-001 | HIGH | CONFIRMED | PARTIALLY FIXED | Private media lacks object/tenant authorization | Yes | Yes |
 | CH-SEC-002 | HIGH | CONFIRMED | FIXED | General announcements cross denomination wall | Yes | Yes |
 | CH-SEC-003 | HIGH | CONFIRMED | FIXED (Phase 1) | MFA verification not throttled | No | Post-password |
-| CH-SEC-004 | HIGH | CONFIRMED | OPEN | Tenant district reassignment skips `Church.clean()` | Yes | Platform |
-| CH-SEC-005 | HIGH | CONFIRMED | OPEN | Asset journals pending; working day skipped | No | Staff |
-| CH-SEC-006 | HIGH | CONFIRMED | OPEN | Contribution posting has no idempotency | No | Staff |
+| CH-SEC-004 | HIGH | CONFIRMED | FIXED (Phase 3) | Tenant district reassignment skips `Church.clean()` | Yes | Platform |
+| CH-SEC-005 | HIGH | CONFIRMED | FIXED (Phase 3) | Asset journals pending; working day skipped | No | Staff |
+| CH-SEC-006 | HIGH | CONFIRMED | FIXED (Phase 3) | Contribution posting has no idempotency | No | Staff |
 | CH-SEC-007 | HIGH | CONFIRMED | FIXED (Phase 1) | Remittance/bank-rec use read-oriented wrapper | No | Staff |
 | CH-SEC-008 | MEDIUM | CONFIRMED | FIXED | Announcement detail IDOR for approvers | Yes | Staff |
 | CH-SEC-009 | MEDIUM | CONFIRMED | OPEN | Platform dashboard stats not denomination-scoped | Yes | Platform |
 | CH-SEC-010 | MEDIUM | CONFIRMED | OPEN | Portal login account enumeration | N/A | No |
-| CH-SEC-011 | MEDIUM | CONFIRMED | OPEN | Welfare same-user approval | No | Staff |
-| CH-SEC-012 | MEDIUM | CONFIRMED | OPEN | Concurrent void can double-reverse | No | Staff |
-| CH-SEC-013 | MEDIUM | CONFIRMED | OPEN | Incomplete idempotency keys reusable | No | Staff |
+| CH-SEC-011 | MEDIUM | CONFIRMED | FIXED (Phase 3) | Welfare same-user approval | No | Staff |
+| CH-SEC-012 | MEDIUM | CONFIRMED | FIXED (Phase 3) | Concurrent void can double-reverse | No | Staff |
+| CH-SEC-013 | MEDIUM | CONFIRMED | FIXED (Phase 3) | Incomplete idempotency keys reusable | No | Staff |
 | CH-SEC-014 | MEDIUM | CONFIRMED | OPEN | UserActivityLog deletable in admin | No | Break-glass |
 | CH-SEC-015 | MEDIUM | CONFIRMED | OPEN | Email+DOB first-login credential | No | Public portal |
 | CH-SEC-016 | MEDIUM | CONFIRMED | OPEN | Some financial CSVs unaudited | No | Staff |
@@ -41,7 +41,7 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 | CH-SEC-022 | LOW | CONFIRMED | OPEN | Django HSTS 1h vs Nginx 1y | N/A | N/A |
 | CH-SEC-L1 | HIGH | LIKELY | OPEN | Unanchored SUPER_ADMIN is global | Yes | If user exists |
 | CH-SEC-L2 | MEDIUM | LIKELY | OPEN | Upload validation is MIME/extension only | Maybe | Yes |
-| CH-SEC-L3 | MEDIUM | LIKELY | OPEN | Settlement/district remittance races | No | Staff |
+| CH-SEC-L3 | MEDIUM | LIKELY | FIXED (Phase 3) | Settlement/district remittance races | No | Staff |
 | CH-SEC-L4 | LOW | LIKELY | OPEN | Password-reset paths skip trusted-device revoke | No | Yes |
 | CH-SEC-P1 | LOW | POTENTIAL | OPEN | Health token compared without `compare_digest` | N/A | No |
 | CH-SEC-P2 | INFO | POTENTIAL | OPEN | Nginx template hostnames vs `mychurch.zreta.com` | N/A | N/A |
@@ -138,6 +138,8 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 15. **Crosses tenant boundaries:** Yes  
 16. **Confidence:** High  
 
+**Remediation (Phase 3):** **FIXED.** `organization.repositories.save_church` / `sitecontrol.repositories.save_model|save_church` call `full_clean()`; `TenantChurchForm` scopes districts and validates same-denomination destination; `tenant_edit` re-checks. Tests: `transactions/tests_phase3_financial.py` Phase3TenantIntegrityTests.
+
 ---
 
 ## CH-SEC-005 — HIGH — CONFIRMED
@@ -159,6 +161,8 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 15. **Crosses tenant boundaries:** No  
 16. **Confidence:** High  
 
+**Remediation (Phase 3):** **FIXED.** Depreciation/disposal/acquisition assert working day + period; CAPITIAL journals use `approve_module_journal`; register/DISPOSED only after APPROVED; Celery/`user=None` leaves PENDING without register mutation. Tests: Phase3AssetJournalTests + assets tests.
+
 ---
 
 ## CH-SEC-006 — HIGH — CONFIRMED
@@ -179,6 +183,8 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 14. **Auth required:** Yes  
 15. **Crosses tenant boundaries:** No  
 16. **Confidence:** High  
+
+**Remediation (Phase 3):** **FIXED.** `record_member_contribution` claims `CONTRIBUTION` via `claim_financial_idempotency`; views/bulk/import pass keys; completed replay returns existing gift. Migration `0022` adds action choice. Tests: Phase3ContributionIdempotencyTests.
 
 ---
 
@@ -237,7 +243,9 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 **`approve_welfare_case` does not compare creator vs approver** (`remittance/welfare_services.py` ~360–372). Users who hold both create and approve can self-approve. Core transactions block this.  
 **Remediation:** Reject `case.created_by_id == user.id`.  
 **Test:** Creator’s approve POST raises.  
-**Auth:** Yes. **Cross-tenant:** No. **Confidence:** High.
+**Auth:** Yes. **Cross-tenant:** No. **Confidence:** High.  
+
+**Remediation (Phase 3):** **FIXED.** Creator cannot review/approve/reject; reviewer cannot final-approve; high-risk cases require UNDER_REVIEW first. Tests: Phase3MakerCheckerWelfareTests + updated welfare enterprise/disburse tests.
 
 ---
 
@@ -246,7 +254,9 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 **`void_transaction` checks `is_voided` without `select_for_update`** (`transactions/services.py` 945–993). Two concurrent voids can each insert a reversal.  
 **Remediation:** Lock the original row inside `atomic`; unique constraint on `reversal_of`.  
 **Test:** Concurrent voids → one reversal, second raises.  
-**Auth:** Yes. **Cross-tenant:** No. **Confidence:** High.
+**Auth:** Yes. **Cross-tenant:** No. **Confidence:** High.  
+
+**Remediation (Phase 3):** **FIXED.** `select_for_update` on void; partial unique `uniq_txn_one_reversal_per_original` after quarantine migration `0022`. Tests: Phase3VoidConcurrencyTests.
 
 ---
 
@@ -255,7 +265,9 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 **`claim_financial_idempotency` returns existing incomplete keys** (`transactions/idempotency.py` 27–67) instead of locking/rejecting. Two in-flight posts can share a key.  
 **Remediation:** `select_for_update` on the key row; reject if claimed and incomplete.  
 **Test:** Parallel receipt POSTs with same key create one transaction.  
-**Auth:** Yes. **Cross-tenant:** No. **Confidence:** High.
+**Auth:** Yes. **Cross-tenant:** No. **Confidence:** High.  
+
+**Remediation (Phase 3):** **FIXED.** Claim uses `select_for_update`; incomplete keys serialize under the row lock; completed keys raise `IdempotencyReplay`. Tests: Phase3IdempotencyTests.
 
 ---
 
@@ -339,6 +351,8 @@ Failed logins lock by submitted identifier (`sitecontrol/middleware.py` 260–33
 **CH-SEC-L1 HIGH:** `get_manageable_churches` returns all churches when superadmin has no church/denomination (`permissions/scoping.py` 16–31). `User.clean()` would block; `save()` skips it.  
 **CH-SEC-L2 MEDIUM:** `validate_upload` does not check magic bytes (`church_system/uploads.py` 100–138).  
 **CH-SEC-L3 MEDIUM:** Settlement posting and district remittance duplicate checks are query-based without row locks.  
+
+**Remediation (Phase 3):** **FIXED.** Settlement draft/post use `select_for_update`; partial unique `uniq_settlement_active_period_obligation` on `(from_unit_type, from_unit_id, offering_type, period_start, period_end)` for DRAFT|POSTED after quarantine (`0005`); `record_district_remittance` locks `MonthlyCutoff`. Tests: Phase3SettlementUniquenessTests.  
 **CH-SEC-L4 LOW:** Staff profile password change and portal set-password do not always revoke trusted devices.
 
 ---

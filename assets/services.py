@@ -11,12 +11,14 @@ from django.utils import timezone
 from transactions.services import (
     PeriodLockedError,
     UnbalancedTransactionError,
+    WorkingDayClosedError,
     _get_account,
     _log_audit,
     _post_line,
     _quantize_currency,
     approve_module_journal,
     assert_period_open,
+    assert_working_day_allows_posting,
     validate_transaction_balance,
 )
 from transactions import repositories as txn_repo
@@ -278,6 +280,7 @@ def post_acquisition_to_ledger(asset, user):
         return asset.acquisition_transaction
 
     assert_period_open(asset.church, asset.purchase_date)
+    assert_working_day_allows_posting(asset.church, asset.purchase_date)
     payment_type = policy.default_payment_account_type
 
     trx = txn_repo.create_transaction(
@@ -357,7 +360,23 @@ def reject_asset(asset, user, reason=""):
 
 
 @db_transaction.atomic
-def post_depreciation_entry(asset, period_year, period_month, user, *, force=False):
+def post_depreciation_entry(asset, period_year, period_month, user, *, force=False, checker=None):
+    """
+    Post monthly depreciation.
+
+    CH-SEC-005 / INV-SOD-01 / INV-DATE-01:
+    - Require open period + working day.
+    - Create CAPITAL journal; approve via maker-checker when a distinct checker exists.
+    - Update the asset register ONLY after the journal is APPROVED.
+    - Background/Celery callers with no independent checker leave journal PENDING
+      and do not mutate accumulated depreciation.
+    """
+    asset = (
+        type(asset)
+        .objects.select_for_update()
+        .select_related("church")
+        .get(pk=asset.pk)
+    )
     if asset.status != "ACTIVE":
         raise AssetError("Depreciation applies only to active assets.")
     validate_depreciation_period(period_year, period_month)
@@ -372,6 +391,7 @@ def post_depreciation_entry(asset, period_year, period_month, user, *, force=Fal
     policy = ensure_depreciation_policy(asset.church)
     period_date = date(period_year, period_month, min(28, monthrange(period_year, period_month)[1]))
     assert_period_open(asset.church, period_date)
+    assert_working_day_allows_posting(asset.church, period_date)
 
     trx = None
     if policy.post_depreciation_to_ledger:
@@ -397,8 +417,33 @@ def post_depreciation_entry(asset, period_year, period_month, user, *, force=Fal
                 "asset_id": str(asset.pk),
                 "period": f"{period_year}-{period_month:02d}",
                 "amount": str(amount),
+                "pending_register": True,
             },
         )
+        # Maker ≠ checker: background jobs / sole actor leave PENDING.
+        trx = approve_module_journal(trx, checker, user) if (user or checker) else trx
+        if trx.approval_status != "APPROVED":
+            entry, _ = repo.update_or_create_depreciation_entry(
+                asset=asset,
+                period_year=period_year,
+                period_month=period_month,
+                defaults={
+                    "amount": amount,
+                    "method_used": asset.depreciation_method,
+                    "transaction": trx,
+                    "posted_by": user,
+                },
+            )
+            _asset_log(
+                asset,
+                "DEPRECIATE",
+                user,
+                notes=(
+                    f"{period_year}-{period_month:02d}: journal {trx.reference} "
+                    "PENDING — register not updated until independent approval."
+                ),
+            )
+            return {"pending_journal": trx, "entry": entry, "amount": amount}
 
     entry, _ = repo.update_or_create_depreciation_entry(
         asset=asset,
@@ -444,22 +489,25 @@ def run_monthly_depreciation(church, year, month, user):
     validate_depreciation_period(year, month)
     posted = 0
     skipped = 0
+    pending = 0
     errors = []
     for asset in selectors.active_assets_for_church(church):
         try:
             result = post_depreciation_entry(asset, year, month, user)
-            if result:
-                posted += 1
-            else:
+            if result is None:
                 skipped += 1
-        except (AssetError, PeriodLockedError, UnbalancedTransactionError) as exc:
+            elif isinstance(result, dict) and result.get("pending_journal"):
+                pending += 1
+            else:
+                posted += 1
+        except (AssetError, PeriodLockedError, WorkingDayClosedError, UnbalancedTransactionError) as exc:
             errors.append(f"{asset.asset_code}: {exc}")
-    return {"posted": posted, "skipped": skipped, "errors": errors}
+    return {"posted": posted, "skipped": skipped, "pending": pending, "errors": errors}
 
 
 @db_transaction.atomic
-def post_disposal_to_ledger(asset, user, disposal_date=None):
-    """Write off remaining book value on disposal."""
+def post_disposal_to_ledger(asset, user, disposal_date=None, *, checker=None):
+    """Write off remaining book value on disposal — register link only after approve."""
     policy = ensure_depreciation_policy(asset.church)
     if not policy.post_disposal_to_ledger:
         return None
@@ -469,6 +517,7 @@ def post_disposal_to_ledger(asset, user, disposal_date=None):
 
     disposal_date = disposal_date or asset.disposed_at or timezone.now().date()
     assert_period_open(asset.church, disposal_date)
+    assert_working_day_allows_posting(asset.church, disposal_date)
 
     accum = _quantize(asset.accumulated_depreciation)
     cost = _quantize(asset.acquisition_cost)
@@ -506,20 +555,41 @@ def post_disposal_to_ledger(asset, user, disposal_date=None):
             "nbv": str(nbv),
         },
     )
+    trx = approve_module_journal(trx, checker, user) if (user or checker) else trx
+    if trx.approval_status != "APPROVED":
+        raise AssetError(
+            "Asset disposal journal requires approval by an officer other than the disposer. "
+            f"Journal {trx.reference} is pending; asset not marked disposed."
+        )
     asset.disposal_transaction = trx
     repo.save_asset(asset, update_fields=["disposal_transaction", "updated_at"])
     return trx
 
 
 @db_transaction.atomic
-def dispose_asset(asset, user, disposal_date=None, notes=""):
+def dispose_asset(asset, user, disposal_date=None, notes="", *, checker=None):
+    asset = (
+        type(asset)
+        .objects.select_for_update()
+        .select_related("church")
+        .get(pk=asset.pk)
+    )
     if asset.status not in ("ACTIVE", "UNDER_REPAIR"):
         raise AssetError("Only active assets can be disposed.")
+    disposal_date = disposal_date or timezone.now().date()
+    # Journal + SoD first; only then mark DISPOSED (CH-SEC-005).
+    policy = ensure_depreciation_policy(asset.church)
+    if policy.post_disposal_to_ledger:
+        post_disposal_to_ledger(
+            asset, user, disposal_date=disposal_date, checker=checker
+        )
+        asset.refresh_from_db()
+        if not asset.disposal_transaction_id:
+            raise AssetError("Disposal journal was not approved; asset not disposed.")
     asset.status = "DISPOSED"
-    asset.disposed_at = disposal_date or timezone.now().date()
+    asset.disposed_at = disposal_date
     asset.disposal_notes = notes
     repo.save_asset(asset)
-    post_disposal_to_ledger(asset, user, disposal_date=asset.disposed_at)
     _asset_log(asset, "DISPOSE", user, notes=notes)
     return asset
 

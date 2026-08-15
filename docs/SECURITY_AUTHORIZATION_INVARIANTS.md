@@ -624,16 +624,16 @@ Inspection of **this workspace** (including uncommitted files) vs the MUST rules
 | INV-MED-01 / INV-MED-02 | **Aligned on this working tree:** `church_system/media_authorization.py` `user_may_access_media` + `protected_media` 404. Tests no longer assert unscoped 200. **Audit baseline `main` contradicted this** (`is_authenticated` only). Remaining: S3 `FileField.url` may still bypass Django if bucket env is set (`INV-MED-03`). Templates still emit `.url`; that is safe only while MEDIA_URL hits `protected_media`. |
 | INV-MFA-01 … INV-MFA-08 | **Aligned on this working tree:** per-user/per-IP cache lock, pending TTL, TOTP replay cache, enroll/verify 429, `LOGIN_PATHS` still excludes `/accounts/mfa`. **Audit baseline `main` contradicted this.** |
 | INV-FIN-01 / INV-FIN-03 / INV-FIN-04 remittance & recon | **Aligned on this working tree:** `_remittance_write_required` (`manage_finances`); recon list/detail GET uses view/manage/finalize; recon create/match POST uses `manage_reconciliation`. **Audit baseline `main` used `_finance_required` (OR `view_transactions`) on remittance POST and recon writes.** |
-| INV-FIN-02 ledger | `ledger_finance_required` still ORs `view_ledger` onto posting views (`ledger/views.py`). |
+| INV-FIN-02 ledger | **Aligned (Phase 3):** `ledger_write_required` = `manage_ledger_entries` \| `manage_finances` on create/confirm; `post_ledger_entry` rechecks write perms. `view_ledger` remains read-only. |
 | INV-TEN-07 / INV-ANN-01 | **Aligned on this working tree (Phase 2):** `Announcement.denomination` FK; selectors require denomination predicate; `visible_announcements` never uses unfiltered `scoped = qs`. **Audit baseline / Phase 1 contradicted this.** Quarantined NULL-denomination rows remain fail-closed. |
 | INV-OBJ-02 / INV-ANN-03 | **Aligned on this working tree (Phase 2):** denomination-scoped object load + object-scoped `can_approve_announcement`. **Audit baseline contradicted this.** |
-| INV-TEN-05 | `repo.save_church` → `Model.save()` skips `Church.clean()`. |
+| INV-TEN-05 | **Aligned (Phase 3):** repository `save_church` / `save_model` call `Church.full_clean()`; tenant form scopes districts. |
 | INV-TEN-02 / INV-TEN-18 | `get_manageable_churches`: unanchored superadmin returns **all** churches. `User.clean()` would block; `save()` does not `full_clean()`. |
-| INV-DATE-01 / INV-SOD-01 | Asset depreciation/disposal skip working day and `approve_module_journal`; register updates while GL is PENDING. |
-| INV-IDEM-01 | `record_member_contribution` has no idempotency claim. |
-| INV-IDEM-03 | `claim_financial_idempotency` returns incomplete keys without locking. |
-| INV-SOD-02 | `approve_welfare_case` does not compare creator vs approver. |
-| INV-SOD-04 | `void_transaction` checks `is_voided` without `select_for_update`. |
+| INV-DATE-01 / INV-SOD-01 | **Aligned (Phase 3):** asset dep/disposal assert working day; register updates only after approved module journal; Celery leaves PENDING. |
+| INV-IDEM-01 | **Aligned (Phase 3):** contributions claim `CONTRIBUTION` idempotency keys. |
+| INV-IDEM-03 | **Aligned (Phase 3):** `claim_financial_idempotency` uses `select_for_update` on incomplete keys. |
+| INV-SOD-02 | **Aligned (Phase 3):** welfare creator/reviewer SoD in `approve_welfare_case` / review. |
+| INV-SOD-04 | **Aligned (Phase 3):** void uses `select_for_update` + unique `reversal_of`. |
 | INV-TEN-03 platform stats | `platform_stats()` / over-limit names are global; `CAP_VIEW` operators see them. |
 | §11 activity log | `UserActivityLogAdmin` allows delete. |
 | §11 exports | Asset/contribution CSV without `audit_export`. |

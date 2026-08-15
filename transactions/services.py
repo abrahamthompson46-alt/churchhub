@@ -735,6 +735,13 @@ def record_district_remittance(
     cutoff = generate_monthly_cutoff(church, month_date) if month_date else None
 
     if cutoff:
+        cutoff = (
+            MonthlyCutoff.objects.select_for_update()
+            .filter(pk=cutoff.pk)
+            .first()
+        )
+        if cutoff is None:
+            raise ValueError("Monthly cutoff could not be locked for remittance.")
         if cutoff.transferred:
             raise ValueError(
                 f"District remittance for {month_date.strftime('%B %Y')} has already been transferred."
@@ -854,48 +861,53 @@ def approve_module_journal(transaction, *checker_candidates):
 
 @db_transaction.atomic
 def approve_transaction(transaction, user):
-    if transaction.approval_status == "APPROVED" and transaction.locked:
-        return transaction
-    if transaction.locked:
+    locked = (
+        Transaction.objects.select_for_update()
+        .select_related("church")
+        .get(pk=transaction.pk)
+    )
+    if locked.approval_status == "APPROVED" and locked.locked:
+        return locked
+    if locked.locked:
         raise ValueError("Transaction is already locked.")
-    if transaction.created_by_id == user.id and not is_superadmin(user):
+    if locked.created_by_id == user.id and not is_superadmin(user):
         raise ValueError("Creator cannot approve their own transaction.")
 
-    assert_period_open(transaction.church, transaction.date)
-    validate_transaction_balance(transaction)
-    transaction.approval_status = "APPROVED"
-    transaction.locked = True
-    transaction.approved_by = user
-    transaction.approved_at = timezone.now()
+    assert_period_open(locked.church, locked.date)
+    validate_transaction_balance(locked)
+    locked.approval_status = "APPROVED"
+    locked.locked = True
+    locked.approved_by = user
+    locked.approved_at = timezone.now()
     repo.save_transaction(
-        transaction,
+        locked,
         update_fields=["approval_status", "locked", "approved_by", "approved_at"],
     )
     _log_audit(
-        transaction.church,
+        locked.church,
         "APPROVE",
         user,
-        transaction=transaction,
-        details={"reference": transaction.reference},
+        transaction=locked,
+        details={"reference": locked.reference},
     )
-    _mark_cutoff_transferred_for_remittance(transaction)
+    _mark_cutoff_transferred_for_remittance(locked)
     try:
         from remittance.notifications import notify_district_remittance_payment_approved
 
-        notify_district_remittance_payment_approved(transaction, approved_by=user)
+        notify_district_remittance_payment_approved(locked, approved_by=user)
     except Exception:
         pass
     try:
         from church_system.perf_cache import invalidate_church_finance_caches
 
         invalidate_church_finance_caches(
-            transaction.church_id,
-            year=transaction.date.year,
-            month=transaction.date.month,
+            locked.church_id,
+            year=locked.date.year,
+            month=locked.date.month,
         )
     except Exception:
         pass
-    return transaction
+    return locked
 
 
 def _mark_cutoff_transferred_for_remittance(transaction):
@@ -944,38 +956,49 @@ def reject_transaction(transaction, user, reason=""):
 
 @db_transaction.atomic
 def void_transaction(transaction, user, reason=""):
-    """Void an approved transaction by posting an equal-and-opposite reversal."""
-    if transaction.is_voided:
+    """Void an approved transaction by posting an equal-and-opposite reversal.
+
+    INV-SOD-04 / CH-SEC-012: row-lock the original so concurrent voids cannot
+    create two reversals.
+    """
+    locked = (
+        Transaction.objects.select_for_update()
+        .select_related("church", "member")
+        .get(pk=transaction.pk)
+    )
+    if locked.is_voided:
         raise ValueError("Transaction is already voided.")
-    if transaction.approval_status != "APPROVED":
+    if locked.approval_status != "APPROVED":
         raise ValueError("Only approved transactions can be voided.")
-    if transaction.reversal_of_id:
+    if locked.reversal_of_id:
         raise ValueError("Reversal entries cannot be voided.")
+    if locked.reversals.exists():
+        raise ValueError("Transaction is already voided.")
 
-    assert_period_open(transaction.church, transaction.date)
-    validate_transaction_balance(transaction)
+    assert_period_open(locked.church, locked.date)
+    validate_transaction_balance(locked)
 
-    reversal_date = transaction.date
-    assert_period_open(transaction.church, reversal_date)
-    active_day = get_active_working_day(transaction.church)
+    reversal_date = locked.date
+    assert_period_open(locked.church, reversal_date)
+    active_day = get_active_working_day(locked.church)
     if active_day and active_day.date == reversal_date:
-        assert_working_day_allows_posting(transaction.church, reversal_date)
+        assert_working_day_allows_posting(locked.church, reversal_date)
 
     reversal = repo.create_transaction(
-        transaction_type=transaction.transaction_type,
-        church=transaction.church,
-        member=transaction.member,
-        description=f"VOID: {transaction.reference}" + (f" — {reason}" if reason else ""),
+        transaction_type=locked.transaction_type,
+        church=locked.church,
+        member=locked.member,
+        description=f"VOID: {locked.reference}" + (f" — {reason}" if reason else ""),
         date=reversal_date,
         created_by=user,
         approval_status="APPROVED",
         locked=False,
         approved_by=user,
         approved_at=timezone.now(),
-        reversal_of=transaction,
+        reversal_of=locked,
     )
 
-    for line in transaction.lines.select_related("account"):
+    for line in locked.lines.select_related("account"):
         _post_line(reversal, line.account, -line.amount)
 
     validate_transaction_balance(reversal)
@@ -984,21 +1007,21 @@ def void_transaction(transaction, user, reason=""):
 
     from remittance.welfare_services import void_welfare_for_transaction
 
-    void_welfare_for_transaction(transaction, user)
+    void_welfare_for_transaction(locked, user)
 
-    transaction.is_voided = True
-    transaction.voided_at = timezone.now()
-    transaction.voided_by = user
+    locked.is_voided = True
+    locked.voided_at = timezone.now()
+    locked.voided_by = user
     repo.save_transaction(
-        transaction, update_fields=["is_voided", "voided_at", "voided_by"]
+        locked, update_fields=["is_voided", "voided_at", "voided_by"]
     )
     _log_audit(
-        transaction.church,
+        locked.church,
         "VOID",
         user,
-        transaction=transaction,
+        transaction=locked,
         details={
-            "reference": transaction.reference,
+            "reference": locked.reference,
             "reversal_reference": reversal.reference,
             "reason": reason,
         },
@@ -1007,9 +1030,9 @@ def void_transaction(transaction, user, reason=""):
         from church_system.perf_cache import invalidate_church_finance_caches
 
         invalidate_church_finance_caches(
-            transaction.church_id,
-            year=transaction.date.year,
-            month=transaction.date.month,
+            locked.church_id,
+            year=locked.date.year,
+            month=locked.date.month,
         )
     except Exception:
         pass

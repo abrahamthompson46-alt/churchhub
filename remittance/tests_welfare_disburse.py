@@ -12,7 +12,11 @@ from members.models import Gender, Member
 from organization.models import Church, Conference, District, Zone
 from remittance.models import WelfareAssistanceCase, WelfareMemberLedger
 from remittance.services import RemittancePolicyError, approve_welfare_case
-from remittance.welfare_services import create_welfare_case, disburse_welfare_case
+from remittance.welfare_services import (
+    create_welfare_case,
+    disburse_welfare_case,
+    send_welfare_case_to_review,
+)
 from transactions.models import FinancialAuditLog, Transaction
 from transactions.services import approve_transaction, open_working_day, record_receipt
 
@@ -39,6 +43,12 @@ class WelfareDisburseBase:
             role="LOCAL_PASTOR",
             church=self.church,
         )
+        self.reviewer = User.objects.create_user(
+            username="disb_reviewer",
+            password="pass12345",
+            role="BOARD_MEMBER",
+            church=self.church,
+        )
         self.member = Member.objects.create(
             church=self.church,
             first_name="Ada",
@@ -63,6 +73,7 @@ class WelfareDisburseBase:
             user=self.treasurer,
             assistance_type="MEDICAL",
         )
+        send_welfare_case_to_review(case, self.reviewer, review_notes="Reviewed")
         approve_welfare_case(case, self.pastor, amount_approved=amount)
         case.refresh_from_db()
         return case

@@ -21,7 +21,12 @@ class PermissionOverrideDeleteAuditTests(TestCase):
             singleton_id=1,
             defaults={"mfa_required_for_privileged": False},
         )
-        conf = Conference.objects.create(name="Perm Conf", code="PERC")
+        from sitecontrol.models import Denomination
+
+        denom = Denomination.objects.create(
+            code="perm-del", name="Perm Del Denom", is_active=True
+        )
+        conf = Conference.objects.create(name="Perm Conf", code="PERC", denomination=denom)
         zone = Zone.objects.create(conference=conf, name="Perm Z", code="PERZ")
         dist = District.objects.create(zone=zone, name="Perm D", code="PERD")
         cls.church = Church.objects.create(district=dist, name="Perm Church", code="PERCH")
@@ -31,6 +36,7 @@ class PermissionOverrideDeleteAuditTests(TestCase):
             email="perm-del@test.com",
             role=UserRole.SUPER_ADMIN,
             church=cls.church,
+            denomination=denom,
         )
         cls.target = User.objects.create_user(
             username="perm_target_del",

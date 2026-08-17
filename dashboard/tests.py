@@ -36,7 +36,12 @@ User = get_user_model()
 class DashboardTestMixin:
     @classmethod
     def setUpTestData(cls):
-        cls.conference = Conference.objects.create(code="T1", name="Test Conference")
+        cls.denomination = Denomination.objects.create(
+            code="dash-t1", name="Dashboard Test Denom", is_active=True
+        )
+        cls.conference = Conference.objects.create(
+            code="T1", name="Test Conference", denomination=cls.denomination
+        )
         cls.zone = Zone.objects.create(conference=cls.conference, code="Z1", name="Test Zone")
         cls.district = District.objects.create(zone=cls.zone, code="D1", name="Test District")
         cls.church = Church.objects.create(district=cls.district, code="C1", name="Test Church")
@@ -143,6 +148,7 @@ class ServiceTests(DashboardTestMixin, TestCase):
             password="pass12345",
             role=UserRole.SUPER_ADMIN,
             church=self.church,
+            denomination=self.denomination,
         )
         actions = get_quick_actions(admin)
         labels = [a["label"] for a in actions]
@@ -461,6 +467,7 @@ class ViewTests(DashboardTestMixin, TestCase):
             username="overseer",
             password="pass12345",
             role=UserRole.GENERAL_OVERSEER,
+            denomination=self.denomination,
         )
         self._login("overseer")
         response = self.client.get(reverse("dashboard:home"))
@@ -533,7 +540,10 @@ class ViewTests(DashboardTestMixin, TestCase):
 
     def test_home_200_for_overseer_and_secretary(self):
         overseer = User.objects.create_user(
-            username="ov2", password="pass12345", role=UserRole.GENERAL_OVERSEER
+            username="ov2",
+            password="pass12345",
+            role=UserRole.GENERAL_OVERSEER,
+            denomination=self.denomination,
         )
         secretary = User.objects.create_user(
             username="sec2", password="pass12345", role=UserRole.SECRETARY, church=self.church

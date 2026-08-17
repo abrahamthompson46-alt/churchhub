@@ -41,6 +41,9 @@ def _churchhub_pre_setup(self):
         clear_request_permission_cache()
     except Exception:
         pass
+    # Django 5.1: unbound function needs self; Django 6.0+: already-bound method.
+    if getattr(_original_testcase_pre_setup, "__self__", None) is not None:
+        return _original_testcase_pre_setup()
     return _original_testcase_pre_setup(self)
 
 

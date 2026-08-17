@@ -53,14 +53,20 @@ class ReportsTests(TestCase):
             singleton_id=1,
             defaults={"mfa_required_for_privileged": False},
         )
-        conf = Conference.objects.create(code="R1", name="R Conf")
+        from sitecontrol.models import Denomination
+
+        denom = Denomination.objects.create(
+            code="rep-t1", name="Reports Test Denom", is_active=True
+        )
+        conf = Conference.objects.create(code="R1", name="R Conf", denomination=denom)
         zone = Zone.objects.create(conference=conf, code="R1", name="R Zone")
         dist = District.objects.create(zone=zone, code="R1", name="R Dist")
         cls.church = Church.objects.create(district=dist, code="R1", name="R Church")
-        conf2 = Conference.objects.create(code="R2", name="R Conf 2")
+        conf2 = Conference.objects.create(code="R2", name="R Conf 2", denomination=denom)
         zone2 = Zone.objects.create(conference=conf2, code="R2", name="R Zone 2")
         dist2 = District.objects.create(zone=zone2, code="R2", name="R Dist 2")
         cls.other_church = Church.objects.create(district=dist2, code="R2", name="Other Church")
+        cls.denomination = denom
 
     def setUp(self):
         self.client = Client()
@@ -105,6 +111,7 @@ class ReportsTests(TestCase):
             username="overseer_r",
             password="pass12345",
             role=UserRole.GENERAL_OVERSEER,
+            denomination=self.denomination,
         )
         data = build_report("hierarchy_rollup", self._request(overseer), period="monthly")
         self.assertEqual(data["title"], "District Roll-up")
@@ -141,6 +148,7 @@ class ReportsTests(TestCase):
             username="overseer_form",
             password="pass12345",
             role=UserRole.GENERAL_OVERSEER,
+            denomination=self.denomination,
         )
         form = ReportFilterForm(user=overseer, hierarchy=get_hierarchy_context(overseer))
         self.assertTrue(form.show_hierarchy_filters)

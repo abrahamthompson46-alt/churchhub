@@ -87,6 +87,7 @@ class ServiceTests(AnnouncementTestMixin, TestCase):
             username="admin1",
             password="pass12345",
             role=UserRole.SUPER_ADMIN,
+            denomination=self.denomination,
         )
 
     def _pending(self, **kwargs):

@@ -961,9 +961,11 @@ def void_transaction(transaction, user, reason=""):
     INV-SOD-04 / CH-SEC-012: row-lock the original so concurrent voids cannot
     create two reversals.
     """
+    # Do not select_related nullable FKs (member) with FOR UPDATE — PostgreSQL
+    # rejects locking the nullable side of an OUTER JOIN.
     locked = (
         Transaction.objects.select_for_update()
-        .select_related("church", "member")
+        .select_related("church")
         .get(pk=transaction.pk)
     )
     if locked.is_voided:

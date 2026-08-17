@@ -424,6 +424,8 @@ complete idempotency
 audit
 ```
 
+**PostgreSQL:** `SELECT FOR UPDATE` cannot lock the nullable side of an outer join. Lock queries MUST NOT `select_related()` nullable FKs (`Transaction.member`, `FinancialIdempotencyKey.transaction`, welfare `approved_by` / `created_by` / `disbursement_transaction`). Required FKs (`church`, welfare `member`) are inner joins and remain safe. Related rows can be loaded after the lock.
+
 ### 6.2 Per-operation locks
 
 | Operation | Lock target |

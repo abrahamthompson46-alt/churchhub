@@ -58,6 +58,9 @@ def claim_financial_idempotency(church, user, action, idempotency_key):
             "Missing idempotency key. Refresh the page and try again."
         )
 
+    # Lock the key row only. Do not select_related("transaction") here:
+    # that FK is nullable, and PostgreSQL rejects FOR UPDATE on the nullable
+    # side of an OUTER JOIN.
     existing = (
         FinancialIdempotencyKey.objects.select_for_update()
         .filter(
@@ -66,7 +69,6 @@ def claim_financial_idempotency(church, user, action, idempotency_key):
             action=action,
             idempotency_key=key,
         )
-        .select_related("transaction")
         .first()
     )
     if existing:
@@ -93,7 +95,6 @@ def claim_financial_idempotency(church, user, action, idempotency_key):
                 action=action,
                 idempotency_key=key,
             )
-            .select_related("transaction")
             .first()
         )
         if existing is None:

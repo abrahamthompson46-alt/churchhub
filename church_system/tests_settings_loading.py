@@ -209,7 +209,8 @@ class ProductionSettingsModuleTests(SimpleTestCase):
                 # Strip selection vars so only the temp .env can supply them
                 for k in (
                     "DJANGO_ENV", "CHURCHHUB_ENV", "RENDER", "DYNO",
-                    "PYTHONANYWHERE_SITE",
+                    "PYTHONANYWHERE_SITE", "DJANGO_DEBUG",
+                    "DJANGO_ALLOW_DEBUG_IN_PROD",
                 ):
                     os.environ.pop(k, None)
                 from pathlib import Path
@@ -225,7 +226,15 @@ class ProductionSettingsModuleTests(SimpleTestCase):
                 """
             )
             env = os.environ.copy()
-            for k in ("DJANGO_ENV", "CHURCHHUB_ENV", "RENDER", "DYNO", "PYTHONANYWHERE_SITE"):
+            for k in (
+                "DJANGO_ENV",
+                "CHURCHHUB_ENV",
+                "RENDER",
+                "DYNO",
+                "PYTHONANYWHERE_SITE",
+                "DJANGO_DEBUG",
+                "DJANGO_ALLOW_DEBUG_IN_PROD",
+            ):
                 env.pop(k, None)
             env["PYTHONPATH"] = str(root) + os.pathsep + env.get("PYTHONPATH", "")
             # Prevent real project .env from winning if process already had nothing —

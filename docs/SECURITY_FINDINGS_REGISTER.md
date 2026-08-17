@@ -260,7 +260,7 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 **Test:** Concurrent voids → one reversal, second raises.  
 **Auth:** Yes. **Cross-tenant:** No. **Confidence:** High.  
 
-**Remediation (Phase 3):** **FIXED.** `select_for_update` on void; partial unique `uniq_txn_one_reversal_per_original` after quarantine migration `0022`. Tests: Phase3VoidConcurrencyTests.
+**Remediation (Phase 3):** **FIXED.** `select_for_update` on void (required `church` only — PostgreSQL cannot `FOR UPDATE` the nullable `member` outer join); partial unique `uniq_txn_one_reversal_per_original` after quarantine migration `0022`. Tests: Phase3VoidConcurrencyTests.
 
 ---
 
@@ -271,7 +271,7 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 **Test:** Parallel receipt POSTs with same key create one transaction.  
 **Auth:** Yes. **Cross-tenant:** No. **Confidence:** High.  
 
-**Remediation (Phase 3):** **FIXED.** Claim uses `select_for_update`; incomplete keys serialize under the row lock; completed keys raise `IdempotencyReplay`. Tests: Phase3IdempotencyTests.
+**Remediation (Phase 3):** **FIXED.** Claim uses `select_for_update` on the key row (no nullable `transaction` join); incomplete keys serialize under the row lock; completed keys raise `IdempotencyReplay`. Tests: Phase3IdempotencyTests.
 
 ---
 

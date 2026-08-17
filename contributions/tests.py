@@ -89,6 +89,7 @@ class ContributionCampaignTests(TestCase):
             member=self.member,
             amount=Decimal("50.00"),
             performed_by=self.treasurer,
+            idempotency_key="contrib-test-receipt-1",
         )
         self.assertEqual(MemberContribution.objects.filter(campaign=self.campaign).count(), 1)
         self.assertEqual(gift.transaction.transaction_type, "RECEIPT")
@@ -102,6 +103,7 @@ class ContributionCampaignTests(TestCase):
                 member=self.member,
                 amount=Decimal("10.00"),
                 performed_by=self.treasurer,
+                idempotency_key="contrib-test-closed-1",
             )
 
     def test_portal_lists_open_campaign(self):
@@ -168,6 +170,7 @@ class ContributionPhase2Tests(ContributionCampaignTests):
             member=self.member,
             amount=Decimal("50.00"),
             performed_by=self.treasurer,
+            idempotency_key="contrib-test-progress-1",
         )
         progress = member_progress(self.campaign, self.member)
         self.assertEqual(progress["target"], Decimal("150.00"))

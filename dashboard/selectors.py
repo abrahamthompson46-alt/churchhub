@@ -260,22 +260,33 @@ def district_count_for_ids(district_ids):
 
 
 def pending_announcements_for_admin(user, church_ids):
+    """
+    Pending announcements for dashboard counts/feeds.
+
+    INV-ANN-01 / INV-DENY-01: missing user denomination fails closed.
+    Never return cross-denomination pending rows for unanchored superusers.
+    """
     from announcements.models import Announcement
 
     pending_ann = Announcement.objects.filter(
-        is_approved=False, is_archived=False, is_rejected=False
+        is_approved=False,
+        is_archived=False,
+        is_rejected=False,
+        denomination__isnull=False,
     )
     user_denom = get_user_denomination(user)
+    if not user_denom:
+        return pending_ann.none()
+    pending_ann = pending_ann.filter(denomination_id=user_denom.pk)
     if church_ids:
-        return pending_ann.filter(Q(church_id__in=church_ids) | Q(church__isnull=True))
-    if user_denom:
         return pending_ann.filter(
-            Q(church__district__zone__conference__denomination=user_denom)
-            | Q(church__isnull=True)
+            Q(visibility="church", church_id__in=church_ids)
+            | Q(visibility="general", denomination_id=user_denom.pk)
         )
-    if user.is_superuser:
-        return pending_ann
-    return pending_ann.none()
+    return pending_ann.filter(
+        Q(visibility="church", church__district__zone__conference__denomination=user_denom)
+        | Q(visibility="general", denomination_id=user_denom.pk)
+    )
 
 
 def manageable_church_district_rows(manageable):

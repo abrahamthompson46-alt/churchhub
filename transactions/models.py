@@ -186,6 +186,11 @@ class Transaction(models.Model):
                 fields=["church", "reference"],
                 name="uniq_txn_reference_per_church",
             ),
+            models.UniqueConstraint(
+                fields=["reversal_of"],
+                condition=models.Q(reversal_of__isnull=False),
+                name="uniq_txn_one_reversal_per_original",
+            ),
         ]
 
     # ============================
@@ -676,6 +681,7 @@ class FinancialIdempotencyKey(models.Model):
         ("LEDGER", "Ledger Entry"),
         ("PAYROLL_POST", "Payroll Post"),
         ("PAYROLL_PAY", "Payroll Pay"),
+        ("CONTRIBUTION", "Member Contribution"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

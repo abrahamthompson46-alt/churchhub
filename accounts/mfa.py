@@ -31,6 +31,7 @@ User = get_user_model()
 SESSION_MFA_VERIFIED = "mfa_verified"
 SESSION_MFA_PENDING_USER = "mfa_pending_user_id"
 SESSION_MFA_PENDING_BACKEND = "mfa_pending_backend"
+SESSION_MFA_PENDING_AT = "mfa_pending_at"
 SESSION_MFA_ENROLL_SECRET = "mfa_enroll_secret"
 
 # Recommended defaults when owners enable MFA without customizing audiences.
@@ -49,6 +50,9 @@ EMAIL_OTP_TTL_SECONDS = 600
 EMAIL_OTP_LENGTH = 6
 EMAIL_OTP_SEND_LIMIT = 3
 EMAIL_OTP_SEND_WINDOW_SECONDS = 900
+MFA_PENDING_TTL_SECONDS = EMAIL_OTP_TTL_SECONDS
+MFA_VERIFY_IP_MAX_ATTEMPTS = 20
+MFA_TOTP_REPLAY_TTL_SECONDS = 180
 
 
 def _fernet():
@@ -236,6 +240,7 @@ def mark_mfa_verified(request) -> None:
     request.session[SESSION_MFA_VERIFIED] = True
     request.session.pop(SESSION_MFA_PENDING_USER, None)
     request.session.pop(SESSION_MFA_PENDING_BACKEND, None)
+    request.session.pop(SESSION_MFA_PENDING_AT, None)
     request.session.pop(SESSION_MFA_ENROLL_SECRET, None)
     request.session.modified = True
 
@@ -245,10 +250,106 @@ def clear_mfa_session(request) -> None:
         SESSION_MFA_VERIFIED,
         SESSION_MFA_PENDING_USER,
         SESSION_MFA_PENDING_BACKEND,
+        SESSION_MFA_PENDING_AT,
         SESSION_MFA_ENROLL_SECRET,
     ):
         request.session.pop(key, None)
     request.session.modified = True
+
+
+def stamp_mfa_pending(request) -> None:
+    """Record when the post-password MFA challenge started (INV MFA expiry)."""
+    import time
+
+    request.session[SESSION_MFA_PENDING_AT] = time.time()
+    request.session.modified = True
+
+
+def mfa_pending_expired(request) -> bool:
+    """True when a pending (not-yet-logged-in) MFA challenge has timed out."""
+    import time
+
+    if not request.session.get(SESSION_MFA_PENDING_USER):
+        return False
+    raw = request.session.get(SESSION_MFA_PENDING_AT)
+    if raw is None:
+        return True
+    try:
+        started = float(raw)
+    except (TypeError, ValueError):
+        return True
+    return (time.time() - started) > MFA_PENDING_TTL_SECONDS
+
+
+def _mfa_lock_settings() -> tuple[int, int]:
+    try:
+        from sitecontrol.services import get_site_settings
+
+        cfg = get_site_settings()
+        attempts = int(getattr(cfg, "login_max_attempts", 5) or 5)
+        minutes = int(getattr(cfg, "login_lockout_minutes", 15) or 15)
+    except Exception:
+        attempts, minutes = 5, 15
+    return max(3, attempts), max(60, minutes * 60)
+
+
+def _mfa_fail_user_key(user) -> str:
+    return f"mfa_verify_fail:user:{user.pk}"
+
+
+def _mfa_fail_ip_key(ip: str) -> str:
+    return f"mfa_verify_fail:ip:{ip or 'unknown'}"
+
+
+def _mfa_lock_user_key(user) -> str:
+    return f"mfa_verify_lock:user:{user.pk}"
+
+
+def _mfa_lock_ip_key(ip: str) -> str:
+    return f"mfa_verify_lock:ip:{ip or 'unknown'}"
+
+
+def mfa_verify_allowed(user, ip: str | None) -> tuple[bool, str]:
+    """MFA §9: both per-user and per-IP locks must allow verification."""
+    if cache.get(_mfa_lock_user_key(user)) or cache.get(_mfa_lock_ip_key(ip or "")):
+        return False, "Too many attempts. Try again later."
+    return True, ""
+
+
+def record_mfa_failure(user, ip: str | None) -> None:
+    """Count a failed MFA verify/enroll attempt per user and per IP."""
+    max_attempts, ttl = _mfa_lock_settings()
+    ip = ip or ""
+    user_fails = int(cache.get(_mfa_fail_user_key(user), 0)) + 1
+    cache.set(_mfa_fail_user_key(user), user_fails, ttl)
+    if user_fails >= max_attempts:
+        cache.set(_mfa_lock_user_key(user), True, ttl)
+        cache.delete(_mfa_fail_user_key(user))
+    ip_fails = int(cache.get(_mfa_fail_ip_key(ip), 0)) + 1
+    cache.set(_mfa_fail_ip_key(ip), ip_fails, ttl)
+    if ip_fails >= MFA_VERIFY_IP_MAX_ATTEMPTS:
+        cache.set(_mfa_lock_ip_key(ip), True, ttl)
+        cache.delete(_mfa_fail_ip_key(ip))
+
+
+def clear_mfa_failures(user, ip: str | None) -> None:
+    ip = ip or ""
+    cache.delete(_mfa_fail_user_key(user))
+    cache.delete(_mfa_lock_user_key(user))
+    cache.delete(_mfa_fail_ip_key(ip))
+    cache.delete(_mfa_lock_ip_key(ip))
+
+
+def _totp_used_key(user, token: str) -> str:
+    return f"mfa_totp_used:{user.pk}:{hash_recovery_code(token)}"
+
+
+def totp_already_used(user, token: str) -> bool:
+    return bool(cache.get(_totp_used_key(user, token)))
+
+
+def remember_used_totp(user, token: str) -> None:
+    cache.set(_totp_used_key(user, token), 1, MFA_TOTP_REPLAY_TTL_SECONDS)
 
 
 def verify_user_mfa(user, token: str) -> tuple[bool, str]:
@@ -258,6 +359,9 @@ def verify_user_mfa(user, token: str) -> tuple[bool, str]:
     """
     secret = get_user_totp_secret(user)
     if secret and verify_totp(secret, token):
+        if totp_already_used(user, token):
+            return False, ""
+        remember_used_totp(user, token)
         return True, "totp"
     if verify_email_otp(user, token):
         return True, "email"

@@ -42,6 +42,12 @@ class WelfareEnterpriseTests(TestCase):
             role="LOCAL_PASTOR",
             church=self.church,
         )
+        self.reviewer = User.objects.create_user(
+            username="welfare_reviewer",
+            password="pass12345",
+            role="BOARD_MEMBER",
+            church=self.church,
+        )
         self.member = Member.objects.create(
             church=self.church,
             first_name="John",
@@ -81,7 +87,7 @@ class WelfareEnterpriseTests(TestCase):
         self.assertTrue(case.case_number.startswith("WEL-"))
         self.assertEqual(WelfareMemberLedger.objects.filter(case=case, entry_type="REQUEST").count(), 1)
 
-        send_welfare_case_to_review(case, self.treasurer, review_notes="Committee review")
+        send_welfare_case_to_review(case, self.reviewer, review_notes="Committee review")
         case.refresh_from_db()
         self.assertEqual(case.status, "UNDER_REVIEW")
 

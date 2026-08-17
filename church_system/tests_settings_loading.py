@@ -203,14 +203,34 @@ class ProductionSettingsModuleTests(SimpleTestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            # load_dotenv never overwrites process env — even an empty
+            # CHURCHHUB_HEALTH_TOKEN= from the parent/VPS test command would
+            # block the temp .env and fail production validation. Strip the
+            # keys this fixture is meant to supply so DJANGO_ENV still comes
+            # only from the file (not pre-exported).
+            dotenv_only_keys = (
+                "DJANGO_ENV",
+                "CHURCHHUB_ENV",
+                "RENDER",
+                "DYNO",
+                "PYTHONANYWHERE_SITE",
+                "DJANGO_DEBUG",
+                "DJANGO_ALLOW_DEBUG_IN_PROD",
+                "DJANGO_SECRET_KEY",
+                "DJANGO_ALLOWED_HOSTS",
+                "DJANGO_CSRF_TRUSTED_ORIGINS",
+                "CHURCHHUB_PUBLIC_URL",
+                "REDIS_URL",
+                "DATABASE_URL",
+                "CHURCHHUB_HEALTH_TOKEN",
+                "SECURE_SSL_REDIRECT",
+                "CHURCHHUB_REQUIRE_REDIS",
+            )
             script = textwrap.dedent(
                 f"""
                 import os
                 # Strip selection vars so only the temp .env can supply them
-                for k in (
-                    "DJANGO_ENV", "CHURCHHUB_ENV", "RENDER", "DYNO",
-                    "PYTHONANYWHERE_SITE",
-                ):
+                for k in {dotenv_only_keys!r}:
                     os.environ.pop(k, None)
                 from pathlib import Path
                 from church_system.env import load_dotenv, resolve_django_env
@@ -225,7 +245,7 @@ class ProductionSettingsModuleTests(SimpleTestCase):
                 """
             )
             env = os.environ.copy()
-            for k in ("DJANGO_ENV", "CHURCHHUB_ENV", "RENDER", "DYNO", "PYTHONANYWHERE_SITE"):
+            for k in dotenv_only_keys:
                 env.pop(k, None)
             env["PYTHONPATH"] = str(root) + os.pathsep + env.get("PYTHONPATH", "")
             # Prevent real project .env from winning if process already had nothing —

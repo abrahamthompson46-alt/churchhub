@@ -128,6 +128,10 @@ class AnnouncementEditForm(forms.ModelForm):
             if "church" in self.fields:
                 self.fields["church"].queryset = churches
                 self.fields["church"].required = False
+            if not (is_top_level_approver(user) or can_approve_announcements(user)):
+                self.fields["visibility"].choices = [
+                    c for c in Announcement.VISIBILITY_CHOICES if c[0] == "church"
+                ]
             self.fields["target_departments"].queryset = Department.objects.filter(
                 church__in=churches
             ).order_by("name")
@@ -140,6 +144,30 @@ class AnnouncementEditForm(forms.ModelForm):
                 link.department_id
                 for link in self.instance.target_department_links.select_related("department")
             ]
+
+    def clean(self):
+        cleaned = super().clean()
+        visibility = cleaned.get("visibility") or "church"
+        church = cleaned.get("church")
+        if visibility == "church" and not church and self.user:
+            from church_system.church_scope import get_user_church
+
+            church = get_user_church(self.user)
+            cleaned["church"] = church
+        if visibility == "church" and not cleaned.get("church"):
+            raise ValidationError({"church": "Select a church for this announcement."})
+        if visibility == "general":
+            cleaned["church"] = None
+            if self.user and not is_top_level_approver(self.user):
+                raise ValidationError(
+                    {
+                        "visibility": (
+                            "Only top-level leadership can set general "
+                            "(denomination-wide) visibility."
+                        )
+                    }
+                )
+        return cleaned
 
 
 class AnnouncementRejectForm(forms.Form):

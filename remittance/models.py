@@ -134,6 +134,19 @@ class SettlementBatch(models.Model):
 
     class Meta:
         ordering = ["-period_end", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "from_unit_type",
+                    "from_unit_id",
+                    "offering_type",
+                    "period_start",
+                    "period_end",
+                ],
+                condition=models.Q(status__in=["DRAFT", "POSTED"]),
+                name="uniq_settlement_active_period_obligation",
+            ),
+        ]
 
 
 class SettlementLine(models.Model):

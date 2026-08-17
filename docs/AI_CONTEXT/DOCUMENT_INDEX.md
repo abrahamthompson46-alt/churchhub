@@ -29,7 +29,7 @@
 | Work | Read next |
 |------|-----------|
 | Schema / models | [`DATABASE_MAP.md`](DATABASE_MAP.md), [`DATABASE/DATABASE_SCHEMA.md`](../DATABASE/DATABASE_SCHEMA.md), [`ENTITY_RELATIONSHIP.md`](../DATABASE/ENTITY_RELATIONSHIP.md), [`MIGRATION_HISTORY.md`](../DATABASE/MIGRATION_HISTORY.md) |
-| Auth / RBAC / tenancy | [`SECURITY/AUTHENTICATION.md`](../SECURITY/AUTHENTICATION.md), [`AUTHORIZATION.md`](../SECURITY/AUTHORIZATION.md), [`ARCHITECTURE/MULTI_TENANCY.md`](../ARCHITECTURE/MULTI_TENANCY.md) |
+| Auth / RBAC / tenancy | [`SECURITY/AUTHENTICATION.md`](../SECURITY/AUTHENTICATION.md), [`AUTHORIZATION.md`](../SECURITY/AUTHORIZATION.md), [`ARCHITECTURE/MULTI_TENANCY.md`](../ARCHITECTURE/MULTI_TENANCY.md), [`SECURITY_AUTHORIZATION_INVARIANTS.md`](../SECURITY_AUTHORIZATION_INVARIANTS.md) (contract for P0/P1) |
 | Finance | [`MODULE_SPECIFICATIONS/FINANCE/finance_spec.md`](../MODULE_SPECIFICATIONS/FINANCE/finance_spec.md) + TRANSACTIONS / LEDGER / GIVING / REMITTANCE / PAYROLL / ASSETS specs; [`AUDIT_COMPLIANCE.md`](../SECURITY/AUDIT_COMPLIANCE.md) |
 | JSON / AJAX | [`API/API_CONVENTIONS.md`](../API/API_CONVENTIONS.md), [`API_REFERENCE.md`](../API/API_REFERENCE.md) — **no DRF `/api/v1/`** |
 | Workflows | [`ARCHITECTURE/WORKFLOW_ARCHITECTURE.md`](../ARCHITECTURE/WORKFLOW_ARCHITECTURE.md) |
@@ -79,6 +79,21 @@ Persistent agent rules (always apply): `.cursor/rules/*.mdc` — architecture, d
 | [AUTHENTICATION.md](../SECURITY/AUTHENTICATION.md) | Session auth, MFA stub, sessions |
 | [AUTHORIZATION.md](../SECURITY/AUTHORIZATION.md) | RBAC, scope, platform capabilities |
 | [AUDIT_COMPLIANCE.md](../SECURITY/AUDIT_COMPLIANCE.md) | Domain audit trails, retention gaps |
+
+### Security contract / audit (root `docs/`)
+
+These are the 14 August 2026 audit pack. They do **not** replace `SECURITY/*.md` Current docs.
+
+| File | Role |
+|------|------|
+| [SECURITY_AUTHORIZATION_INVARIANTS.md](../SECURITY_AUTHORIZATION_INVARIANTS.md) | **Authorization contract** (MUST rules for remediation and tests) |
+| [SECURITY_AUDIT_REPORT.md](../SECURITY_AUDIT_REPORT.md) | Full audit narrative / score |
+| [SECURITY_FINDINGS_REGISTER.md](../SECURITY_FINDINGS_REGISTER.md) | CH-SEC-* findings |
+| [SECURITY_REMEDIATION_DESIGN.md](../SECURITY_REMEDIATION_DESIGN.md) | Per-finding design |
+| [SECURITY_REMEDIATION_ROADMAP.md](../SECURITY_REMEDIATION_ROADMAP.md) | P0–P3 plan |
+| [SECURITY_PHASE2_ANNOUNCEMENTS_DESIGN.md](../SECURITY_PHASE2_ANNOUNCEMENTS_DESIGN.md) | Phase 2 CH-SEC-002/008 design + implementation notes |
+| [SECURITY_PHASE3_FINANCIAL_DESIGN.md](../SECURITY_PHASE3_FINANCIAL_DESIGN.md) | Phase 3 financial integrity / maker-checker design + implementation contract |
+| [SECURITY_PHASE4_MEDIA_TENANCY_DESIGN.md](../SECURITY_PHASE4_MEDIA_TENANCY_DESIGN.md) | Phase 4 media URL gate, unanchored tenancy, platform stats (Option A) |
 
 ### API — `docs/API/`
 

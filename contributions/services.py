@@ -157,6 +157,14 @@ def build_campaign_summary(campaign) -> dict:
     }
 
 
+def contribution_idempotency_key(*parts) -> str:
+    """Stable ≤64-char key for CONTRIBUTION idempotency claims."""
+    import hashlib
+
+    raw = "|".join(str(p) for p in parts)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:64]
+
+
 @db_transaction.atomic
 def record_member_contribution(
     campaign,
@@ -167,7 +175,18 @@ def record_member_contribution(
     contribution_date=None,
     notes="",
     payment_account_type="CASH",
+    idempotency_key=None,
 ) -> MemberContribution:
+    """
+    Record a campaign gift and post the receipt (CH-SEC-006 / INV-IDEM-01).
+
+    Requires an idempotency key so retries cannot double-post.
+    """
+    from transactions.idempotency import (
+        IdempotencyReplay,
+        claim_financial_idempotency,
+        complete_financial_idempotency,
+    )
     from transactions.services import record_receipt
 
     if campaign.status != CampaignStatus.OPEN:
@@ -178,6 +197,26 @@ def record_member_contribution(
     if amount <= 0:
         raise ValidationError({"amount": "Amount must be greater than zero."})
     contribution_date = contribution_date or timezone.localdate()
+
+    try:
+        idem_record = claim_financial_idempotency(
+            campaign.church,
+            performed_by,
+            "CONTRIBUTION",
+            idempotency_key,
+        )
+    except IdempotencyReplay as replay:
+        existing = (
+            MemberContribution.objects.filter(transaction_id=replay.existing_transaction.pk)
+            .select_related("transaction", "member")
+            .first()
+        )
+        if existing:
+            return existing
+        raise ContributionServiceError(
+            "This contribution was already recorded; refresh and continue."
+        ) from replay
+
     category_code = campaign.offering_category.code
     description = notes.strip() or f"{campaign.name} — {member.full_name}"
     trx = record_receipt(
@@ -198,6 +237,7 @@ def record_member_contribution(
         recorded_by=performed_by,
         notes=notes.strip()[:255],
     )
+    complete_financial_idempotency(idem_record, trx)
     return contribution
 
 
@@ -209,18 +249,31 @@ def record_bulk_contributions(
     performed_by,
     contribution_date=None,
     payment_account_type="CASH",
+    batch_idempotency_key=None,
 ) -> list[MemberContribution]:
     """Record multiple member gifts in one atomic batch."""
+    import uuid
+
     if campaign.status != CampaignStatus.OPEN:
         raise ContributionServiceError("Campaign must be open for bulk entry.")
     if not entries:
         raise ContributionServiceError("Enter at least one amount to record.")
     contribution_date = contribution_date or timezone.localdate()
+    batch_key = batch_idempotency_key or str(uuid.uuid4())
     created = []
-    for entry in entries:
+    for index, entry in enumerate(entries):
         member = entry["member"]
         amount = entry["amount"]
         notes = entry.get("notes") or ""
+        line_key = contribution_idempotency_key(
+            "bulk",
+            campaign.pk,
+            batch_key,
+            index,
+            member.pk,
+            amount,
+            contribution_date,
+        )
         created.append(
             record_member_contribution(
                 campaign,
@@ -230,6 +283,7 @@ def record_bulk_contributions(
                 contribution_date=contribution_date,
                 notes=notes,
                 payment_account_type=payment_account_type,
+                idempotency_key=line_key,
             )
         )
     return created

@@ -192,9 +192,9 @@ class AssetServicesTests(TestCase):
             status="ACTIVE",
         )
         open_working_day(self.church, date(2024, 1, 28), self.approver)
-        post_depreciation_entry(asset, 2024, 1, self.approver)
+        post_depreciation_entry(asset, 2024, 1, self.user, checker=self.approver)
         with self.assertRaises(AssetError):
-            post_depreciation_entry(asset, 2024, 1, self.approver)
+            post_depreciation_entry(asset, 2024, 1, self.user, checker=self.approver)
 
     def test_preview_monthly_depreciation(self):
         category = self.church.asset_categories.first()
@@ -230,7 +230,7 @@ class AssetServicesTests(TestCase):
             accumulated_depreciation=Decimal("250.00"),
         )
         open_working_day(self.church, timezone.localdate(), self.approver)
-        dispose_asset(asset, self.approver, notes="Scrapped")
+        dispose_asset(asset, self.user, notes="Scrapped", checker=self.approver)
         asset.refresh_from_db()
         self.assertEqual(asset.status, "DISPOSED")
         self.assertIsNotNone(asset.disposal_transaction_id)

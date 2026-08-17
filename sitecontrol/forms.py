@@ -713,6 +713,49 @@ class TenantChurchForm(forms.ModelForm):
             "district": forms.Select(attrs=select_attrs()),
         }
 
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        from organization.models import District
+        from sitecontrol.platform_access import (
+            get_operator_denominations,
+            operator_has_global_access,
+        )
+
+        if user is not None:
+            if operator_has_global_access(user):
+                self.fields["district"].queryset = District.objects.select_related(
+                    "zone__conference__denomination"
+                ).order_by("name")
+            else:
+                denoms = get_operator_denominations(user)
+                self.fields["district"].queryset = District.objects.filter(
+                    zone__conference__denomination__in=denoms
+                ).select_related("zone__conference__denomination").order_by("name")
+            # Same-denomination moves only: constrain to current church denomination.
+            if self.instance and self.instance.pk and self.instance.district_id:
+                current_denom = getattr(self.instance.conference, "denomination", None)
+                if current_denom:
+                    self.fields["district"].queryset = self.fields["district"].queryset.filter(
+                        zone__conference__denomination=current_denom
+                    )
+
+    def clean_district(self):
+        district = self.cleaned_data.get("district")
+        if not district or not self.instance or not self.instance.pk:
+            return district
+        old_denom = (
+            self.instance.conference.denomination_id if self.instance.conference else None
+        )
+        new_conf = getattr(district, "zone", None)
+        new_conf = getattr(new_conf, "conference", None) if new_conf else None
+        new_denom = new_conf.denomination_id if new_conf else None
+        if old_denom and new_denom and old_denom != new_denom:
+            raise forms.ValidationError(
+                "Cannot move a church to a district in another denomination."
+            )
+        return district
+
 
 class PlatformOperatorForm(forms.ModelForm):
     password1 = forms.CharField(

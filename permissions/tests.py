@@ -43,7 +43,14 @@ User = get_user_model()
 class ChurchHubTestMixin:
     @classmethod
     def setUpTestData(cls):
-        cls.conference = Conference.objects.create(code="P1", name="Perm Conference")
+        from sitecontrol.models import Denomination
+
+        cls.denomination = Denomination.objects.create(
+            code="perm-t1", name="Perm Test Denom", is_active=True
+        )
+        cls.conference = Conference.objects.create(
+            code="P1", name="Perm Conference", denomination=cls.denomination
+        )
         cls.zone = Zone.objects.create(conference=cls.conference, code="PZ", name="Perm Zone")
         cls.district = District.objects.create(zone=cls.zone, code="PD", name="Perm District")
         cls.church = Church.objects.create(district=cls.district, code="PC", name="Perm Church")
@@ -133,6 +140,9 @@ class PermissionCheckTests(ChurchHubTestMixin, TestCase):
             username="perm_admin",
             password="pass12345",
             email="perm@test.com",
+            role=UserRole.SUPER_ADMIN,
+            denomination=self.denomination,
+            church=self.church,
         )
         self.assertTrue(is_superadmin(user))
         self.assertTrue(can_view_all_churches(user))
@@ -144,6 +154,7 @@ class PermissionCheckTests(ChurchHubTestMixin, TestCase):
             password="pass12345",
             role=UserRole.SUPER_ADMIN,
             church=self.church,
+            denomination=self.denomination,
         )
         perm = Permission.objects.get(codename="manage_finances")
         create_override(user, perm, granted=False, reason="Should not block super admin")
@@ -157,6 +168,7 @@ class PermissionCheckTests(ChurchHubTestMixin, TestCase):
             password="pass12345",
             role=UserRole.SUPER_ADMIN,
             church=self.church,
+            denomination=self.denomination,
         )
         self.assertTrue(user_has_role(user, {UserRole.TREASURY}))
 
@@ -375,6 +387,8 @@ class PermissionViewTests(ChurchHubTestMixin, TestCase):
             password="pass12345",
             email="super@test.com",
             role=UserRole.SUPER_ADMIN,
+            denomination=self.denomination,
+            church=self.church,
         )
         enable_mfa_for_user(self.admin, generate_totp_secret(), [])
         self.member = User.objects.create_user(

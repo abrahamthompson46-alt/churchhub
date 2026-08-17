@@ -345,10 +345,22 @@ def create_welfare_case(
     return case
 
 
+def _welfare_is_high_risk(case) -> bool:
+    return case.priority in ("HIGH", "URGENT") or case.assistance_type in (
+        "MEDICAL",
+        "EMERGENCY",
+        "BEREAVEMENT",
+    )
+
+
 @db_transaction.atomic
 def send_welfare_case_to_review(case, user, review_notes=""):
     if case.status != "PENDING":
         raise RemittancePolicyError("Only pending cases can be sent for review.")
+    if case.created_by_id and case.created_by_id == user.id:
+        raise RemittancePolicyError(
+            "The case creator cannot review their own welfare case."
+        )
     case.status = "UNDER_REVIEW"
     case.reviewed_by = user
     case.reviewed_at = timezone.now()
@@ -359,8 +371,26 @@ def send_welfare_case_to_review(case, user, review_notes=""):
 
 @db_transaction.atomic
 def approve_welfare_case(case, user, amount_approved=None):
+    """
+    INV-SOD-02 / CH-SEC-011:
+    - Creator cannot approve.
+    - Reviewer cannot be final approver when reviewed_by is set.
+    - High-risk cases must be UNDER_REVIEW before approval.
+    """
     if case.status not in ("PENDING", "UNDER_REVIEW"):
         raise RemittancePolicyError("Only pending or under-review cases can be approved.")
+    if case.created_by_id and case.created_by_id == user.id:
+        raise RemittancePolicyError(
+            "The case creator cannot approve their own welfare case."
+        )
+    if case.reviewed_by_id and case.reviewed_by_id == user.id:
+        raise RemittancePolicyError(
+            "The case reviewer cannot also be the final approver."
+        )
+    if _welfare_is_high_risk(case) and case.status == "PENDING":
+        raise RemittancePolicyError(
+            "High-risk welfare cases must be reviewed by another officer before approval."
+        )
     approved = _quantize(amount_approved or case.amount_requested)
     if approved <= 0:
         raise RemittancePolicyError("Approved amount must be greater than zero.")
@@ -376,6 +406,10 @@ def approve_welfare_case(case, user, amount_approved=None):
 def reject_welfare_case(case, user, rejection_reason=""):
     if case.status not in ("PENDING", "UNDER_REVIEW"):
         raise RemittancePolicyError("Only pending or under-review cases can be rejected.")
+    if case.created_by_id and case.created_by_id == user.id:
+        raise RemittancePolicyError(
+            "The case creator cannot reject their own welfare case."
+        )
     case.status = "REJECTED"
     case.rejection_reason = rejection_reason
     case.approved_by = user

@@ -1,12 +1,14 @@
 """Regression tests for auth POST rate limiting (P0-6)."""
 
+from datetime import date
+
 from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
-from accounts.models import User
+from members.models import Member
 from organization.models import Church, Conference, District, Zone
-from permissions.roles import UserRole
+from portal.services import canonical_dob_password
 from sitecontrol.models import SiteSettings
 from sitecontrol.services import clear_settings_cache
 from sitecontrol.test_support import SiteControlClientHarness
@@ -36,11 +38,15 @@ class LoginRateLimitMiddlewareTests(SiteControlClientHarness, TestCase):
         zone = Zone.objects.create(name="RL Zone", code="RLZ", conference=conf)
         district = District.objects.create(name="RL Dist", code="RLD", zone=zone)
         self.church = Church.objects.create(name="RL Church", code="RLCH", district=district)
-        self.member = User.objects.create_user(
-            username="portal_member",
-            password="pass12345",
-            role=UserRole.MEMBER,
+        self.portal_dob = date(1988, 3, 14)
+        self.portal_email = "rl.member@example.com"
+        self.member = Member.objects.create(
             church=self.church,
+            first_name="Rate",
+            last_name="Limited",
+            email=self.portal_email,
+            date_of_birth=self.portal_dob,
+            gender="Male",
         )
         self.client = Client()
 
@@ -51,10 +57,10 @@ class LoginRateLimitMiddlewareTests(SiteControlClientHarness, TestCase):
     def test_portal_login_locks_after_max_failed_attempts(self):
         url = reverse("portal:login")
         for _ in range(3):
-            self.client.post(url, {"username": "portal_member", "password": "wrong"})
+            self.client.post(url, {"username": self.portal_email, "password": "wrong"})
         self.assertTrue(cache.get("login_lock:127.0.0.1"))
 
-        response = self.client.post(url, {"username": "portal_member", "password": "wrong"})
+        response = self.client.post(url, {"username": self.portal_email, "password": "wrong"})
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, url)
 
@@ -74,9 +80,17 @@ class LoginRateLimitMiddlewareTests(SiteControlClientHarness, TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, url)
 
+    @override_settings(DEBUG=True, SECURE_SSL_REDIRECT=False)
     def test_successful_portal_login_clears_fail_counter(self):
         url = reverse("portal:login")
-        self.client.post(url, {"username": "portal_member", "password": "wrong"})
+        self.client.post(url, {"username": self.portal_email, "password": "wrong"})
         self.assertEqual(cache.get("login_fail:127.0.0.1"), 1)
-        self.client.post(url, {"username": "portal_member", "password": "pass12345"})
+        # Valid portal credentials reach pending-confirmation / success path.
+        self.client.post(
+            url,
+            {
+                "username": self.portal_email,
+                "password": canonical_dob_password(self.portal_dob),
+            },
+        )
         self.assertIsNone(cache.get("login_fail:127.0.0.1"))

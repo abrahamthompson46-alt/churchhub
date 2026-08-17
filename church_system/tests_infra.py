@@ -107,7 +107,7 @@ class EnvHelperTests(SimpleTestCase):
 class StorageConfigTests(SimpleTestCase):
     def test_default_filesystem_and_whitenoise(self):
         storages = build_storages()
-        self.assertIn("FileSystemStorage", storages["default"]["BACKEND"])
+        self.assertIn("ChurchHubFileSystemStorage", storages["default"]["BACKEND"])
         self.assertIn("whitenoise", storages["staticfiles"]["BACKEND"])
 
 

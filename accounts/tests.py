@@ -42,7 +42,14 @@ class ChurchHubTestMixin:
 
     @classmethod
     def setUpTestData(cls):
-        cls.conference = Conference.objects.create(code="T1", name="Test Conference")
+        from sitecontrol.models import Denomination
+
+        cls.denomination = Denomination.objects.create(
+            code="acct-t1", name="Accounts Test Denom", is_active=True
+        )
+        cls.conference = Conference.objects.create(
+            code="T1", name="Test Conference", denomination=cls.denomination
+        )
         cls.zone = Zone.objects.create(conference=cls.conference, code="Z1", name="Test Zone")
         cls.district = District.objects.create(zone=cls.zone, code="D1", name="Test District")
         cls.church = Church.objects.create(
@@ -98,6 +105,9 @@ class PermissionTests(ChurchHubTestMixin, TestCase):
             username="admin1",
             password="pass12345",
             email="admin@test.com",
+            role=UserRole.SUPER_ADMIN,
+            denomination=self.denomination,
+            church=self.church,
         )
         self.assertTrue(can_view_all_churches(user))
         self.assertTrue(can_manage_finances(user))
@@ -169,6 +179,7 @@ class ManageableScopeTests(ChurchHubTestMixin, TestCase):
             password="pass12345",
             email="sa@test.com",
             role=UserRole.SUPER_ADMIN,
+            denomination=self.denomination,
         )
         self.pastor = User.objects.create_user(
             username="pastor",
@@ -222,6 +233,7 @@ class ServiceTests(ChurchHubTestMixin, TestCase):
             email="mgr@test.com",
             role=UserRole.SUPER_ADMIN,
             church=self.church,
+            denomination=self.denomination,
         )
         self.target = User.objects.create_user(
             username="target",
@@ -425,6 +437,9 @@ class FormTests(ChurchHubTestMixin, TestCase):
             username="form_mgr",
             password="pass12345",
             email="formmgr@test.com",
+            role=UserRole.SUPER_ADMIN,
+            denomination=self.denomination,
+            church=self.church,
         )
         target = User.objects.create_user(
             username="form_target",
@@ -504,6 +519,7 @@ class ViewTests(ChurchHubTestMixin, TestCase):
             email="admin@test.com",
             role=UserRole.SUPER_ADMIN,
             church=self.church,
+            denomination=self.denomination,
         )
         enable_mfa_for_user(self.admin, generate_totp_secret(), [])
         self.member = User.objects.create_user(

@@ -1,5 +1,7 @@
 """Tests for safe DEBUG resolution (P0-7)."""
 
+import os
+
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase
 
@@ -8,14 +10,28 @@ from church_system.debug_config import is_production_like_env, resolve_debug
 
 class DebugConfigTests(SimpleTestCase):
     def test_unset_debug_defaults_true_locally(self):
-        self.assertTrue(
-            resolve_debug(debug_env=None, production_like=False, allow_debug_in_prod=False)
-        )
+        previous = os.environ.pop("DJANGO_DEBUG", None)
+        try:
+            self.assertTrue(
+                resolve_debug(
+                    debug_env=None, production_like=False, allow_debug_in_prod=False
+                )
+            )
+        finally:
+            if previous is not None:
+                os.environ["DJANGO_DEBUG"] = previous
 
     def test_unset_debug_defaults_false_when_production_like(self):
-        self.assertFalse(
-            resolve_debug(debug_env=None, production_like=True, allow_debug_in_prod=False)
-        )
+        previous = os.environ.pop("DJANGO_DEBUG", None)
+        try:
+            self.assertFalse(
+                resolve_debug(
+                    debug_env=None, production_like=True, allow_debug_in_prod=False
+                )
+            )
+        finally:
+            if previous is not None:
+                os.environ["DJANGO_DEBUG"] = previous
 
     def test_explicit_true_allowed_locally(self):
         self.assertTrue(

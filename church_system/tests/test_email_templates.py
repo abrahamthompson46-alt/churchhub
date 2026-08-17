@@ -33,6 +33,7 @@ class EmailTemplateRenderTests(TestCase):
             **get_email_branding_context(preheader="Invitation"),
             "invitation": _Inv(),
             "accept_url": "https://churchhub.example.com/accounts/invite/accept/x/",
+            "organization_name": "Grace Church",
             "church_name": "Grace Church",
             "invited_by": "Admin User",
             "expires_at": "2026-08-01",

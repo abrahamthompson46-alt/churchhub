@@ -10,6 +10,7 @@ from accounts.mfa import (
     SESSION_MFA_PENDING_USER,
     mark_mfa_verified,
     request_has_trusted_device,
+    stamp_mfa_pending,
     user_requires_mfa,
 )
 from accounts.services import get_client_ip, log_activity
@@ -67,7 +68,7 @@ class MfaAwareLoginMixin:
                 self.request.session[SESSION_MFA_PENDING_BACKEND] = getattr(
                     user, "backend", "django.contrib.auth.backends.ModelBackend"
                 )
-                self.request.session.modified = True
+                stamp_mfa_pending(self.request)
                 return redirect("accounts:mfa_verify")
             login(self.request, user)
             self.request.session["mfa_verified"] = False

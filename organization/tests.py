@@ -370,9 +370,12 @@ class ViewTests(OrganizationTestMixin, TestCase):
         self.assertFalse(self.church.is_active)
 
     def test_inactive_church_excluded_from_manageable_churches(self):
+        # Non-superadmin church-scoped users see active churches only.
         set_church_active(self.church, False)
-        manageable = get_manageable_churches(self.admin)
+        manageable = get_manageable_churches(self.secretary)
         self.assertNotIn(self.church, list(manageable))
+        # Institution SUPER_ADMIN includes inactive churches in denomination scope.
+        self.assertIn(self.church, list(get_manageable_churches(self.admin)))
 
     def test_church_transfer_requires_global_admin(self):
         self._login("district_pastor")

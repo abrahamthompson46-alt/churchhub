@@ -62,6 +62,7 @@ class RecordContributionForm(forms.Form):
         initial="CASH",
     )
     notes = forms.CharField(required=False, max_length=255, widget=forms.TextInput)
+    idempotency_key = forms.CharField(max_length=64, widget=forms.HiddenInput)
 
     def __init__(self, *args, church=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -78,6 +79,7 @@ class BulkContributionForm(forms.Form):
         initial=timezone.localdate,
         widget=forms.DateInput(attrs={"type": "date"}),
     )
+    idempotency_key = forms.CharField(max_length=64, widget=forms.HiddenInput)
     payment_account_type = forms.ChoiceField(
         choices=[("CASH", "Cash"), ("BANK", "Bank")],
         initial="CASH",

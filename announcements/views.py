@@ -14,7 +14,6 @@ from announcements import selectors
 from church_system.church_scope import get_active_church, get_user_church
 from church_system.flash import flash_exception, flash_info, flash_success
 from permissions.checks import (
-    can_approve_announcements,
     can_create_announcements,
     can_export_announcements,
     can_view_announcements,
@@ -32,6 +31,7 @@ from .services import (
     AnnouncementServiceError,
     approve_announcement,
     archive_announcement,
+    can_approve_announcement,
     can_archive_announcement,
     can_edit_announcement,
     create_announcement,
@@ -191,11 +191,13 @@ def announcement_list(request):
 
 @view_required
 def announcement_detail(request, pk):
-    announcement = selectors.get_announcement_detail_or_404(pk)
-    # Allow creator / approver to see pending/rejected; others only visible published
+    # CH-SEC-008 / INV-ANN-03: denomination-scoped load; capability alone is not enough.
+    announcement = selectors.get_announcement_in_user_denomination_or_404(
+        request.user, pk
+    )
     can_see = (
         announcement.created_by_id == request.user.id
-        or can_approve_announcements(request.user)
+        or can_approve_announcement(request.user, announcement)
         or selectors.announcement_exists_in_qs(visible_announcements(request.user), pk)
     )
     if not can_see:
@@ -239,8 +241,8 @@ def pending_approvals(request):
 @approve_required
 @require_POST
 def approve_announcement_view(request, pk):
-    announcement = selectors.get_announcement_or_404(
-        pk, is_archived=False, is_rejected=False
+    announcement = selectors.get_announcement_in_user_denomination_or_404(
+        request.user, pk, is_archived=False, is_rejected=False
     )
     try:
         approve_announcement(announcement, request.user)
@@ -260,8 +262,8 @@ def approve_announcement_view(request, pk):
 @approve_required
 @require_POST
 def reject_announcement_view(request, pk):
-    announcement = selectors.get_announcement_or_404(
-        pk, is_archived=False, is_approved=False, is_rejected=False
+    announcement = selectors.get_announcement_in_user_denomination_or_404(
+        request.user, pk, is_archived=False, is_approved=False, is_rejected=False
     )
     form = AnnouncementRejectForm(request.POST)
     if not form.is_valid():
@@ -286,7 +288,9 @@ def reject_announcement_view(request, pk):
 @login_required
 @permission_required("create_announcements")
 def edit_announcement(request, pk):
-    announcement = selectors.get_announcement_or_404(pk)
+    announcement = selectors.get_announcement_in_user_denomination_or_404(
+        request.user, pk
+    )
     if not can_edit_announcement(request.user, announcement):
         raise PermissionDenied
     if request.method == "POST":
@@ -331,7 +335,9 @@ def edit_announcement(request, pk):
 @login_required
 @require_POST
 def archive_announcement_view(request, pk):
-    announcement = selectors.get_announcement_or_404(pk, is_archived=False)
+    announcement = selectors.get_announcement_in_user_denomination_or_404(
+        request.user, pk, is_archived=False
+    )
     try:
         archive_announcement(announcement, request.user)
         flash_success(request, f'"{announcement.title}" archived.')

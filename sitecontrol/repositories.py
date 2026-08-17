@@ -25,6 +25,16 @@ def create_platform_audit(**fields):
 
 
 def save_model(instance, *, update_fields=None):
+    """
+    Persist a model instance.
+
+    Church rows always run full_clean() so INV-TEN-05 denomination rules cannot be
+    bypassed by repository callers (CH-SEC-004).
+    """
+    from organization.models import Church
+
+    if isinstance(instance, Church):
+        instance.full_clean()
     if update_fields is not None:
         instance.save(update_fields=update_fields)
     else:

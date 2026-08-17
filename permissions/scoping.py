@@ -9,26 +9,30 @@ from permissions.superadmin import is_superadmin
 
 
 def get_manageable_churches(user):
-    """Churches inside the user's organization subtree (active only, except super-admins)."""
+    """Churches inside the user's organization subtree (active only, except super-admins).
+
+    INV-TEN-02 / INV-TEN-18 / CH-SEC-L1: unanchored institution superadmins and
+    break-glass superusers MUST receive an empty queryset — never all churches.
+    """
     if not user or not getattr(user, "is_authenticated", False):
         return selectors.empty_churches()
 
     # Institution super-admins see every church in their denomination (incl. inactive).
     if is_superadmin(user):
-        qs = selectors.all_churches_base_qs()
         user_denom = get_user_denomination(user)
-        if user_denom:
-            return selectors.churches_for_denomination(qs, user_denom)
-        return qs
+        if not user_denom:
+            return selectors.empty_churches()
+        qs = selectors.all_churches_base_qs()
+        return selectors.churches_for_denomination(qs, user_denom)
 
     qs = selectors.active_churches_base_qs()
 
-    # Break-glass Django superuser sees all (still filtered later by denomination UI).
+    # Break-glass Django superuser: denomination-bounded only (INV-TEN-18).
     if getattr(user, "is_superuser", False) and not getattr(user, "is_platform_user", False):
         user_denom = get_user_denomination(user)
-        if user_denom:
-            return selectors.churches_for_denomination(qs, user_denom)
-        return qs
+        if not user_denom:
+            return selectors.empty_churches()
+        return selectors.churches_for_denomination(qs, user_denom)
 
     return selectors.churches_filtered_by_q(qs, church_q_for_scope(user))
 
@@ -44,21 +48,21 @@ def get_manageable_users(user):
 
     qs = selectors.institution_users_base_qs()
 
-    # Institution super-admins see all non-platform users (optionally
-    # denomination-bounded when the actor has a denomination).
+    # Institution super-admins see all non-platform users in their denomination.
     if is_superadmin(user):
         user_denom = get_user_denomination(user)
-        if user_denom:
-            church_ids = list(
-                get_manageable_churches(user).values_list("pk", flat=True)
-            )
-            return selectors.users_matching_q(
-                qs,
-                models.Q(church_id__in=church_ids)
-                | models.Q(denomination=user_denom)
-                | models.Q(pk=user.pk),
-            )
-        return qs
+        if not user_denom:
+            # CH-SEC-L1: unanchored — self only (never all institution users).
+            return selectors.users_matching_q(qs, models.Q(pk=user.pk))
+        church_ids = list(
+            get_manageable_churches(user).values_list("pk", flat=True)
+        )
+        return selectors.users_matching_q(
+            qs,
+            models.Q(church_id__in=church_ids)
+            | models.Q(denomination=user_denom)
+            | models.Q(pk=user.pk),
+        )
 
     manageable_church_ids = list(get_manageable_churches(user).values_list("pk", flat=True))
     user_denom = get_user_denomination(user)

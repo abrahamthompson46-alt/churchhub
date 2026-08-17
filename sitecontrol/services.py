@@ -689,8 +689,55 @@ def record_subscription_payment(
     return subscription
 
 
-def platform_stats():
+def platform_stats(user=None):
+    """
+    Platform KPI counts for the control-room dashboard.
+
+    CH-SEC-009 / Option A: OWNER (and break-glass platform superuser) see global
+    aggregates. All other operators are limited to ``managed_denominations``.
+    """
+    from organization.models import Church, Conference, District, Zone
+    from sitecontrol.platform_access import (
+        filter_applications_for_operator,
+        filter_churches_for_operator,
+        filter_conferences_for_operator,
+        filter_districts_for_operator,
+        filter_institution_users_for_operator,
+        filter_subscriptions_for_operator,
+        filter_zones_for_operator,
+        operator_has_global_access,
+    )
     from sitecontrol.registration_services import pending_application_count
+    from accounts.models import User
+
+    if user is not None and not operator_has_global_access(user):
+        churches = filter_churches_for_operator(Church.objects.all(), user)
+        conferences = filter_conferences_for_operator(Conference.objects.all(), user)
+        zones = filter_zones_for_operator(Zone.objects.all(), user)
+        districts = filter_districts_for_operator(District.objects.all(), user)
+        subs = filter_subscriptions_for_operator(
+            TenantSubscription.objects.all(), user
+        )
+        users_qs = filter_institution_users_for_operator(
+            User.objects.filter(is_active=True, is_platform_user=False),
+            user,
+        )
+        apps = filter_applications_for_operator(
+            selectors.applications_list_base().filter(status="PENDING"),
+            user,
+        )
+        return {
+            "churches": churches.count(),
+            "conferences": conferences.count(),
+            "zones": zones.count(),
+            "districts": districts.count(),
+            "active_subscriptions": subs.filter(status="ACTIVE").count(),
+            "suspended": subs.filter(status="SUSPENDED").count(),
+            "users": users_qs.count(),
+            "operators": selectors.active_operator_count(),
+            "plans": selectors.active_plans_ordered().count(),
+            "pending_applications": apps.count(),
+        }
 
     return {
         "churches": selectors.church_count(),
@@ -706,9 +753,49 @@ def platform_stats():
     }
 
 
-def tenant_health_alerts():
+def tenant_health_alerts(user=None):
+    """
+    Tenant health alerts for the control room.
+
+    CH-SEC-009 / Option A: over-limit church names and counts are scoped to the
+    operator's managed denominations unless the operator has global access.
+    """
+    from sitecontrol.platform_access import (
+        filter_applications_for_operator,
+        filter_churches_for_operator,
+        filter_subscriptions_for_operator,
+        operator_has_global_access,
+    )
+    from sitecontrol.registration_services import pending_application_count
+
+    global_ops = user is None or operator_has_global_access(user)
+
+    if global_ops:
+        churches_without = selectors.churches_without_subscription_count()
+        suspended = selectors.subscription_status_count("SUSPENDED")
+        expired = selectors.subscription_status_count("EXPIRED")
+        pending_apps = pending_application_count()
+        subs_for_limit = selectors.active_subscriptions_with_plan()
+    else:
+        churches_without = filter_churches_for_operator(
+            selectors.churches_without_subscription(),
+            user,
+        ).count()
+        scoped_subs = filter_subscriptions_for_operator(
+            TenantSubscription.objects.all(), user
+        )
+        suspended = scoped_subs.filter(status="SUSPENDED").count()
+        expired = scoped_subs.filter(status="EXPIRED").count()
+        pending_apps = filter_applications_for_operator(
+            selectors.applications_list_base().filter(status="PENDING"),
+            user,
+        ).count()
+        subs_for_limit = filter_subscriptions_for_operator(
+            selectors.active_subscriptions_with_plan(),
+            user,
+        )
+
     alerts = []
-    churches_without = selectors.churches_without_subscription_count()
     if churches_without:
         alerts.append({
             "level": "warning",
@@ -717,7 +804,6 @@ def tenant_health_alerts():
             "url_name": "sitecontrol:subscription_seed",
         })
 
-    suspended = selectors.subscription_status_count("SUSPENDED")
     if suspended:
         alerts.append({
             "level": "danger",
@@ -726,7 +812,6 @@ def tenant_health_alerts():
             "url_name": "sitecontrol:subscription_list",
         })
 
-    expired = selectors.subscription_status_count("EXPIRED")
     if expired:
         alerts.append({
             "level": "danger",
@@ -743,9 +828,6 @@ def tenant_health_alerts():
             "url_name": "sitecontrol:settings",
         })
 
-    from sitecontrol.registration_services import pending_application_count
-
-    pending_apps = pending_application_count()
     if pending_apps:
         alerts.append({
             "level": "warning",
@@ -756,7 +838,7 @@ def tenant_health_alerts():
 
     over_limit = []
     if subscription_enforced():
-        for sub in selectors.active_subscriptions_with_plan():
+        for sub in subs_for_limit:
             count = church_user_count(sub.church)
             limit = sub.effective_max_users()
             if count > limit:

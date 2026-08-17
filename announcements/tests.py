@@ -21,6 +21,7 @@ from announcements.services import (
 )
 from dashboard.models import Notification
 from organization.models import Church, Conference, District, Zone
+from sitecontrol.models import Denomination
 
 User = get_user_model()
 
@@ -51,11 +52,18 @@ class AnnouncementTestMixin:
 
     @classmethod
     def setUpTestData(cls):
-        cls.conference = Conference.objects.create(code="T1", name="Test Conference")
+        cls.denomination = Denomination.objects.create(
+            code="ann-t1", name="Announcement Test Denom", is_active=True
+        )
+        cls.conference = Conference.objects.create(
+            code="T1", name="Test Conference", denomination=cls.denomination
+        )
         cls.zone = Zone.objects.create(conference=cls.conference, code="Z1", name="Test Zone")
         cls.district = District.objects.create(zone=cls.zone, code="D1", name="Test District")
         cls.church = Church.objects.create(district=cls.district, code="C1", name="Test Church")
-        cls.other_church = Church.objects.create(district=cls.district, code="C2", name="Other Church")
+        cls.other_church = Church.objects.create(
+            district=cls.district, code="C2", name="Other Church"
+        )
         from permissions.services import ensure_permission_matrix
 
         ensure_permission_matrix()
@@ -79,6 +87,7 @@ class ServiceTests(AnnouncementTestMixin, TestCase):
             username="admin1",
             password="pass12345",
             role=UserRole.SUPER_ADMIN,
+            denomination=self.denomination,
         )
 
     def _pending(self, **kwargs):

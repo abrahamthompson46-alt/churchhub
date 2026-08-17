@@ -557,15 +557,11 @@ def member_for_request(request, member_id):
 
 
 def welfare_case_lock_for_disburse(case_id):
+    # PostgreSQL rejects FOR UPDATE on the nullable side of an OUTER JOIN.
+    # Only join required FKs (church, member) while the case row is locked.
     return (
         WelfareAssistanceCase.objects.select_for_update()
-        .select_related(
-            "church",
-            "member",
-            "approved_by",
-            "created_by",
-            "disbursement_transaction",
-        )
+        .select_related("church", "member")
         .get(pk=case_id)
     )
 

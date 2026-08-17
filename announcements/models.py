@@ -46,6 +46,16 @@ class Announcement(models.Model):
         blank=True,
         related_name="announcements",
     )
+    # SaaS wall owner (INV-ANN-01). Nullable only for legacy quarantine rows;
+    # selectors/services MUST fail closed when null.
+    denomination = models.ForeignKey(
+        "sitecontrol.Denomination",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="announcements",
+        help_text="Authoritative tenant owner. Required for live church and general announcements.",
+    )
 
     visibility = models.CharField(
         max_length=10,
@@ -124,9 +134,26 @@ class Announcement(models.Model):
                 fields=["church", "status", "is_archived"],
                 name="ann_church_status_idx",
             ),
+            models.Index(
+                fields=["denomination", "visibility", "status", "is_archived"],
+                name="ann_denom_vis_status_idx",
+            ),
+            models.Index(
+                fields=["denomination", "is_approved", "publish_at"],
+                name="ann_denom_approved_pub_idx",
+            ),
             models.Index(fields=["is_approved", "is_archived", "event_date"], name="ann_visible_idx"),
             models.Index(fields=["created_at"], name="ann_created_idx"),
             models.Index(fields=["publish_at"], name="ann_publish_at_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(visibility="general", church__isnull=True)
+                    | models.Q(visibility="church", church__isnull=False)
+                ),
+                name="ann_visibility_church_consistency",
+            ),
         ]
 
     def is_expired(self):
@@ -154,10 +181,41 @@ class Announcement(models.Model):
 
     def clean(self):
         super().clean()
-        if self.visibility == "church" and not self.church_id:
-            raise ValidationError({"church": "Church is required for church-scoped announcements."})
-        if self.visibility == "general":
+        from church_system.denomination_scope import get_church_denomination
+
+        if self.visibility == "church":
+            if not self.church_id:
+                raise ValidationError(
+                    {"church": "Church is required for church-scoped announcements."}
+                )
+            church_denom = get_church_denomination(self.church)
+            if not church_denom:
+                raise ValidationError(
+                    {"church": "Church has no denomination; cannot publish announcements."}
+                )
+            if self.denomination_id and self.denomination_id != church_denom.pk:
+                raise ValidationError(
+                    {
+                        "denomination": (
+                            "Announcement denomination must match the church denomination."
+                        )
+                    }
+                )
+            self.denomination = church_denom
+        elif self.visibility == "general":
             self.church = None
+            if not self.denomination_id:
+                raise ValidationError(
+                    {
+                        "denomination": (
+                            "Denomination is required for general (denomination-wide) "
+                            "announcements."
+                        )
+                    }
+                )
+        else:
+            raise ValidationError({"visibility": "Invalid visibility."})
+
         if self.target_roles is None:
             self.target_roles = []
         if not isinstance(self.target_roles, list):
@@ -179,6 +237,12 @@ class Announcement(models.Model):
     def save(self, *args, **kwargs):
         if self.visibility == "general":
             self.church = None
+        elif self.visibility == "church" and self.church_id and not self.denomination_id:
+            from church_system.denomination_scope import get_church_denomination
+
+            church_denom = get_church_denomination(self.church)
+            if church_denom:
+                self.denomination = church_denom
         if self.is_approved and not self.approved_at:
             self.approved_at = timezone.now()
         self.sync_status_flags()

@@ -15,7 +15,10 @@ from django.test import testcases
 from django.test.client import ContextList
 from django.test.runner import DiscoverRunner
 
-_original_testcase_pre_setup = testcases.SimpleTestCase._pre_setup
+# Capture the underlying function (never a bound method). Accessing the attribute
+# on the class is normally a function; if a bound method is seen, unwrap via __func__.
+_pre_setup_attr = testcases.SimpleTestCase._pre_setup
+_original_testcase_pre_setup = getattr(_pre_setup_attr, "__func__", _pre_setup_attr)
 
 
 def _safe_store_rendered_templates(store, signal, sender, template, context, **kwargs):
@@ -41,9 +44,9 @@ def _churchhub_pre_setup(self):
         clear_request_permission_cache()
     except Exception:
         pass
-    # Django 5.1: unbound function needs self; Django 6.0+: already-bound method.
-    if getattr(_original_testcase_pre_setup, "__self__", None) is not None:
-        return _original_testcase_pre_setup()
+    # Always invoke the raw function with self. The wrapper is installed as a
+    # plain function on the class so Python binds instance methods correctly on
+    # both Django 5.1 and 6.0.
     return _original_testcase_pre_setup(self)
 
 
@@ -55,6 +58,7 @@ class ChurchHubDiscoverRunner(DiscoverRunner):
             _safe_store_rendered_templates,
         )
         self._template_store_patcher.start()
+        # Install unbound function — do not assign a bound method.
         testcases.SimpleTestCase._pre_setup = _churchhub_pre_setup
 
     def teardown_test_environment(self, **kwargs):

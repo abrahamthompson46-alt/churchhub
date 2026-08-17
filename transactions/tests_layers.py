@@ -13,6 +13,7 @@ from transactions import selectors
 from transactions.services import (
     approve_transaction,
     create_default_accounts,
+    get_or_create_treasury_approval_policy,
     open_working_day,
     record_receipt,
     validate_transaction_balance,
@@ -54,6 +55,16 @@ class TransactionsLayerTests(TestCase):
         return request
 
     def test_selector_pending_and_repository_create_line_path(self):
+        # Keep receipt PENDING (default auto-approve would approve under $500).
+        policy = get_or_create_treasury_approval_policy(self.church)
+        policy.receipt_auto_approve_enabled = True
+        policy.default_receipt_auto_approve_limit = Decimal("0.00")
+        policy.save(
+            update_fields=[
+                "receipt_auto_approve_enabled",
+                "default_receipt_auto_approve_limit",
+            ]
+        )
         txn = record_receipt(
             church=self.church,
             created_by=self.user,

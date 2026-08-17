@@ -93,7 +93,7 @@ class BudgetViewTests(BudgetsTestMixin, TestCase):
         response = self.client.get(reverse("budgets:list"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Annual Budget")
-        self.assertContains(response, "Total Budgeted")
+        self.assertContains(response, "Income budgeted")
 
     def test_create_church_budget(self):
         self.client.login(username="budget_treasury", password="pass12345")

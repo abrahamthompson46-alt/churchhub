@@ -168,7 +168,14 @@ class ReportsTests(TestCase):
         )
 
     def test_advanced_report_fail_closed_without_church(self):
-        self.assertFalse(user_may_access_report(self.treasury, "trial_balance", active_church=None))
+        # Fail-closed when neither active_church nor get_user_church(user) resolves.
+        user = User.objects.create_user(
+            username="treasury_no_church",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=None,
+        )
+        self.assertFalse(user_may_access_report(user, "trial_balance", active_church=None))
 
     def test_cash_position_not_tied_to_payroll_feature(self):
         """cash_position requires advanced_reports only, not payroll."""

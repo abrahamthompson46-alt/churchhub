@@ -181,7 +181,7 @@ class BudgetViewTests(BudgetsTestMixin, TestCase):
         from transactions.services import approve_transaction, open_working_day, record_expense
 
         open_working_day(self.church, timezone.localdate(), self.pastor)
-        expense_account = Account.objects.filter(church=self.church, account_type="EXPENSE").first()
+        expense_account = self.expense_account
         year = timezone.now().year
         Budget.objects.create(
             church=self.church,
@@ -195,6 +195,7 @@ class BudgetViewTests(BudgetsTestMixin, TestCase):
             created_by=self.treasury,
             amount=Decimal("400.00"),
             description="Budget test expense",
+            expense_account=expense_account,
         )
         approve_transaction(txn, self.pastor)
         self.client.login(username="budget_treasury", password="pass12345")

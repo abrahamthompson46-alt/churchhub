@@ -386,11 +386,6 @@ def entry_create(request):
     return render(request, "ledger/entry.html", {
         "form": form,
         "business_date": form.initial.get("date") or resolve_transaction_date(church),
-        "path_note": (
-            "Day-to-day tithes and offerings: Treasury → Record Receipt "
-            "(category-driven). Use this General Ledger entry for expenses, "
-            "transfers, or journals that need a full type → category cascade."
-        ),
         "breadcrumbs": [
             {"label": "Ledger", "url": reverse("ledger:index")},
             {"label": "New Entry"},

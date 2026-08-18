@@ -13,25 +13,21 @@
                     <li class="breadcrumb-item active" aria-current="page">Record Receipt</li>
                 </ol>
             </nav>
-            {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Record Receipt" page_description="Choose a category — accounts update automatically. Receipts within your auto-approve limit post immediately; larger amounts need second approval." %}
-
-            {% if classic %}
-            <div class="alert alert-light border small mb-3" role="note">
-                <i class="bi bi-info-circle me-1"></i>
-                Classic multi-amount mode.
-                <a href="{% url 'transactions:record_receipt' %}">Use category mode</a>
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                <h1 class="page-title mb-0">Record Receipt</h1>
+                <details class="finance-entry-help">
+                    <summary>Tips</summary>
+                    {% if classic %}
+                    <p class="mb-0"><a href="{% url 'transactions:record_receipt' %}">Use category mode</a></p>
+                    {% else %}
+                    <p class="mb-1">Search a category to fill accounts automatically. Member is required only when the category says so.</p>
+                    <p class="mb-0"><a href="{% url 'transactions:record_receipt' %}?classic=1">Classic multi-amount form</a></p>
+                    {% endif %}
+                </details>
             </div>
-            {% else %}
-            <div class="alert alert-light border small mb-3" role="note">
-                <i class="bi bi-info-circle me-1"></i>
-                Admins set “Requires member” on each category under Ledger → Categories.
-                Need several amounts on one slip?
-                <a href="{% url 'transactions:record_receipt' %}?classic=1">Classic multi-amount form</a>
-            </div>
-            {% endif %}
 
             <div class="form-card-inner card">
-                <div class="card-body p-4 p-md-5">
+                <div class="card-body">
                     <form method="post" id="record-receipt-form" class="finance-entry-form" novalidate>
                         {% csrf_token %}
                         {% if classic %}<input type="hidden" name="classic" value="1">{% endif %}
@@ -55,7 +51,6 @@
                         {{ form.idempotency_key }}
                         {{ form.date }}
 
-                        <h6 class="text-muted text-uppercase small fw-semibold mb-2">Receipt</h6>
                         {% include "includes/form_field.html" with field=form.category %}
 
                         <div id="account-preview" class="ledger-account-preview mt-1 mb-2" hidden>
@@ -86,7 +81,6 @@
                         <p class="text-muted small mb-2">
                             <i class="bi bi-calendar-check me-1"></i>Posting date:
                             <strong>{{ business_date|date:"j M Y" }}</strong>
-                            <span class="text-muted">(business day)</span>
                         </p>
                         {% endif %}
                         {% endif %}
@@ -108,7 +102,7 @@
 
 {% block extra_js %}
 {% if not classic %}
-<script src="{% static 'js/category-picker.js' %}"></script>
+<script>{% include "includes/category_picker.js" %}</script>
 <script src="{% static 'js/record-receipt.js' %}"></script>
 {% endif %}
 {% endblock %}

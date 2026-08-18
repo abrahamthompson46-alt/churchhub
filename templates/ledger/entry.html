@@ -8,16 +8,16 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
-            {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Journal Entry" page_description="One amount, one narration. Choose type and category — accounts cascade automatically." %}
-
-            {% if path_note %}
-            <div class="alert alert-light border small mb-3" role="note">
-                <i class="bi bi-info-circle me-1"></i>{{ path_note }}
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                <h1 class="page-title mb-0">Journal Entry</h1>
+                <details class="finance-entry-help">
+                    <summary>Tips</summary>
+                    <p class="mb-0">Choose a type, then search a category. Debit and credit accounts fill automatically.</p>
+                </details>
             </div>
-            {% endif %}
 
             <div class="form-card-inner card">
-                <div class="card-body p-4 p-md-5">
+                <div class="card-body">
                     <form method="post" id="ledger-entry-form" class="finance-entry-form" novalidate
                           data-categories-url="{% url 'ledger:api_categories' %}"
                           data-category-detail-url="{% url 'ledger:api_category_detail' pk='00000000-0000-0000-0000-000000000000' %}">
@@ -60,7 +60,6 @@
                         {% if business_date %}
                         <p class="text-muted small mb-2">
                             <i class="bi bi-calendar-check me-1"></i>Posting date: <strong>{{ business_date|date:"j M Y" }}</strong>
-                            <span class="text-muted">(business day)</span>
                         </p>
                         {% endif %}
 
@@ -81,6 +80,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/category-picker.js' %}"></script>
+<script>{% include "includes/category_picker.js" %}</script>
 <script src="{% static 'js/ledger-entry.js' %}"></script>
 {% endblock %}

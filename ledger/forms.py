@@ -29,13 +29,8 @@ class LedgerEntryForm(forms.Form):
         label="Category",
         queryset=LedgerCategory.objects.none(),
         widget=forms.Select(
-            attrs={
-                **select_attrs(),
-                "id": "id_category",
-                "class": select_attrs()["class"] + " js-category-picker",
-            }
+            attrs=select_attrs(id="id_category", **{"class": "js-category-picker"})
         ),
-        help_text="Accounts for debit/credit are filled automatically from the category.",
     )
     amount = forms.DecimalField(
         label="Amount",

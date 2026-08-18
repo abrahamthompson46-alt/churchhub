@@ -2698,18 +2698,21 @@ body.app-body.auth-page {
     color: var(--ch-muted);
 }
 
-/* ── Category picker (searchable select) ── */
+/* ── Category picker (type-to-filter combobox) ── */
 .category-picker { position: relative; }
-.category-picker__native {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
+.category-picker.is-enhanced > select,
+.category-picker.is-enhanced .category-picker__native {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 .category-picker__search-wrap { position: relative; }
 .category-picker__input {
@@ -2739,35 +2742,10 @@ body.app-body.auth-page {
     font-size: 0.875rem;
 }
 .category-picker__option:hover,
-.category-picker__option:focus {
+.category-picker__option:focus,
+.category-picker__option.is-active {
     background: var(--ch-primary-soft);
     outline: none;
-}
-.category-picker__selected {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.45rem 0.55rem;
-    border: 1px solid var(--ch-border);
-    border-radius: var(--ch-radius-xs);
-    background: var(--ch-surface);
-    min-height: calc(1.5em + 0.75rem + 2px);
-}
-.category-picker__label {
-    flex: 1;
-    min-width: 0;
-    font-size: 0.875rem;
-    font-weight: 500;
-    line-height: 1.3;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.category-picker__clear {
-    margin-left: auto;
-    font-size: 1.25rem;
-    line-height: 1;
-    padding: 0 0.25rem;
 }
 .category-picker__empty {
     padding: 0.65rem 0.75rem;
@@ -2779,13 +2757,42 @@ body.app-body.auth-page {
 .finance-entry-shell {
     max-width: 52rem;
 }
-.finance-entry-shell .page-header-block,
-.finance-entry-shell .app-breadcrumb {
-    margin-bottom: 0.5rem;
+.finance-entry-shell .page-title {
+    font-size: 1.25rem;
 }
-.finance-entry-shell .alert {
-    margin-bottom: 0.75rem !important;
-    padding: 0.45rem 0.65rem;
+.finance-entry-shell .app-breadcrumb {
+    margin-bottom: 0.35rem;
+}
+.finance-entry-help {
+    font-size: 0.75rem;
+    color: var(--ch-muted);
+    flex-shrink: 0;
+}
+.finance-entry-help summary {
+    cursor: pointer;
+    user-select: none;
+    color: var(--ch-text-secondary);
+    list-style: none;
+}
+.finance-entry-help summary::-webkit-details-marker { display: none; }
+.finance-entry-help summary::after {
+    content: " ▾";
+    font-size: 0.65rem;
+}
+.finance-entry-help[open] {
+    position: relative;
+    z-index: 2;
+}
+.finance-entry-help[open] > *:not(summary) {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    width: min(22rem, 80vw);
+    padding: 0.65rem 0.75rem;
+    background: var(--ch-card);
+    border: 1px solid var(--ch-border);
+    border-radius: var(--ch-radius-xs);
+    box-shadow: var(--ch-shadow-lg);
 }
 .finance-entry-form .form-group {
     margin-bottom: 0.65rem;
@@ -2804,14 +2811,10 @@ body.app-body.auth-page {
     margin-bottom: 0.5rem !important;
 }
 .finance-entry-form .form-hint {
-    margin-top: 0.15rem;
-    font-size: 0.75rem;
+    display: none;
 }
-@media (min-height: 640px) {
-    .finance-entry-shell .form-card-inner > .card-body {
-        padding-top: 1.25rem;
-        padding-bottom: 1.25rem;
-    }
+.finance-entry-shell .form-card-inner > .card-body {
+    padding: 1rem 1.25rem !important;
 }
 
 /* Transfer / record member preview */

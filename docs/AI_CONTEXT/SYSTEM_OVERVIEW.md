@@ -114,8 +114,9 @@ Defined in `church_system/urls.py`:
 | `/assets/` | `assets` |
 | `/portal/` | `portal` |
 | `/platform/` | `sitecontrol` (platform operators) |
+| `/` | Public landing (`church_system.views.public_home`); signed-in users are sent to dashboard, portal, or `/platform/` |
 
-Login: `/accounts/login/` (`ChurchHubLoginView`). Root redirects to login.
+Login: `/accounts/login/` (`ChurchHubLoginView`). The site root is a public landing page with links to staff sign-in and the member portal.
 
 ---
 

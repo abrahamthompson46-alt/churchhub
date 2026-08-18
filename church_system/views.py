@@ -2,7 +2,7 @@
 
 from django.contrib import messages
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET
 
 from church_system.flash import flash_denied
@@ -62,3 +62,24 @@ def permission_denied(request, exception=None):
     if request.user.is_authenticated and not messages.get_messages(request):
         flash_denied(request)
     return render(request, "403.html", status=403)
+
+
+@require_GET
+def public_home(request):
+    """Public landing page at `/`. Signed-in users continue to their workspace."""
+    if request.user.is_authenticated:
+        if getattr(request.user, "is_platform_user", False):
+            return redirect("sitecontrol:dashboard")
+        from permissions.roles import UserRole
+
+        if getattr(request.user, "role", None) == UserRole.MEMBER:
+            return redirect("portal:home")
+        return redirect("dashboard:home")
+
+    from sitecontrol.marketing_services import marketing_inquiry_is_ready
+
+    return render(
+        request,
+        "public/home.html",
+        {"show_marketing_inquiry": marketing_inquiry_is_ready()},
+    )

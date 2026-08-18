@@ -29,6 +29,8 @@ class PublicHomeTests(TestCase):
         self.assertContains(response, "Staff sign in")
         self.assertContains(response, reverse("login"))
         self.assertContains(response, reverse("portal:login"))
+        self.assertContains(response, "css/landing.css")
+        self.assertContains(response, "lp-dock")
 
     def test_public_home_url_is_root(self):
         self.assertEqual(reverse("public_home"), "/")

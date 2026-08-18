@@ -143,6 +143,7 @@ class MaintenanceModeMiddleware:
                 and not getattr(settings_obj, "maintenance_block_apply", True)
             ),
             request.path == reverse("login"),
+            request.path == reverse("public_home"),
         )
         if any(exempt):
             return self.get_response(request)

@@ -26,7 +26,7 @@
                 {% include "includes/auth_tenant_header.html" %}
 
                 <h1 class="auth-form-title text-center">Sign in</h1>
-                <p class="text-muted small mb-4 text-center">Continue to your church workspace.</p>
+                <p class="text-muted small mb-4 text-center">Continue to your church workspace. <a href="{% url 'public_home' %}" class="text-decoration-none">Back to home</a></p>
 
                 {% if form.errors %}
                 <div class="alert alert-danger py-2 small d-flex align-items-center gap-2 mb-3">

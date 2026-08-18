@@ -37,7 +37,7 @@ flowchart TD
 | Portal login | `/portal/login/` → `portal.views.portal_login` (member email + DOB/password) |
 | Backend | Default `ModelBackend` for staff; portal verifies against `members.Member` then establishes a session |
 | Settings | `LOGIN_URL=/accounts/login/`; `LOGIN_REDIRECT_URL=/dashboard/` (overridden by view) |
-| Root | `""` redirects to `login` |
+| Root | `""` → `public_home` (landing). Signed-in users redirect to `/dashboard/`, `/portal/`, or `/platform/`. Unauthenticated visitors are not sent to login automatically. |
 | Also mounted | `django.contrib.auth.urls` under `/accounts/` (staff password reset/change); portal reset under `/portal/password/` |
 
 ### Member portal credentials (Current)

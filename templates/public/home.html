@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}{{ site_name }} — {{ site_tagline|default:"Church management" }}{% endblock %}
+{% block body_class %}landing-page{% endblock %}
+
+{% block content %}
+<header class="lp-nav">
+    <div class="lp-wrap lp-nav__inner">
+        <a class="lp-brand" href="{% url 'public_home' %}">
+            {% if site_logo %}
+            <img src="{{ site_logo.url }}" alt="" class="lp-brand__logo">
+            {% else %}
+            <span class="lp-brand__mark" aria-hidden="true"><i class="bi bi-grid-1x2-fill"></i></span>
+            {% endif %}
+            <span class="lp-brand__name">{{ site_name }}</span>
+        </a>
+        <nav class="lp-nav__links" aria-label="Primary">
+            <a href="#features">Features</a>
+            <a href="{% url 'portal:login' %}">Member portal</a>
+            <a class="lp-btn lp-btn--primary" href="{% url 'login' %}">Sign in</a>
+        </nav>
+    </div>
+</header>
+
+<section class="lp-hero" aria-labelledby="lp-hero-title">
+    <div class="lp-hero__glow" aria-hidden="true"></div>
+    <div class="lp-wrap lp-hero__grid">
+        <div class="lp-hero__copy">
+            <p class="lp-eyebrow">Church management</p>
+            <h1 id="lp-hero-title">{{ site_name }}</h1>
+            <p class="lp-lede">{{ site_tagline|default:"One workspace for membership, treasury, and church life — from the local congregation to conference." }}</p>
+            <div class="lp-hero__actions">
+                <a class="lp-btn lp-btn--light" href="{% url 'login' %}">Staff sign in</a>
+                <a class="lp-btn lp-btn--ghost" href="{% url 'portal:login' %}">Member portal</a>
+            </div>
+            {% if public_registration_allowed %}
+            <p class="lp-hero__note">New to {{ site_name }}? <a href="{% url 'church_apply' %}">Register your church</a></p>
+            {% endif %}
+        </div>
+        <div class="lp-hero__panel" aria-hidden="true">
+            <div class="lp-pulse">
+                <p class="lp-pulse__label">Mission Control</p>
+                <p class="lp-pulse__title">Members · Treasury · Remittance · Reports</p>
+                <ul class="lp-pulse__list">
+                    {% if login_highlights %}
+                    {% for item in login_highlights|slice:":4" %}
+                    <li><i class="bi bi-check2-circle"></i> {{ item }}</li>
+                    {% endfor %}
+                    {% else %}
+                    <li><i class="bi bi-check2-circle"></i> Membership records scoped to your church</li>
+                    <li><i class="bi bi-check2-circle"></i> Tithe, offerings, and remittance on trusted books</li>
+                    <li><i class="bi bi-check2-circle"></i> Role-based access from church to conference</li>
+                    <li><i class="bi bi-check2-circle"></i> Member portal for announcements and giving</li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="lp-section" id="features">
+    <div class="lp-wrap">
+        <p class="lp-eyebrow lp-eyebrow--ink">Capabilities</p>
+        <h2 class="lp-section__title">Built for every leadership lane</h2>
+        <p class="lp-section__lede">One platform. Permissions decide what each pastor, clerk, treasurer, and member can see.</p>
+        <div class="lp-grid">
+            <article class="lp-card">
+                <i class="bi bi-people lp-card__icon" aria-hidden="true"></i>
+                <h3>Membership</h3>
+                <p>Directory, families, transfers, and visitor follow-up without re-typing the same story.</p>
+            </article>
+            <article class="lp-card">
+                <i class="bi bi-cash-stack lp-card__icon" aria-hidden="true"></i>
+                <h3>Treasury</h3>
+                <p>Receipts, approvals, giving statements, and remittance with books auditors can follow.</p>
+            </article>
+            <article class="lp-card">
+                <i class="bi bi-diagram-3 lp-card__icon" aria-hidden="true"></i>
+                <h3>Hierarchy</h3>
+                <p>Church, district, zone, and conference — each user stays inside their authorized scope.</p>
+            </article>
+            <article class="lp-card">
+                <i class="bi bi-calendar-event lp-card__icon" aria-hidden="true"></i>
+                <h3>Church life</h3>
+                <p>Meetings, announcements, and a calendar that keeps ministry moving through the week.</p>
+            </article>
+            <article class="lp-card">
+                <i class="bi bi-phone lp-card__icon" aria-hidden="true"></i>
+                <h3>Member portal</h3>
+                <p>Members sign in with email to see announcements, profile details, and live meeting links.</p>
+            </article>
+            <article class="lp-card">
+                <i class="bi bi-shield-check lp-card__icon" aria-hidden="true"></i>
+                <h3>Secure by design</h3>
+                <p>Session sign-in, role checks on the server, and optional MFA for privileged accounts.</p>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="lp-paths">
+    <div class="lp-wrap lp-paths__grid">
+        <article class="lp-path">
+            <h2>Church staff</h2>
+            <p>Pastors, clerks, and treasurers use the staff workspace for membership, finance, and reports.</p>
+            <a class="lp-btn lp-btn--primary" href="{% url 'login' %}">Continue to sign in</a>
+        </article>
+        <article class="lp-path">
+            <h2>Members</h2>
+            <p>Use the member portal for announcements, your profile, and church life on phone or laptop.</p>
+            <a class="lp-btn lp-btn--outline" href="{% url 'portal:login' %}">Open member portal</a>
+        </article>
+    </div>
+</section>
+
+<footer class="lp-footer">
+    <div class="lp-wrap lp-footer__inner">
+        <span>&copy; {% now "Y" %} {{ site_name }}</span>
+        <span class="lp-footer__links">
+            {% if show_marketing_inquiry %}
+            <a href="{% url 'marketing_inquiry' %}">Contact</a>
+            {% endif %}
+            {% if public_registration_allowed %}
+            <a href="{% url 'church_apply' %}">Register a church</a>
+            {% endif %}
+            <a href="{% url 'login' %}">Sign in</a>
+        </span>
+    </div>
+</footer>
+{% endblock %}

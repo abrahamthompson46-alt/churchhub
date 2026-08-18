@@ -185,7 +185,7 @@ python manage.py check
 python manage.py runserver
 ```
 
-Open http://127.0.0.1:8000/ → redirects to login.
+Open http://127.0.0.1:8000/ → public landing page. Staff sign-in is `/accounts/login/`.
 
 Health: http://127.0.0.1:8000/health/
 

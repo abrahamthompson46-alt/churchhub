@@ -3,11 +3,10 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import include, path
-from django.views.generic import RedirectView
 
 from church_system.auth import ChurchHubLoginView
 from church_system.media_views import protected_media
-from church_system.views import health_check, live_check, metrics_check, ready_check
+from church_system.views import health_check, live_check, metrics_check, public_home, ready_check
 from sitecontrol.views_registration import church_apply, church_apply_success
 from sitecontrol.views_marketing import marketing_inquiry, marketing_inquiry_success
 
@@ -24,7 +23,7 @@ urlpatterns = [
         marketing_inquiry_success,
         name="marketing_inquiry_success",
     ),
-    path("", RedirectView.as_view(pattern_name="login", permanent=False)),
+    path("", public_home, name="public_home"),
     path(
         "accounts/login/",
         ChurchHubLoginView.as_view(),

@@ -1,7 +1,12 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{{ site_name }} — {{ site_tagline|default:"Church management" }}{% endblock %}
 {% block body_class %}landing-page{% endblock %}
+
+{% block extra_css %}
+<style id="churchhub-landing-css">{% include "public/landing.css" %}</style>
+{% endblock %}
 
 {% block content %}
 <header class="lp-nav">
@@ -30,27 +35,32 @@
             <h1 id="lp-hero-title">{{ site_name }}</h1>
             <p class="lp-lede">{{ site_tagline|default:"One workspace for membership, treasury, and church life — from the local congregation to conference." }}</p>
             <div class="lp-hero__actions">
-                <a class="lp-btn lp-btn--light" href="{% url 'login' %}">Staff sign in</a>
-                <a class="lp-btn lp-btn--ghost" href="{% url 'portal:login' %}">Member portal</a>
+                <a class="lp-btn lp-btn--light lp-btn--block" href="{% url 'login' %}">Staff sign in</a>
+                <a class="lp-btn lp-btn--ghost lp-btn--block" href="{% url 'portal:login' %}">Member portal</a>
             </div>
             {% if public_registration_allowed %}
             <p class="lp-hero__note">New to {{ site_name }}? <a href="{% url 'church_apply' %}">Register your church</a></p>
             {% endif %}
+            <div class="lp-stats" aria-hidden="true">
+                <div class="lp-stat"><strong>Members</strong><span>Records</span></div>
+                <div class="lp-stat"><strong>Treasury</strong><span>Books</span></div>
+                <div class="lp-stat"><strong>Portal</strong><span>Anytime</span></div>
+            </div>
         </div>
-        <div class="lp-hero__panel" aria-hidden="true">
+        <div class="lp-hero__panel">
             <div class="lp-pulse">
                 <p class="lp-pulse__label">Mission Control</p>
                 <p class="lp-pulse__title">Members · Treasury · Remittance · Reports</p>
                 <ul class="lp-pulse__list">
                     {% if login_highlights %}
                     {% for item in login_highlights|slice:":4" %}
-                    <li><i class="bi bi-check2-circle"></i> {{ item }}</li>
+                    <li><i class="bi bi-check2-circle" aria-hidden="true"></i> {{ item }}</li>
                     {% endfor %}
                     {% else %}
-                    <li><i class="bi bi-check2-circle"></i> Membership records scoped to your church</li>
-                    <li><i class="bi bi-check2-circle"></i> Tithe, offerings, and remittance on trusted books</li>
-                    <li><i class="bi bi-check2-circle"></i> Role-based access from church to conference</li>
-                    <li><i class="bi bi-check2-circle"></i> Member portal for announcements and giving</li>
+                    <li><i class="bi bi-check2-circle" aria-hidden="true"></i> Membership records scoped to your church</li>
+                    <li><i class="bi bi-check2-circle" aria-hidden="true"></i> Tithe, offerings, and remittance on trusted books</li>
+                    <li><i class="bi bi-check2-circle" aria-hidden="true"></i> Role-based access from church to conference</li>
+                    <li><i class="bi bi-check2-circle" aria-hidden="true"></i> Member portal for announcements and giving</li>
                     {% endif %}
                 </ul>
             </div>
@@ -65,32 +75,32 @@
         <p class="lp-section__lede">One platform. Permissions decide what each pastor, clerk, treasurer, and member can see.</p>
         <div class="lp-grid">
             <article class="lp-card">
-                <i class="bi bi-people lp-card__icon" aria-hidden="true"></i>
+                <span class="lp-card__icon" aria-hidden="true"><i class="bi bi-people"></i></span>
                 <h3>Membership</h3>
                 <p>Directory, families, transfers, and visitor follow-up without re-typing the same story.</p>
             </article>
             <article class="lp-card">
-                <i class="bi bi-cash-stack lp-card__icon" aria-hidden="true"></i>
+                <span class="lp-card__icon" aria-hidden="true"><i class="bi bi-cash-stack"></i></span>
                 <h3>Treasury</h3>
                 <p>Receipts, approvals, giving statements, and remittance with books auditors can follow.</p>
             </article>
             <article class="lp-card">
-                <i class="bi bi-diagram-3 lp-card__icon" aria-hidden="true"></i>
+                <span class="lp-card__icon" aria-hidden="true"><i class="bi bi-diagram-3"></i></span>
                 <h3>Hierarchy</h3>
                 <p>Church, district, zone, and conference — each user stays inside their authorized scope.</p>
             </article>
             <article class="lp-card">
-                <i class="bi bi-calendar-event lp-card__icon" aria-hidden="true"></i>
+                <span class="lp-card__icon" aria-hidden="true"><i class="bi bi-calendar-event"></i></span>
                 <h3>Church life</h3>
                 <p>Meetings, announcements, and a calendar that keeps ministry moving through the week.</p>
             </article>
             <article class="lp-card">
-                <i class="bi bi-phone lp-card__icon" aria-hidden="true"></i>
+                <span class="lp-card__icon" aria-hidden="true"><i class="bi bi-phone"></i></span>
                 <h3>Member portal</h3>
                 <p>Members sign in with email to see announcements, profile details, and live meeting links.</p>
             </article>
             <article class="lp-card">
-                <i class="bi bi-shield-check lp-card__icon" aria-hidden="true"></i>
+                <span class="lp-card__icon" aria-hidden="true"><i class="bi bi-shield-check"></i></span>
                 <h3>Secure by design</h3>
                 <p>Session sign-in, role checks on the server, and optional MFA for privileged accounts.</p>
             </article>
@@ -103,12 +113,12 @@
         <article class="lp-path">
             <h2>Church staff</h2>
             <p>Pastors, clerks, and treasurers use the staff workspace for membership, finance, and reports.</p>
-            <a class="lp-btn lp-btn--primary" href="{% url 'login' %}">Continue to sign in</a>
+            <a class="lp-btn lp-btn--primary lp-btn--block" href="{% url 'login' %}">Continue to sign in</a>
         </article>
         <article class="lp-path">
             <h2>Members</h2>
             <p>Use the member portal for announcements, your profile, and church life on phone or laptop.</p>
-            <a class="lp-btn lp-btn--outline" href="{% url 'portal:login' %}">Open member portal</a>
+            <a class="lp-btn lp-btn--outline lp-btn--block" href="{% url 'portal:login' %}">Open member portal</a>
         </article>
     </div>
 </section>
@@ -127,4 +137,9 @@
         </span>
     </div>
 </footer>
+
+<nav class="lp-dock" aria-label="Quick sign in">
+    <a class="lp-btn lp-btn--light" href="{% url 'login' %}">Staff</a>
+    <a class="lp-btn lp-btn--primary" href="{% url 'portal:login' %}">Members</a>
+</nav>
 {% endblock %}

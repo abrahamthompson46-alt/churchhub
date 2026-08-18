@@ -39,6 +39,9 @@
             }
             categorySelect.appendChild(opt);
         });
+        if (window.ChCategoryPicker) {
+            window.ChCategoryPicker.refresh(categorySelect);
+        }
     }
 
     function applyCategory(cat) {

@@ -285,6 +285,9 @@ class PageTests(LedgerTestMixin, TestCase):
         response = self.client.get(reverse("ledger:entry"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Journal Entry")
+        self.assertContains(response, "js-category-picker")
+        self.assertContains(response, "category-picker.js")
+        self.assertContains(response, "finance-entry-form")
 
     def test_confirm_page_renders_with_draft(self):
         cat = LedgerCategory.objects.get(church=self.church, code="REC_INCOME_CASH")

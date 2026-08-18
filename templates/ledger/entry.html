@@ -4,83 +4,83 @@
 {% block title %}Journal Entry — ChurchHub{% endblock %}
 
 {% block content %}
-<div class="page-container">
-    {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
-
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Journal Entry" page_description="One amount, one narration. Choose type and category — accounts cascade automatically." %}
-
-    {% if path_note %}
-    <div class="alert alert-light border small mb-4" role="note">
-        <i class="bi bi-info-circle me-1"></i>{{ path_note }}
-    </div>
-    {% endif %}
-
+<div class="page-container finance-entry-shell">
     <div class="row justify-content-center">
-        <div class="col-lg-7">
-            <form method="post" id="ledger-entry-form" class="data-card p-4" novalidate
-                  data-categories-url="{% url 'ledger:api_categories' %}"
-                  data-category-detail-url="{% url 'ledger:api_category_detail' pk='00000000-0000-0000-0000-000000000000' %}">
-                {% csrf_token %}
-                {{ form.date }}
+        <div class="col-lg-8">
+            {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
+            {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Journal Entry" page_description="One amount, one narration. Choose type and category — accounts cascade automatically." %}
 
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        {% include "includes/form_field.html" with field=form.transaction_type %}
-                    </div>
-                    <div class="col-md-6">
-                        {% include "includes/form_field.html" with field=form.category %}
-                    </div>
-                </div>
+            {% if path_note %}
+            <div class="alert alert-light border small mb-3" role="note">
+                <i class="bi bi-info-circle me-1"></i>{{ path_note }}
+            </div>
+            {% endif %}
 
-                <div id="account-preview" class="ledger-account-preview mt-2 mb-3" hidden>
-                    <div class="row g-2">
-                        <div class="col-md-6">
-                            <label class="form-label text-muted ledger-account-label">Debit</label>
-                            <div class="ledger-account-box" id="preview-debit" title="">—</div>
+            <div class="form-card-inner card">
+                <div class="card-body p-4 p-md-5">
+                    <form method="post" id="ledger-entry-form" class="finance-entry-form" novalidate
+                          data-categories-url="{% url 'ledger:api_categories' %}"
+                          data-category-detail-url="{% url 'ledger:api_category_detail' pk='00000000-0000-0000-0000-000000000000' %}">
+                        {% csrf_token %}
+                        {{ form.date }}
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                {% include "includes/form_field.html" with field=form.transaction_type %}
+                            </div>
+                            <div class="col-md-6">
+                                {% include "includes/form_field.html" with field=form.category %}
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label text-muted ledger-account-label">Credit</label>
-                            <div class="ledger-account-box" id="preview-credit" title="">—</div>
+
+                        <div id="account-preview" class="ledger-account-preview mt-1 mb-2" hidden>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted ledger-account-label">Debit</label>
+                                    <div class="ledger-account-box" id="preview-debit" title="">—</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted ledger-account-label">Credit</label>
+                                    <div class="ledger-account-box" id="preview-credit" title="">—</div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-5">
+                                {% include "includes/form_field.html" with field=form.amount %}
+                            </div>
+                            <div class="col-md-7" id="member-field-wrap">
+                                {% include "includes/form_field.html" with field=form.member %}
+                            </div>
+                        </div>
+
+                        {% include "includes/form_field.html" with field=form.narration %}
+
+                        {% if business_date %}
+                        <p class="text-muted small mb-2">
+                            <i class="bi bi-calendar-check me-1"></i>Posting date: <strong>{{ business_date|date:"j M Y" }}</strong>
+                            <span class="text-muted">(business day)</span>
+                        </p>
+                        {% endif %}
+
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger small">{{ form.non_field_errors }}</div>
+                        {% endif %}
+
+                        <div class="d-flex gap-2 pt-2">
+                            <button type="submit" class="btn btn-primary">Review Entry</button>
+                            <a href="{% url 'ledger:index' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
                 </div>
-
-                <div class="row g-3">
-                    <div class="col-md-5">
-                        {% include "includes/form_field.html" with field=form.amount %}
-                    </div>
-                    <div class="col-md-7" id="member-field-wrap">
-                        {% include "includes/form_field.html" with field=form.member %}
-                    </div>
-                </div>
-
-                <div class="mb-3 mt-1">
-                    {% include "includes/form_field.html" with field=form.narration %}
-                </div>
-
-                {% if business_date %}
-                <p class="text-muted small mb-3">
-                    <i class="bi bi-calendar-check me-1"></i>Posting date: <strong>{{ business_date|date:"j M Y" }}</strong>
-                    <span class="text-muted">(business day)</span>
-                </p>
-                {% endif %}
-
-                {% if form.non_field_errors %}
-                <div class="alert alert-danger small">{{ form.non_field_errors }}</div>
-                {% endif %}
-
-                <div class="d-flex justify-content-between gap-2">
-                    <a href="{% url 'ledger:index' %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="bi bi-arrow-right-circle me-1"></i>Review Entry
-                    </button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/category-picker.js' %}"></script>
 <script src="{% static 'js/ledger-entry.js' %}"></script>
 {% endblock %}

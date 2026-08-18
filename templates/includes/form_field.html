@@ -27,8 +27,19 @@ Usage: {% include "includes/form_field.html" with field=form.field_name %}
             <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
         </div>
     {% else %}
+        {% with wclass=field.field.widget.attrs.class|default:"" %}
+        {% if "js-category-picker" in wclass %}
+        <label class="form-label" for="{{ field.id_for_label }}_search">{{ field.label }}{% if field.field.required %}<span class="text-danger ms-1">*</span>{% endif %}</label>
+        <div class="category-picker" data-category-picker>
+            {{ field }}
+            <input type="search" class="form-control category-picker__input" id="{{ field.id_for_label }}_search" autocomplete="off" spellcheck="false" placeholder="Type to search categories…" aria-label="Search categories" data-cp-input>
+            <div class="category-picker__results d-none" data-cp-results role="listbox"></div>
+        </div>
+        {% else %}
         <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="text-danger ms-1">*</span>{% endif %}</label>
         {{ field }}
+        {% endif %}
+        {% endwith %}
     {% endif %}
     {% if field.help_text %}<div class="form-hint">{{ field.help_text }}</div>{% endif %}
     {% if field.errors %}<div class="form-error">{{ field.errors.0 }}</div>{% endif %}

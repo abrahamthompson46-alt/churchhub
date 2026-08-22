@@ -254,6 +254,36 @@ class FinancialServicesTests(TestCase):
             FinancialAuditLog.objects.filter(transaction=txn, action="VOID").exists()
         )
 
+    def test_remove_void_pairs_keeps_good_journals(self):
+        from django.core.management import call_command
+        from io import StringIO
+        from transactions.models import Transaction
+
+        keep = record_receipt(
+            church=self.church,
+            created_by=self.treasurer,
+            income_amount=Decimal("40.00"),
+        )
+        approve_transaction(keep, self.pastor)
+        voided = record_receipt(
+            church=self.church,
+            created_by=self.treasurer,
+            income_amount=Decimal("25.00"),
+        )
+        approve_transaction(voided, self.pastor)
+        reversal = void_transaction(voided, self.pastor, reason="Mistake")
+
+        out = StringIO()
+        call_command(
+            "remove_void_pairs",
+            church=self.church.name,
+            execute=True,
+            stdout=out,
+        )
+        self.assertTrue(Transaction.objects.filter(pk=keep.pk).exists())
+        self.assertFalse(Transaction.objects.filter(pk=voided.pk).exists())
+        self.assertFalse(Transaction.objects.filter(pk=reversal.pk).exists())
+
     def test_period_lock_blocks_receipt(self):
         today = timezone.now().date()
         lock_financial_period(self.church, today.year, today.month, self.pastor)

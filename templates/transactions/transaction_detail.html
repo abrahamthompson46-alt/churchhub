@@ -75,13 +75,13 @@
 
             {% if can_void %}
             <div class="panel border-danger">
-                <div class="panel-header text-danger">Void Transaction</div>
+                <div class="panel-header text-danger">Reverse Transaction</div>
                 <div class="panel-body">
-                    <p class="small text-muted">Creates an equal-and-opposite reversal entry. Requires an open financial period.</p>
+                    <p class="small text-muted">Posts an equal-and-opposite journal so account balances return to zero net for this entry. The original stays in history as voided. Requires an open financial period.</p>
                     <form method="post" action="{% url 'transactions:void_transaction' transaction.id %}">
                         {% csrf_token %}
                         {% include "includes/form_field.html" with field=void_form.reason %}
-                        <button type="submit" class="btn btn-outline-danger btn-sm w-100" onclick="return confirm('Void this transaction? This cannot be undone.')">Void Transaction</button>
+                        <button type="submit" class="btn btn-outline-danger btn-sm w-100" onclick="return confirm('Reverse this transaction? An opposite journal will be posted. This cannot be undone.')">Reverse Transaction</button>
                     </form>
                 </div>
             </div>

@@ -293,7 +293,7 @@ class WorkingDayCloseForm(forms.Form):
 class VoidTransactionForm(forms.Form):
     reason = forms.CharField(
         required=False,
-        label="Reason for void",
+        label="Reason for reversal",
         widget=forms.Textarea(attrs=textarea_attrs(rows=2)),
     )
 

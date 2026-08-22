@@ -636,7 +636,7 @@ def void_transaction_view(request, pk):
         reversal = void_transaction(transaction, request.user, reason=reason)
         flash_success(
             request,
-            f"{transaction.reference} voided. Reversal: {reversal.reference}.",
+            f"{transaction.reference} reversed. Opposite journal: {reversal.reference}.",
         )
     except (ValueError, PeriodLockedError, WorkingDayClosedError) as exc:
         flash_exception(request, str(exc))

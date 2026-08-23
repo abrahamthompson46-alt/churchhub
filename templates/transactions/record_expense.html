@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Record Expense — ChurchHub{% endblock %}
 
 {% block content %}
-<div class="page-container">
+<div class="page-container finance-entry-shell">
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <nav aria-label="breadcrumb" class="app-breadcrumb">
@@ -12,15 +13,54 @@
                     <li class="breadcrumb-item active" aria-current="page">Record Expense</li>
                 </ol>
             </nav>
-            {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Record Expense" page_description="Expense will be pending until approved." %}
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                <h1 class="page-title mb-0">Record Expense</h1>
+                <details class="finance-entry-help">
+                    <summary>Tips</summary>
+                    <p class="mb-0">Search a category to fill debit and credit accounts automatically. Expense stays pending until approved.</p>
+                </details>
+            </div>
             <div class="form-card-inner card">
-                <div class="card-body p-4 p-md-5">
-                    <form method="post" novalidate>
+                <div class="card-body">
+                    <form method="post" id="record-expense-form" class="finance-entry-form" data-category-payload-id="expense-category-data" novalidate>
                         {% csrf_token %}
                         {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
-                        {% for field in form %}
-                            {% include "includes/form_field.html" with field=field %}
-                        {% endfor %}
+                        {{ form.idempotency_key }}
+                        {{ form.date }}
+
+                        {% include "includes/form_field.html" with field=form.category %}
+
+                        <div id="account-preview" class="ledger-account-preview mt-1 mb-2" hidden>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted ledger-account-label">Debit</label>
+                                    <div class="ledger-account-box" id="preview-debit" title="">—</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted ledger-account-label">Credit</label>
+                                    <div class="ledger-account-box" id="preview-credit" title="">—</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-5">
+                                {% include "includes/form_field.html" with field=form.amount %}
+                            </div>
+                            <div class="col-md-7" id="member-field-wrap">
+                                {% include "includes/form_field.html" with field=form.member %}
+                            </div>
+                        </div>
+
+                        {% include "includes/form_field.html" with field=form.description %}
+
+                        {% if business_date %}
+                        <p class="text-muted small mb-2">
+                            <i class="bi bi-calendar-check me-1"></i>Posting date:
+                            <strong>{{ business_date|date:"j M Y" }}</strong>
+                        </p>
+                        {% endif %}
+
                         <div class="d-flex gap-2 pt-2">
                             <button type="submit" class="btn btn-danger">Submit Expense</button>
                             <a href="{% url 'transactions:pending_approvals' %}" class="btn btn-outline-secondary">Cancel</a>
@@ -31,4 +71,10 @@
         </div>
     </div>
 </div>
+{{ category_payload|json_script:"expense-category-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script>{% include "includes/category_picker.js" %}</script>
+<script src="{% static 'js/record-receipt.js' %}"></script>
 {% endblock %}

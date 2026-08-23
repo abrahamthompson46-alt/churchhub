@@ -70,7 +70,7 @@ from transactions.services import (
     lock_financial_period,
     open_working_day,
     record_district_remittance,
-    record_expense,
+    record_expense_by_category,
     record_receipt,
     record_receipt_by_category,
     reject_transaction as svc_reject,
@@ -425,14 +425,14 @@ def record_expense_view(request):
                 "EXPENSE",
                 form.cleaned_data.get("idempotency_key"),
             )
-            txn = record_expense(
+            txn = record_expense_by_category(
                 church=church,
                 created_by=request.user,
+                category=form.cleaned_data["category"],
                 amount=form.cleaned_data["amount"],
-                payment_account_type=form.cleaned_data["payment_account_type"],
                 description=form.cleaned_data["description"],
+                member=form.cleaned_data.get("member"),
                 date=form.cleaned_data.get("date"),
-                expense_account=form.cleaned_data.get("expense_account"),
             )
             complete_financial_idempotency(idem_record, txn)
             flash_success(request, f"Expense {txn.reference} recorded and pending approval.")
@@ -449,9 +449,24 @@ def record_expense_view(request):
             )
         except MissingIdempotencyKey as exc:
             flash_error(request, str(exc))
-        except (PeriodLockedError, WorkingDayClosedError) as exc:
+        except (PeriodLockedError, WorkingDayClosedError, ValueError) as exc:
             flash_exception(request, str(exc))
-    return render(request, "transactions/record_expense.html", {"form": form})
+
+    from ledger.services import category_to_dict, get_categories_for_type
+
+    category_payload = {
+        str(c.pk): category_to_dict(c)
+        for c in get_categories_for_type(church, "EXPENSE")
+    }
+    return render(
+        request,
+        "transactions/record_expense.html",
+        {
+            "form": form,
+            "category_payload": category_payload,
+            "business_date": default_date,
+        },
+    )
 
 
 @_finance_required

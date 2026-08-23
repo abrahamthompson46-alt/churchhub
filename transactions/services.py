@@ -652,6 +652,70 @@ def record_expense(
     return trx
 
 
+def record_expense_by_category(
+    church,
+    created_by,
+    category,
+    amount,
+    description="",
+    member=None,
+    date=None,
+):
+    """Post a single-category expense using LedgerCategory debit/credit defaults.
+
+    Server re-resolves accounts from the category. Expense stays pending until approved.
+    """
+    amount = Decimal(str(amount))
+    if amount <= 0:
+        raise ValueError("Expense amount must be greater than zero.")
+    if category is None:
+        raise ValueError("An expense category is required.")
+    if getattr(category, "church_id", None) != church.pk:
+        raise ValueError("Invalid category for this church.")
+    if category.transaction_type != "EXPENSE":
+        raise ValueError("Only expense categories can be recorded here.")
+    if not category.is_active:
+        raise ValueError("This category is inactive.")
+    if category.requires_member and not member:
+        raise ValueError("This category requires a member to be selected.")
+
+    debit = category.default_debit_account
+    credit = category.default_credit_account
+    if debit.church_id != church.pk or credit.church_id != church.pk:
+        raise ValueError("Category accounts must belong to this church.")
+
+    txn_date = resolve_transaction_date(church, date)
+    assert_period_open(church, txn_date)
+    assert_working_day_allows_posting(church, txn_date)
+
+    narration = (description or category.default_narration or category.name or "").strip()
+    trx = repo.create_transaction(
+        transaction_type="EXPENSE",
+        church=church,
+        created_by=created_by,
+        description=narration,
+        date=txn_date,
+        member=member,
+        ledger_category=category,
+    )
+    _post_line(trx, debit, amount)
+    _post_line(trx, credit, -amount)
+
+    validate_transaction_balance(trx)
+    _log_audit(
+        church,
+        "CREATE",
+        created_by,
+        transaction=trx,
+        details={
+            "type": "EXPENSE",
+            "amount": str(amount),
+            "category": category.code,
+        },
+    )
+    return trx
+
+
 # ==========================================
 # RECORD TRANSFER (bank/cash or remittance)
 # ==========================================

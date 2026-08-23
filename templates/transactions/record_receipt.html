@@ -28,7 +28,7 @@
 
             <div class="form-card-inner card">
                 <div class="card-body">
-                    <form method="post" id="record-receipt-form" class="finance-entry-form" novalidate>
+                    <form method="post" id="record-receipt-form" class="finance-entry-form" data-category-payload-id="receipt-category-data" novalidate>
                         {% csrf_token %}
                         {% if classic %}<input type="hidden" name="classic" value="1">{% endif %}
                         {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}

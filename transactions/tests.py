@@ -105,6 +105,30 @@ class FinancialServicesTests(TestCase):
         self.assertEqual(debit.account_id, category.default_debit_account_id)
         self.assertEqual(credit.account_id, category.default_credit_account_id)
 
+    def test_record_expense_by_category_sets_accounts_and_description(self):
+        from ledger.models import LedgerCategory
+        from ledger.services import seed_ledger
+        from transactions.services import record_expense_by_category
+
+        seed_ledger(self.church)
+        category = LedgerCategory.objects.get(church=self.church, code="EXP_UTIL_CASH")
+        txn = record_expense_by_category(
+            church=self.church,
+            created_by=self.treasurer,
+            category=category,
+            amount=Decimal("55.00"),
+            description="Electricity",
+        )
+        validate_transaction_balance(txn)
+        self.assertEqual(txn.transaction_type, "EXPENSE")
+        self.assertEqual(txn.approval_status, "PENDING")
+        self.assertEqual(txn.ledger_category_id, category.pk)
+        self.assertEqual(txn.description, "Electricity")
+        debit = txn.lines.get(amount__gt=0)
+        credit = txn.lines.get(amount__lt=0)
+        self.assertEqual(debit.account_id, category.default_debit_account_id)
+        self.assertEqual(credit.account_id, category.default_credit_account_id)
+
     def test_record_receipt_by_category_requires_member_when_configured(self):
         from ledger.models import LedgerCategory
         from ledger.services import seed_ledger
@@ -424,6 +448,20 @@ class TransactionViewTests(FinancialServicesTests):
     def test_reconciliation_list_accessible(self):
         response = self.client.get(reverse("transactions:reconciliation_list"))
         self.assertEqual(response.status_code, 200)
+
+    def test_record_expense_page_has_category_search(self):
+        from ledger.services import seed_ledger
+        from transactions.services import create_default_accounts
+
+        create_default_accounts(self.church)
+        seed_ledger(self.church)
+        response = self.client.get(reverse("transactions:record_expense"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "js-category-picker")
+        self.assertContains(response, "Type to search categories")
+        self.assertContains(response, "preview-debit")
+        self.assertContains(response, "preview-credit")
+        self.assertContains(response, "expense-category-data")
 
     def test_remittance_payment_get_not_405(self):
         session = self.client.session

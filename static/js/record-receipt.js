@@ -1,9 +1,12 @@
 /**
- * Record Receipt — apply category defaults (accounts, member required, description).
- * Uses embedded category payload so tellers with manage_receipts (no ledger API) still work.
+ * Receipt/expense category defaults (accounts, member required, description).
+ * Uses embedded category payload so tellers without ledger API still work.
  */
 (function () {
-    const form = document.getElementById("record-receipt-form");
+    const form =
+        document.querySelector("form[data-category-payload-id]") ||
+        document.getElementById("record-receipt-form") ||
+        document.getElementById("record-expense-form");
     const categorySelect = document.getElementById("id_category");
     const descriptionField = document.getElementById("id_description");
     const memberWrap = document.getElementById("member-field-wrap");
@@ -13,7 +16,9 @@
     const preview = document.getElementById("account-preview");
     const previewDebit = document.getElementById("preview-debit");
     const previewCredit = document.getElementById("preview-credit");
-    const dataEl = document.getElementById("receipt-category-data");
+    const payloadId =
+        (form && form.dataset.categoryPayloadId) || "receipt-category-data";
+    const dataEl = document.getElementById(payloadId);
 
     if (!form || !categorySelect || !dataEl) return;
 

@@ -190,29 +190,39 @@ class ClassicReceiptForm(forms.Form):
 
 
 class ExpenseForm(forms.Form):
+    """Category-driven expense: one category, one amount, debit/credit from the category."""
+
     idempotency_key = forms.CharField(
         widget=forms.HiddenInput(),
         required=True,
+    )
+    category = forms.ModelChoiceField(
+        label="Category",
+        queryset=LedgerCategory.objects.none(),
+        widget=forms.Select(
+            attrs=select_attrs(id="id_category", **{"class": "js-category-picker"})
+        ),
     )
     amount = forms.DecimalField(
         min_value=Decimal("0.01"), decimal_places=2,
         label="Amount",
         widget=forms.NumberInput(attrs=_MONEY()),
     )
-    expense_account = forms.ModelChoiceField(
-        queryset=Account.objects.none(),
-        label="Expense Category",
-        widget=forms.Select(attrs=select_attrs()),
-    )
-    payment_account_type = forms.ChoiceField(
-        label="Payment Method",
-        choices=[("CASH", "Cash"), ("BANK", "Bank")],
-        widget=forms.Select(attrs=select_attrs()),
-    )
     description = forms.CharField(
         required=False,
         label="Description",
-        widget=forms.TextInput(attrs=input_attrs(placeholder="e.g. Utility bill")),
+        widget=forms.TextInput(
+            attrs={
+                **input_attrs(placeholder="e.g. Utility bill"),
+                "id": "id_description",
+            }
+        ),
+    )
+    member = forms.ModelChoiceField(
+        queryset=Member.objects.none(),
+        required=False,
+        label="Member",
+        widget=forms.HiddenInput(attrs={"id": "id_member"}),
     )
     date = forms.DateField(
         required=False,
@@ -222,15 +232,49 @@ class ExpenseForm(forms.Form):
 
     def __init__(self, *args, church=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.church = church
         if church:
-            expense_qs = Account.objects.filter(
-                church=church, account_type="EXPENSE"
-            ).order_by("name")
-            self.fields["expense_account"].queryset = expense_qs
-            self.fields["expense_account"].label_from_instance = lambda obj: obj.name
-            default = expense_qs.filter(name="General Expense").first() or expense_qs.first()
-            if default and not self.is_bound:
-                self.fields["expense_account"].initial = default.pk
+            from ledger import selectors as ledger_selectors
+            from ledger.services import seed_ledger
+
+            if not ledger_selectors.categories_for_type_qs(church, "EXPENSE").exists():
+                seed_ledger(church)
+            if "date" not in self.initial and not self.data:
+                self.fields["date"].initial = resolve_transaction_date(church)
+            self.fields["category"].queryset = ledger_selectors.categories_for_type_qs(
+                church, "EXPENSE"
+            )
+            self.fields["member"].queryset = Member.objects.filter(
+                church=church, is_active=True
+            )
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.church and not cleaned.get("date"):
+            cleaned["date"] = resolve_transaction_date(self.church)
+        category = cleaned.get("category")
+        member = cleaned.get("member")
+        if category and self.church and category.church_id != self.church.pk:
+            raise forms.ValidationError("Invalid category for this church.")
+        if category and category.transaction_type != "EXPENSE":
+            raise forms.ValidationError("Only expense categories can be used here.")
+        if category and not category.is_active:
+            raise forms.ValidationError("This category is inactive.")
+        if category and category.requires_member and not member:
+            self.add_error("member", "This category requires a member.")
+        if category:
+            debit = category.default_debit_account
+            credit = category.default_credit_account
+            if debit.church_id != category.church_id or credit.church_id != category.church_id:
+                raise forms.ValidationError(
+                    "Category accounts are misconfigured for this church. "
+                    "Contact an administrator."
+                )
+        description = (cleaned.get("description") or "").strip()
+        if not description and category:
+            description = (category.default_narration or category.name or "").strip()
+        cleaned["description"] = description
+        return cleaned
 
 
 class PeriodLockForm(forms.Form):

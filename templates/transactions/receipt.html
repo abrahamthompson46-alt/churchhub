@@ -58,7 +58,7 @@
                         <div class="mt-2">
                             <span class="badge {% if transaction.approval_status == 'APPROVED' %}bg-success{% elif transaction.approval_status == 'REJECTED' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ transaction.approval_status }}</span>
                             <span class="chip ms-1">{{ transaction.transaction_type }}</span>
-                            {% if transaction.is_voided %}<span class="badge bg-dark ms-1">VOIDED</span>{% endif %}
+                            {% if transaction.is_voided or transaction.approval_status == 'REVERSED' %}<span class="badge bg-dark ms-1">REVERSED</span>{% endif %}
                         </div>
                     </div>
 

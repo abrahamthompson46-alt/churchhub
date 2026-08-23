@@ -24,6 +24,7 @@
                     <option value="PENDING" {% if status_filter == 'PENDING' %}selected{% endif %}>Pending</option>
                     <option value="APPROVED" {% if status_filter == 'APPROVED' %}selected{% endif %}>Approved</option>
                     <option value="REJECTED" {% if status_filter == 'REJECTED' %}selected{% endif %}>Rejected</option>
+                    <option value="REVERSED" {% if status_filter == 'REVERSED' %}selected{% endif %}>Reversed</option>
                 </select>
             </div>
             <div class="filter-field">
@@ -40,7 +41,7 @@
             <div class="filter-field">
                 <div class="form-check mt-4">
                     <input class="form-check-input" type="checkbox" name="voided" value="1" id="show-voided" {% if show_voided %}checked{% endif %}>
-                    <label class="form-check-label small" for="show-voided">Include voided</label>
+                    <label class="form-check-label small" for="show-voided">Include reversed</label>
                 </div>
             </div>
             <div class="filter-actions">
@@ -87,8 +88,11 @@
                         <td>{{ t.date|date:"j M Y" }}</td>
                         <td>{{ t.get_transaction_type_display }}</td>
                         <td>
+                            {% if t.is_voided or t.approval_status == 'REVERSED' %}
+                            <span class="table-status table-status--voided">Reversed</span>
+                            {% else %}
                             <span class="table-status table-status--{{ t.approval_status|lower }}">{{ t.get_approval_status_display }}</span>
-                            {% if t.is_voided %}<span class="table-status table-status--voided">Voided</span>{% endif %}
+                            {% endif %}
                         </td>
                         <td class="small text-muted">{% if t.created_by %}{{ t.created_by.get_full_name|default:t.created_by.username }}{% else %}—{% endif %}</td>
                         <td class="text-muted small">{{ t.description|default:"—"|truncatechars:40 }}</td>

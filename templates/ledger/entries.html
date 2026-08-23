@@ -98,7 +98,7 @@
                         
                             {{ t.get_approval_status_display }}
                         
-                        {% if t.is_voided %}Voided{% endif %}
+                        {% if t.is_voided or t.approval_status == 'REVERSED' %}Reversed{% endif %}
                     </td>
                     <td class="text-end text-nowrap">
                         <a href="{% url 'transactions:transaction_detail' t.pk %}" class="btn btn-sm btn-outline-secondary">View</a>

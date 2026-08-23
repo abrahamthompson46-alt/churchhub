@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from organization.models import Church, Conference, District, Zone
-from transactions.models import Account, BankReconciliation, FinancialAuditLog, FinancialPeriod
+from transactions.models import Account, BankReconciliation, FinancialAuditLog, FinancialPeriod, Transaction
 from transactions.services import (
     approve_transaction,
     close_working_day,
@@ -246,10 +246,14 @@ class FinancialServicesTests(TestCase):
             income_amount=Decimal("100.00"),
         )
         approve_transaction(txn, self.pastor)
-        reversal = void_transaction(txn, self.pastor, reason="Error")
-        validate_transaction_balance(reversal)
+        reversed_txn = void_transaction(txn, self.pastor, reason="Error")
         txn.refresh_from_db()
+        self.assertEqual(reversed_txn.pk, txn.pk)
         self.assertTrue(txn.is_voided)
+        self.assertEqual(txn.approval_status, "REVERSED")
+        self.assertFalse(
+            Transaction.objects.filter(reversal_of=txn).exists()
+        )
         self.assertTrue(
             FinancialAuditLog.objects.filter(transaction=txn, action="VOID").exists()
         )
@@ -271,7 +275,7 @@ class FinancialServicesTests(TestCase):
             income_amount=Decimal("25.00"),
         )
         approve_transaction(voided, self.pastor)
-        reversal = void_transaction(voided, self.pastor, reason="Mistake")
+        void_transaction(voided, self.pastor, reason="Mistake")
 
         out = StringIO()
         call_command(
@@ -282,7 +286,6 @@ class FinancialServicesTests(TestCase):
         )
         self.assertTrue(Transaction.objects.filter(pk=keep.pk).exists())
         self.assertFalse(Transaction.objects.filter(pk=voided.pk).exists())
-        self.assertFalse(Transaction.objects.filter(pk=reversal.pk).exists())
 
     def test_period_lock_blocks_receipt(self):
         today = timezone.now().date()
@@ -366,6 +369,8 @@ class FinancialWorkflowIntegrationTests(FinancialServicesTests):
         self.assertEqual(tithe_row["budgeted"], Decimal("200.00"))
 
     def test_expense_approve_then_void_restores_integrity(self):
+        from transactions.models import Transaction
+
         txn = record_expense(
             church=self.church,
             created_by=self.treasurer,
@@ -373,11 +378,12 @@ class FinancialWorkflowIntegrationTests(FinancialServicesTests):
             description="Supplies",
         )
         approve_transaction(txn, self.pastor)
-        reversal = void_transaction(txn, self.pastor, reason="Duplicate entry")
-        validate_transaction_balance(reversal)
+        reversed_txn = void_transaction(txn, self.pastor, reason="Duplicate entry")
         txn.refresh_from_db()
+        self.assertEqual(reversed_txn.pk, txn.pk)
         self.assertTrue(txn.is_voided)
-        self.assertEqual(reversal.reversal_of_id, txn.id)
+        self.assertEqual(txn.approval_status, "REVERSED")
+        self.assertFalse(Transaction.objects.filter(reversal_of=txn).exists())
 
 
 class TransactionViewTests(FinancialServicesTests):

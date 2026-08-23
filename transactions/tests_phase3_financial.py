@@ -468,9 +468,12 @@ class Phase3VoidConcurrencyTests(TransactionTestCase):
         void_transaction(self.trx, self.checker, reason="first")
         with self.assertRaises(ValueError):
             void_transaction(self.trx, self.checker, reason="second")
+        self.trx.refresh_from_db()
+        self.assertTrue(self.trx.is_voided)
+        self.assertEqual(self.trx.approval_status, "REVERSED")
         self.assertEqual(
             Transaction.objects.filter(reversal_of=self.trx).count(),
-            1,
+            0,
         )
 
 

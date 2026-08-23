@@ -633,10 +633,10 @@ def void_transaction_view(request, pk):
     form = VoidTransactionForm(request.POST)
     reason = form.data.get("reason", "") if form.is_valid() else request.POST.get("reason", "")
     try:
-        reversal = void_transaction(transaction, request.user, reason=reason)
+        void_transaction(transaction, request.user, reason=reason)
         flash_success(
             request,
-            f"{transaction.reference} reversed. Opposite journal: {reversal.reference}.",
+            f"{transaction.reference} reversed. It is excluded from books and reports.",
         )
     except (ValueError, PeriodLockedError, WorkingDayClosedError) as exc:
         flash_exception(request, str(exc))

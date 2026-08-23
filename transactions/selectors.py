@@ -161,10 +161,13 @@ def transaction_list_qs(
     )
     if status:
         qs = qs.filter(approval_status=status)
+        if status == "REVERSED":
+            include_voided = True
     if txn_type:
         qs = qs.filter(transaction_type=txn_type)
     if not include_voided:
         qs = qs.filter(is_voided=False)
+        qs = qs.exclude(reversal_of__isnull=False)
     return qs
 
 

@@ -15,8 +15,9 @@
     {% include "includes/page_header.html" with page_subtitle=transaction.transaction_type page_title=transaction.reference page_description=transaction.church.name %}
 
     <div class="d-flex flex-wrap gap-2 mb-4">
-            <span class="badge {% if transaction.approval_status == 'APPROVED' %}bg-success{% elif transaction.approval_status == 'PENDING' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ transaction.approval_status }}</span>
-            {% if transaction.is_voided %}<span class="badge bg-dark">VOIDED</span>{% endif %}
+            <span class="badge {% if transaction.approval_status == 'APPROVED' %}bg-success{% elif transaction.approval_status == 'PENDING' %}bg-warning text-dark{% elif transaction.approval_status == 'REVERSED' or transaction.is_voided %}bg-dark{% else %}bg-secondary{% endif %}">
+                {% if transaction.is_voided or transaction.approval_status == 'REVERSED' %}Reversed{% else %}{{ transaction.get_approval_status_display }}{% endif %}
+            </span>
         <a href="{% url 'transactions:transaction_confirm' transaction.id %}" class="btn btn-outline-secondary btn-sm">Confirmation / Print</a>
     </div>
 
@@ -39,20 +40,6 @@
                     </table>
                 </div>
             </div>
-
-            {% if transaction.reversals.exists %}
-            <div class="panel">
-                <div class="panel-header">Reversals</div>
-                <ul class="list-plain">
-                    {% for rev in transaction.reversals.all %}
-                    <li class="d-flex justify-content-between py-2 border-bottom">
-                        <a href="{% url 'transactions:transaction_detail' rev.id %}" class="table-link">{{ rev.reference }}</a>
-                        <span class="text-muted small">{{ rev.date }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-            {% endif %}
         </div>
 
         <div>
@@ -66,8 +53,8 @@
                         {% if transaction.approved_by %}
                         <dt class="text-muted">Approved By</dt><dd>{{ transaction.approved_by }} ({{ transaction.approved_at|date:"M j, Y" }})</dd>
                         {% endif %}
-                        {% if transaction.reversal_of %}
-                        <dt class="text-muted">Reversal Of</dt><dd><a href="{% url 'transactions:transaction_detail' transaction.reversal_of_id %}" class="table-link">{{ transaction.reversal_of.reference }}</a></dd>
+                        {% if transaction.voided_at %}
+                        <dt class="text-muted">Reversed</dt><dd>{{ transaction.voided_by|default:"—" }} ({{ transaction.voided_at|date:"M j, Y" }})</dd>
                         {% endif %}
                     </dl>
                 </div>
@@ -77,11 +64,11 @@
             <div class="panel border-danger">
                 <div class="panel-header text-danger">Reverse Transaction</div>
                 <div class="panel-body">
-                    <p class="small text-muted">Posts an equal-and-opposite journal so account balances return to zero net for this entry. The original stays in history as voided. Requires an open financial period.</p>
+                    <p class="small text-muted">Marks this entry as reversed so it no longer affects balances or reports. Requires an open financial period.</p>
                     <form method="post" action="{% url 'transactions:void_transaction' transaction.id %}">
                         {% csrf_token %}
                         {% include "includes/form_field.html" with field=void_form.reason %}
-                        <button type="submit" class="btn btn-outline-danger btn-sm w-100" onclick="return confirm('Reverse this transaction? An opposite journal will be posted. This cannot be undone.')">Reverse Transaction</button>
+                        <button type="submit" class="btn btn-outline-danger btn-sm w-100" onclick="return confirm('Reverse this transaction? It will be excluded from books. This cannot be undone.')">Reverse Transaction</button>
                     </form>
                 </div>
             </div>

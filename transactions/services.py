@@ -956,10 +956,12 @@ def reject_transaction(transaction, user, reason=""):
 
 @db_transaction.atomic
 def void_transaction(transaction, user, reason=""):
-    """Void an approved transaction by posting an equal-and-opposite reversal.
+    """Reverse an approved transaction by marking it REVERSED (excluded from books).
 
-    INV-SOD-04 / CH-SEC-012: row-lock the original so concurrent voids cannot
-    create two reversals.
+    Does not post an opposite journal. Report and balance queries already ignore
+    ``is_voided`` journals, so marking reversed restores net books without clutter.
+
+    INV-SOD-04 / CH-SEC-012: row-lock the original so concurrent reverses cannot race.
     """
     # Do not select_related nullable FKs (member) with FOR UPDATE — PostgreSQL
     # rejects locking the nullable side of an OUTER JOIN.
@@ -968,54 +970,40 @@ def void_transaction(transaction, user, reason=""):
         .select_related("church")
         .get(pk=transaction.pk)
     )
-    if locked.is_voided:
-        raise ValueError("Transaction is already voided.")
+    if locked.is_voided or locked.approval_status == "REVERSED":
+        raise ValueError("Transaction is already reversed.")
     if locked.approval_status != "APPROVED":
-        raise ValueError("Only approved transactions can be voided.")
+        raise ValueError("Only approved transactions can be reversed.")
     if locked.reversal_of_id:
-        raise ValueError("Reversal entries cannot be voided.")
+        raise ValueError("Opposite-journal entries cannot be reversed this way.")
     if locked.reversals.exists():
-        raise ValueError("Transaction is already voided.")
+        raise ValueError("Transaction already has a legacy opposite journal.")
 
     assert_period_open(locked.church, locked.date)
     validate_transaction_balance(locked)
-
-    reversal_date = locked.date
-    assert_period_open(locked.church, reversal_date)
-    active_day = get_active_working_day(locked.church)
-    if active_day and active_day.date == reversal_date:
-        assert_working_day_allows_posting(locked.church, reversal_date)
-
-    reversal = repo.create_transaction(
-        transaction_type=locked.transaction_type,
-        church=locked.church,
-        member=locked.member,
-        description=f"VOID: {locked.reference}" + (f" — {reason}" if reason else ""),
-        date=reversal_date,
-        created_by=user,
-        approval_status="APPROVED",
-        locked=False,
-        approved_by=user,
-        approved_at=timezone.now(),
-        reversal_of=locked,
-    )
-
-    for line in locked.lines.select_related("account"):
-        _post_line(reversal, line.account, -line.amount)
-
-    validate_transaction_balance(reversal)
-    reversal.locked = True
-    repo.save_transaction(reversal, update_fields=["locked"])
 
     from remittance.welfare_services import void_welfare_for_transaction
 
     void_welfare_for_transaction(locked, user)
 
     locked.is_voided = True
+    locked.approval_status = "REVERSED"
     locked.voided_at = timezone.now()
     locked.voided_by = user
+    if reason:
+        note = f"Reversed: {reason}"
+        locked.description = (
+            f"{locked.description} — {note}" if locked.description else note
+        )
     repo.save_transaction(
-        locked, update_fields=["is_voided", "voided_at", "voided_by"]
+        locked,
+        update_fields=[
+            "is_voided",
+            "approval_status",
+            "voided_at",
+            "voided_by",
+            "description",
+        ],
     )
     _log_audit(
         locked.church,
@@ -1024,8 +1012,8 @@ def void_transaction(transaction, user, reason=""):
         transaction=locked,
         details={
             "reference": locked.reference,
-            "reversal_reference": reversal.reference,
             "reason": reason,
+            "mode": "status_reversed",
         },
     )
     try:
@@ -1038,7 +1026,7 @@ def void_transaction(transaction, user, reason=""):
         )
     except Exception:
         pass
-    return reversal
+    return locked
 
 
 # ==========================================

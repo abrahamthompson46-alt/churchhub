@@ -1,8 +1,4 @@
-"""Remove voided originals and their linked reversal journals for one church.
-
-User-approved corrective cleanup when accidental voids litter the books.
-Keeps all non-voided transactions untouched.
-"""
+"""Remove voided/reversed journals and legacy opposite-journal pairs for one church."""
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction as db_transaction
@@ -14,8 +10,9 @@ from transactions.models import Transaction
 
 class Command(BaseCommand):
     help = (
-        "Delete voided transactions and their reversal pairs for a church. "
-        "Non-voided journals are kept. Use --execute to apply; default is dry-run."
+        "Delete reversed/voided transactions and legacy opposite-journal pairs "
+        "for a church. Non-reversed journals are kept. Default is dry-run; "
+        "pass --execute to delete."
     )
 
     def add_arguments(self, parser):
@@ -46,31 +43,17 @@ class Command(BaseCommand):
                 names = ", ".join(f'"{c.name}"' for c in matches)
                 raise CommandError(f'Multiple churches match "{name}": {names}. Use the exact name.')
 
-        voided = list(
-            Transaction.objects.filter(church=church, is_voided=True)
-            .prefetch_related("reversals")
-            .order_by("date", "created_at")
+        qs = Transaction.objects.filter(church=church).filter(
+            Q(is_voided=True)
+            | Q(approval_status="REVERSED")
+            | Q(reversal_of__isnull=False)
+            | Q(description__istartswith="VOID:")
         )
-        reversal_ids = set()
-        for txn in voided:
-            for rev in txn.reversals.all():
-                reversal_ids.add(rev.pk)
-
-        # Orphan reversals that still point at a voided original (already covered),
-        # plus any reversal whose original was already missing.
-        orphan_reversals = list(
-            Transaction.objects.filter(church=church, reversal_of__isnull=False)
-            .filter(Q(reversal_of__is_voided=True) | Q(pk__in=reversal_ids))
-            .distinct()
-        )
-        for rev in orphan_reversals:
-            reversal_ids.add(rev.pk)
-
-        delete_ids = {t.pk for t in voided} | reversal_ids
+        delete_ids = list(qs.values_list("pk", flat=True))
         if not delete_ids:
             self.stdout.write(
                 self.style.SUCCESS(
-                    f'No void pairs for "{church.name}". Nothing to remove.'
+                    f'No reversed/voided journals for "{church.name}". Nothing to remove.'
                 )
             )
             return
@@ -80,11 +63,14 @@ class Command(BaseCommand):
             .order_by("date", "created_at")
         )
         self.stdout.write(f'Church: {church.name} ({church.pk})')
-        self.stdout.write(f"Voided originals: {len(voided)}")
-        self.stdout.write(f"Reversals: {len(reversal_ids)}")
         self.stdout.write(f"Total journals to remove: {to_delete.count()}")
         for txn in to_delete:
-            kind = "VOIDED" if txn.is_voided else ("REVERSAL" if txn.reversal_of_id else "OTHER")
+            if txn.is_voided or txn.approval_status == "REVERSED":
+                kind = "REVERSED"
+            elif txn.reversal_of_id or (txn.description or "").upper().startswith("VOID:"):
+                kind = "LEGACY_OPPOSITE"
+            else:
+                kind = "OTHER"
             self.stdout.write(
                 f"  - {txn.date} | {txn.reference} | {txn.transaction_type} | {kind}"
             )
@@ -96,7 +82,6 @@ class Command(BaseCommand):
             return
 
         with db_transaction.atomic():
-            # PROTECT: campaign contributions cannot leave dangling transaction FKs.
             try:
                 from contributions.models import MemberContribution
 
@@ -114,6 +99,7 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f'Removed void pairs for "{church.name}": deleted {deleted_count} DB object(s). {detail}'
+                f'Removed reversed/voided journals for "{church.name}": '
+                f"deleted {deleted_count} DB object(s). {detail}"
             )
         )

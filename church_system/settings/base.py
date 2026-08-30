@@ -168,6 +168,7 @@ MIDDLEWARE = [
 
     "sitecontrol.denomination_middleware.DenominationContextMiddleware",
     "sitecontrol.middleware.UserScopeMiddleware",
+    "sitecontrol.middleware.SubscriptionAccessMiddleware",
     "sitecontrol.middleware.PlatformSessionMiddleware",
     "sitecontrol.middleware.MaintenanceModeMiddleware",
     "sitecontrol.middleware.LoginRateLimitMiddleware",

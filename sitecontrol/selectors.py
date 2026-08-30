@@ -227,7 +227,7 @@ def subscriptions_due_to_expire(today):
     return TenantSubscription.objects.filter(
         status__in=("ACTIVE", "TRIAL"),
         expires_at__isnull=False,
-        expires_at__lt=today,
+        expires_at__lte=today,
     ).select_related("church")
 
 
@@ -257,6 +257,26 @@ def pending_application_count() -> int:
 def pending_application_for_email(email) -> bool:
     return TenantApplication.objects.filter(
         status="PENDING", contact_email=email
+    ).exists()
+
+
+def approved_application_for_email(email) -> bool:
+    return TenantApplication.objects.filter(
+        status="APPROVED", contact_email__iexact=email
+    ).exists()
+
+
+def approved_application_for_username(username) -> bool:
+    return TenantApplication.objects.filter(
+        status="APPROVED", applicant_username__iexact=username
+    ).exists()
+
+
+def approved_application_for_normalized_phone(normalized_phone) -> bool:
+    if not normalized_phone:
+        return False
+    return TenantApplication.objects.filter(
+        status="APPROVED", contact_phone_normalized=normalized_phone
     ).exists()
 
 

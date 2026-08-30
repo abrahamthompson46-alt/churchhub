@@ -15,8 +15,12 @@
     <section class="auth-split-form">
         <div class="auth-card card">
             <div class="card-body p-4 p-md-5">
-                <h1 class="h4 fw-bold mb-1">Church application</h1>
-                <p class="text-muted small mb-4">Submit your details for platform review. You will receive an invite link if approved.</p>
+                    <h1 class="h4 fw-bold mb-1">{% if auto_demo %}Start your {{ demo_trial_days }}-day demo{% else %}Church application{% endif %}</h1>
+                    {% if auto_demo %}
+                    <p class="text-muted small mb-4">Your workspace is created immediately. Access stops automatically when the {{ demo_trial_days }}-day window ends. One demo per email, username, or phone.</p>
+                    {% else %}
+                    <p class="text-muted small mb-4">Submit your details for platform review. You will receive an invite link if approved.</p>
+                    {% endif %}
 
                 <form method="post" novalidate id="apply-form">
                     {% csrf_token %}
@@ -74,6 +78,10 @@
                         <div class="col-md-6"><label class="form-label">Phone</label>{{ form.contact_phone }}</div>
                         <div class="col-md-6"><label class="form-label">Email</label>{{ form.contact_email }}</div>
                         <div class="col-md-6"><label class="form-label">Preferred username</label>{{ form.applicant_username }}</div>
+                        {% if form.password %}
+                        <div class="col-md-6"><label class="form-label">Password</label>{{ form.password }}{% for error in form.password.errors %}<div class="form-error">{{ error }}</div>{% endfor %}</div>
+                        <div class="col-md-6"><label class="form-label">Confirm password</label>{{ form.password_confirm }}{% for error in form.password_confirm.errors %}<div class="form-error">{{ error }}</div>{% endfor %}</div>
+                        {% endif %}
                         <div class="col-12"><label class="form-label">Notes (optional)</label>{{ form.applicant_notes }}</div>
                     </div>
 
@@ -81,7 +89,7 @@
                     <div class="alert alert-danger mt-3 small">{{ form.non_field_errors }}</div>
                     {% endif %}
 
-                    <button type="submit" class="btn btn-primary w-100 py-2 mt-4">Submit application</button>
+                    <button type="submit" class="btn btn-primary w-100 py-2 mt-4">{% if auto_demo %}Start {{ demo_trial_days }}-day demo{% else %}Submit application{% endif %}</button>
                 </form>
                 <p class="text-center mt-4 mb-0 small">
                     Already have an account? <a href="{% url 'login' %}">Sign in</a>

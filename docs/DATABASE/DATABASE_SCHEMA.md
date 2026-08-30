@@ -131,13 +131,13 @@ Tenant: **global** catalog (not church-scoped). Authorization scope is applied a
 
 | Model | PK | Key points |
 |-------|-----|------------|
-| `SiteSettings` | `singleton_id` PositiveSmallInteger | Platform singleton; FK `application_default_plan` → SubscriptionPlan |
+| `SiteSettings` | `singleton_id` PositiveSmallInteger | Platform singleton; FK `application_default_plan` → SubscriptionPlan; `auto_provision_public_trials`; `public_demo_trial_days` (max 30) |
 | `SubscriptionPlan` | UUID | `code` SlugField unique; feature flags; `is_active` |
 | `PlatformPaymentMethod` | UUID | method_type BANK_TRANSFER/MOBILE_MONEY/CARD/CASH/INVOICE |
 | `TenantSubscription` | UUID | **O2O** `church` CASCADE; FK plan PROTECT; status TRIAL/ACTIVE/SUSPENDED/EXPIRED; billing_interval MONTHLY/YEARLY |
 | `PlatformAuditLog` | UUID | Immutable; many action codes; FK user, denomination; indexes on created_at/action |
 | `PlatformAnnouncement` | UUID | Platform-wide; FK created_by |
-| `TenantApplication` | UUID | status PENDING/APPROVED/REJECTED/WITHDRAWN; type EXISTING_DISTRICT/NEW_HIERARCHY; FKs district, denomination PROTECT, reviewed_by, created_church, invitation |
+| `TenantApplication` | UUID | status PENDING/APPROVED/REJECTED/WITHDRAWN; type EXISTING_DISTRICT/NEW_HIERARCHY; `contact_phone_normalized`; FKs district, denomination PROTECT, reviewed_by, created_church, invitation |
 | `Denomination` | UUID | `code` Slug unique; SaaS wall; FK default_plan; index `(is_active, code)` |
 
 ---

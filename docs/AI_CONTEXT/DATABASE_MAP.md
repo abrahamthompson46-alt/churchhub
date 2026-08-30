@@ -327,7 +327,7 @@ Distinct from `sitecontrol.PlatformAnnouncement`.
 | `TenantSubscription` | OneToOne → Church; status TRIAL/ACTIVE/SUSPENDED/EXPIRED; billing fields; `is_operational` property |
 | `PlatformAuditLog` | Immutable platform audit |
 | `PlatformAnnouncement` | Platform-wide announcements |
-| `TenantApplication` | Public/apply workflow; status PENDING/APPROVED/REJECTED/WITHDRAWN; types EXISTING_DISTRICT/NEW_HIERARCHY |
+| `TenantApplication` | Public/apply workflow; status PENDING/APPROVED/REJECTED/WITHDRAWN; types EXISTING_DISTRICT/NEW_HIERARCHY; `contact_phone_normalized` for demo identity lock |
 | `Denomination` | SaaS tenant boundary; branding; feature flags; `allow_institution_branding`; defaults |
 | `MarketingSettings` | Singleton public inquiry, privacy consent, retention, website and sales-notification settings |
 | `MarketingCampaign` | UUID campaign; status/period and UTM attribution metadata |

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Demo ended — {{ site_name }}{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<div class="page-container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7">
+            <div class="card shadow-sm">
+                <div class="card-body p-5 text-center">
+                    <div class="text-danger mb-3" style="font-size:3rem"><i class="bi bi-hourglass-bottom"></i></div>
+                    <h1 class="h4 fw-bold">Your access has ended</h1>
+                    <p class="text-muted mb-3">
+                        {% if church %}The workspace for <strong>{{ church.name }}</strong> is no longer active.{% else %}This account’s church subscription is no longer active.{% endif %}
+                        {% if subscription and subscription.expires_at %} The period ended on {{ subscription.expires_at }}.{% endif %}
+                    </p>
+                    <p class="text-muted mb-4">Demo and expired subscriptions cannot be extended from this screen. Contact {{ support_email|default:"the platform owner" }} to subscribe.</p>
+                    <form method="post" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary">Sign out</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

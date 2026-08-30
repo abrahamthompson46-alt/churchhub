@@ -115,7 +115,24 @@ class SiteSettings(models.Model):
     )
     allow_church_self_registration = models.BooleanField(
         default=False,
-        help_text="Allow public church registration applications at /apply/.",
+        help_text="Allow public church self-registration at /apply/.",
+    )
+    auto_provision_public_trials = models.BooleanField(
+        default=True,
+        help_text=(
+            "When public registration is open, provision a church, first user, and "
+            "30-day TRIAL immediately. No operator approval. Disable only to restore "
+            "the queued application workflow."
+        ),
+    )
+    public_demo_trial_days = models.PositiveSmallIntegerField(
+        default=30,
+        validators=[MinValueValidator(1), MaxValueValidator(30)],
+        help_text=(
+            "Hard public demo length in days (max 30). Frozen onto the subscription "
+            "as expires_at at provision time; changing this later does not extend "
+            "existing demos."
+        ),
     )
     allow_institution_user_invites = models.BooleanField(
         default=True,
@@ -127,7 +144,7 @@ class SiteSettings(models.Model):
     )
     registration_intro = models.TextField(
         blank=True,
-        default="Apply to register your church on ChurchHub. A platform administrator will review your request.",
+        default="Create your church workspace and start a 30-day demo. Access ends automatically when the trial expires.",
     )
     application_default_plan = models.ForeignKey(
         "SubscriptionPlan",
@@ -391,7 +408,12 @@ class TenantSubscription(models.Model):
     def is_operational(self):
         if self.status in ("SUSPENDED", "EXPIRED"):
             return False
-        if self.expires_at and self.expires_at < timezone.now().date():
+        today = timezone.now().date()
+        if self.status == "TRIAL":
+            if not self.expires_at or self.expires_at <= today:
+                return False
+            return True
+        if self.expires_at and self.expires_at <= today:
             return False
         return True
 
@@ -752,7 +774,7 @@ class MarketingAsset(models.Model):
 
 
 class TenantApplication(models.Model):
-    """Public church registration request — reviewed by platform owner."""
+    """Public church registration request — auto-provisioned demo or operator review."""
 
     STATUS_CHOICES = [
         ("PENDING", "Pending Review"),
@@ -797,6 +819,7 @@ class TenantApplication(models.Model):
     contact_name = models.CharField(max_length=120)
     contact_email = models.EmailField()
     contact_phone = models.CharField(max_length=20, blank=True)
+    contact_phone_normalized = models.CharField(max_length=20, blank=True, db_index=True)
     applicant_username = models.CharField(max_length=150)
     applicant_notes = models.TextField(blank=True)
 

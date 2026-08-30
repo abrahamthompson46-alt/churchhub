@@ -7,7 +7,11 @@ from django.urls import include, path
 from church_system.auth import ChurchHubLoginView
 from church_system.media_views import protected_media
 from church_system.views import health_check, live_check, metrics_check, public_home, ready_check
-from sitecontrol.views_registration import church_apply, church_apply_success
+from sitecontrol.views_registration import (
+    church_apply,
+    church_apply_success,
+    subscription_expired,
+)
 from sitecontrol.views_marketing import marketing_inquiry, marketing_inquiry_success
 
 urlpatterns = [
@@ -17,6 +21,11 @@ urlpatterns = [
     path("metrics/", metrics_check, name="metrics"),
     path("apply/", church_apply, name="church_apply"),
     path("apply/success/", church_apply_success, name="church_apply_success"),
+    path(
+        "accounts/subscription-expired/",
+        subscription_expired,
+        name="subscription_expired",
+    ),
     path("contact/", marketing_inquiry, name="marketing_inquiry"),
     path(
         "contact/success/",

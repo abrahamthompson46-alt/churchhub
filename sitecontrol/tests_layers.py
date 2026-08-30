@@ -76,7 +76,8 @@ class SiteControlLayerTests(TestCase):
         cls.plan = SubscriptionPlan.objects.filter(is_active=True).first()
         settings_obj = SiteSettings.load()
         settings_obj.allow_church_self_registration = True
-        settings_obj.save(update_fields=["allow_church_self_registration"])
+        settings_obj.auto_provision_public_trials = False
+        settings_obj.save(update_fields=["allow_church_self_registration", "auto_provision_public_trials"])
         clear_settings_cache()
 
     def setUp(self):

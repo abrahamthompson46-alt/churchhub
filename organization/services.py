@@ -88,13 +88,16 @@ def create_church(
     setup_financials=True,
     performed_by=None,
     ip_address=None,
+    skip_branch_limit=False,
+    ensure_subscription=True,
 ):
     """Create a church under an existing district."""
     from sitecontrol.services import can_add_branch_to_district, ensure_church_subscription
 
-    allowed, message = can_add_branch_to_district(district)
-    if not allowed:
-        raise ValueError(message)
+    if not skip_branch_limit:
+        allowed, message = can_add_branch_to_district(district)
+        if not allowed:
+            raise ValueError(message)
 
     church, created = repo.get_or_create_church(
         district=district,
@@ -111,7 +114,8 @@ def create_church(
 
     if setup_financials:
         provision_church(church, force=True)
-    ensure_church_subscription(church)
+    if ensure_subscription:
+        ensure_church_subscription(church)
     log_org_audit(
         "CREATE" if created else "UPDATE",
         church,
@@ -182,6 +186,8 @@ def onboard_full_hierarchy(
     denomination=None,
     performed_by=None,
     ip_address=None,
+    skip_branch_limit=False,
+    ensure_subscription=True,
 ):
     """Create or reuse conference, zone, district, then create the church."""
     conference, conf_created = _resolve_or_create_conference(
@@ -216,6 +222,8 @@ def onboard_full_hierarchy(
         setup_financials=setup_financials,
         performed_by=performed_by,
         ip_address=ip_address,
+        skip_branch_limit=skip_branch_limit,
+        ensure_subscription=ensure_subscription,
     )
     if conf_created:
         log_org_audit(

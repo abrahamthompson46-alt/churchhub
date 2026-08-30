@@ -185,17 +185,20 @@ Platform IP allowlisting uses `SiteSettings` via `ip_allowed_for_platform`.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> PENDING: submit_tenant_application
+  [*] --> PENDING: submit_tenant_application (queued mode)
   PENDING --> APPROVED: approve_tenant_application
+  PENDING --> APPROVED: auto_provision_public_demo
   PENDING --> REJECTED: reject_tenant_application
   PENDING --> WITHDRAWN: withdraw
-  APPROVED --> [*]: Church + subscription + invitation provisioned
+  APPROVED --> [*]: Church + TRIAL/ACTIVE subscription (+ invite in queued mode)
 ```
 
-- Application types: `EXISTING_DISTRICT`, `NEW_HIERARCHY`  
-- Approval provisions church (and optionally hierarchy), assigns `TenantSubscription`, creates invitation  
-- Subscription statuses: `TRIAL`, `ACTIVE`, `SUSPENDED`, `EXPIRED`  
-- `TenantSubscription.is_operational` is false if suspended/expired or past `expires_at`
+- Application types: `EXISTING_DISTRICT`, `NEW_HIERARCHY`
+- **Current public demo:** when `SiteSettings.allow_church_self_registration` and `auto_provision_public_trials` are on, `/apply/` creates the church, first local-pastor user, and a `TRIAL` subscription in one transaction. `expires_at` is frozen as `started_at + public_demo_trial_days` (hard cap **30**). No operator approval. No invitation.
+- Queued mode (`auto_provision_public_trials=False`): approval still provisions church + subscription + invitation.
+- Subscription statuses: `TRIAL`, `ACTIVE`, `SUSPENDED`, `EXPIRED`
+- `TenantSubscription.is_operational` is false if suspended/expired, if `TRIAL` has no `expires_at`, or if `expires_at` is today or earlier. Middleware `SubscriptionAccessMiddleware` enforces this on every authenticated institution request.
+- One public demo per email, username, or normalized phone (`TenantApplication` APPROVED identity lock).
 
 Public entry: `/apply/`. Operator tools: `/platform/`.
 

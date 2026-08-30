@@ -1,6 +1,8 @@
 """Public registration and platform application review views."""
 
 from django.contrib import messages
+from django.contrib.auth import get_user_model, login
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, render
@@ -17,11 +19,20 @@ from sitecontrol.registration_services import (
     approve_tenant_application,
     institution_invites_allowed,
     institution_onboarding_allowed,
+    public_demo_auto_provision_enabled,
+    public_demo_trial_days,
     public_registration_allowed,
     reject_tenant_application,
     submit_tenant_application,
 )
-from sitecontrol.services import clear_settings_cache, get_site_settings, log_platform_action
+from sitecontrol.services import (
+    clear_settings_cache,
+    get_church_subscription,
+    get_site_settings,
+    log_platform_action,
+)
+
+User = get_user_model()
 
 
 def _breadcrumbs(*crumbs):
@@ -45,7 +56,12 @@ def church_apply(request):
         if denom_code
         else None
     )
-    form = TenantApplicationForm(request.POST or None, denomination=initial_denom)
+    auto_demo = public_demo_auto_provision_enabled()
+    form = TenantApplicationForm(
+        request.POST or None,
+        denomination=initial_denom,
+        require_password=auto_demo,
+    )
     if request.method == "POST" and form.is_valid():
         try:
             application = submit_tenant_application(
@@ -60,6 +76,24 @@ def church_apply(request):
                     target_model="TenantApplication",
                     target_id=application.pk,
                 )
+            if auto_demo and application.status == "APPROVED":
+                user = User.objects.get(username__iexact=application.applicant_username)
+                login(
+                    request,
+                    user,
+                    backend="django.contrib.auth.backends.ModelBackend",
+                )
+                church = application.created_church
+                sub = get_church_subscription(church) if church else None
+                days = public_demo_trial_days()
+                expiry = sub.expires_at.isoformat() if sub and sub.expires_at else ""
+                flash_success(
+                    request,
+                    f"Your {days}-day demo is active"
+                    + (f" until {expiry}." if expiry else "."),
+                    title="Demo workspace ready",
+                )
+                return redirect("dashboard:home")
             return redirect("church_apply_success")
         except ValueError as exc:
             flash_error(request, str(exc), title="Application not submitted")
@@ -74,6 +108,8 @@ def church_apply(request):
         "registration_intro": intro,
         "site_name": display_name,
         "active_denomination": initial_denom,
+        "auto_demo": auto_demo,
+        "demo_trial_days": public_demo_trial_days() if auto_demo else None,
     })
 
 
@@ -82,7 +118,31 @@ def church_apply_success(request):
         return redirect("login")
     return render(request, "registration/apply_success.html", {
         "site_name": get_site_settings().site_name,
+        "auto_demo": public_demo_auto_provision_enabled(),
     })
+
+
+@login_required
+def subscription_expired(request):
+    """Hard stop for non-operational church subscriptions (including ended demos)."""
+    user = request.user
+    if getattr(user, "is_platform_user", False):
+        return redirect("sitecontrol:dashboard")
+    church = getattr(user, "church", None)
+    sub = get_church_subscription(church) if church else None
+    if sub and sub.is_operational:
+        return redirect("dashboard:home")
+    settings_obj = get_site_settings()
+    return render(
+        request,
+        "registration/subscription_expired.html",
+        {
+            "site_name": settings_obj.site_name,
+            "support_email": settings_obj.support_email,
+            "subscription": sub,
+            "church": church,
+        },
+    )
 
 
 @platform_required

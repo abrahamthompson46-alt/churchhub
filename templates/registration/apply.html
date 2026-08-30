@@ -15,10 +15,8 @@
     <section class="auth-split-form">
         <div class="auth-card card">
             <div class="card-body p-4 p-md-5">
-                    <h1 class="h4 fw-bold mb-1">{% if auto_demo %}Start your {{ demo_trial_days }}-day demo{% else %}Church application{% endif %}</h1>
-                    {% if auto_demo %}
-                    <p class="text-muted small mb-4">Your workspace is created immediately. Access stops automatically when the {{ demo_trial_days }}-day window ends. One demo per email, username, or phone.</p>
-                    {% else %}
+                    <h1 class="h4 fw-bold {% if auto_demo %}mb-4{% else %}mb-1{% endif %}">{% if auto_demo %}Start your {{ demo_trial_days }}-day demo{% else %}Church application{% endif %}</h1>
+                    {% if not auto_demo %}
                     <p class="text-muted small mb-4">Submit your details for platform review. You will receive an invite link if approved.</p>
                     {% endif %}
 
@@ -28,7 +26,8 @@
                     <div class="form-group">
                         <label class="form-label fw-semibold">Denomination</label>
                         {{ form.denomination }}
-                        {% for error in form.denomination.errors %}<div class="form-error">{{ error }}</div>{% endfor %}
+                        <input type="text" class="form-control form-control-sm" value="DEMO" readonly disabled>
+                        <div class="form-text">Demo accounts are created under DEMO. This cannot be changed.</div>
                     </div>
 
                     <div class="mb-3">

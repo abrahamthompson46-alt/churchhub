@@ -23,7 +23,7 @@
                 </a>
                 {% if public_registration_allowed %}
                 <p class="text-center mt-4 mb-0 small">
-                    <a href="{% url 'church_apply' %}{% if active_denomination %}?denomination={{ active_denomination.code }}{% endif %}" class="text-muted text-decoration-none">Register your church</a>
+                    <a href="{% url 'church_apply' %}" class="text-muted text-decoration-none">Start a {{ public_demo_trial_days }}-day demo</a>
                 </p>
                 {% endif %}
             </div>

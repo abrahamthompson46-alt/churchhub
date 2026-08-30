@@ -21,6 +21,9 @@
         </a>
         <nav class="lp-nav__links" aria-label="Primary">
             <a href="#features">Features</a>
+            {% if public_registration_allowed %}
+            <a href="{% url 'church_apply' %}">{{ public_demo_trial_days }}-day demo</a>
+            {% endif %}
             <a href="{% url 'portal:login' %}">Member portal</a>
             <a class="lp-btn lp-btn--primary" href="{% url 'login' %}">Sign in</a>
         </nav>
@@ -31,15 +34,21 @@
     <div class="lp-hero__glow" aria-hidden="true"></div>
     <div class="lp-wrap lp-hero__grid">
         <div class="lp-hero__copy">
-            <p class="lp-eyebrow">Church management</p>
+            <p class="lp-eyebrow">30-day trial</p>
             <h1 id="lp-hero-title">{{ site_name }}</h1>
             <p class="lp-lede">{{ site_tagline|default:"One workspace for membership, treasury, and church life — from the local congregation to conference." }}</p>
+            {% if public_registration_allowed %}
+            <p class="lp-trial">Demo accounts are for trial only. Access ends automatically after {{ public_demo_trial_days }} days. There is no in-app extension.</p>
+            {% endif %}
             <div class="lp-hero__actions">
-                <a class="lp-btn lp-btn--light lp-btn--block" href="{% url 'login' %}">Staff sign in</a>
+                {% if public_registration_allowed %}
+                <a class="lp-btn lp-btn--light lp-btn--block" href="{% url 'church_apply' %}">Start {{ public_demo_trial_days }}-day demo</a>
+                {% endif %}
+                <a class="lp-btn {% if public_registration_allowed %}lp-btn--ghost{% else %}lp-btn--light{% endif %} lp-btn--block" href="{% url 'login' %}">Staff sign in</a>
                 <a class="lp-btn lp-btn--ghost lp-btn--block" href="{% url 'portal:login' %}">Member portal</a>
             </div>
             {% if public_registration_allowed %}
-            <p class="lp-hero__note">New to {{ site_name }}? <a href="{% url 'church_apply' %}">Register your church</a></p>
+            <p class="lp-hero__note">Already have a workspace? <a href="{% url 'login' %}">Sign in</a></p>
             {% endif %}
             <div class="lp-stats" aria-hidden="true">
                 <div class="lp-stat"><strong>Members</strong><span>Records</span></div>
@@ -110,6 +119,13 @@
 
 <section class="lp-paths">
     <div class="lp-wrap lp-paths__grid">
+        {% if public_registration_allowed %}
+        <article class="lp-path">
+            <h2>Try a demo</h2>
+            <p>Open a trial workspace and explore ChurchHub. Demo accounts are for evaluation only — access ends after {{ public_demo_trial_days }} days.</p>
+            <a class="lp-btn lp-btn--primary lp-btn--block" href="{% url 'church_apply' %}">Start {{ public_demo_trial_days }}-day demo</a>
+        </article>
+        {% endif %}
         <article class="lp-path">
             <h2>Church staff</h2>
             <p>Pastors, clerks, and treasurers use the staff workspace for membership, finance, and reports.</p>
@@ -131,7 +147,7 @@
             <a href="{% url 'marketing_inquiry' %}">Contact</a>
             {% endif %}
             {% if public_registration_allowed %}
-            <a href="{% url 'church_apply' %}">Register a church</a>
+            <a href="{% url 'church_apply' %}">Start a {{ public_demo_trial_days }}-day demo</a>
             {% endif %}
             <a href="{% url 'login' %}">Sign in</a>
         </span>

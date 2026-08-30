@@ -88,7 +88,8 @@ class RegistrationSettingsForm(forms.ModelForm):
 class TenantApplicationForm(forms.Form):
     denomination = forms.ModelChoiceField(
         queryset=selectors.public_registration_denominations(),
-        widget=forms.Select(attrs=select_attrs()),
+        widget=forms.HiddenInput(),
+        required=False,
     )
     application_type = forms.ChoiceField(
         choices=TenantApplication.TYPE_CHOICES,
@@ -133,21 +134,22 @@ class TenantApplicationForm(forms.Form):
         else:
             self.fields.pop("password", None)
             self.fields.pop("password_confirm", None)
-        denom = denomination
-        if not denom and self.is_bound:
-            denom_id = self.data.get("denomination")
-            if denom_id:
-                denom = selectors.denomination_by_pk(denom_id)
-        if denom:
-            self.fields["denomination"].initial = denom.pk
-            self.fields["district"].queryset = selectors.districts_for_denomination(denom)
-        else:
-            self.fields["district"].queryset = selectors.empty_districts()
+        from sitecontrol.registration_services import get_public_demo_denomination
+
+        demo = get_public_demo_denomination()
+        self.demo_denomination = demo
+        self.fields["denomination"].queryset = Denomination.objects.filter(pk=demo.pk)
+        self.fields["denomination"].initial = demo.pk
+        self.fields["district"].queryset = selectors.districts_for_denomination(demo)
 
     def clean(self):
         cleaned = super().clean()
-        if not cleaned.get("denomination"):
-            self.add_error("denomination", "Select your denomination.")
+        demo = getattr(self, "demo_denomination", None)
+        if demo is None:
+            from sitecontrol.registration_services import get_public_demo_denomination
+
+            demo = get_public_demo_denomination()
+        cleaned["denomination"] = demo
         app_type = cleaned.get("application_type")
         if app_type == "EXISTING_DISTRICT" and not cleaned.get("district"):
             self.add_error("district", "Select the district your church belongs to.")

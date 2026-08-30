@@ -68,7 +68,7 @@
                         <span class="text-muted">Church staff use the sign-in form above.</span>
                         {% if public_registration_allowed %}
                         <span class="text-muted" aria-hidden="true">·</span>
-                        <a href="{% url 'church_apply' %}{% if active_denomination %}?denomination={{ active_denomination.code }}{% endif %}" class="text-decoration-none">Register your church</a>
+                        <a href="{% url 'church_apply' %}" class="text-decoration-none">Start a {{ public_demo_trial_days }}-day demo</a>
                         {% endif %}
                     </p>
                 </div>

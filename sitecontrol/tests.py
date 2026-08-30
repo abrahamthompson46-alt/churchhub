@@ -374,7 +374,7 @@ class RegistrationWorkflowTests(SiteControlClientHarness, TestCase):
         from sitecontrol.models import Denomination
 
         ensure_builtin_denominations()
-        self.denomination = Denomination.objects.filter(is_active=True, allow_public_registration=True).first()
+        self.denomination = Denomination.objects.get(code="demo")
         conf = Conference.objects.create(name="RegConf", code="RC1", denomination=self.denomination)
         zone = Zone.objects.create(name="RegZone", code="RZ1", conference=conf)
         self.district = District.objects.create(name="RegDist", code="RD1", zone=zone)
@@ -396,6 +396,9 @@ class RegistrationWorkflowTests(SiteControlClientHarness, TestCase):
     def test_public_apply_when_enabled(self):
         response = self.client.get("/apply/")
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "DEMO")
+        self.assertContains(response, "readonly")
+        self.assertNotContains(response, '<select name="denomination"')
 
     def test_public_apply_blocked_when_disabled(self):
         settings_obj = SiteSettings.load()
@@ -420,6 +423,7 @@ class RegistrationWorkflowTests(SiteControlClientHarness, TestCase):
             "applicant_username": "pastorjoe",
         })
         self.assertEqual(app.status, "PENDING")
+        self.assertEqual(app.denomination.code, "demo")
 
         app, church, invitation = approve_tenant_application(app, self.platform_user)
         self.assertEqual(app.status, "APPROVED")
@@ -455,9 +459,7 @@ class BillingProvisioningTests(SiteControlClientHarness, TestCase):
 
         ensure_builtin_denominations()
         ensure_default_payment_methods()
-        self.denomination = Denomination.objects.filter(is_active=True).first()
-        self.denomination.allow_public_registration = True
-        self.denomination.save(update_fields=["allow_public_registration"])
+        self.denomination = Denomination.objects.get(code="demo")
         conf = Conference.objects.create(name="ProvConf", code="PC1", denomination=self.denomination)
         zone = Zone.objects.create(name="ProvZone", code="PZ1", conference=conf)
         self.district = District.objects.create(name="ProvDist", code="PD1", zone=zone)

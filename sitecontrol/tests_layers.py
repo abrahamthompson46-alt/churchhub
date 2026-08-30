@@ -150,13 +150,22 @@ class SiteControlLayerTests(TestCase):
         self.assertEqual(sub.status, "SUSPENDED")
 
     def test_tenant_application_workflow_via_layers(self):
+        from organization.models import Conference, District, Zone
+        from sitecontrol.registration_services import get_public_demo_denomination
+
+        demo = get_public_demo_denomination()
+        conf = Conference.objects.create(
+            code="SCLDEM", name="SC Demo Conf", denomination=demo
+        )
+        zone = Zone.objects.create(conference=conf, code="SCLDZ", name="SC Demo Zone")
+        district = District.objects.create(zone=zone, code="SCLDD", name="SC Demo Dist")
         application = submit_tenant_application(
             {
                 "denomination": self.denom_a,
                 "application_type": "EXISTING_DISTRICT",
                 "church_name": "Apply Church",
                 "church_code": "SCLAPP",
-                "district": self.district_a,
+                "district": district,
                 "contact_name": "Applicant",
                 "contact_email": "applicant_layer@test.com",
                 "applicant_username": "applicant_layer",
@@ -167,6 +176,7 @@ class SiteControlLayerTests(TestCase):
             ip_address="127.0.0.1",
         )
         self.assertEqual(application.status, "PENDING")
+        self.assertEqual(application.denomination_id, demo.pk)
         self.assertTrue(
             selectors.pending_application_for_email("applicant_layer@test.com")
         )

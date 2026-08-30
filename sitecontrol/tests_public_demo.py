@@ -36,9 +36,7 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         from sitecontrol.models import Denomination
 
         ensure_builtin_denominations()
-        self.denomination = Denomination.objects.filter(
-            is_active=True, allow_public_registration=True
-        ).first()
+        self.denomination = Denomination.objects.get(code="demo")
         conf = Conference.objects.create(
             name="DemoConf", code="DC1", denomination=self.denomination
         )
@@ -89,8 +87,17 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         user = User.objects.get(username="pastorada")
         self.assertEqual(user.role, UserRole.LOCAL_PASTOR)
         self.assertEqual(user.church_id, church.pk)
+        self.assertEqual(church.denomination.code, "demo")
         self.assertTrue(user.check_password(DEMO_PASSWORD))
         self.assertLessEqual((sub.expires_at - sub.started_at).days, 30)
+
+    def test_posted_foreign_denomination_is_ignored(self):
+        from sitecontrol.models import Denomination
+
+        sda = Denomination.objects.get(code="sda")
+        app = submit_tenant_application(self._payload(denomination=sda))
+        self.assertEqual(app.denomination.code, "demo")
+        self.assertEqual(app.created_church.denomination.code, "demo")
 
     def test_plan_trial_days_cannot_stretch_public_demo(self):
         plan = get_default_plan()

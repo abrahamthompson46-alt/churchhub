@@ -45,6 +45,11 @@ def active_denomination_exists() -> bool:
 
 
 def public_registration_denomination_exists() -> bool:
+    demo = denomination_by_code(
+        code="demo", active_only=True, allow_public_registration=True
+    )
+    if demo:
+        return True
     return Denomination.objects.filter(
         is_active=True, allow_public_registration=True
     ).exists()

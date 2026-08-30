@@ -231,6 +231,18 @@ body.landing-page .app-footer {
 
 .lp-hero__note a { color: #fff; font-weight: 700; }
 
+.lp-trial {
+    margin: 0 0 1.15rem;
+    max-width: 36rem;
+    padding: 0.75rem 0.9rem;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.35);
+    border: 1px solid rgba(253, 224, 71, 0.35);
+    color: #fef9c3;
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
 .lp-stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

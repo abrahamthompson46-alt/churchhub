@@ -30,6 +30,16 @@ DEFAULT_SEED_CONFIG = {
 
 BUILTIN_DENOMINATIONS = [
     {
+        "code": "demo",
+        "name": "DEMO",
+        "display_name": "DEMO",
+        "tagline": "30-day trial workspaces",
+        "hierarchy_labels": DEFAULT_LEVEL_LABELS,
+        "seed_config": DEFAULT_SEED_CONFIG,
+        "allow_public_registration": True,
+        "is_default": False,
+    },
+    {
         "code": "sda",
         "name": "Seventh-day Adventist",
         "display_name": "SDA ChurchHub",

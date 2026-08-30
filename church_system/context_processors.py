@@ -86,6 +86,7 @@ def platform_context(request):
     from sitecontrol.registration_services import (
         institution_invites_allowed,
         institution_onboarding_allowed,
+        public_demo_trial_days,
         public_registration_allowed,
     )
     from sitecontrol.services import get_active_platform_announcement, get_site_settings
@@ -112,6 +113,7 @@ def platform_context(request):
         ),
         "platform_announcement": announcement,
         "public_registration_allowed": public_registration_allowed(),
+        "public_demo_trial_days": public_demo_trial_days(),
         "institution_invites_allowed": institution_invites_allowed(),
         "institution_onboarding_allowed": institution_onboarding_allowed(),
         "is_impersonating": bool(impersonator_id),

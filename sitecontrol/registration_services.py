@@ -25,6 +25,8 @@ from .services import (
 
 # Public demos never exceed this, including if SiteSettings is tampered in the DB.
 PUBLIC_DEMO_TRIAL_DAYS_CAP = 30
+PUBLIC_DEMO_DENOMINATION_CODE = "demo"
+PUBLIC_DEMO_DENOMINATION_NAME = "DEMO"
 PUBLIC_DEMO_ROLE = UserRole.LOCAL_PASTOR
 DEMO_IDENTITY_ERROR = (
     "This email, username, or phone has already used a ChurchHub demo. "
@@ -32,10 +34,43 @@ DEMO_IDENTITY_ERROR = (
 )
 
 
+def ensure_public_demo_denomination():
+    """Guarantee the DEMO SaaS wall exists for public self-registration."""
+    from sitecontrol.denomination_defaults import DEFAULT_LEVEL_LABELS, DEFAULT_SEED_CONFIG
+    from sitecontrol.denomination_services import merge_hierarchy_labels
+
+    obj, _ = repo.update_or_create_denomination(
+        code=PUBLIC_DEMO_DENOMINATION_CODE,
+        defaults={
+            "name": PUBLIC_DEMO_DENOMINATION_NAME,
+            "display_name": PUBLIC_DEMO_DENOMINATION_NAME,
+            "tagline": "30-day trial workspaces",
+            "hierarchy_labels": merge_hierarchy_labels(DEFAULT_LEVEL_LABELS),
+            "seed_config": DEFAULT_SEED_CONFIG,
+            "allow_public_registration": True,
+            "is_default": False,
+            "is_active": True,
+        },
+    )
+    return obj
+
+
+def get_public_demo_denomination():
+    demo = selectors.denomination_by_code(
+        code=PUBLIC_DEMO_DENOMINATION_CODE, active_only=True
+    )
+    return demo or ensure_public_demo_denomination()
+
+
 def public_registration_allowed():
     if not get_site_settings().allow_church_self_registration:
         return False
-    return selectors.public_registration_denomination_exists()
+    demo = selectors.denomination_by_code(
+        code=PUBLIC_DEMO_DENOMINATION_CODE, active_only=True
+    )
+    if demo is None:
+        return True
+    return bool(demo.allow_public_registration)
 
 
 def institution_invites_allowed():
@@ -269,11 +304,9 @@ def submit_tenant_application(data, ip_address=None):
         raise ValueError("An account with this email already exists.")
 
     app_type = data.get("application_type", "EXISTING_DISTRICT")
-    denomination = data.get("denomination")
-    if not denomination:
-        raise ValueError("Please select your denomination.")
+    denomination = get_public_demo_denomination()
     if not denomination.allow_public_registration:
-        raise ValueError("Registration is not open for the selected denomination.")
+        raise ValueError("Registration is not open for the DEMO denomination.")
 
     if app_type == "EXISTING_DISTRICT":
         district = data.get("district")

@@ -33,8 +33,21 @@ class PublicHomeTests(TestCase):
         self.assertContains(response, "lp-dock")
         self.assertContains(response, ".lp-hero")
 
-    def test_public_home_url_is_root(self):
-        self.assertEqual(reverse("public_home"), "/")
+    def test_landing_explains_30_day_demo_when_registration_open(self):
+        from sitecontrol.denomination_services import ensure_builtin_denominations
+        from sitecontrol.services import clear_settings_cache
+
+        ensure_builtin_denominations()
+        settings_obj = SiteSettings.load()
+        settings_obj.allow_church_self_registration = True
+        settings_obj.save(update_fields=["allow_church_self_registration"])
+        clear_settings_cache()
+        response = Client().get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Demo accounts are for trial only")
+        self.assertContains(response, "after 30 days")
+        self.assertContains(response, reverse("church_apply"))
+        self.assertContains(response, "Start 30-day demo")
 
     def test_staff_user_is_sent_to_dashboard(self):
         User.objects.create_user(

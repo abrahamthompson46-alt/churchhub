@@ -47,19 +47,9 @@ def church_apply(request):
         )
 
     settings_obj = get_site_settings()
-
-    denom_code = request.GET.get("denomination")
-    initial_denom = (
-        selectors.denomination_by_code(
-            code=denom_code, active_only=True, allow_public_registration=True
-        )
-        if denom_code
-        else None
-    )
     auto_demo = public_demo_auto_provision_enabled()
     form = TenantApplicationForm(
         request.POST or None,
-        denomination=initial_denom,
         require_password=auto_demo,
     )
     if request.method == "POST" and form.is_valid():
@@ -99,17 +89,19 @@ def church_apply(request):
             flash_error(request, str(exc), title="Application not submitted")
 
     intro = settings_obj.registration_intro
-    if initial_denom and initial_denom.registration_intro:
-        intro = initial_denom.registration_intro
-    display_name = initial_denom.display_name if initial_denom else settings_obj.site_name
+    demo = getattr(form, "demo_denomination", None)
+    if demo and demo.registration_intro:
+        intro = demo.registration_intro
+    display_name = settings_obj.site_name
 
     return render(request, "registration/apply.html", {
         "form": form,
         "registration_intro": intro,
         "site_name": display_name,
-        "active_denomination": initial_denom,
+        "active_denomination": demo,
         "auto_demo": auto_demo,
         "demo_trial_days": public_demo_trial_days() if auto_demo else None,
+        "demo_denomination_label": "DEMO",
     })
 
 

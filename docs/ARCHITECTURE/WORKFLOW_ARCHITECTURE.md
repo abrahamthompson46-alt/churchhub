@@ -286,14 +286,21 @@ sequenceDiagram
   participant Sub as TenantSubscription
   participant Inv as UserInvitation
 
-  Applicant->>Apply: submit form
+  Applicant->>Apply: submit form (password when auto-demo)
   Apply->>Reg: submit_tenant_application
-  Reg-->>Ops: PENDING application
-  Ops->>Reg: approve_tenant_application
-  Reg->>Prov: create_church / onboard_full_hierarchy
-  Prov->>Church: persist
-  Reg->>Sub: assign_subscription
-  Reg->>Inv: create invitation
+  alt Auto-provision public trials
+    Reg->>Prov: create_church (no branch-limit, no default ACTIVE sub)
+    Prov->>Church: persist
+    Reg->>Sub: assign_subscription TRIAL (expires_at frozen, max 30 days)
+    Reg->>Applicant: create first user + session login
+  else Queued review
+    Reg-->>Ops: PENDING application
+    Ops->>Reg: approve_tenant_application
+    Reg->>Prov: create_church / onboard_full_hierarchy
+    Prov->>Church: persist
+    Reg->>Sub: assign_subscription
+    Reg->>Inv: create invitation
+  end
 ```
 
 Reject path: `reject_tenant_application`.  

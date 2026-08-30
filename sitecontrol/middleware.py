@@ -54,6 +54,7 @@ INSTITUTION_ACCOUNT_PATHS = (
     "/accounts/profile",
     "/accounts/invite/accept",
     "/accounts/mfa/",
+    "/accounts/subscription-expired",
 )
 
 
@@ -105,6 +106,52 @@ class UserScopeMiddleware:
                 return redirect("sitecontrol:dashboard")
 
         return self.get_response(request)
+
+
+class SubscriptionAccessMiddleware:
+    """
+    Hard cutoff for church subscriptions that are not operational.
+
+    Date on TenantSubscription.expires_at is the source of truth. Nightly
+    expire_due_subscriptions is hygiene only — this runs on every request.
+    """
+
+    EXEMPT_PREFIXES = (
+        "/accounts/login",
+        "/accounts/logout",
+        "/accounts/subscription-expired",
+        "/static/",
+        "/health/",
+        "/metrics/",
+        "/apply/",
+        "/contact/",
+        "/admin/login",
+    )
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            return self.get_response(request)
+        if getattr(user, "is_platform_user", False):
+            return self.get_response(request)
+
+        path = request.path
+        if any(path.startswith(prefix) for prefix in self.EXEMPT_PREFIXES):
+            return self.get_response(request)
+
+        church = getattr(user, "church", None)
+        if not church:
+            return self.get_response(request)
+
+        from sitecontrol.services import get_church_subscription
+
+        sub = get_church_subscription(church)
+        if sub is None or sub.is_operational:
+            return self.get_response(request)
+        return redirect("subscription_expired")
 
 
 class PlatformSessionMiddleware:

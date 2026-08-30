@@ -66,7 +66,7 @@ erDiagram
 4. Maintenance mode: only platform operators; may block `/apply/`.  
 5. Login rate limit from SiteSettings (`login_max_attempts`, `login_lockout_minutes`).  
 6. Denomination context scopes platform operators who are not global.  
-7. Tenant suspend/reactivate/offboard via services; applications approve → provision church + invite.  
+7. Tenant suspend/reactivate/offboard via services. Public `/apply/` auto-provisions a 30-day TRIAL (capped, identity-locked) when `auto_provision_public_trials` is on; otherwise applications approve → provision church + invite. `SubscriptionAccessMiddleware` blocks institution users when the church subscription is not operational.  
 8. Platform operators identified by `user.is_platform_user` + `platform_role` capabilities.
 9. Marketing management requires owner-only `manage_marketing`; leads are platform data, not church visitor records.
 10. Public inquiries default to disabled and require owner activation after configuring an HTTPS privacy policy, consent, retention, and (when enabled) a sales inbox.

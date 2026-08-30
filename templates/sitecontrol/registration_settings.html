@@ -48,6 +48,16 @@
                     <td>{% if form.instance.allow_church_self_registration %}Open{% else %}Closed{% endif %}</td>
                 </tr>
                 <tr>
+                    <td>Instant 30-day demo (no approval)</td>
+                    <td>Auto-provision public trials</td>
+                    <td>{% if form.instance.auto_provision_public_trials %}On{% else %}Queued for review{% endif %}</td>
+                </tr>
+                <tr>
+                    <td>Public demo length</td>
+                    <td>Public demo trial days (max 30)</td>
+                    <td>{{ form.instance.public_demo_trial_days }} days</td>
+                </tr>
+                <tr>
                     <td>Institution user invites</td>
                     <td>Allow institution user invites</td>
                     <td>{% if form.instance.allow_institution_user_invites %}Allowed{% else %}Blocked{% endif %}</td>

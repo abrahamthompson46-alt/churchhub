@@ -380,6 +380,7 @@ class RegistrationWorkflowTests(SiteControlClientHarness, TestCase):
         self.district = District.objects.create(name="RegDist", code="RD1", zone=zone)
         settings_obj = SiteSettings.load()
         settings_obj.allow_church_self_registration = True
+        settings_obj.auto_provision_public_trials = False
         settings_obj.mfa_required_for_privileged = False
         settings_obj.save()
         from sitecontrol.services import clear_settings_cache
@@ -462,6 +463,7 @@ class BillingProvisioningTests(SiteControlClientHarness, TestCase):
         self.district = District.objects.create(name="ProvDist", code="PD1", zone=zone)
         settings_obj = SiteSettings.load()
         settings_obj.allow_church_self_registration = True
+        settings_obj.auto_provision_public_trials = False
         settings_obj.mfa_required_for_privileged = False
         settings_obj.save()
         clear_settings_cache()

@@ -274,7 +274,7 @@ sequenceDiagram
 | Audit | INVITE_*, USER_CREATE on `UserActivityLog` |
 | Gates | `sitecontrol` invite limits / `institution_invites_allowed()` |
 
-Public tenant onboarding: `/apply/` → platform approve → church provision + invitation — see Site Control spec.
+Public tenant onboarding: `/apply/` — when auto-provision is on, instant 30-day TRIAL + login; otherwise platform approve → church + invitation. Hard cutoff: `SubscriptionAccessMiddleware`. See Site Control spec.
 
 ---
 

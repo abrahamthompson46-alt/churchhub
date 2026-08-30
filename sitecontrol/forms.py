@@ -61,6 +61,8 @@ class RegistrationSettingsForm(forms.ModelForm):
         model = SiteSettings
         fields = (
             "allow_church_self_registration",
+            "auto_provision_public_trials",
+            "public_demo_trial_days",
             "allow_institution_user_invites",
             "allow_institution_church_onboarding",
             "registration_intro",
@@ -71,6 +73,8 @@ class RegistrationSettingsForm(forms.ModelForm):
             "registration_intro": forms.Textarea(attrs=textarea_attrs(rows=4)),
             "application_default_plan": forms.Select(attrs=select_attrs()),
             "allow_church_self_registration": forms.CheckboxInput(attrs=checkbox_attrs()),
+            "auto_provision_public_trials": forms.CheckboxInput(attrs=checkbox_attrs()),
+            "public_demo_trial_days": forms.NumberInput(attrs=input_attrs(min="1", max="30")),
             "allow_institution_user_invites": forms.CheckboxInput(attrs=checkbox_attrs()),
             "allow_institution_church_onboarding": forms.CheckboxInput(attrs=checkbox_attrs()),
         }
@@ -110,9 +114,25 @@ class TenantApplicationForm(forms.Form):
     contact_phone = forms.CharField(max_length=20, required=False, widget=forms.TextInput(attrs=input_attrs()))
     applicant_username = forms.CharField(max_length=150, widget=forms.TextInput(attrs=input_attrs()))
     applicant_notes = forms.CharField(required=False, widget=forms.Textarea(attrs=textarea_attrs(rows=3)))
+    password = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(attrs=input_attrs(autocomplete="new-password")),
+    )
+    password_confirm = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(attrs=input_attrs(autocomplete="new-password")),
+        label="Confirm password",
+    )
 
-    def __init__(self, *args, denomination=None, **kwargs):
+    def __init__(self, *args, denomination=None, require_password=False, **kwargs):
+        self.require_password = require_password
         super().__init__(*args, **kwargs)
+        if require_password:
+            self.fields["password"].required = True
+            self.fields["password_confirm"].required = True
+        else:
+            self.fields.pop("password", None)
+            self.fields.pop("password_confirm", None)
         denom = denomination
         if not denom and self.is_bound:
             denom_id = self.data.get("denomination")
@@ -142,6 +162,19 @@ class TenantApplicationForm(forms.Form):
         code = cleaned.get("church_code", "")
         if code:
             cleaned["church_code"] = code.strip().upper()
+        if self.require_password:
+            password = cleaned.get("password") or ""
+            confirm = cleaned.get("password_confirm") or ""
+            if password != confirm:
+                self.add_error("password_confirm", "Passwords do not match.")
+            elif password:
+                from django.contrib.auth.password_validation import validate_password
+                from django.core.exceptions import ValidationError as DjangoValidationError
+
+                try:
+                    validate_password(password)
+                except DjangoValidationError as exc:
+                    self.add_error("password", exc)
         return cleaned
 
 

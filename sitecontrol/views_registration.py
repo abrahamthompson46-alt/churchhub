@@ -10,11 +10,20 @@ from django.shortcuts import redirect, render
 from church_system.flash import flash_error, flash_success, flash_warning
 from accounts.services import send_invitation_email
 from sitecontrol.checks import platform_required, require_platform_capability
-from sitecontrol.forms import ApplicationReviewForm, RegistrationSettingsForm, TenantApplicationForm
+from sitecontrol.forms import (
+    ApplicationReviewForm,
+    RegistrationSettingsForm,
+    SubscriptionActivationRequestForm,
+    TenantApplicationForm,
+)
 from sitecontrol import repositories as repo
 from sitecontrol import selectors
-from sitecontrol.models import TenantApplication
-from sitecontrol.rbac import CAP_MANAGE_APPLICATIONS, CAP_MANAGE_REGISTRATION
+from sitecontrol.models import SubscriptionActivationRequest, TenantApplication
+from sitecontrol.rbac import CAP_MANAGE_APPLICATIONS, CAP_MANAGE_REGISTRATION, CAP_VIEW
+from sitecontrol.activation_services import (
+    pending_request_for_church,
+    submit_activation_request,
+)
 from sitecontrol.registration_services import (
     approve_tenant_application,
     institution_invites_allowed,
@@ -125,47 +134,106 @@ def subscription_expired(request):
     if sub and sub.is_operational:
         return redirect("dashboard:home")
     settings_obj = get_site_settings()
-    from urllib.parse import quote
-
-    church_name = church.name if church else "our church"
-    subject = f"Full version request — {church_name}"
-    body_lines = [
-        f"I want to subscribe to the full version of {settings_obj.site_name}.",
-        "",
-        f"Church: {church_name}",
-        f"Username: {user.get_username()}",
-    ]
-    if sub and sub.expires_at:
-        body_lines.append(f"Demo ended: {sub.expires_at.isoformat()}")
-    body_lines.extend(
-        [
-            "",
-            "Payment reference (if already paid):",
-            "",
-        ]
-    )
-    mailto_href = ""
-    if settings_obj.support_email:
-        mailto_href = (
-            f"mailto:{settings_obj.support_email}"
-            f"?subject={quote(subject)}"
-            f"&body={quote(chr(10).join(body_lines))}"
-        )
     plan = sub.plan if sub else None
+    pending = pending_request_for_church(church)
     return render(
         request,
         "registration/subscription_expired.html",
         {
             "site_name": settings_obj.site_name,
-            "support_email": settings_obj.support_email,
             "subscription": sub,
             "church": church,
             "plan": plan,
+            "pending_request": pending,
             "billing_currency": settings_obj.default_billing_currency,
             "billing_payment_instructions": (
                 settings_obj.billing_payment_instructions or ""
             ).strip(),
-            "mailto_href": mailto_href,
+        },
+    )
+
+
+@login_required
+def subscription_subscribe(request):
+    """Church user submits payment reference and church details (no email)."""
+    user = request.user
+    if getattr(user, "is_platform_user", False):
+        return redirect("sitecontrol:dashboard")
+    church = getattr(user, "church", None)
+    if church is None:
+        flash_error(request, "Your account is not linked to a church.", title="Cannot subscribe")
+        return redirect("subscription_expired")
+    sub = get_church_subscription(church)
+    if sub and sub.is_operational:
+        return redirect("dashboard:home")
+
+    settings_obj = get_site_settings()
+    pending = pending_request_for_church(church)
+    initial = {
+        "church_name": church.name,
+        "church_code": church.code,
+        "church_address": church.address,
+        "contact_name": user.get_full_name() or user.username,
+        "contact_email": user.email or "",
+        "contact_phone": getattr(user, "phone", "") or "",
+    }
+    application = (
+        TenantApplication.objects.filter(created_church=church)
+        .order_by("-created_at")
+        .first()
+    )
+    if application:
+        if not initial["contact_email"]:
+            initial["contact_email"] = application.contact_email
+        if not initial["contact_phone"]:
+            initial["contact_phone"] = application.contact_phone
+        if not user.get_full_name():
+            initial["contact_name"] = application.contact_name
+    if pending:
+        initial.update(
+            {
+                "church_name": pending.church_name,
+                "church_code": pending.church_code,
+                "church_address": pending.church_address,
+                "contact_name": pending.contact_name,
+                "contact_email": pending.contact_email,
+                "contact_phone": pending.contact_phone,
+                "payment_reference": pending.payment_reference,
+                "notes": pending.notes,
+            }
+        )
+
+    form = SubscriptionActivationRequestForm(request.POST or None, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        submit_activation_request(
+            church=church,
+            subscription=sub,
+            user=user,
+            cleaned_data=form.cleaned_data,
+            request=request,
+        )
+        flash_success(
+            request,
+            "Platform administrators have been notified. We will activate this same church after we confirm payment.",
+            title="Request received",
+        )
+        return redirect("subscription_subscribe")
+
+    plan = sub.plan if sub else None
+    return render(
+        request,
+        "registration/subscription_subscribe.html",
+        {
+            "form": form,
+            "site_name": settings_obj.site_name,
+            "church": church,
+            "subscription": sub,
+            "plan": plan,
+            "pending_request": pending,
+            "billing_currency": settings_obj.default_billing_currency,
+            "billing_payment_instructions": (
+                settings_obj.billing_payment_instructions or ""
+            ).strip(),
         },
     )
 
@@ -320,3 +388,49 @@ def application_reject(request, pk):
         flash_success(request, "Application rejected.")
         return redirect("sitecontrol:application_list")
     return redirect("sitecontrol:application_detail", pk=pk)
+
+
+@platform_required
+@require_platform_capability(CAP_VIEW)
+def activation_request_list(request):
+    from sitecontrol.platform_access import filter_platform_denomination
+
+    qs = filter_platform_denomination(selectors.activation_requests_list_base(), request.user)
+    status = request.GET.get("status", "")
+    if status:
+        qs = qs.filter(status=status)
+    paginator = Paginator(qs, 25)
+    page = paginator.get_page(request.GET.get("page"))
+    return render(request, "sitecontrol/activation_request_list.html", {
+        "page_obj": page,
+        "status_filter": status,
+        "status_choices": SubscriptionActivationRequest.STATUS_CHOICES,
+        "breadcrumbs": _breadcrumbs(("Platform", "/platform/"), ("Activation requests",)),
+    })
+
+
+@platform_required
+@require_platform_capability(CAP_VIEW)
+def activation_request_detail(request, pk):
+    from django.core.exceptions import PermissionDenied
+    from dashboard.models import Notification
+    from sitecontrol.platform_access import operator_can_access_denomination
+
+    activation_request = selectors.get_activation_request_or_404(pk)
+    if activation_request.denomination_id and not operator_can_access_denomination(
+        request.user, activation_request.denomination
+    ):
+        raise PermissionDenied("You do not have access to this request.")
+    Notification.objects.filter(
+        user=request.user,
+        action_url__contains=str(activation_request.pk),
+        read=False,
+    ).update(read=True)
+    return render(request, "sitecontrol/activation_request_detail.html", {
+        "activation_request": activation_request,
+        "breadcrumbs": _breadcrumbs(
+            ("Platform", "/platform/"),
+            ("Activation requests", "/platform/activation-requests/"),
+            (activation_request.church_name,),
+        ),
+    })

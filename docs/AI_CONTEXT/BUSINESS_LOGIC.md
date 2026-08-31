@@ -330,8 +330,10 @@ Views should use `permission_required` / `any_permission_required` / `can_*` fro
 | `Denomination` | SaaS isolation, branding, feature flags, defaults |
 | `TenantSubscription` | OneToOne Church; statuses `TRIAL`, `ACTIVE`, `SUSPENDED`, `EXPIRED`; operational check uses status + `expires_at` |
 | `TenantApplication` | Statuses `PENDING`, `APPROVED`, `REJECTED`, `WITHDRAWN`; types `EXISTING_DISTRICT`, `NEW_HIERARCHY` |
+| `SubscriptionActivationRequest` | Church-submitted full-version request; statuses `PENDING`, `ACKNOWLEDGED`, `ACTIVATED`, `REJECTED`; payment reference required; no email send |
 | Approval path | Queued: `submit_tenant_application` → `approve_tenant_application` / `reject_tenant_application`. Public demo: `submit_tenant_application` → `auto_provision_public_demo` (TRIAL, frozen `expires_at`, first user, no invite) |
 | Demo cutoff | `SubscriptionAccessMiddleware` + `TenantSubscription.is_operational` (date, not the expire job) |
+| Paid upgrade request | `submit_activation_request` → in-app notify all platform operators; activate via `record_subscription_payment` |
 | Demo identity | One APPROVED application per email / username / normalized phone |
 | `SiteSettings` | Singleton platform settings (SMTP, maintenance, etc.) |
 | `PlatformAuditLog` | Immutable platform audit |

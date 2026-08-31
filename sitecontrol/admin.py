@@ -5,6 +5,7 @@ from sitecontrol.models import (
     PlatformAnnouncement,
     PlatformAuditLog,
     SiteSettings,
+    SubscriptionActivationRequest,
     SubscriptionPlan,
     TenantApplication,
     TenantSubscription,
@@ -80,6 +81,20 @@ class TenantSubscriptionAdmin(admin.ModelAdmin):
     list_display = ("church", "plan", "status", "started_at", "expires_at", "updated_at")
     list_filter = ("status", "plan")
     search_fields = ("church__name", "church__code")
+    autocomplete_fields = ("church",)
+
+
+@admin.register(SubscriptionActivationRequest)
+class SubscriptionActivationRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "church_name",
+        "payment_reference",
+        "status",
+        "contact_email",
+        "created_at",
+    )
+    list_filter = ("status",)
+    search_fields = ("church_name", "payment_reference", "contact_email")
     autocomplete_fields = ("church",)
 
 

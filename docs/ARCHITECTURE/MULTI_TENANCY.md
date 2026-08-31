@@ -198,6 +198,7 @@ stateDiagram-v2
 - Queued mode (`auto_provision_public_trials=False`): approval still provisions church + subscription + invitation.
 - Subscription statuses: `TRIAL`, `ACTIVE`, `SUSPENDED`, `EXPIRED`
 - `TenantSubscription.is_operational` is false if suspended/expired, if `TRIAL` has no `expires_at`, or if `expires_at` is today or earlier. Middleware `SubscriptionAccessMiddleware` enforces this on every authenticated institution request.
+- After cutoff, church users use `/accounts/subscription-expired/` then `/accounts/subscription-subscribe/` to store church details and a **payment reference** (no email). That creates `SubscriptionActivationRequest` (`PENDING`) and immediately creates in-app `Notification` rows for every active `is_platform_user`. Operators see a Control Room alert, a top-bar count, and `/platform/activation-requests/`. Paid access is still turned on with **Record payment** on the tenant subscription (which marks matching requests `ACTIVATED`).
 - One public demo per email, username, or normalized phone (`TenantApplication` APPROVED identity lock).
 
 Public entry: `/apply/`. Operator tools: `/platform/`.

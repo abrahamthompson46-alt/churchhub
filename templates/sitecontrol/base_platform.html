@@ -84,6 +84,37 @@
             </div>
             <div class="platform-topbar-actions">
                 {% block page_actions %}{% endblock %}
+                {% if pending_activation_count %}
+                <a href="{% url 'sitecontrol:activation_request_list' %}?status=PENDING" class="btn btn-danger btn-sm d-inline-flex align-items-center" title="Churches waiting for paid activation">
+                    <i class="bi bi-exclamation-circle me-1"></i>
+                    {{ pending_activation_count }} full-version request{{ pending_activation_count|pluralize }}
+                </a>
+                {% endif %}
+                {% if platform_unread_count %}
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-bell"></i>
+                        <span class="badge text-bg-danger">{{ platform_unread_count }}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" style="min-width: 20rem;">
+                        {% for note in platform_unread_notifications %}
+                        <li>
+                            {% if note.action_url %}
+                            <a class="dropdown-item py-2" href="{{ note.action_url }}">
+                                <div class="fw-semibold small">{{ note.title }}</div>
+                                <div class="text-muted small text-wrap">{{ note.message }}</div>
+                            </a>
+                            {% else %}
+                            <span class="dropdown-item-text py-2">
+                                <div class="fw-semibold small">{{ note.title }}</div>
+                                <div class="text-muted small">{{ note.message }}</div>
+                            </span>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
                 {% if platform_denominations %}
                 <div class="dropdown">
                     <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">

@@ -54,7 +54,7 @@ INSTITUTION_ACCOUNT_PATHS = (
     "/accounts/profile",
     "/accounts/invite/accept",
     "/accounts/mfa/",
-    "/accounts/subscription-expired",
+    "/accounts/subscription-",
 )
 
 
@@ -119,7 +119,7 @@ class SubscriptionAccessMiddleware:
     EXEMPT_PREFIXES = (
         "/accounts/login",
         "/accounts/logout",
-        "/accounts/subscription-expired",
+        "/accounts/subscription-",
         "/static/",
         "/health/",
         "/metrics/",

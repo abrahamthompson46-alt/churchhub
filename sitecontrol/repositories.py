@@ -14,6 +14,7 @@ from sitecontrol.models import (
     PlatformAnnouncement,
     PlatformAuditLog,
     PlatformPaymentMethod,
+    SubscriptionActivationRequest,
     SubscriptionPlan,
     TenantApplication,
     TenantSubscription,
@@ -52,6 +53,10 @@ def create_subscription_plan(**fields):
 
 def create_tenant_subscription(**fields):
     return TenantSubscription.objects.create(**fields)
+
+
+def create_activation_request(**fields):
+    return SubscriptionActivationRequest.objects.create(**fields)
 
 
 def update_or_create_tenant_subscription(*, church, defaults):

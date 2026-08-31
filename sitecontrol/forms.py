@@ -180,6 +180,51 @@ class TenantApplicationForm(forms.Form):
         return cleaned
 
 
+class SubscriptionActivationRequestForm(forms.Form):
+    church_name = forms.CharField(
+        max_length=200,
+        label="Church name",
+        widget=forms.TextInput(attrs=input_attrs()),
+    )
+    church_code = forms.CharField(
+        max_length=20,
+        required=False,
+        label="Church code",
+        widget=forms.TextInput(attrs=input_attrs(readonly="readonly")),
+    )
+    church_address = forms.CharField(
+        required=False,
+        label="Church address",
+        widget=forms.Textarea(attrs=textarea_attrs(rows=2)),
+    )
+    contact_name = forms.CharField(
+        max_length=120,
+        label="Contact name",
+        widget=forms.TextInput(attrs=input_attrs()),
+    )
+    contact_email = forms.EmailField(
+        label="Contact email",
+        widget=forms.EmailInput(attrs=input_attrs()),
+    )
+    contact_phone = forms.CharField(
+        required=False,
+        max_length=20,
+        label="Contact phone",
+        widget=forms.TextInput(attrs=input_attrs()),
+    )
+    payment_reference = forms.CharField(
+        max_length=120,
+        label="Payment reference",
+        help_text="Bank transfer reference, receipt number, or mobile-money ID.",
+        widget=forms.TextInput(attrs=input_attrs(placeholder="e.g. TRX-10482")),
+    )
+    notes = forms.CharField(
+        required=False,
+        label="Notes for the platform owner",
+        widget=forms.Textarea(attrs=textarea_attrs(rows=3)),
+    )
+
+
 class ApplicationReviewForm(forms.Form):
     review_notes = forms.CharField(
         required=False,

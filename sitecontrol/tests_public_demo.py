@@ -178,9 +178,13 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
 
         expired = self.client.get(reverse("subscription_expired"))
         self.assertEqual(expired.status_code, 200)
-        self.assertContains(expired, "Your access has ended")
+        self.assertContains(expired, "Your demo has ended")
         self.assertContains(expired, "Request the full version")
         self.assertContains(expired, "Your records are kept")
+        self.assertContains(expired, reverse("subscription_subscribe"))
+        self.assertNotContains(expired, "mailto:")
+        self.assertNotContains(expired, "support@churchhub.local")
+        self.assertNotContains(expired, "Send your church name")
 
         logout = self.client.post(reverse("logout"))
         self.assertIn(logout.status_code, (200, 302))
@@ -238,3 +242,93 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         app = submit_tenant_application(data)
         self.assertEqual(app.status, "PENDING")
         self.assertFalse(User.objects.filter(username="pastorada").exists())
+
+    def _expire_demo_user(self):
+        app = submit_tenant_application(self._payload())
+        sub = TenantSubscription.objects.get(church=app.created_church)
+        user = User.objects.get(username="pastorada")
+        sub.expires_at = timezone.now().date()
+        sub.save(update_fields=["expires_at"])
+        self.client.force_login(user)
+        return app, sub, user
+
+    def test_subscribe_form_creates_request_and_notifies_platform(self):
+        from dashboard.models import Notification
+        from sitecontrol.models import SubscriptionActivationRequest
+        from sitecontrol.services import tenant_health_alerts
+
+        owner = User.objects.create_user(
+            username="platowner",
+            password="pass12345",
+            email="owner@hub.test",
+            is_platform_user=True,
+            is_superuser=True,
+            is_staff=True,
+            platform_role="OWNER",
+        )
+        app, sub, user = self._expire_demo_user()
+
+        get_form = self.client.get(reverse("subscription_subscribe"))
+        self.assertEqual(get_form.status_code, 200)
+        self.assertContains(get_form, "Payment reference")
+        self.assertContains(get_form, "Demo Chapel")
+
+        missing_ref = self.client.post(
+            reverse("subscription_subscribe"),
+            {
+                "church_name": "Demo Chapel",
+                "church_code": "DM01",
+                "church_address": "1 Demo St",
+                "contact_name": "Pastor Ada",
+                "contact_email": "ada@demo.test",
+                "contact_phone": "0241112222",
+                "payment_reference": "",
+                "notes": "",
+            },
+        )
+        self.assertEqual(missing_ref.status_code, 200)
+        self.assertEqual(SubscriptionActivationRequest.objects.count(), 0)
+
+        posted = self.client.post(
+            reverse("subscription_subscribe"),
+            {
+                "church_name": "Demo Chapel",
+                "church_code": "DM01",
+                "church_address": "1 Demo St",
+                "contact_name": "Pastor Ada",
+                "contact_email": "ada@demo.test",
+                "contact_phone": "0241112222",
+                "payment_reference": "TRX-10482",
+                "notes": "Paid via bank",
+            },
+        )
+        self.assertEqual(posted.status_code, 302)
+        self.assertEqual(posted.url, reverse("subscription_subscribe"))
+        req = SubscriptionActivationRequest.objects.get()
+        self.assertEqual(req.status, "PENDING")
+        self.assertEqual(req.payment_reference, "TRX-10482")
+        self.assertEqual(req.church_id, app.created_church_id)
+        self.assertEqual(req.submitted_by_id, user.pk)
+
+        note = Notification.objects.get(user=owner)
+        self.assertEqual(note.title, "Full version request")
+        self.assertIn("TRX-10482", note.message)
+        self.assertIn(str(req.pk), note.action_url)
+
+        alerts = tenant_health_alerts(owner)
+        titles = [a["title"] for a in alerts]
+        self.assertIn("Full version requests", titles)
+
+        self.client.force_login(owner)
+        platform_list = self.client.get(reverse("sitecontrol:activation_request_list"))
+        self.assertEqual(platform_list.status_code, 200)
+        self.assertContains(platform_list, "TRX-10482")
+        self.assertContains(platform_list, "full-version request")
+
+    def test_active_subscription_cannot_open_subscribe_form(self):
+        submit_tenant_application(self._payload())
+        user = User.objects.get(username="pastorada")
+        self.client.force_login(user)
+        response = self.client.get(reverse("subscription_subscribe"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("dashboard:home"))

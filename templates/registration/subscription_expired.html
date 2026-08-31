@@ -1,25 +1,54 @@
 {% extends "base.html" %}
 
-{% block title %}Demo ended — {{ site_name }}{% endblock %}
+{% block title %}Subscribe to continue — {{ site_name }}{% endblock %}
 {% block body_class %}auth-page{% endblock %}
 
 {% block content %}
 <div class="page-container py-5">
     <div class="row justify-content-center">
-        <div class="col-md-7">
+        <div class="col-md-8 col-lg-7">
             <div class="card shadow-sm">
-                <div class="card-body p-5 text-center">
-                    <div class="text-danger mb-3" style="font-size:3rem"><i class="bi bi-hourglass-bottom"></i></div>
-                    <h1 class="h4 fw-bold">Your access has ended</h1>
-                    <p class="text-muted mb-3">
-                        {% if church %}The workspace for <strong>{{ church.name }}</strong> is no longer active.{% else %}This account’s church subscription is no longer active.{% endif %}
-                        {% if subscription and subscription.expires_at %} The period ended on {{ subscription.expires_at }}.{% endif %}
-                    </p>
-                    <p class="text-muted mb-4">Demo and expired subscriptions cannot be extended from this screen. Contact {{ support_email|default:"the platform owner" }} to subscribe.</p>
-                    <form method="post" action="{% url 'logout' %}">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-primary">Sign out</button>
-                    </form>
+                <div class="card-body p-4 p-md-5">
+                    <div class="text-center mb-4">
+                        <div class="text-warning mb-3" style="font-size:3rem"><i class="bi bi-unlock"></i></div>
+                        <h1 class="h4 fw-bold">Your access has ended</h1>
+                        <p class="text-muted mb-0">
+                            {% if church %}The 30-day demo for <strong>{{ church.name }}</strong> is over.{% else %}This workspace’s trial is over.{% endif %}
+                            {% if subscription and subscription.expires_at %} It ended on {{ subscription.expires_at }}.{% endif %}
+                            Your records are kept. Subscribe to reopen the full product.
+                        </p>
+                    </div>
+
+                    <ol class="mb-4 ps-3">
+                        <li class="mb-2">Pay using the instructions below (or email us first if you need an invoice).</li>
+                        <li class="mb-2">Send your church name and payment reference to {% if support_email %}<a href="{{ mailto_href }}">{{ support_email }}</a>{% else %}the platform owner{% endif %}.</li>
+                        <li>We activate the paid plan on this same church. You sign in as usual — no second demo.</li>
+                    </ol>
+
+                    {% if plan %}
+                    <div class="border rounded p-3 mb-3 bg-light">
+                        <div class="fw-semibold">{{ plan.name }}</div>
+                        <div class="text-muted small">
+                            {% if plan.price_monthly %}{{ billing_currency }} {{ plan.price_monthly }}/month{% endif %}
+                            {% if plan.price_yearly %} · {{ billing_currency }} {{ plan.effective_yearly_price|default:plan.price_yearly }}/year{% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if billing_payment_instructions %}
+                    <h2 class="h6 fw-bold">How to pay</h2>
+                    <div class="border rounded p-3 mb-4" style="white-space: pre-wrap;">{{ billing_payment_instructions }}</div>
+                    {% endif %}
+
+                    <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
+                        {% if mailto_href %}
+                        <a class="btn btn-primary" href="{{ mailto_href }}">Request the full version</a>
+                        {% endif %}
+                        <form method="post" action="{% url 'logout' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-secondary w-100">Sign out</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

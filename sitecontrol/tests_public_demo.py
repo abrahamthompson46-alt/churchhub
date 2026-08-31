@@ -179,6 +179,8 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         expired = self.client.get(reverse("subscription_expired"))
         self.assertEqual(expired.status_code, 200)
         self.assertContains(expired, "Your access has ended")
+        self.assertContains(expired, "Request the full version")
+        self.assertContains(expired, "Your records are kept")
 
         logout = self.client.post(reverse("logout"))
         self.assertIn(logout.status_code, (200, 302))

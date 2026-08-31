@@ -125,6 +125,33 @@ def subscription_expired(request):
     if sub and sub.is_operational:
         return redirect("dashboard:home")
     settings_obj = get_site_settings()
+    from urllib.parse import quote
+
+    church_name = church.name if church else "our church"
+    subject = f"Full version request — {church_name}"
+    body_lines = [
+        f"I want to subscribe to the full version of {settings_obj.site_name}.",
+        "",
+        f"Church: {church_name}",
+        f"Username: {user.get_username()}",
+    ]
+    if sub and sub.expires_at:
+        body_lines.append(f"Demo ended: {sub.expires_at.isoformat()}")
+    body_lines.extend(
+        [
+            "",
+            "Payment reference (if already paid):",
+            "",
+        ]
+    )
+    mailto_href = ""
+    if settings_obj.support_email:
+        mailto_href = (
+            f"mailto:{settings_obj.support_email}"
+            f"?subject={quote(subject)}"
+            f"&body={quote(chr(10).join(body_lines))}"
+        )
+    plan = sub.plan if sub else None
     return render(
         request,
         "registration/subscription_expired.html",
@@ -133,6 +160,12 @@ def subscription_expired(request):
             "support_email": settings_obj.support_email,
             "subscription": sub,
             "church": church,
+            "plan": plan,
+            "billing_currency": settings_obj.default_billing_currency,
+            "billing_payment_instructions": (
+                settings_obj.billing_payment_instructions or ""
+            ).strip(),
+            "mailto_href": mailto_href,
         },
     )
 

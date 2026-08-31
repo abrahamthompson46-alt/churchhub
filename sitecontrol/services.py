@@ -686,6 +686,9 @@ def record_subscription_payment(
 
     repo.save_subscription(subscription)
     clear_church_plan_cache(subscription.church)
+    from sitecontrol.activation_services import mark_activation_requests_activated
+
+    mark_activation_requests_activated(subscription.church, reviewer=user)
     return subscription
 
 
@@ -763,6 +766,7 @@ def tenant_health_alerts(user=None):
     from sitecontrol.platform_access import (
         filter_applications_for_operator,
         filter_churches_for_operator,
+        filter_platform_denomination,
         filter_subscriptions_for_operator,
         operator_has_global_access,
     )
@@ -794,6 +798,14 @@ def tenant_health_alerts(user=None):
             selectors.active_subscriptions_with_plan(),
             user,
         )
+
+    from sitecontrol.models import SubscriptionActivationRequest
+
+    pending_activations_qs = SubscriptionActivationRequest.objects.filter(status="PENDING")
+    if global_ops:
+        pending_activations = pending_activations_qs.count()
+    else:
+        pending_activations = filter_platform_denomination(pending_activations_qs, user).count()
 
     alerts = []
     if churches_without:
@@ -834,6 +846,14 @@ def tenant_health_alerts(user=None):
             "title": "Pending registration applications",
             "detail": f"{pending_apps} church application(s) awaiting review.",
             "url_name": "sitecontrol:application_list",
+        })
+
+    if pending_activations:
+        alerts.append({
+            "level": "danger",
+            "title": "Full version requests",
+            "detail": f"{pending_activations} church(es) submitted a payment reference and requested activation.",
+            "url_name": "sitecontrol:activation_request_list",
         })
 
     over_limit = []

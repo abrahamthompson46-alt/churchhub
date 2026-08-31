@@ -7,26 +7,53 @@
 <div class="page-container py-5">
     <div class="row justify-content-center">
         <div class="col-md-8 col-lg-7">
-            <div class="card shadow-sm">
+            <div class="card shadow-sm border-0">
                 <div class="card-body p-4 p-md-5">
                     <div class="text-center mb-4">
-                        <div class="text-warning mb-3" style="font-size:3rem"><i class="bi bi-unlock"></i></div>
-                        <h1 class="h4 fw-bold">Your access has ended</h1>
+                        <div class="rounded-circle bg-warning bg-opacity-10 text-warning d-inline-flex align-items-center justify-content-center mb-3" style="width:4.5rem;height:4.5rem;font-size:2rem">
+                            <i class="bi bi-hourglass-split"></i>
+                        </div>
+                        <h1 class="h3 fw-bold mb-2">Your demo has ended</h1>
                         <p class="text-muted mb-0">
-                            {% if church %}The 30-day demo for <strong>{{ church.name }}</strong> is over.{% else %}This workspace’s trial is over.{% endif %}
+                            {% if church %}Access for <strong>{{ church.name }}</strong> is paused.{% else %}This workspace’s trial is over.{% endif %}
                             {% if subscription and subscription.expires_at %} It ended on {{ subscription.expires_at }}.{% endif %}
-                            Your records are kept. Subscribe to reopen the full product.
+                            Your records are kept. Subscribe to reopen this same church.
                         </p>
                     </div>
 
-                    <ol class="mb-4 ps-3">
-                        <li class="mb-2">Pay using the instructions below (or email us first if you need an invoice).</li>
-                        <li class="mb-2">Send your church name and payment reference to {% if support_email %}<a href="{{ mailto_href }}">{{ support_email }}</a>{% else %}the platform owner{% endif %}.</li>
-                        <li>We activate the paid plan on this same church. You sign in as usual — no second demo.</li>
-                    </ol>
+                    {% if pending_request %}
+                    <div class="alert alert-success d-flex gap-2 align-items-start" role="status">
+                        <i class="bi bi-check-circle mt-1"></i>
+                        <div>
+                            <div class="fw-semibold">Request received</div>
+                            <div class="small mb-0">Payment reference <strong>{{ pending_request.payment_reference }}</strong> is with the platform owner. You can update it if needed.</div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <div class="h-100 border rounded-3 p-3 bg-light">
+                                <div class="text-primary fw-bold mb-1">1. Pay</div>
+                                <p class="small text-muted mb-0">Use the instructions below for this church.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="h-100 border rounded-3 p-3 bg-light">
+                                <div class="text-primary fw-bold mb-1">2. Tell us</div>
+                                <p class="small text-muted mb-0">Enter church details and your payment reference in ChurchHub. No email required.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="h-100 border rounded-3 p-3 bg-light">
+                                <div class="text-primary fw-bold mb-1">3. We activate</div>
+                                <p class="small text-muted mb-0">Platform admins are notified immediately. Sign in as usual after activation.</p>
+                            </div>
+                        </div>
+                    </div>
 
                     {% if plan %}
-                    <div class="border rounded p-3 mb-3 bg-light">
+                    <div class="border rounded-3 p-3 mb-3">
                         <div class="fw-semibold">{{ plan.name }}</div>
                         <div class="text-muted small">
                             {% if plan.price_monthly %}{{ billing_currency }} {{ plan.price_monthly }}/month{% endif %}
@@ -37,16 +64,16 @@
 
                     {% if billing_payment_instructions %}
                     <h2 class="h6 fw-bold">How to pay</h2>
-                    <div class="border rounded p-3 mb-4" style="white-space: pre-wrap;">{{ billing_payment_instructions }}</div>
+                    <div class="border rounded-3 p-3 mb-4 bg-light" style="white-space: pre-wrap;">{{ billing_payment_instructions }}</div>
                     {% endif %}
 
                     <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
-                        {% if mailto_href %}
-                        <a class="btn btn-primary" href="{{ mailto_href }}">Request the full version</a>
-                        {% endif %}
+                        <a class="btn btn-primary btn-lg px-4" href="{% url 'subscription_subscribe' %}">
+                            {% if pending_request %}Update your request{% else %}Request the full version{% endif %}
+                        </a>
                         <form method="post" action="{% url 'logout' %}">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-outline-secondary w-100">Sign out</button>
+                            <button type="submit" class="btn btn-outline-secondary btn-lg w-100">Sign out</button>
                         </form>
                     </div>
                 </div>

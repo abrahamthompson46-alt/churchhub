@@ -1,0 +1,48 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}{{ activation_request.church_name }}{% endblock %}
+{% block page_subtitle %}<p class="platform-topbar-meta mb-0">Full version request · {{ activation_request.get_status_display }}</p>{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="platform-card">
+            <div class="platform-card-header">Request details</div>
+            <div class="platform-card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Church</dt>
+                    <dd class="col-sm-8">{{ activation_request.church_name }} ({{ activation_request.church_code|default:"—" }})</dd>
+                    <dt class="col-sm-4">Address</dt>
+                    <dd class="col-sm-8">{{ activation_request.church_address|default:"—" }}</dd>
+                    <dt class="col-sm-4">Contact</dt>
+                    <dd class="col-sm-8">{{ activation_request.contact_name }} · {{ activation_request.contact_email }}{% if activation_request.contact_phone %} · {{ activation_request.contact_phone }}{% endif %}</dd>
+                    <dt class="col-sm-4">Payment reference</dt>
+                    <dd class="col-sm-8"><code>{{ activation_request.payment_reference }}</code></dd>
+                    {% if activation_request.notes %}
+                    <dt class="col-sm-4">Notes</dt>
+                    <dd class="col-sm-8">{{ activation_request.notes|linebreaksbr }}</dd>
+                    {% endif %}
+                    <dt class="col-sm-4">Submitted</dt>
+                    <dd class="col-sm-8">{{ activation_request.created_at|date:"Y-m-d H:i" }}{% if activation_request.submitted_by %} · {{ activation_request.submitted_by.get_username }}{% endif %}</dd>
+                    <dt class="col-sm-4">Status</dt>
+                    <dd class="col-sm-8">{{ activation_request.get_status_display }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="platform-card">
+            <div class="platform-card-header">Activate</div>
+            <div class="platform-card-body">
+                <p class="small text-muted">Recording payment on the tenant subscription marks this request activated.</p>
+                {% if activation_request.church_id %}
+                <a class="btn btn-primary w-100 mb-2" href="{% url 'sitecontrol:tenant_detail' activation_request.church_id %}">Open tenant</a>
+                {% if activation_request.subscription_id %}
+                <a class="btn btn-outline-primary w-100" href="{% url 'sitecontrol:subscription_record_payment' activation_request.subscription_id %}">Record payment</a>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

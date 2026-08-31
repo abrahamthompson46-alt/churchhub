@@ -131,6 +131,16 @@ def platform_context(request):
         from church_system.denomination_scope import get_active_denomination
 
         ctx["platform_active_denomination"] = get_active_denomination(request)
+        from dashboard.models import Notification
+        from sitecontrol.activation_services import pending_activation_count_for_operator
+
+        ctx["pending_activation_count"] = pending_activation_count_for_operator(request.user)
+        ctx["platform_unread_notifications"] = list(
+            Notification.objects.filter(user=request.user, read=False)[:8]
+        )
+        ctx["platform_unread_count"] = Notification.objects.filter(
+            user=request.user, read=False
+        ).count()
     return ctx
 
 

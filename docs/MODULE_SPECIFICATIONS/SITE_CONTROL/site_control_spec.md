@@ -47,7 +47,8 @@ erDiagram
 - **TenantSubscription** — church entitlement, status, overrides JSON, expiry  
 - **PlatformAuditLog** — immutable-style platform actions  
 - **PlatformAnnouncement** — platform banner content  
-- **TenantApplication** — public apply workflow  
+- **TenantApplication** — public apply workflow
+- **SubscriptionActivationRequest** — in-app full-version request after demo expiry (payment reference; notifies platform operators)  
 - **Denomination** — SaaS isolation wall, terminology, branding/seeds; `allow_institution_branding` (default True) gates Super Admin self-service identity branding  
 - **MarketingSettings** — singleton inquiry, consent, privacy, retention, and sales-notification controls
 - **MarketingCampaign** — owner-created attribution campaigns and tracked inquiry URLs
@@ -125,7 +126,7 @@ Institution feature gate decorator: `require_feature` in `sitecontrol.checks`.
 | Ops | ``, `setup/`, `health/`, `ops/` |
 | Audit | `audit/`, `audit/export/` |
 | Settings | `settings/`, branding, email, security, features |
-| Registration | `registration/`, `applications/…` |
+| Registration | `registration/`, `applications/…`, `activation-requests/…` |
 | Billing | plans, subscriptions, `subscriptions/<id>/record-payment/`, payment-methods, billing |
 | Denominations | list/detail/edit/terminology/seeds/branding/billing/context |
 | Tenants | list/detail/edit/provision/suspend/reactivate/offboard/reprovision-financials |
@@ -135,13 +136,13 @@ Institution feature gate decorator: `require_feature` in `sitecontrol.checks`.
 | Marketing | `marketing/`, settings, campaigns, leads/export/retention/anonymization and approved asset links |
 | Hierarchy view | `organization/` |
 
-Public: `/apply/`, `/apply/success/`, `/contact/`, `/contact/success/`.
+Public: `/apply/`, `/apply/success/`, `/contact/`, `/contact/success/`, `/accounts/subscription-expired/`, `/accounts/subscription-subscribe/`.
 
 ---
 
 ## 7. Forms / Views / Templates
 
-**Forms:** SiteSettings*, Registration*, TenantApplication*, Billing*, Plan/Subscription*, PlatformOperator*, Denomination*, PlatformAnnouncement*, provisioning forms (`forms.py`, `denomination_forms.py`), and marketing settings/campaign/lead/asset/public inquiry forms (`marketing_forms.py`).
+**Forms:** SiteSettings*, Registration*, TenantApplication*, SubscriptionActivationRequest*, Billing*, Plan/Subscription*, PlatformOperator*, Denomination*, PlatformAnnouncement*, provisioning forms (`forms.py`, `denomination_forms.py`), and marketing settings/campaign/lead/asset/public inquiry forms (`marketing_forms.py`).
 
 **Views:** `views.py`, `views_registration.py`, `views_denominations.py`, `views_marketing.py`.
 

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Request the full version — {{ site_name }}{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<div class="page-container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <a href="{% url 'subscription_expired' %}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> Back</a>
+            </div>
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4 p-md-5">
+                    <h1 class="h3 fw-bold mb-1">Request the full version</h1>
+                    <p class="text-muted mb-4">
+                        Enter your church details and the payment reference from your transfer.
+                        This stays in ChurchHub — nothing is sent by email. Platform administrators are notified as soon as you submit.
+                    </p>
+
+                    {% if pending_request %}
+                    <div class="alert alert-info small">You already submitted a request. Submit again to update the payment reference or contact details.</div>
+                    {% endif %}
+
+                    {% if billing_payment_instructions %}
+                    <details class="border rounded-3 p-3 mb-4 bg-light">
+                        <summary class="fw-semibold">Payment instructions</summary>
+                        <div class="mt-2 small" style="white-space: pre-wrap;">{{ billing_payment_instructions }}</div>
+                    </details>
+                    {% endif %}
+
+                    {% if plan %}
+                    <p class="small text-muted">Plan: <strong>{{ plan.name }}</strong>
+                        {% if plan.price_monthly %} · {{ billing_currency }} {{ plan.price_monthly }}/month{% endif %}
+                    </p>
+                    {% endif %}
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+
+                        <h2 class="h6 fw-bold">Church</h2>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-8">
+                                <label class="form-label" for="{{ form.church_name.id_for_label }}">{{ form.church_name.label }}</label>
+                                {{ form.church_name }}
+                                {% for error in form.church_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="{{ form.church_code.id_for_label }}">{{ form.church_code.label }}</label>
+                                {{ form.church_code }}
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="{{ form.church_address.id_for_label }}">{{ form.church_address.label }}</label>
+                                {{ form.church_address }}
+                            </div>
+                        </div>
+
+                        <h2 class="h6 fw-bold">Contact</h2>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="{{ form.contact_name.id_for_label }}">{{ form.contact_name.label }}</label>
+                                {{ form.contact_name }}
+                                {% for error in form.contact_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="{{ form.contact_phone.id_for_label }}">{{ form.contact_phone.label }}</label>
+                                {{ form.contact_phone }}
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="{{ form.contact_email.id_for_label }}">{{ form.contact_email.label }}</label>
+                                {{ form.contact_email }}
+                                {% for error in form.contact_email.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                            </div>
+                        </div>
+
+                        <h2 class="h6 fw-bold">Payment</h2>
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.payment_reference.id_for_label }}">{{ form.payment_reference.label }}</label>
+                            {{ form.payment_reference }}
+                            <div class="form-text">{{ form.payment_reference.help_text }}</div>
+                            {% for error in form.payment_reference.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label" for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+                            {{ form.notes }}
+                        </div>
+
+                        <div class="d-flex flex-column flex-sm-row gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">Submit request</button>
+                            <a href="{% url 'subscription_expired' %}" class="btn btn-outline-secondary btn-lg">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

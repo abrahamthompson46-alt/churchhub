@@ -343,6 +343,9 @@ erDiagram
   Denomination ||--o{ TenantApplication : applications
   District ||--o{ TenantApplication : optional
   Church ||--o{ TenantApplication : created_church
+  Church ||--o{ SubscriptionActivationRequest : requests
+  TenantSubscription ||--o{ SubscriptionActivationRequest : optional
+  Denomination ||--o{ SubscriptionActivationRequest : optional
   UserInvitation ||--o{ TenantApplication : invitation
   User ||--o{ PlatformAuditLog : actor
   Denomination ||--o{ PlatformAuditLog : optional

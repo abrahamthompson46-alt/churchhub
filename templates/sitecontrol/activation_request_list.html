@@ -1,0 +1,55 @@
+{% extends "sitecontrol/base_platform.html" %}
+
+{% block page_title %}Activation requests{% endblock %}
+
+{% block content %}
+<div class="platform-card">
+    <div class="platform-card-header">
+        <span>Full version requests</span>
+        <form method="get" class="d-flex gap-2">
+            <select name="status" class="form-select form-select-sm" style="width:auto">
+                <option value="">All statuses</option>
+                {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ value }} — {{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="platform-table mb-0">
+            <thead>
+                <tr>
+                    <th>Submitted</th>
+                    <th>Church</th>
+                    <th>Contact</th>
+                    <th>Payment reference</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in page_obj %}
+            <tr>
+                <td class="small text-muted">{{ item.created_at|date:"M j, Y H:i" }}</td>
+                <td class="fw-semibold">{{ item.church_name }} <code class="small">{{ item.church_code }}</code></td>
+                <td>{{ item.contact_name }}<br><small class="text-muted">{{ item.contact_email }}</small></td>
+                <td><code>{{ item.payment_reference }}</code></td>
+                <td>{{ item.get_status_display }}</td>
+                <td><a href="{% url 'sitecontrol:activation_request_detail' item.pk %}" class="btn btn-sm btn-outline-primary">Open</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-muted p-4">No activation requests yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if page_obj.has_other_pages %}
+    <div class="platform-card-body border-top d-flex justify-content-between">
+        {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}&status={{ status_filter }}">Previous</a>{% else %}<span></span>{% endif %}
+        <span class="text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}&status={{ status_filter }}">Next</a>{% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

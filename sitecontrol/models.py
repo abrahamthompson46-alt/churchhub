@@ -480,6 +480,7 @@ class PlatformAuditLog(models.Model):
         ("MARKETING_LEAD_NOTIFY", "Marketing Lead Notification Updated"),
         ("MARKETING_LEAD_EXPORT", "Marketing Leads Exported"),
         ("MARKETING_LEAD_ANONYMIZE", "Marketing Lead Anonymized"),
+        ("ACTIVATION_REQUEST", "Full Version Activation Requested"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -861,6 +862,86 @@ class TenantApplication(models.Model):
 
     def __str__(self):
         return f"{self.church_name} ({self.get_status_display()})"
+
+    @property
+    def is_pending(self):
+        return self.status == "PENDING"
+
+
+class SubscriptionActivationRequest(models.Model):
+    """Church-submitted full-version request with payment reference (no email)."""
+
+    STATUS_CHOICES = [
+        ("PENDING", "Pending"),
+        ("ACKNOWLEDGED", "Acknowledged"),
+        ("ACTIVATED", "Activated"),
+        ("REJECTED", "Rejected"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="PENDING")
+    church = models.ForeignKey(
+        "organization.Church",
+        on_delete=models.CASCADE,
+        related_name="activation_requests",
+    )
+    subscription = models.ForeignKey(
+        TenantSubscription,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="activation_requests",
+    )
+    denomination = models.ForeignKey(
+        "sitecontrol.Denomination",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="activation_requests",
+    )
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="activation_requests_submitted",
+    )
+    church_name = models.CharField(max_length=200)
+    church_code = models.CharField(max_length=20, blank=True)
+    church_address = models.TextField(blank=True)
+    contact_name = models.CharField(max_length=120)
+    contact_email = models.EmailField()
+    contact_phone = models.CharField(max_length=20, blank=True)
+    payment_reference = models.CharField(max_length=120)
+    notes = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="activation_requests_reviewed",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "-created_at"]),
+            models.Index(fields=["church", "status"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["church"],
+                condition=models.Q(status="PENDING"),
+                name="uniq_pending_activation_per_church",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.church_name} ({self.payment_reference})"
 
     @property
     def is_pending(self):

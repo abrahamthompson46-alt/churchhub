@@ -19,6 +19,7 @@ from sitecontrol.models import (
     PlatformAnnouncement,
     PlatformAuditLog,
     PlatformPaymentMethod,
+    SubscriptionActivationRequest,
     SubscriptionPlan,
     TenantApplication,
     TenantSubscription,
@@ -304,6 +305,20 @@ def application_detail_qs():
 
 def get_application_or_404(pk):
     return get_object_or_404(application_detail_qs(), pk=pk)
+
+
+def activation_requests_list_base():
+    return SubscriptionActivationRequest.objects.select_related(
+        "church",
+        "subscription",
+        "denomination",
+        "submitted_by",
+        "reviewed_by",
+    ).order_by("-created_at")
+
+
+def get_activation_request_or_404(pk):
+    return get_object_or_404(activation_requests_list_base(), pk=pk)
 
 
 # ---------------------------------------------------------------------------

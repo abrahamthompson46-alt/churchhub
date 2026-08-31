@@ -127,7 +127,7 @@ Tenant: **global** catalog (not church-scoped). Authorization scope is applied a
 
 ---
 
-### 4.4 `sitecontrol` (8 models)
+### 4.4 `sitecontrol` (9 models)
 
 | Model | PK | Key points |
 |-------|-----|------------|
@@ -135,6 +135,7 @@ Tenant: **global** catalog (not church-scoped). Authorization scope is applied a
 | `SubscriptionPlan` | UUID | `code` SlugField unique; feature flags; `is_active` |
 | `PlatformPaymentMethod` | UUID | method_type BANK_TRANSFER/MOBILE_MONEY/CARD/CASH/INVOICE |
 | `TenantSubscription` | UUID | **O2O** `church` CASCADE; FK plan PROTECT; status TRIAL/ACTIVE/SUSPENDED/EXPIRED; billing_interval MONTHLY/YEARLY |
+| `SubscriptionActivationRequest` | UUID | FK church CASCADE; optional subscription/denomination; payment_reference; status PENDING/ACKNOWLEDGED/ACTIVATED/REJECTED; unique pending per church |
 | `PlatformAuditLog` | UUID | Immutable; many action codes; FK user, denomination; indexes on created_at/action |
 | `PlatformAnnouncement` | UUID | Platform-wide; FK created_by |
 | `TenantApplication` | UUID | status PENDING/APPROVED/REJECTED/WITHDRAWN; type EXISTING_DISTRICT/NEW_HIERARCHY; `contact_phone_normalized`; FKs district, denomination PROTECT, reviewed_by, created_church, invitation |

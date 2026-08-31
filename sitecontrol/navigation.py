@@ -23,6 +23,7 @@ PLATFORM_NAV = [
             {"label": "Denominations", "url_name": "sitecontrol:denomination_list", "icon": "bi-layers"},
             {"label": "Billing Roll-ups", "url_name": "sitecontrol:denomination_billing_rollups", "icon": "bi-cash-stack"},
             {"label": "Applications", "url_name": "sitecontrol:application_list", "icon": "bi-inbox"},
+            {"label": "Activation requests", "url_name": "sitecontrol:activation_request_list", "icon": "bi-patch-check"},
             {"label": "Provision Tenant", "url_name": "sitecontrol:tenant_provision", "icon": "bi-magic"},
             {"label": "All Churches", "url_name": "sitecontrol:tenant_list", "icon": "bi-building"},
             {"label": "Subscriptions", "url_name": "sitecontrol:subscription_list", "icon": "bi-credit-card"},

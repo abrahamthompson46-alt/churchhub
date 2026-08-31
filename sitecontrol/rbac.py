@@ -115,6 +115,7 @@ NAV_ITEM_CAPABILITIES = {
     "sitecontrol:denomination_list": CAP_MANAGE_DENOMINATIONS,
     "sitecontrol:denomination_billing_rollups": CAP_VIEW_BILLING,
     "sitecontrol:application_list": CAP_MANAGE_APPLICATIONS,
+    "sitecontrol:activation_request_list": CAP_VIEW,
     # Tenant browse is available to all operators with CAP_VIEW; mutations stay gated.
     "sitecontrol:tenant_list": CAP_VIEW,
     "sitecontrol:subscription_list": CAP_MANAGE_SUBSCRIPTIONS,

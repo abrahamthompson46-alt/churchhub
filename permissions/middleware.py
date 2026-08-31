@@ -14,6 +14,7 @@ EXEMPT_PREFIXES = (
     "/accounts/invite/accept",
     "/accounts/profile",
     "/accounts/mfa/",
+    "/accounts/subscription-",
     "/admin/",
     "/platform/",
     "/apply/",

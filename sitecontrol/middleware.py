@@ -150,6 +150,9 @@ class SubscriptionAccessMiddleware:
 
         sub = get_church_subscription(church)
         if sub is None or sub.is_operational:
+            from sitecontrol.activation_services import maybe_notify_expiry_warning
+
+            maybe_notify_expiry_warning(request, user, church, sub)
             return self.get_response(request)
         return redirect("subscription_expired")
 

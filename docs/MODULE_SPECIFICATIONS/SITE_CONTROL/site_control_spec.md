@@ -48,7 +48,7 @@ erDiagram
 - **PlatformAuditLog** — immutable-style platform actions  
 - **PlatformAnnouncement** — platform banner content  
 - **TenantApplication** — public apply workflow
-- **SubscriptionActivationRequest** — in-app full-version request after demo expiry (payment reference; notifies platform operators)  
+- **SubscriptionActivationRequest** — in-app full-version request (pay confirmation, monthly/yearly amount, optional receipt, duplicate payment-reference block; notifies platform operators)  
 - **Denomination** — SaaS isolation wall, terminology, branding/seeds; `allow_institution_branding` (default True) gates Super Admin self-service identity branding  
 - **MarketingSettings** — singleton inquiry, consent, privacy, retention, and sales-notification controls
 - **MarketingCampaign** — owner-created attribution campaigns and tracked inquiry URLs
@@ -136,7 +136,7 @@ Institution feature gate decorator: `require_feature` in `sitecontrol.checks`.
 | Marketing | `marketing/`, settings, campaigns, leads/export/retention/anonymization and approved asset links |
 | Hierarchy view | `organization/` |
 
-Public: `/apply/`, `/apply/success/`, `/contact/`, `/contact/success/`, `/accounts/subscription-expired/`, `/accounts/subscription-subscribe/`.
+Public: `/apply/`, `/apply/success/`, `/contact/`, `/contact/success/`, `/accounts/subscription-expired/`, `/accounts/subscription-pay/`, `/accounts/subscription-subscribe/`.
 
 ---
 

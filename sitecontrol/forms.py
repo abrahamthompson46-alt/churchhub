@@ -3,6 +3,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
+from church_system.uploads import document_upload_validator
 from church_system.widgets import checkbox_attrs, input_attrs, select_attrs, textarea_attrs
 from organization.models import Church
 from permissions.roles import UserRole
@@ -180,6 +181,20 @@ class TenantApplicationForm(forms.Form):
         return cleaned
 
 
+class SubscriptionPayForm(forms.Form):
+    billing_interval = forms.ChoiceField(
+        choices=TenantSubscription.BILLING_INTERVALS,
+        initial="MONTHLY",
+        widget=forms.RadioSelect(attrs={"class": "form-check-input"}),
+        label="Billing period",
+    )
+    payment_completed = forms.BooleanField(
+        required=True,
+        label="I have completed this payment.",
+        widget=forms.CheckboxInput(attrs=checkbox_attrs()),
+    )
+
+
 class SubscriptionActivationRequestForm(forms.Form):
     church_name = forms.CharField(
         max_length=200,
@@ -218,11 +233,36 @@ class SubscriptionActivationRequestForm(forms.Form):
         help_text="Bank transfer reference, receipt number, or mobile-money ID.",
         widget=forms.TextInput(attrs=input_attrs(placeholder="e.g. TRX-10482")),
     )
+    receipt = forms.FileField(
+        required=False,
+        label="Payment receipt (optional)",
+        help_text="PDF or image of the transfer, up to 10 MB.",
+        validators=[document_upload_validator],
+    )
     notes = forms.CharField(
         required=False,
         label="Notes for the platform owner",
         widget=forms.Textarea(attrs=textarea_attrs(rows=3)),
     )
+
+    def __init__(self, *args, church=None, **kwargs):
+        self.church = church
+        super().__init__(*args, **kwargs)
+
+    def clean_payment_reference(self):
+        from sitecontrol.activation_services import (
+            PAYMENT_REF_IN_USE,
+            normalize_payment_reference,
+            payment_reference_in_use,
+        )
+
+        raw = (self.cleaned_data.get("payment_reference") or "").strip()
+        normalized = normalize_payment_reference(raw)
+        if not normalized:
+            raise forms.ValidationError("Enter a payment reference.")
+        if payment_reference_in_use(normalized, church=self.church):
+            raise forms.ValidationError(PAYMENT_REF_IN_USE)
+        return raw
 
 
 class ApplicationReviewForm(forms.Form):

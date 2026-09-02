@@ -18,6 +18,17 @@
                     <dd class="col-sm-8">{{ activation_request.contact_name }} · {{ activation_request.contact_email }}{% if activation_request.contact_phone %} · {{ activation_request.contact_phone }}{% endif %}</dd>
                     <dt class="col-sm-4">Payment reference</dt>
                     <dd class="col-sm-8"><code>{{ activation_request.payment_reference }}</code></dd>
+                    <dt class="col-sm-4">Plan / amount</dt>
+                    <dd class="col-sm-8">
+                        {{ activation_request.plan_name|default:"—" }}
+                        {% if activation_request.amount is not None %}
+                        · {{ activation_request.currency }} {{ activation_request.amount }} / {{ activation_request.get_billing_interval_display }}
+                        {% endif %}
+                    </dd>
+                    {% if activation_request.receipt %}
+                    <dt class="col-sm-4">Receipt</dt>
+                    <dd class="col-sm-8"><a href="{{ activation_request.receipt.url }}" target="_blank" rel="noopener">Open receipt</a></dd>
+                    {% endif %}
                     {% if activation_request.notes %}
                     <dt class="col-sm-4">Notes</dt>
                     <dd class="col-sm-8">{{ activation_request.notes|linebreaksbr }}</dd>

@@ -265,7 +265,9 @@ DENY (404 for media/object IDOR; 403 for authenticated wrong permission on a kno
 | Any other prefix under `MEDIA_ROOT` | Private | Login redirect | Object ACL or **404** |
 | Unknown prefix | Private | 404 | **404** (fail closed) |
 
-Current `FileField.upload_to` prefixes: `members/profile_pictures/`, `records/`, `history/`, `meetings/attachments/`, `welfare/cases/`, `announcements/`, `exports/reports/`, plus public branding. Anything else MUST DENY.
+Current `FileField.upload_to` prefixes: `members/profile_pictures/`, `records/`, `history/`, `meetings/attachments/`, `welfare/cases/`, `announcements/`, `exports/reports/`, `sitecontrol/activation-receipts/`, plus public branding. Anything else MUST DENY.
+
+Platform operators may fetch `sitecontrol/activation-receipts/` only when `operator_can_access_denomination` allows the owning `SubscriptionActivationRequest`. They still MUST NOT read other private prefixes via `CAP_VIEW` alone.
 
 ### Conditions by action
 

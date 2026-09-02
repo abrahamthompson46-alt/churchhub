@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Complete payment — {{ site_name }}{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<div class="page-container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                {% if subscription and subscription.is_operational %}
+                <a href="{% url 'dashboard:home' %}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> Back to workspace</a>
+                {% else %}
+                <a href="{% url 'subscription_expired' %}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> Back</a>
+                {% endif %}
+                <span class="small text-muted">Step 1 of 2 · Pay</span>
+            </div>
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4 p-md-5">
+                    <h1 class="h3 fw-bold mb-1">Complete payment</h1>
+                    <p class="text-muted mb-4">
+                        Pay for {% if church %}<strong>{{ church.name }}</strong>{% else %}this church{% endif %} using the instructions below.
+                        Put the church code in the transfer memo so we can match your payment, then confirm you have paid.
+                    </p>
+
+                    {% if church %}
+                    <div class="border rounded-3 p-3 mb-4">
+                        <div class="fw-semibold mb-2">Use this memo on your payment</div>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-7">
+                                <label class="form-label small mb-1" for="copy-church-name">Church name</label>
+                                <div class="input-group input-group-sm">
+                                    <input id="copy-church-name" class="form-control" type="text" value="{{ church.name }}" readonly>
+                                    <button type="button" class="btn btn-outline-secondary" data-copy-target="copy-church-name">Copy</button>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label small mb-1" for="copy-church-code">Church code</label>
+                                <div class="input-group input-group-sm">
+                                    <input id="copy-church-code" class="form-control" type="text" value="{{ church.code }}" readonly>
+                                    <button type="button" class="btn btn-outline-secondary" data-copy-target="copy-church-code">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="small text-muted mb-0 mt-2">Transfer memo: <strong>{{ transfer_memo }}</strong></p>
+                    </div>
+                    {% endif %}
+
+                    {% if plan %}
+                    <div class="border rounded-3 p-3 mb-4">
+                        <div class="fw-semibold">{{ plan.name }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if billing_payment_instructions %}
+                    <h2 class="h6 fw-bold">How to pay</h2>
+                    <div class="border rounded-3 p-3 mb-4 bg-light" style="white-space: pre-wrap;">{{ billing_payment_instructions }}</div>
+                    {% endif %}
+
+                    {% if payment_methods %}
+                    <h2 class="h6 fw-bold">Accepted methods</h2>
+                    <div class="row g-3 mb-4">
+                        {% for method in payment_methods %}
+                        <div class="col-md-6">
+                            <div class="h-100 border rounded-3 p-3">
+                                <div class="fw-semibold">{{ method.name }}</div>
+                                <div class="small text-muted mb-2">{{ method.get_method_type_display }}</div>
+                                {% if method.instructions %}
+                                <div class="small" style="white-space: pre-wrap;">{{ method.instructions }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {% if not billing_payment_instructions and not payment_methods %}
+                    <div class="alert alert-info">Use the payment details provided by the platform owner, then continue with your payment reference.</div>
+                    {% endif %}
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {% if pay_form.non_field_errors %}
+                        <div class="alert alert-danger">{{ pay_form.non_field_errors }}</div>
+                        {% endif %}
+                        <h2 class="h6 fw-bold">Amount to pay</h2>
+                        <div class="mb-3">
+                            {% for radio in pay_form.billing_interval %}
+                            <div class="form-check border rounded-3 p-3 mb-2">
+                                {{ radio.tag }}
+                                <label class="form-check-label" for="{{ radio.id_for_label }}">
+                                    <span class="fw-semibold">{{ radio.choice_label }}</span>
+                                    {% if radio.data.value == "MONTHLY" and monthly_amount is not None %}
+                                    <span class="text-muted"> — {{ billing_currency }} {{ monthly_amount }}</span>
+                                    {% elif radio.data.value == "YEARLY" and yearly_amount is not None %}
+                                    <span class="text-muted"> — {{ billing_currency }} {{ yearly_amount }}</span>
+                                    {% endif %}
+                                </label>
+                            </div>
+                            {% endfor %}
+                            {% for error in pay_form.billing_interval.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="form-check mb-4">
+                            {{ pay_form.payment_completed }}
+                            <label class="form-check-label" for="{{ pay_form.payment_completed.id_for_label }}">{{ pay_form.payment_completed.label }}</label>
+                            {% for error in pay_form.payment_completed.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="d-flex flex-column flex-sm-row gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">I’ve paid — send upgrade details</button>
+                            {% if subscription and subscription.is_operational %}
+                            <a class="btn btn-outline-secondary btn-lg" href="{% url 'dashboard:home' %}">Cancel</a>
+                            {% else %}
+                            <a class="btn btn-outline-secondary btn-lg" href="{% url 'subscription_expired' %}">Cancel</a>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    document.querySelectorAll("[data-copy-target]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var el = document.getElementById(btn.getAttribute("data-copy-target"));
+            if (!el) return;
+            var value = el.value || "";
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(value);
+            } else {
+                el.select();
+                document.execCommand("copy");
+            }
+            btn.textContent = "Copied";
+            setTimeout(function () { btn.textContent = "Copy"; }, 1500);
+        });
+    });
+})();
+</script>
+{% endblock %}

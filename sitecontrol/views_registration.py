@@ -14,6 +14,7 @@ from sitecontrol.forms import (
     ApplicationReviewForm,
     RegistrationSettingsForm,
     SubscriptionActivationRequestForm,
+    SubscriptionPayForm,
     TenantApplicationForm,
 )
 from sitecontrol import repositories as repo
@@ -21,7 +22,11 @@ from sitecontrol import selectors
 from sitecontrol.models import SubscriptionActivationRequest, TenantApplication
 from sitecontrol.rbac import CAP_MANAGE_APPLICATIONS, CAP_MANAGE_REGISTRATION, CAP_VIEW
 from sitecontrol.activation_services import (
+    can_use_upgrade_flow,
+    payment_confirmation_for,
     pending_request_for_church,
+    plan_price_for_interval,
+    store_payment_confirmation,
     submit_activation_request,
 )
 from sitecontrol.registration_services import (
@@ -123,51 +128,118 @@ def church_apply_success(request):
     })
 
 
+def _nonoperational_subscription_or_redirect(request, *, require_church=False):
+    """Return (user, church, sub) for expired/suspended churches, or a redirect."""
+    user = request.user
+    if getattr(user, "is_platform_user", False):
+        return None, redirect("sitecontrol:dashboard")
+    church = getattr(user, "church", None)
+    if require_church and church is None:
+        flash_error(request, "Your account is not linked to a church.", title="Cannot subscribe")
+        return None, redirect("subscription_expired")
+    sub = get_church_subscription(church) if church else None
+    if sub and sub.is_operational:
+        return None, redirect("dashboard:home")
+    return (user, church, sub), None
+
+
+def _upgrade_flow_or_redirect(request):
+    """Pay/details pages: expired churches, or churches inside the 7-day warning window."""
+    user = request.user
+    if getattr(user, "is_platform_user", False):
+        return None, redirect("sitecontrol:dashboard")
+    church = getattr(user, "church", None)
+    if church is None:
+        flash_error(request, "Your account is not linked to a church.", title="Cannot subscribe")
+        return None, redirect("subscription_expired")
+    sub = get_church_subscription(church)
+    if not can_use_upgrade_flow(sub):
+        return None, redirect("dashboard:home")
+    return (user, church, sub), None
+
+
+def _upgrade_page_context(church, sub, **extra):
+    settings_obj = get_site_settings()
+    plan = sub.plan if sub else None
+    ctx = {
+        "site_name": settings_obj.site_name,
+        "subscription": sub,
+        "church": church,
+        "plan": plan,
+        "pending_request": pending_request_for_church(church),
+        "billing_currency": settings_obj.default_billing_currency,
+        "billing_payment_instructions": (
+            settings_obj.billing_payment_instructions or ""
+        ).strip(),
+        "payment_methods": selectors.active_payment_methods_ordered(),
+        "monthly_amount": plan_price_for_interval(plan, "MONTHLY"),
+        "yearly_amount": plan_price_for_interval(plan, "YEARLY"),
+        "transfer_memo": (church.code if church else "") or (church.name if church else ""),
+    }
+    ctx.update(extra)
+    return ctx
+
+
 @login_required
 def subscription_expired(request):
     """Hard stop for non-operational church subscriptions (including ended demos)."""
-    user = request.user
-    if getattr(user, "is_platform_user", False):
-        return redirect("sitecontrol:dashboard")
-    church = getattr(user, "church", None)
-    sub = get_church_subscription(church) if church else None
-    if sub and sub.is_operational:
-        return redirect("dashboard:home")
-    settings_obj = get_site_settings()
-    plan = sub.plan if sub else None
-    pending = pending_request_for_church(church)
+    scoped, bounce = _nonoperational_subscription_or_redirect(request)
+    if bounce:
+        return bounce
+    _user, church, sub = scoped
     return render(
         request,
         "registration/subscription_expired.html",
-        {
-            "site_name": settings_obj.site_name,
-            "subscription": sub,
-            "church": church,
-            "plan": plan,
-            "pending_request": pending,
-            "billing_currency": settings_obj.default_billing_currency,
-            "billing_payment_instructions": (
-                settings_obj.billing_payment_instructions or ""
-            ).strip(),
-        },
+        _upgrade_page_context(church, sub),
+    )
+
+
+@login_required
+def subscription_pay(request):
+    """Show how to pay; require confirmation before upgrade details."""
+    scoped, bounce = _upgrade_flow_or_redirect(request)
+    if bounce:
+        return bounce
+    _user, church, sub = scoped
+    pending = pending_request_for_church(church)
+    initial_interval = payment_confirmation_for(request.session, church)
+    if not initial_interval and pending:
+        initial_interval = pending.billing_interval
+    form = SubscriptionPayForm(
+        request.POST or None,
+        initial={"billing_interval": initial_interval or "MONTHLY"},
+    )
+    if request.method == "POST" and form.is_valid():
+        store_payment_confirmation(
+            request.session,
+            church=church,
+            billing_interval=form.cleaned_data["billing_interval"],
+        )
+        return redirect("subscription_subscribe")
+    return render(
+        request,
+        "registration/subscription_pay.html",
+        _upgrade_page_context(church, sub, pay_form=form),
     )
 
 
 @login_required
 def subscription_subscribe(request):
     """Church user submits payment reference and church details (no email)."""
-    user = request.user
-    if getattr(user, "is_platform_user", False):
-        return redirect("sitecontrol:dashboard")
-    church = getattr(user, "church", None)
-    if church is None:
-        flash_error(request, "Your account is not linked to a church.", title="Cannot subscribe")
-        return redirect("subscription_expired")
-    sub = get_church_subscription(church)
-    if sub and sub.is_operational:
-        return redirect("dashboard:home")
+    scoped, bounce = _upgrade_flow_or_redirect(request)
+    if bounce:
+        return bounce
+    user, church, sub = scoped
 
-    settings_obj = get_site_settings()
+    billing_interval = payment_confirmation_for(request.session, church)
+    if not billing_interval:
+        flash_warning(
+            request,
+            "Complete payment and confirm it first, then send your church and payment details.",
+            title="Pay first",
+        )
+        return redirect("subscription_pay")
+
     pending = pending_request_for_church(church)
     initial = {
         "church_name": church.name,
@@ -203,38 +275,42 @@ def subscription_subscribe(request):
             }
         )
 
-    form = SubscriptionActivationRequestForm(request.POST or None, initial=initial)
+    form = SubscriptionActivationRequestForm(
+        request.POST or None,
+        request.FILES or None,
+        initial=initial,
+        church=church,
+    )
     if request.method == "POST" and form.is_valid():
-        submit_activation_request(
-            church=church,
-            subscription=sub,
-            user=user,
-            cleaned_data=form.cleaned_data,
-            request=request,
-        )
-        flash_success(
-            request,
-            "Platform administrators have been notified. We will activate this same church after we confirm payment.",
-            title="Request received",
-        )
-        return redirect("subscription_subscribe")
+        data = dict(form.cleaned_data)
+        data["billing_interval"] = billing_interval
+        try:
+            submit_activation_request(
+                church=church,
+                subscription=sub,
+                user=user,
+                cleaned_data=data,
+                request=request,
+            )
+        except ValueError as exc:
+            form.add_error("payment_reference", str(exc))
+        else:
+            flash_success(
+                request,
+                "Platform administrators have been notified. We will activate this same church after we confirm payment.",
+                title="Request received",
+            )
+            return redirect("subscription_subscribe")
 
-    plan = sub.plan if sub else None
     return render(
         request,
         "registration/subscription_subscribe.html",
-        {
-            "form": form,
-            "site_name": settings_obj.site_name,
-            "church": church,
-            "subscription": sub,
-            "plan": plan,
-            "pending_request": pending,
-            "billing_currency": settings_obj.default_billing_currency,
-            "billing_payment_instructions": (
-                settings_obj.billing_payment_instructions or ""
-            ).strip(),
-        },
+        _upgrade_page_context(
+            church,
+            sub,
+            form=form,
+            selected_interval=billing_interval,
+        ),
     )
 
 

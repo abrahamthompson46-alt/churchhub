@@ -333,7 +333,7 @@ Views should use `permission_required` / `any_permission_required` / `can_*` fro
 | `SubscriptionActivationRequest` | Church-submitted full-version request; statuses `PENDING`, `ACKNOWLEDGED`, `ACTIVATED`, `REJECTED`; payment reference required; no email send |
 | Approval path | Queued: `submit_tenant_application` → `approve_tenant_application` / `reject_tenant_application`. Public demo: `submit_tenant_application` → `auto_provision_public_demo` (TRIAL, frozen `expires_at`, first user, no invite) |
 | Demo cutoff | `SubscriptionAccessMiddleware` + `TenantSubscription.is_operational` (date, not the expire job) |
-| Paid upgrade request | `submit_activation_request` → in-app notify all platform operators; activate via `record_subscription_payment` |
+| Paid upgrade request | Expired or ≤7 days to expiry → `/accounts/subscription-pay/` (interval + “I have paid”) then `submit_activation_request` (institution + payment reference + optional receipt). Duplicate payment references across churches are rejected. Notify platform operators; activate only via `record_subscription_payment` |
 | Demo identity | One APPROVED application per email / username / normalized phone |
 | `SiteSettings` | Singleton platform settings (SMTP, maintenance, etc.) |
 | `PlatformAuditLog` | Immutable platform audit |

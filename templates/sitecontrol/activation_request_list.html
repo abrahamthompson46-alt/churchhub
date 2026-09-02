@@ -24,6 +24,7 @@
                     <th>Church</th>
                     <th>Contact</th>
                     <th>Payment reference</th>
+                    <th>Plan / amount</th>
                     <th>Status</th>
                     <th></th>
                 </tr>
@@ -35,11 +36,17 @@
                 <td class="fw-semibold">{{ item.church_name }} <code class="small">{{ item.church_code }}</code></td>
                 <td>{{ item.contact_name }}<br><small class="text-muted">{{ item.contact_email }}</small></td>
                 <td><code>{{ item.payment_reference }}</code></td>
+                <td class="small">
+                    {{ item.plan_name|default:"—" }}
+                    {% if item.amount is not None %}
+                    <br>{{ item.currency }} {{ item.amount }} / {{ item.get_billing_interval_display }}
+                    {% endif %}
+                </td>
                 <td>{{ item.get_status_display }}</td>
                 <td><a href="{% url 'sitecontrol:activation_request_detail' item.pk %}" class="btn btn-sm btn-outline-primary">Open</a></td>
             </tr>
             {% empty %}
-            <tr><td colspan="6" class="text-muted p-4">No activation requests yet.</td></tr>
+            <tr><td colspan="7" class="text-muted p-4">No activation requests yet.</td></tr>
             {% endfor %}
             </tbody>
         </table>

@@ -17,7 +17,7 @@
                         <p class="text-muted mb-0">
                             {% if church %}Access for <strong>{{ church.name }}</strong> is paused.{% else %}This workspace’s trial is over.{% endif %}
                             {% if subscription and subscription.expires_at %} It ended on {{ subscription.expires_at }}.{% endif %}
-                            Your records are kept. Subscribe to reopen this same church.
+                            Your records are kept. Pay first, then send your church and payment details so we can upgrade this same church.
                         </p>
                     </div>
 
@@ -26,7 +26,7 @@
                         <i class="bi bi-check-circle mt-1"></i>
                         <div>
                             <div class="fw-semibold">Request received</div>
-                            <div class="small mb-0">Payment reference <strong>{{ pending_request.payment_reference }}</strong> is with the platform owner. You can update it if needed.</div>
+                            <div class="small mb-0">Payment reference <strong>{{ pending_request.payment_reference }}</strong> is with the platform owner. You can update it after paying if needed.</div>
                         </div>
                     </div>
                     {% endif %}
@@ -35,13 +35,13 @@
                         <div class="col-md-4">
                             <div class="h-100 border rounded-3 p-3 bg-light">
                                 <div class="text-primary fw-bold mb-1">1. Pay</div>
-                                <p class="small text-muted mb-0">Use the instructions below for this church.</p>
+                                <p class="small text-muted mb-0">Open the payment page and complete payment for this church.</p>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="h-100 border rounded-3 p-3 bg-light">
-                                <div class="text-primary fw-bold mb-1">2. Tell us</div>
-                                <p class="small text-muted mb-0">Enter church details and your payment reference in ChurchHub. No email required.</p>
+                                <div class="text-primary fw-bold mb-1">2. Send details</div>
+                                <p class="small text-muted mb-0">Submit institution details and your payment reference in ChurchHub.</p>
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -53,7 +53,7 @@
                     </div>
 
                     {% if plan %}
-                    <div class="border rounded-3 p-3 mb-3">
+                    <div class="border rounded-3 p-3 mb-4">
                         <div class="fw-semibold">{{ plan.name }}</div>
                         <div class="text-muted small">
                             {% if plan.price_monthly %}{{ billing_currency }} {{ plan.price_monthly }}/month{% endif %}
@@ -62,15 +62,11 @@
                     </div>
                     {% endif %}
 
-                    {% if billing_payment_instructions %}
-                    <h2 class="h6 fw-bold">How to pay</h2>
-                    <div class="border rounded-3 p-3 mb-4 bg-light" style="white-space: pre-wrap;">{{ billing_payment_instructions }}</div>
-                    {% endif %}
-
                     <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
-                        <a class="btn btn-primary btn-lg px-4" href="{% url 'subscription_subscribe' %}">
-                            {% if pending_request %}Update your request{% else %}Request the full version{% endif %}
-                        </a>
+                        <a class="btn btn-primary btn-lg px-4" href="{% url 'subscription_pay' %}">Continue to payment</a>
+                        {% if pending_request %}
+                        <a class="btn btn-outline-primary btn-lg px-4" href="{% url 'subscription_pay' %}">Update upgrade details</a>
+                        {% endif %}
                         <form method="post" action="{% url 'logout' %}">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-outline-secondary btn-lg w-100">Sign out</button>

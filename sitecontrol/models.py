@@ -1,6 +1,7 @@
 """Platform-wide settings, subscription plans, and tenant entitlements."""
 
 import uuid
+from pathlib import Path
 
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -14,6 +15,20 @@ def default_mfa_institution_roles():
 
 def default_mfa_platform_roles():
     return ["OWNER", "SECURITY"]
+
+
+_RECEIPT_EXTENSIONS = frozenset({
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".csv",
+    ".jpg", ".jpeg", ".png", ".gif", ".webp",
+})
+
+
+def activation_receipt_upload_to(instance, filename):
+    ext = Path(filename or "").suffix.lower()
+    if ext not in _RECEIPT_EXTENSIONS:
+        ext = ".bin"
+    church_id = getattr(instance, "church_id", None) or "unknown"
+    return f"sitecontrol/activation-receipts/{church_id}/{uuid.uuid4().hex}{ext}"
 
 
 class SiteSettings(models.Model):
@@ -913,6 +928,20 @@ class SubscriptionActivationRequest(models.Model):
     contact_email = models.EmailField()
     contact_phone = models.CharField(max_length=20, blank=True)
     payment_reference = models.CharField(max_length=120)
+    payment_reference_normalized = models.CharField(max_length=120, db_index=True, blank=True)
+    billing_interval = models.CharField(
+        max_length=10,
+        choices=TenantSubscription.BILLING_INTERVALS,
+        default="MONTHLY",
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    currency = models.CharField(max_length=3, blank=True)
+    plan_name = models.CharField(max_length=80, blank=True)
+    receipt = models.FileField(
+        upload_to=activation_receipt_upload_to,
+        blank=True,
+        null=True,
+    )
     notes = models.TextField(blank=True)
     reviewed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -931,12 +960,21 @@ class SubscriptionActivationRequest(models.Model):
         indexes = [
             models.Index(fields=["status", "-created_at"]),
             models.Index(fields=["church", "status"]),
+            models.Index(fields=["payment_reference_normalized"]),
         ]
         constraints = [
             models.UniqueConstraint(
                 fields=["church"],
                 condition=models.Q(status="PENDING"),
                 name="uniq_pending_activation_per_church",
+            ),
+            models.UniqueConstraint(
+                fields=["payment_reference_normalized"],
+                condition=(
+                    models.Q(status__in=["PENDING", "ACKNOWLEDGED", "ACTIVATED"])
+                    & ~models.Q(payment_reference_normalized="")
+                ),
+                name="uniq_activation_payment_ref_active",
             ),
         ]
 

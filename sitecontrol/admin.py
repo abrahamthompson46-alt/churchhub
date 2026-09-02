@@ -89,12 +89,14 @@ class SubscriptionActivationRequestAdmin(admin.ModelAdmin):
     list_display = (
         "church_name",
         "payment_reference",
+        "plan_name",
+        "amount",
         "status",
         "contact_email",
         "created_at",
     )
-    list_filter = ("status",)
-    search_fields = ("church_name", "payment_reference", "contact_email")
+    list_filter = ("status", "billing_interval")
+    search_fields = ("church_name", "payment_reference", "contact_email", "church_code", "plan_name")
     autocomplete_fields = ("church",)
 
 

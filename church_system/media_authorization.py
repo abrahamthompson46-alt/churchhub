@@ -24,7 +24,7 @@ def user_may_access_media(user, relative_path: str) -> bool:
     if not user or not getattr(user, "is_authenticated", False):
         return False
     if getattr(user, "is_platform_user", False):
-        return False
+        return _activation_receipt_platform(user, path)
     if not get_user_denomination(user):
         return False
 
@@ -214,8 +214,42 @@ def _export_file(user, path: str) -> bool:
     return ReportExportJob.objects.filter(export_file=path, user=user).exists()
 
 
+def _activation_receipt(user, path: str) -> bool:
+    from sitecontrol.models import SubscriptionActivationRequest
+
+    qs = SubscriptionActivationRequest.objects.filter(receipt=path).select_related("church")
+    for request_row in qs:
+        if request_row.submitted_by_id == user.pk:
+            return True
+        if getattr(user, "church_id", None) and user.church_id == request_row.church_id:
+            if _is_portal_member_role(user):
+                continue
+            return _church_in_scope(user, request_row.church)
+    return False
+
+
+def _activation_receipt_platform(user, path: str) -> bool:
+    if not path.startswith("sitecontrol/activation-receipts/"):
+        return False
+    from sitecontrol.models import SubscriptionActivationRequest
+    from sitecontrol.platform_access import operator_can_access_denomination
+    from sitecontrol.rbac import CAP_VIEW, operator_has_capability
+
+    if not operator_has_capability(user, CAP_VIEW):
+        return False
+    request_row = (
+        SubscriptionActivationRequest.objects.filter(receipt=path)
+        .select_related("denomination")
+        .first()
+    )
+    if request_row is None:
+        return False
+    return operator_can_access_denomination(user, request_row.denomination)
+
+
 # Longest/most specific prefixes first. Anything else is deny (INV-DENY-01).
 _PREFIX_HANDLERS = (
+    ("sitecontrol/activation-receipts/", _activation_receipt),
     ("members/profile_pictures/", _members_photo),
     ("meetings/attachments/", _meeting_attachment),
     ("welfare/cases/", _welfare_attachment),

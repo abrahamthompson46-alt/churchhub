@@ -179,12 +179,23 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         expired = self.client.get(reverse("subscription_expired"))
         self.assertEqual(expired.status_code, 200)
         self.assertContains(expired, "Your demo has ended")
-        self.assertContains(expired, "Request the full version")
+        self.assertContains(expired, "Continue to payment")
         self.assertContains(expired, "Your records are kept")
-        self.assertContains(expired, reverse("subscription_subscribe"))
+        self.assertContains(expired, reverse("subscription_pay"))
+        self.assertNotContains(expired, reverse("subscription_subscribe"))
         self.assertNotContains(expired, "mailto:")
         self.assertNotContains(expired, "support@churchhub.local")
         self.assertNotContains(expired, "Send your church name")
+
+        pay = self.client.get(reverse("subscription_pay"))
+        self.assertEqual(pay.status_code, 200)
+        self.assertContains(pay, "Complete payment")
+        self.assertContains(pay, "I have completed this payment")
+        self.assertContains(pay, "DM01")
+        self.assertContains(pay, "data-copy-target")
+        blocked = self.client.get(reverse("subscription_subscribe"))
+        self.assertEqual(blocked.status_code, 302)
+        self.assertEqual(blocked.url, reverse("subscription_pay"))
 
         logout = self.client.post(reverse("logout"))
         self.assertIn(logout.status_code, (200, 302))
@@ -268,6 +279,24 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         )
         app, sub, user = self._expire_demo_user()
 
+        skipped = self.client.get(reverse("subscription_subscribe"))
+        self.assertEqual(skipped.status_code, 302)
+        self.assertEqual(skipped.url, reverse("subscription_pay"))
+
+        unpaid = self.client.post(
+            reverse("subscription_pay"),
+            {"billing_interval": "YEARLY"},
+        )
+        self.assertEqual(unpaid.status_code, 200)
+        self.assertContains(unpaid, "I have completed this payment")
+
+        paid = self.client.post(
+            reverse("subscription_pay"),
+            {"billing_interval": "YEARLY", "payment_completed": "on"},
+        )
+        self.assertEqual(paid.status_code, 302)
+        self.assertEqual(paid.url, reverse("subscription_subscribe"))
+
         get_form = self.client.get(reverse("subscription_subscribe"))
         self.assertEqual(get_form.status_code, 200)
         self.assertContains(get_form, "Payment reference")
@@ -309,6 +338,8 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         self.assertEqual(req.payment_reference, "TRX-10482")
         self.assertEqual(req.church_id, app.created_church_id)
         self.assertEqual(req.submitted_by_id, user.pk)
+        self.assertEqual(req.billing_interval, "YEARLY")
+        self.assertEqual(req.payment_reference_normalized, "TRX-10482")
 
         note = Notification.objects.get(user=owner)
         self.assertEqual(note.title, "Full version request")
@@ -324,6 +355,8 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         self.assertEqual(platform_list.status_code, 200)
         self.assertContains(platform_list, "TRX-10482")
         self.assertContains(platform_list, "full-version request")
+        if req.plan_name:
+            self.assertContains(platform_list, req.plan_name)
 
     def test_active_subscription_cannot_open_subscribe_form(self):
         submit_tenant_application(self._payload())
@@ -332,3 +365,85 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         response = self.client.get(reverse("subscription_subscribe"))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("dashboard:home"))
+        pay = self.client.get(reverse("subscription_pay"))
+        self.assertEqual(pay.status_code, 302)
+        self.assertEqual(pay.url, reverse("dashboard:home"))
+
+    def test_seven_day_warning_allows_pay_flow(self):
+        from dashboard.models import Notification
+
+        submit_tenant_application(self._payload())
+        user = User.objects.get(username="pastorada")
+        sub = TenantSubscription.objects.get(church=user.church)
+        sub.expires_at = timezone.now().date() + timedelta(days=5)
+        sub.save(update_fields=["expires_at"])
+        self.assertTrue(sub.is_operational)
+        self.client.force_login(user)
+
+        home = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(home.status_code, 200)
+        self.assertContains(home, "Pay now, then send upgrade details")
+        self.assertTrue(
+            Notification.objects.filter(
+                user=user, title="Subscription ending soon"
+            ).exists()
+        )
+
+        pay = self.client.get(reverse("subscription_pay"))
+        self.assertEqual(pay.status_code, 200)
+        skipped = self.client.get(reverse("subscription_subscribe"))
+        self.assertEqual(skipped.url, reverse("subscription_pay"))
+
+    def test_duplicate_payment_reference_rejected_across_churches(self):
+        from sitecontrol.models import SubscriptionActivationRequest
+
+        first, _sub, _user = self._expire_demo_user()
+        self.client.post(
+            reverse("subscription_pay"),
+            {"billing_interval": "MONTHLY", "payment_completed": "on"},
+        )
+        posted = self.client.post(
+            reverse("subscription_subscribe"),
+            {
+                "church_name": "Demo Chapel",
+                "church_code": "DM01",
+                "contact_name": "Pastor Ada",
+                "contact_email": "ada@demo.test",
+                "payment_reference": "SHARED-REF-1",
+            },
+        )
+        self.assertEqual(posted.status_code, 302)
+        self.assertEqual(SubscriptionActivationRequest.objects.count(), 1)
+
+        self.client.logout()
+        submit_tenant_application(
+            self._payload(
+                church_name="Second Chapel",
+                church_code="DM02",
+                contact_email="ada2@demo.test",
+                contact_phone="+233 24 999 0000",
+                applicant_username="pastorada2",
+            )
+        )
+        other = User.objects.get(username="pastorada2")
+        other_sub = TenantSubscription.objects.get(church=other.church)
+        other_sub.expires_at = timezone.now().date()
+        other_sub.save(update_fields=["expires_at"])
+        self.client.force_login(other)
+        self.client.post(
+            reverse("subscription_pay"),
+            {"billing_interval": "MONTHLY", "payment_completed": "on"},
+        )
+        rejected = self.client.post(
+            reverse("subscription_subscribe"),
+            {
+                "church_name": "Second Chapel",
+                "church_code": "DM02",
+                "contact_name": "Pastor Two",
+                "contact_email": "ada2@demo.test",
+                "payment_reference": "shared-ref-1",
+            },
+        )
+        self.assertEqual(rejected.status_code, 200)
+        self.assertContains(rejected, "already used for another church")
+        self.assertEqual(SubscriptionActivationRequest.objects.count(), 1)

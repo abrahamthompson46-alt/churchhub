@@ -60,6 +60,14 @@
     </div>
     {% endif %}
 
+    {% if subscription_expiry_warning and not user.is_platform_user %}
+    <div class="alert alert-warning border-0 rounded-0 mb-0 py-2 px-3 text-center small">
+        Access ends in <strong>{{ subscription_expiry_warning.days }}</strong> day{{ subscription_expiry_warning.days|pluralize }}
+        ({{ subscription_expiry_warning.expires_at }}).
+        <a href="{{ subscription_expiry_warning.pay_url }}" class="alert-link fw-semibold">Pay now, then send upgrade details</a>
+    </div>
+    {% endif %}
+
     {% include "includes/messages.html" %}
 
     <main class="main-content {% if not user.is_authenticated %}main-content--auth{% endif %}">

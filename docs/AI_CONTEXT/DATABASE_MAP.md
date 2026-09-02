@@ -328,8 +328,7 @@ Distinct from `sitecontrol.PlatformAnnouncement`.
 | `PlatformAuditLog` | Immutable platform audit |
 | `PlatformAnnouncement` | Platform-wide announcements |
 | `TenantApplication` | Public/apply workflow; status PENDING/APPROVED/REJECTED/WITHDRAWN; types EXISTING_DISTRICT/NEW_HIERARCHY; `contact_phone_normalized` for demo identity lock |
-| `SubscriptionActivationRequest` | Expired-church full-version request; church + payment_reference snapshots; status PENDING/ACKNOWLEDGED/ACTIVATED/REJECTED; unique pending per church |
-| `SubscriptionActivationRequest` | Expired-church full-version request; church + payment_reference snapshots; status PENDING/ACKNOWLEDGED/ACTIVATED/REJECTED; unique pending per church |
+| `SubscriptionActivationRequest` | Full-version request; payment_reference_normalized unique among non-rejected; billing interval/amount/plan_name; optional receipt; unique pending per church |
 | `Denomination` | SaaS tenant boundary; branding; feature flags; `allow_institution_branding`; defaults |
 | `MarketingSettings` | Singleton public inquiry, privacy consent, retention, website and sales-notification settings |
 | `MarketingCampaign` | UUID campaign; status/period and UTM attribution metadata |

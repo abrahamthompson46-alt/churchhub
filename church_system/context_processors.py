@@ -17,15 +17,23 @@ def church_context(request):
             "user_church": None,
             "available_churches": [],
             "can_switch_church": False,
+            "subscription_expiry_warning": None,
         }
     active_church = get_active_church(request) if request.user.is_authenticated else None
     churches = get_available_churches(request.user) if request.user.is_authenticated else []
     can_switch = request.user.is_authenticated and churches.count() > 1
+    expiry_warning = None
+    if active_church:
+        from sitecontrol.activation_services import expiry_warning_context
+        from sitecontrol.services import get_church_subscription
+
+        expiry_warning = expiry_warning_context(get_church_subscription(active_church))
     return {
         "active_church": active_church,
         "user_church": get_user_church(request.user),
         "available_churches": churches[:100],
         "can_switch_church": can_switch,
+        "subscription_expiry_warning": expiry_warning,
     }
 
 

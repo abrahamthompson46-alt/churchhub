@@ -107,6 +107,15 @@ class PlatformServiceTests(TestCase):
         sub = ensure_church_subscription(self.church)
         self.assertIsInstance(sub, TenantSubscription)
 
+    def test_repeated_feature_checks_do_not_duplicate_subscription(self):
+        from sitecontrol.models import TenantSubscription
+        from sitecontrol.services import church_has_feature
+
+        self.assertEqual(TenantSubscription.objects.filter(church=self.church).count(), 0)
+        self.assertTrue(church_has_feature(self.church, "ledger"))
+        self.assertTrue(church_has_feature(self.church, "budgets"))
+        self.assertEqual(TenantSubscription.objects.filter(church=self.church).count(), 1)
+
     def test_feature_flag_when_enforcement_off(self):
         """Soft mode: operational tenants get known features when enforce is off."""
         from sitecontrol.services import church_has_feature, clear_settings_cache, ensure_church_subscription

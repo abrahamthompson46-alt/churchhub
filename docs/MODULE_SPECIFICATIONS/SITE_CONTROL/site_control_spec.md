@@ -85,7 +85,7 @@ erDiagram
 |--------|------|
 | `selectors.py` | Read/query helpers: denominations, plans, payment methods, churches/subscriptions, applications, audit/announcements, operator/user lookups, hierarchy slices |
 | `repositories.py` | Persistence only: platform audit, model save, payment bulk create, plan/subscription create/update, application/denomination writes, orphan conference assign |
-| `services.py` | Settings cache, features/entitlements, plans, subscriptions lifecycle, tenant suspend/reactivate/offboard, stats, audit helper, seed suite |
+| `services.py` | Settings cache, features/entitlements, plans, subscriptions lifecycle (`ensure_church_subscription` is idempotent / get-or-create), tenant suspend/reactivate/offboard, stats, audit helper, seed suite |
 | `provisioning_services.py` | Tenant provision workflows |
 | `registration_services.py` | Apply / approve / reject applications |
 | `denomination_services.py` | Labels, seeds, builtins |

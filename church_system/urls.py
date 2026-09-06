@@ -12,6 +12,7 @@ from sitecontrol.views_registration import (
     church_apply_success,
     subscription_expired,
     subscription_pay,
+    subscription_plans,
     subscription_subscribe,
 )
 from sitecontrol.views_marketing import marketing_inquiry, marketing_inquiry_success
@@ -27,6 +28,11 @@ urlpatterns = [
         "accounts/subscription-expired/",
         subscription_expired,
         name="subscription_expired",
+    ),
+    path(
+        "accounts/subscription-plans/",
+        subscription_plans,
+        name="subscription_plans",
     ),
     path(
         "accounts/subscription-pay/",

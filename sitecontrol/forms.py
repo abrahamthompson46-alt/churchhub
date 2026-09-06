@@ -181,6 +181,21 @@ class TenantApplicationForm(forms.Form):
         return cleaned
 
 
+class SubscriptionPlanSelectForm(forms.Form):
+    plan = forms.ModelChoiceField(
+        queryset=SubscriptionPlan.objects.none(),
+        widget=forms.RadioSelect(attrs={"class": "form-check-input"}),
+        label="Plan",
+        empty_label=None,
+    )
+
+    def __init__(self, *args, **kwargs):
+        from sitecontrol.selectors import active_plans_ordered
+
+        super().__init__(*args, **kwargs)
+        self.fields["plan"].queryset = active_plans_ordered()
+
+
 class SubscriptionPayForm(forms.Form):
     billing_interval = forms.ChoiceField(
         choices=TenantSubscription.BILLING_INTERVALS,

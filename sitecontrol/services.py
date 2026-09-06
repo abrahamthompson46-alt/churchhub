@@ -645,6 +645,22 @@ def record_subscription_payment(
     if timezone.is_naive(paid_at):
         paid_at = timezone.make_aware(paid_at, timezone.get_current_timezone())
 
+    from sitecontrol.activation_services import (
+        mark_activation_requests_activated,
+        open_activation_request_for_church,
+    )
+
+    pending = open_activation_request_for_church(subscription.church)
+    if pending:
+        if pending.requested_plan_id:
+            subscription.plan = pending.requested_plan
+        if pending.billing_interval in ("MONTHLY", "YEARLY"):
+            subscription.billing_interval = pending.billing_interval
+        subscription.price_snapshot = build_price_snapshot(
+            subscription.plan,
+            subscription.billing_interval,
+        )
+
     subscription.last_payment_at = paid_at
     if payment_method is not None:
         subscription.payment_method = payment_method
@@ -686,8 +702,6 @@ def record_subscription_payment(
 
     repo.save_subscription(subscription)
     clear_church_plan_cache(subscription.church)
-    from sitecontrol.activation_services import mark_activation_requests_activated
-
     mark_activation_requests_activated(subscription.church, reviewer=user)
     return subscription
 

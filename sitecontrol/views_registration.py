@@ -15,6 +15,7 @@ from sitecontrol.forms import (
     RegistrationSettingsForm,
     SubscriptionActivationRequestForm,
     SubscriptionPayForm,
+    SubscriptionPlanSelectForm,
     TenantApplicationForm,
 )
 from sitecontrol import repositories as repo
@@ -26,7 +27,9 @@ from sitecontrol.activation_services import (
     payment_confirmation_for,
     pending_request_for_church,
     plan_price_for_interval,
+    resolve_upgrade_plan,
     store_payment_confirmation,
+    store_plan_selection,
     submit_activation_request,
 )
 from sitecontrol.registration_services import (
@@ -158,16 +161,22 @@ def _upgrade_flow_or_redirect(request):
     return (user, church, sub), None
 
 
-def _upgrade_page_context(church, sub, **extra):
+def _upgrade_page_context(church, sub, *, plan=None, **extra):
     settings_obj = get_site_settings()
-    plan = sub.plan if sub else None
+    if plan is None:
+        plan = sub.plan if sub else None
+    billing_currency = ""
+    if plan and getattr(plan, "currency", None):
+        billing_currency = plan.currency
+    if not billing_currency:
+        billing_currency = settings_obj.default_billing_currency
     ctx = {
         "site_name": settings_obj.site_name,
         "subscription": sub,
         "church": church,
         "plan": plan,
         "pending_request": pending_request_for_church(church),
-        "billing_currency": settings_obj.default_billing_currency,
+        "billing_currency": billing_currency,
         "billing_payment_instructions": (
             settings_obj.billing_payment_instructions or ""
         ).strip(),
@@ -175,6 +184,7 @@ def _upgrade_page_context(church, sub, **extra):
         "monthly_amount": plan_price_for_interval(plan, "MONTHLY"),
         "yearly_amount": plan_price_for_interval(plan, "YEARLY"),
         "transfer_memo": (church.code if church else "") or (church.name if church else ""),
+        "catalog_plans": selectors.active_plans_ordered(),
     }
     ctx.update(extra)
     return ctx
@@ -190,8 +200,57 @@ def subscription_expired(request):
     return render(
         request,
         "registration/subscription_expired.html",
-        _upgrade_page_context(church, sub),
+        _upgrade_page_context(church, sub, plan=resolve_upgrade_plan(request.session, church)),
     )
+
+
+@login_required
+def subscription_plans(request):
+    """Choose among active platform plans; prices come from the selected plan."""
+    scoped, bounce = _upgrade_flow_or_redirect(request)
+    if bounce:
+        return bounce
+    _user, church, sub = scoped
+    plans = selectors.active_plans_ordered()
+    current = resolve_upgrade_plan(request.session, church)
+    form = SubscriptionPlanSelectForm(
+        request.POST or None,
+        initial={"plan": current.pk if current else None},
+    )
+    if not plans.exists():
+        flash_error(
+            request,
+            "No subscription plans are available yet. Contact the platform owner.",
+            title="Plans unavailable",
+        )
+    elif request.method == "POST" and form.is_valid():
+        store_plan_selection(request.session, church=church, plan=form.cleaned_data["plan"])
+        return redirect("subscription_pay")
+    plan_choice_rows = list(zip(form["plan"], plans))
+    return render(
+        request,
+        "registration/subscription_plans.html",
+        _upgrade_page_context(
+            church,
+            sub,
+            plan=current,
+            plan_form=form,
+            catalog_plans=plans,
+            plan_choice_rows=plan_choice_rows,
+        ),
+    )
+
+
+def _require_upgrade_plan(request, church):
+    plan = resolve_upgrade_plan(request.session, church)
+    if plan is not None:
+        return plan, None
+    flash_warning(
+        request,
+        "Choose a plan first. The amount to pay is taken from that plan.",
+        title="Select a plan",
+    )
+    return None, redirect("subscription_plans")
 
 
 @login_required
@@ -201,6 +260,9 @@ def subscription_pay(request):
     if bounce:
         return bounce
     _user, church, sub = scoped
+    plan, missing_plan = _require_upgrade_plan(request, church)
+    if missing_plan:
+        return missing_plan
     pending = pending_request_for_church(church)
     initial_interval = payment_confirmation_for(request.session, church)
     if not initial_interval and pending:
@@ -214,12 +276,13 @@ def subscription_pay(request):
             request.session,
             church=church,
             billing_interval=form.cleaned_data["billing_interval"],
+            plan=plan,
         )
         return redirect("subscription_subscribe")
     return render(
         request,
         "registration/subscription_pay.html",
-        _upgrade_page_context(church, sub, pay_form=form),
+        _upgrade_page_context(church, sub, plan=plan, pay_form=form),
     )
 
 
@@ -230,6 +293,9 @@ def subscription_subscribe(request):
     if bounce:
         return bounce
     user, church, sub = scoped
+    plan, missing_plan = _require_upgrade_plan(request, church)
+    if missing_plan:
+        return missing_plan
 
     billing_interval = payment_confirmation_for(request.session, church)
     if not billing_interval:
@@ -284,6 +350,7 @@ def subscription_subscribe(request):
     if request.method == "POST" and form.is_valid():
         data = dict(form.cleaned_data)
         data["billing_interval"] = billing_interval
+        data["requested_plan"] = plan
         try:
             submit_activation_request(
                 church=church,
@@ -308,6 +375,7 @@ def subscription_subscribe(request):
         _upgrade_page_context(
             church,
             sub,
+            plan=plan,
             form=form,
             selected_interval=billing_interval,
         ),

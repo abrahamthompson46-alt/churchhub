@@ -314,6 +314,7 @@ def activation_requests_list_base():
         "denomination",
         "submitted_by",
         "reviewed_by",
+        "requested_plan",
     ).order_by("-created_at")
 
 

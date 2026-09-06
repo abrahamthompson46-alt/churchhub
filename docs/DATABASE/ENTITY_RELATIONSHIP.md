@@ -345,6 +345,7 @@ erDiagram
   Church ||--o{ TenantApplication : created_church
   Church ||--o{ SubscriptionActivationRequest : requests
   TenantSubscription ||--o{ SubscriptionActivationRequest : optional
+  SubscriptionPlan ||--o{ SubscriptionActivationRequest : requested_plan
   Denomination ||--o{ SubscriptionActivationRequest : optional
   UserInvitation ||--o{ TenantApplication : invitation
   User ||--o{ PlatformAuditLog : actor

@@ -1,6 +1,7 @@
 """Public 30-day demo: auto-provision, identity lock, hard expiry cutoff."""
 
 from datetime import timedelta
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -9,7 +10,7 @@ from django.utils import timezone
 
 from organization.models import Church, Conference, District, Zone
 from permissions.roles import UserRole
-from sitecontrol.models import SiteSettings, TenantApplication, TenantSubscription
+from sitecontrol.models import SiteSettings, SubscriptionPlan, TenantApplication, TenantSubscription
 from sitecontrol.registration_services import (
     DEMO_IDENTITY_ERROR,
     PUBLIC_DEMO_TRIAL_DAYS_CAP,
@@ -20,6 +21,7 @@ from sitecontrol.services import (
     clear_settings_cache,
     ensure_default_plans,
     get_default_plan,
+    record_subscription_payment,
 )
 from sitecontrol.test_support import SiteControlClientHarness
 
@@ -179,23 +181,28 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         expired = self.client.get(reverse("subscription_expired"))
         self.assertEqual(expired.status_code, 200)
         self.assertContains(expired, "Your demo has ended")
-        self.assertContains(expired, "Continue to payment")
+        self.assertContains(expired, "Choose a plan")
         self.assertContains(expired, "Your records are kept")
-        self.assertContains(expired, reverse("subscription_pay"))
+        self.assertContains(expired, reverse("subscription_plans"))
         self.assertNotContains(expired, reverse("subscription_subscribe"))
         self.assertNotContains(expired, "mailto:")
         self.assertNotContains(expired, "support@churchhub.local")
         self.assertNotContains(expired, "Send your church name")
 
         pay = self.client.get(reverse("subscription_pay"))
-        self.assertEqual(pay.status_code, 200)
-        self.assertContains(pay, "Complete payment")
-        self.assertContains(pay, "I have completed this payment")
-        self.assertContains(pay, "DM01")
-        self.assertContains(pay, "data-copy-target")
+        self.assertEqual(pay.status_code, 302)
+        self.assertEqual(pay.url, reverse("subscription_plans"))
         blocked = self.client.get(reverse("subscription_subscribe"))
         self.assertEqual(blocked.status_code, 302)
-        self.assertEqual(blocked.url, reverse("subscription_pay"))
+        self.assertEqual(blocked.url, reverse("subscription_plans"))
+
+        catalog = self.client.get(reverse("subscription_plans"))
+        self.assertEqual(catalog.status_code, 200)
+        self.assertContains(catalog, "Starter")
+        self.assertContains(catalog, "Standard")
+        self.assertContains(catalog, "Enterprise")
+        self.assertContains(catalog, "/month")
+        self.assertContains(catalog, "/year")
 
         logout = self.client.post(reverse("logout"))
         self.assertIn(logout.status_code, (200, 302))
@@ -263,6 +270,24 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         self.client.force_login(user)
         return app, sub, user
 
+    def _priced_starter(self):
+        starter = SubscriptionPlan.objects.get(code="starter")
+        starter.price_monthly = Decimal("50.00")
+        starter.price_yearly = Decimal("500.00")
+        starter.currency = "GHS"
+        starter.save(update_fields=["price_monthly", "price_yearly", "currency"])
+        return starter
+
+    def _choose_plan(self, plan=None):
+        plan = plan or self._priced_starter()
+        response = self.client.post(
+            reverse("subscription_plans"),
+            {"plan": str(plan.pk)},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("subscription_pay"))
+        return plan
+
     def test_subscribe_form_creates_request_and_notifies_platform(self):
         from dashboard.models import Notification
         from sitecontrol.models import SubscriptionActivationRequest
@@ -278,10 +303,19 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
             platform_role="OWNER",
         )
         app, sub, user = self._expire_demo_user()
+        starter = self._priced_starter()
 
         skipped = self.client.get(reverse("subscription_subscribe"))
         self.assertEqual(skipped.status_code, 302)
-        self.assertEqual(skipped.url, reverse("subscription_pay"))
+        self.assertEqual(skipped.url, reverse("subscription_plans"))
+
+        self._choose_plan(starter)
+        pay_page = self.client.get(reverse("subscription_pay"))
+        self.assertEqual(pay_page.status_code, 200)
+        self.assertContains(pay_page, "Starter")
+        self.assertContains(pay_page, "500.00")
+        self.assertContains(pay_page, "I have completed this payment")
+        self.assertContains(pay_page, "DM01")
 
         unpaid = self.client.post(
             reverse("subscription_pay"),
@@ -301,6 +335,8 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         self.assertEqual(get_form.status_code, 200)
         self.assertContains(get_form, "Payment reference")
         self.assertContains(get_form, "Demo Chapel")
+        self.assertContains(get_form, "Starter")
+        self.assertContains(get_form, "500.00")
 
         missing_ref = self.client.post(
             reverse("subscription_subscribe"),
@@ -340,10 +376,15 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         self.assertEqual(req.submitted_by_id, user.pk)
         self.assertEqual(req.billing_interval, "YEARLY")
         self.assertEqual(req.payment_reference_normalized, "TRX-10482")
+        self.assertEqual(req.requested_plan_id, starter.pk)
+        self.assertEqual(req.plan_name, "Starter")
+        self.assertEqual(req.amount, Decimal("500.00"))
+        self.assertEqual(req.currency, "GHS")
 
         note = Notification.objects.get(user=owner)
         self.assertEqual(note.title, "Full version request")
         self.assertIn("TRX-10482", note.message)
+        self.assertIn("Starter", note.message)
         self.assertIn(str(req.pk), note.action_url)
 
         alerts = tenant_health_alerts(owner)
@@ -355,8 +396,28 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         self.assertEqual(platform_list.status_code, 200)
         self.assertContains(platform_list, "TRX-10482")
         self.assertContains(platform_list, "full-version request")
-        if req.plan_name:
-            self.assertContains(platform_list, req.plan_name)
+        self.assertContains(platform_list, "Starter")
+        self.assertContains(platform_list, "500.00")
+
+        platform_detail = self.client.get(
+            reverse("sitecontrol:activation_request_detail", args=[req.pk])
+        )
+        self.assertEqual(platform_detail.status_code, 200)
+        self.assertContains(platform_detail, "Starter")
+        self.assertContains(platform_detail, "500.00")
+        self.assertContains(platform_detail, "Yearly")
+
+        record_subscription_payment(
+            sub,
+            user=owner,
+            payment_reference="TRX-10482",
+        )
+        sub.refresh_from_db()
+        self.assertEqual(sub.plan_id, starter.pk)
+        self.assertEqual(sub.billing_interval, "YEARLY")
+        self.assertEqual(sub.status, "ACTIVE")
+        req.refresh_from_db()
+        self.assertEqual(req.status, "ACTIVATED")
 
     def test_active_subscription_cannot_open_subscribe_form(self):
         submit_tenant_application(self._payload())
@@ -368,6 +429,9 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         pay = self.client.get(reverse("subscription_pay"))
         self.assertEqual(pay.status_code, 302)
         self.assertEqual(pay.url, reverse("dashboard:home"))
+        plans = self.client.get(reverse("subscription_plans"))
+        self.assertEqual(plans.status_code, 302)
+        self.assertEqual(plans.url, reverse("dashboard:home"))
 
     def test_seven_day_warning_allows_pay_flow(self):
         from dashboard.models import Notification
@@ -382,7 +446,7 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
 
         home = self.client.get(reverse("dashboard:home"))
         self.assertEqual(home.status_code, 200)
-        self.assertContains(home, "Pay now, then send upgrade details")
+        self.assertContains(home, "Choose a plan, then pay and send upgrade details")
         self.assertTrue(
             Notification.objects.filter(
                 user=user, title="Subscription ending soon"
@@ -390,14 +454,18 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         )
 
         pay = self.client.get(reverse("subscription_pay"))
-        self.assertEqual(pay.status_code, 200)
+        self.assertEqual(pay.status_code, 302)
+        self.assertEqual(pay.url, reverse("subscription_plans"))
+        catalog = self.client.get(reverse("subscription_plans"))
+        self.assertEqual(catalog.status_code, 200)
         skipped = self.client.get(reverse("subscription_subscribe"))
-        self.assertEqual(skipped.url, reverse("subscription_pay"))
+        self.assertEqual(skipped.url, reverse("subscription_plans"))
 
     def test_duplicate_payment_reference_rejected_across_churches(self):
         from sitecontrol.models import SubscriptionActivationRequest
 
         first, _sub, _user = self._expire_demo_user()
+        self._choose_plan()
         self.client.post(
             reverse("subscription_pay"),
             {"billing_interval": "MONTHLY", "payment_completed": "on"},
@@ -430,6 +498,7 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         other_sub.expires_at = timezone.now().date()
         other_sub.save(update_fields=["expires_at"])
         self.client.force_login(other)
+        self._choose_plan()
         self.client.post(
             reverse("subscription_pay"),
             {"billing_interval": "MONTHLY", "payment_completed": "on"},

@@ -64,7 +64,7 @@
     <div class="alert alert-warning border-0 rounded-0 mb-0 py-2 px-3 text-center small">
         Access ends in <strong>{{ subscription_expiry_warning.days }}</strong> day{{ subscription_expiry_warning.days|pluralize }}
         ({{ subscription_expiry_warning.expires_at }}).
-        <a href="{{ subscription_expiry_warning.pay_url }}" class="alert-link fw-semibold">Pay now, then send upgrade details</a>
+        <a href="{{ subscription_expiry_warning.pay_url }}" class="alert-link fw-semibold">Choose a plan, then pay and send upgrade details</a>
     </div>
     {% endif %}
 

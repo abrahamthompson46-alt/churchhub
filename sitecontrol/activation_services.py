@@ -20,6 +20,7 @@ EXPIRY_WARNING_DAYS = 7
 SESSION_PAYMENT_CONFIRMED = "upgrade_payment_confirmed"
 SESSION_BILLING_INTERVAL = "upgrade_billing_interval"
 SESSION_PAY_CHURCH_ID = "upgrade_payment_church_id"
+SESSION_PLAN_ID = "upgrade_plan_id"
 PAYMENT_REF_IN_USE = (
     "This payment reference was already used for another church."
 )
@@ -52,6 +53,21 @@ def pending_request_for_church(church):
         return None
     return (
         SubscriptionActivationRequest.objects.filter(church=church, status="PENDING")
+        .select_related("requested_plan")
+        .order_by("-updated_at")
+        .first()
+    )
+
+
+def open_activation_request_for_church(church):
+    if church is None:
+        return None
+    return (
+        SubscriptionActivationRequest.objects.filter(
+            church=church,
+            status__in=("PENDING", "ACKNOWLEDGED"),
+        )
+        .select_related("requested_plan")
         .order_by("-updated_at")
         .first()
     )
@@ -91,7 +107,7 @@ def expiry_warning_context(subscription) -> dict | None:
     return {
         "days": days,
         "expires_at": subscription.expires_at,
-        "pay_url": reverse("subscription_pay"),
+        "pay_url": reverse("subscription_plans"),
     }
 
 
@@ -113,7 +129,7 @@ def maybe_notify_expiry_warning(request, user, church, subscription) -> None:
         title="Subscription ending soon",
         message=(
             f"Access for {church.name} ends in {info['days']} day(s) "
-            f"({subscription.expires_at.isoformat()}). Pay now, then send upgrade details."
+            f"({subscription.expires_at.isoformat()}). Choose a plan, pay, then send upgrade details."
         ),
         category="SYSTEM",
         action_url=info["pay_url"],
@@ -133,10 +149,43 @@ def plan_price_for_interval(plan, interval: str) -> Decimal | None:
     return Decimal(price)
 
 
-def store_payment_confirmation(session, *, church, billing_interval: str) -> None:
+def store_plan_selection(session, *, church, plan) -> None:
+    session[SESSION_PLAN_ID] = str(plan.pk)
+    session[SESSION_PAY_CHURCH_ID] = str(church.pk)
+    session.pop(SESSION_PAYMENT_CONFIRMED, None)
+
+
+def selected_plan_for(session, church):
+    """Return the active plan chosen in this session for this church."""
+    if not session or church is None:
+        return None
+    if session.get(SESSION_PAY_CHURCH_ID) != str(church.pk):
+        return None
+    plan_id = session.get(SESSION_PLAN_ID)
+    if not plan_id:
+        return None
+    from sitecontrol.models import SubscriptionPlan
+
+    return SubscriptionPlan.objects.filter(pk=plan_id, is_active=True).first()
+
+
+def resolve_upgrade_plan(session, church):
+    """Session selection first, then a pending request's plan."""
+    plan = selected_plan_for(session, church)
+    if plan is not None:
+        return plan
+    pending = pending_request_for_church(church)
+    if pending is not None and pending.requested_plan_id:
+        return pending.requested_plan
+    return None
+
+
+def store_payment_confirmation(session, *, church, billing_interval: str, plan=None) -> None:
     session[SESSION_PAYMENT_CONFIRMED] = True
     session[SESSION_BILLING_INTERVAL] = billing_interval
     session[SESSION_PAY_CHURCH_ID] = str(church.pk)
+    if plan is not None:
+        session[SESSION_PLAN_ID] = str(plan.pk)
 
 
 def payment_confirmation_for(session, church) -> str | None:
@@ -183,9 +232,9 @@ def _notify_platform_operators(activation_request):
         operators,
         title="Full version request",
         message=(
-            f"{activation_request.church_name} submitted payment reference "
-            f"{activation_request.payment_reference}{amount_bit} "
-            f"and requested the full version."
+            f"{activation_request.church_name} requested "
+            f"{activation_request.plan_name or 'a paid plan'}"
+            f"{amount_bit} (ref {activation_request.payment_reference})."
         ),
         category="SYSTEM",
         action_url=action_url,
@@ -201,7 +250,9 @@ def submit_activation_request(*, church, subscription, user, cleaned_data, reque
     denomination = church_denomination(church)
     ip_address = get_client_ip(request) if request is not None else None
     interval = cleaned_data.get("billing_interval") or "MONTHLY"
-    plan = subscription.plan if subscription else None
+    plan = cleaned_data.get("requested_plan")
+    if plan is None and subscription is not None:
+        plan = subscription.plan
     amount = plan_price_for_interval(plan, interval)
     currency = ""
     if request is not None:
@@ -227,6 +278,7 @@ def submit_activation_request(*, church, subscription, user, cleaned_data, reque
         "amount": amount,
         "currency": currency,
         "plan_name": plan.name if plan else "",
+        "requested_plan": plan,
         "notes": (cleaned_data.get("notes") or "").strip(),
         "ip_address": ip_address,
         "status": "PENDING",
@@ -259,6 +311,8 @@ def submit_activation_request(*, church, subscription, user, cleaned_data, reque
                     "church_id": str(church.pk),
                     "payment_reference": activation_request.payment_reference,
                     "billing_interval": interval,
+                    "plan_id": str(plan.pk) if plan else "",
+                    "plan_name": plan.name if plan else "",
                     "amount": str(amount) if amount is not None else "",
                 },
             )

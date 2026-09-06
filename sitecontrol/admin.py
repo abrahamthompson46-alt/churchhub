@@ -97,7 +97,7 @@ class SubscriptionActivationRequestAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "billing_interval")
     search_fields = ("church_name", "payment_reference", "contact_email", "church_code", "plan_name")
-    autocomplete_fields = ("church",)
+    autocomplete_fields = ("church", "requested_plan")
 
 
 @admin.register(PlatformAuditLog)

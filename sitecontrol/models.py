@@ -937,6 +937,13 @@ class SubscriptionActivationRequest(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     currency = models.CharField(max_length=3, blank=True)
     plan_name = models.CharField(max_length=80, blank=True)
+    requested_plan = models.ForeignKey(
+        SubscriptionPlan,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="activation_requests",
+    )
     receipt = models.FileField(
         upload_to=activation_receipt_upload_to,
         blank=True,

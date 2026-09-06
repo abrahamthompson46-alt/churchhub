@@ -17,7 +17,7 @@
                         <p class="text-muted mb-0">
                             {% if church %}Access for <strong>{{ church.name }}</strong> is paused.{% else %}This workspace’s trial is over.{% endif %}
                             {% if subscription and subscription.expires_at %} It ended on {{ subscription.expires_at }}.{% endif %}
-                            Your records are kept. Pay first, then send your church and payment details so we can upgrade this same church.
+                            Your records are kept. Choose a plan, pay, then send your church and payment details so we can upgrade this same church.
                         </p>
                     </div>
 
@@ -26,7 +26,10 @@
                         <i class="bi bi-check-circle mt-1"></i>
                         <div>
                             <div class="fw-semibold">Request received</div>
-                            <div class="small mb-0">Payment reference <strong>{{ pending_request.payment_reference }}</strong> is with the platform owner. You can update it after paying if needed.</div>
+                            <div class="small mb-0">
+                                {% if pending_request.plan_name %}<strong>{{ pending_request.plan_name }}</strong> · {% endif %}
+                                Payment reference <strong>{{ pending_request.payment_reference }}</strong> is with the platform owner. You can update it after paying if needed.
+                            </div>
                         </div>
                     </div>
                     {% endif %}
@@ -34,38 +37,28 @@
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
                             <div class="h-100 border rounded-3 p-3 bg-light">
-                                <div class="text-primary fw-bold mb-1">1. Pay</div>
-                                <p class="small text-muted mb-0">Open the payment page and complete payment for this church.</p>
+                                <div class="text-primary fw-bold mb-1">1. Choose a plan</div>
+                                <p class="small text-muted mb-0">Pick among published plans. The price is attached to the plan you select.</p>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="h-100 border rounded-3 p-3 bg-light">
-                                <div class="text-primary fw-bold mb-1">2. Send details</div>
-                                <p class="small text-muted mb-0">Submit institution details and your payment reference in ChurchHub.</p>
+                                <div class="text-primary fw-bold mb-1">2. Pay</div>
+                                <p class="small text-muted mb-0">Complete payment for the selected plan and confirm it here.</p>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="h-100 border rounded-3 p-3 bg-light">
-                                <div class="text-primary fw-bold mb-1">3. We activate</div>
-                                <p class="small text-muted mb-0">Platform admins are notified immediately. Sign in as usual after activation.</p>
+                                <div class="text-primary fw-bold mb-1">3. Send details</div>
+                                <p class="small text-muted mb-0">Submit institution details and your payment reference. Platform admins are notified immediately.</p>
                             </div>
                         </div>
                     </div>
-
-                    {% if plan %}
-                    <div class="border rounded-3 p-3 mb-4">
-                        <div class="fw-semibold">{{ plan.name }}</div>
-                        <div class="text-muted small">
-                            {% if plan.price_monthly %}{{ billing_currency }} {{ plan.price_monthly }}/month{% endif %}
-                            {% if plan.price_yearly %} · {{ billing_currency }} {{ plan.effective_yearly_price|default:plan.price_yearly }}/year{% endif %}
-                        </div>
-                    </div>
-                    {% endif %}
 
                     <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
-                        <a class="btn btn-primary btn-lg px-4" href="{% url 'subscription_pay' %}">Continue to payment</a>
+                        <a class="btn btn-primary btn-lg px-4" href="{% url 'subscription_plans' %}">Choose a plan</a>
                         {% if pending_request %}
-                        <a class="btn btn-outline-primary btn-lg px-4" href="{% url 'subscription_pay' %}">Update upgrade details</a>
+                        <a class="btn btn-outline-primary btn-lg px-4" href="{% url 'subscription_plans' %}">Update upgrade details</a>
                         {% endif %}
                         <form method="post" action="{% url 'logout' %}">
                             {% csrf_token %}

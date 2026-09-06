@@ -3,6 +3,7 @@
 from django.core.exceptions import PermissionDenied
 
 from permissions.checks import can_view_all_churches
+from permissions.roles import UserRole
 from permissions.scoping import get_manageable_churches
 from organization.models import Church
 from church_system.denomination_scope import assert_church_in_active_denomination
@@ -25,6 +26,8 @@ def get_active_church(request):
     """
     Resolve the church context for the current request.
     Hierarchy users may switch via session within their manageable churches.
+    Tree admins with more than one church and no explicit GET/session church
+    stay unfocused (None) so the toolbar "All churches" matches dashboard SUBTREE.
     """
     if not request.user.is_authenticated:
         return None
@@ -32,8 +35,11 @@ def get_active_church(request):
     manageable = get_manageable_churches(request.user)
     church_id = request.GET.get("church")
     session = getattr(request, "session", None)
+    had_explicit = bool(church_id)
     if not church_id and session is not None:
         church_id = session.get("current_church_id")
+        if church_id:
+            had_explicit = True
 
     if church_id:
         church = _church_from_id(church_id, manageable)
@@ -42,7 +48,15 @@ def get_active_church(request):
             return church
         if session is not None and str(session.get("current_church_id") or "") == str(church_id):
             session.pop("current_church_id", None)
-        # Do not stop here — fall through so home church / single-church / all-churches can resolve.
+        # Stale/invalid explicit id: fall through to home church.
+
+    if not had_explicit:
+        tree_admin = (
+            getattr(request.user, "role", "") in UserRole.TREE_ADMIN_ROLES
+            or can_view_all_churches(request.user)
+        )
+        if tree_admin and manageable.count() > 1:
+            return None
 
     user_church = get_user_church(request.user)
     if user_church and manageable.filter(pk=user_church.pk).exists():

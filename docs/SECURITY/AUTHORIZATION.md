@@ -155,7 +155,7 @@ See `docs/MODULE_SPECIFICATIONS/ORGANIZATION/organization_spec.md`.
 
 | Function | Behavior |
 |----------|----------|
-| `get_active_church` | Session / `?church=` within manageable churches; **no unscoped fallback** |
+| `get_active_church` | Session / `?church=` within manageable churches. Hierarchy users with more than one church and **no** explicit session stay unfocused (`None` / “All churches”). Stale session IDs still fall back to home church. |
 | `filter_by_church` | Filter queryset to active church or manageable set |
 | `require_church` | Raise `PermissionDenied` if none |
 | `get_available_churches` | Toolbar switch list (denomination-filtered) |

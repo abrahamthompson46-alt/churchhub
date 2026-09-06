@@ -346,7 +346,7 @@ Default role facts (must drive the design, not slogans):
 | Permission | Default roles |
 |------------|----------------|
 | `view_transactions` | `_ROLE_ALL_STAFF` **+ BOARD_MEMBER** |
-| `manage_finances` | `_ROLE_ALL_STAFF` (includes SECRETARY, TREASURY, LOCAL_PASTOR, hierarchy) **not BOARD_MEMBER** |
+| `manage_finances` | `_ROLE_TREASURY_OPS` plus UNION_ADMIN, ZONE_DIRECTOR, DISTRICT_PASTOR, LOCAL_PASTOR — **not SECRETARY** (Current as of Sep 2026; historical finding below assumed `_ROLE_ALL_STAFF`) |
 | `manage_expenses` / `manage_receipts` | `_ROLE_ALL_STAFF` |
 | `manage_reconciliation` | `_ROLE_TREASURY_OPS` + LOCAL_PASTOR + DISTRICT_PASTOR |
 | `finalize_reconciliation` | `_ROLE_LEADERSHIP` + TREASURY |

@@ -68,7 +68,7 @@ class PermissionCheckTests(ChurchHubTestMixin, TestCase):
         self.assertTrue(can_manage_finances(user))
         self.assertTrue(user_has_permission(user, "manage_finances"))
 
-    def test_secretary_can_manage_members_and_finances(self):
+    def test_secretary_can_manage_members_not_finances(self):
         user = User.objects.create_user(
             username="perm_sec",
             password="pass12345",
@@ -76,7 +76,7 @@ class PermissionCheckTests(ChurchHubTestMixin, TestCase):
             church=self.church,
         )
         self.assertTrue(can_manage_members(user))
-        self.assertTrue(can_manage_finances(user))
+        self.assertFalse(can_manage_finances(user))
         self.assertFalse(can_approve_transactions(user))
 
     def test_member_is_restricted(self):

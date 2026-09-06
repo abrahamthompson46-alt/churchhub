@@ -50,6 +50,13 @@ class ActiveChurchScopeTests(TestCase):
         self.assertEqual(church, self.church_a)
         self.assertNotIn("current_church_id", request.session)
 
+    def test_tree_admin_without_session_stays_unfocused(self):
+        factory = RequestFactory()
+        request = factory.get("/dashboard/")
+        request.user = self.super
+        request.session = {}
+        self.assertIsNone(get_active_church(request))
+
     def test_super_admin_sees_inactive_church_in_manageable_scope(self):
         from permissions.scoping import get_manageable_churches
 

@@ -369,7 +369,11 @@
                             <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Income vs Expense — 6 months{% if dashboard_scope.finance_scope_label %} · {{ dashboard_scope.finance_scope_label }}{% endif %}</h2>
                         </div>
                         <div class="cc-panel__body">
+                            {% if chart_has_activity %}
                             <canvas id="trendChart" height="90"></canvas>
+                            {% else %}
+                            <p class="text-muted text-center mb-0 py-4">No approved income or expense in the last 6 posting months for this church.</p>
+                            {% endif %}
                         </div>
                     </section>
                 </div>
@@ -467,7 +471,7 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if show_finance_chart %}
+{% if show_finance_chart and chart_has_activity %}
 <script>
 const ctx = document.getElementById('trendChart');
 if (ctx) {

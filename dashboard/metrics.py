@@ -21,7 +21,7 @@ def aggregate_giving_and_ie_mtd(finance_church_ids, month_start_date):
             "mtd_expense": zeros,
             "mtd_net": zeros,
         }
-    mtd_lines = selectors.mtd_lines_for_churches(list(finance_church_ids), month_start_date)
+    mtd_lines = selectors.lines_for_churches_calendar_month(list(finance_church_ids), month_start_date)
     mtd_tithe, mtd_combined = selectors.sum_tithe_combined_mtd(mtd_lines)
     mtd_totals = selectors.sum_line_amounts_by_types(mtd_lines, ("INCOME", "EXPENSE"))
     mtd_income = mtd_totals["INCOME"]

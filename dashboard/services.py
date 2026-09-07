@@ -102,6 +102,26 @@ def _month_bounds(now=None):
     return now, month_start, month_start_date
 
 
+def _church_finance_as_of(church):
+    """Posting month for KPIs: open working day, else last closed day, else today."""
+    from transactions.services import get_working_day_status
+
+    status = get_working_day_status(church)
+    if status.get("working_date"):
+        return status["working_date"]
+    last = status.get("last_closed")
+    if last is not None:
+        return last.date
+    return timezone.localdate()
+
+
+def finance_as_of_date(scope):
+    """Business date for dashboard money KPIs and the 6-month chart."""
+    if scope and getattr(scope, "level", None) == "CHURCH" and scope.primary_church:
+        return _church_finance_as_of(scope.primary_church)
+    return timezone.localdate()
+
+
 def _sum_account_type(lines_qs, acc_type):
     return selectors.sum_line_amount_for_type(lines_qs, acc_type)
 
@@ -129,9 +149,9 @@ def get_workspace_finance_mtd(request):
         return None
 
     church = scope.primary_church
-
-    _, _, month_start_date = _month_bounds()
-    mtd_lines = selectors.mtd_lines_for_churches([church.pk], month_start_date)
+    as_of = _church_finance_as_of(church)
+    month_start_date = as_of.replace(day=1)
+    mtd_lines = selectors.lines_for_churches_calendar_month([church.pk], month_start_date)
     mtd_tithe, mtd_combined = selectors.sum_tithe_combined_mtd(mtd_lines)
     ie = selectors.sum_line_amounts_by_types(mtd_lines, ("INCOME", "EXPENSE"))
     mtd_remit = _sum_remittance_payable_mtd_for_churches([church], month_start_date)
@@ -145,10 +165,13 @@ def get_workspace_finance_mtd(request):
 
 def get_financial_summary(request):
     """Core financial KPIs for finance dashboards (MTD primary)."""
-    now, month_start, month_start_date = _month_bounds()
+    church = get_active_church(request)
+    as_of = _church_finance_as_of(church) if church else timezone.localdate()
+    month_start_date = as_of.replace(day=1)
+    now = timezone.now()
     transactions = selectors.transactions_for_request(request)
     approved = selectors.approved_transactions(transactions)
-    mtd_approved = approved.filter(date__gte=month_start_date)
+    mtd_approved = approved.filter(date__year=as_of.year, date__month=as_of.month)
     mtd_lines = selectors.lines_for_transactions(mtd_approved)
     all_time_lines = selectors.lines_for_transactions(approved)
 
@@ -157,7 +180,6 @@ def get_financial_summary(request):
     income_total = mtd_totals["INCOME"]
     expense_total = mtd_totals["EXPENSE"]
 
-    church = get_active_church(request)
     if church:
         monthly_cutoff_total = _sum_remittance_payable_mtd_for_churches(
             [church], month_start_date
@@ -167,15 +189,18 @@ def get_financial_summary(request):
             list(get_manageable_churches(request.user)), month_start_date
         )
 
-    six_months_ago = (now - relativedelta(months=5)).replace(day=1)
-    six_months_ago_date = (
-        timezone.localdate(six_months_ago) if timezone.is_aware(six_months_ago) else six_months_ago.date()
-    )
+    from datetime import datetime, time
+
+    as_of_dt = datetime.combine(as_of, time.min)
+    if timezone.is_aware(now):
+        as_of_dt = timezone.make_aware(as_of_dt, timezone.get_current_timezone())
+    six_months_ago = (as_of_dt - relativedelta(months=5)).replace(day=1)
+    six_months_ago_date = six_months_ago.date() if hasattr(six_months_ago, "date") else six_months_ago
     trend_qs = selectors.income_expense_trend_aggregates(all_time_lines, six_months_ago_date)
 
     trend_dict = {}
     for i in range(6):
-        m_dt = (now - relativedelta(months=i)).replace(day=1)
+        m_dt = (as_of_dt - relativedelta(months=i)).replace(day=1)
         label = m_dt.strftime("%b %Y")
         trend_dict[label] = {"INCOME": 0.0, "EXPENSE": 0.0}
 
@@ -504,11 +529,14 @@ def get_alerts(request, user):
 
 def get_hierarchy_rollup(request, user):
     """District-level financial roll-up for overseers, district pastors, and admins."""
+    from dashboard.scope import resolve_dashboard_scope
+
     manageable = get_manageable_churches(user)
     if not manageable.exists():
         return []
 
-    now, _, month_start_date = _month_bounds()
+    as_of = finance_as_of_date(resolve_dashboard_scope(request))
+    month_start_date = as_of.replace(day=1)
     church_rows = selectors.manageable_church_district_rows(manageable)
     if not church_rows:
         return []
@@ -628,16 +656,18 @@ def get_executive_kpis(
     elif not church_ids:
         return None
 
-    now, _, month_start_date = _month_bounds()
-
     if active_church is not None and active_church.pk in set(church_ids):
         finance_church_ids = [active_church.pk]
         finance_scope_label = active_church.name
         finance_scope = "church"
+        as_of = _church_finance_as_of(active_church)
     else:
         finance_church_ids = church_ids
         finance_scope_label = f"{len(church_ids)} churches"
         finance_scope = "scope"
+        as_of = timezone.localdate()
+
+    month_start_date = as_of.replace(day=1)
 
     if compliance is None:
         compliance = get_compliance_snapshot(
@@ -652,7 +682,7 @@ def get_executive_kpis(
         finance_scope_label=finance_scope_label,
         manageable=manageable,
         month_start_date=month_start_date,
-        period_label=now.strftime("%B %Y"),
+        period_label=as_of.strftime("%B %Y"),
         compliance=compliance,
         finance_scope=finance_scope,
     )
@@ -827,12 +857,14 @@ def user_has_asset_approval(user):
 def get_church_leaderboard(request, user, limit=8):
     """Rank churches in scope by MTD giving performance."""
     from django.urls import reverse
+    from dashboard.scope import resolve_dashboard_scope
 
     manageable = get_manageable_churches(user).select_related("district")
     if not manageable.exists():
         return []
 
-    _, _, month_start_date = _month_bounds()
+    as_of = finance_as_of_date(resolve_dashboard_scope(request))
+    month_start_date = as_of.replace(day=1)
     church_ids = list(manageable.values_list("id", flat=True))
 
     totals = selectors.church_mtd_giving_totals(church_ids, month_start_date)
@@ -1126,6 +1158,7 @@ def build_home_context(request):
     scope_banner = scope_selection_banner(scope, user)
     scope_switcher = scope_switcher_context(scope, request)
     church_focused = scope.level == "CHURCH" and scope.primary_church is not None
+    as_of = finance_as_of_date(scope)
 
     actions = apply_pinned_quick_actions(request, get_quick_actions(user))
     alerts = get_alerts(request, user)
@@ -1298,7 +1331,7 @@ def build_home_context(request):
     if finance_bundle is None and scope.church_ids:
         manageable = get_manageable_churches(user)
         church_ids = list(scope.church_ids)
-        now, _, month_start_date = _month_bounds()
+        month_start_date = as_of.replace(day=1)
         compliance = {}
         if show_finance:
             compliance = get_compliance_snapshot(
@@ -1311,7 +1344,7 @@ def build_home_context(request):
                 finance_scope_label=scope.finance_scope_label,
                 manageable=manageable,
                 month_start_date=month_start_date,
-                period_label=now.strftime("%B %Y"),
+                period_label=as_of.strftime("%B %Y"),
                 compliance=compliance or {"overdue_count": 0, "locked_periods": 0},
                 finance_scope="church" if scope.level == "CHURCH" else "scope",
             )
@@ -1342,13 +1375,24 @@ def build_home_context(request):
     )
 
     if show_finance_charts and scope.finance_church_ids:
-        labels, income, expense = metrics.income_expense_trend_chart(list(scope.finance_church_ids))
+        from datetime import datetime, time
+
+        as_of_dt = datetime.combine(as_of, time.min)
+        if timezone.is_aware(timezone.now()):
+            as_of_dt = timezone.make_aware(as_of_dt, timezone.get_current_timezone())
+        labels, income, expense = metrics.income_expense_trend_chart(
+            list(scope.finance_church_ids), now=as_of_dt
+        )
         context["trend_labels"] = labels
         context["income_data"] = income
         context["expense_data"] = expense
         context["show_finance_chart"] = True
+        context["chart_has_activity"] = any(
+            float(v) for v in (json.loads(income) + json.loads(expense))
+        )
     else:
         context["show_finance_chart"] = False
+        context["chart_has_activity"] = False
 
     if scope.level == "CHURCH" and scope.primary_church:
         context["has_active_church"] = True

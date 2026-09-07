@@ -69,6 +69,7 @@ class LedgerEntryForm(forms.Form):
             self.fields["category"].queryset = selectors.categories_for_type_qs(
                 church, txn_type
             )
+            self.fields["category"].label_from_instance = lambda obj: obj.name
             self.fields["member"].queryset = selectors.active_members_for_church_qs(church)
 
     def clean(self):

@@ -273,7 +273,7 @@ def build_kpi_widgets(
                 "income_mtd",
                 "Income MTD",
                 finance_bundle["mtd_income"],
-                f"{hint_scope} · receipts",
+                f"{hint_scope} · {period}",
                 receipts_url,
                 card_class="cc-kpi-card--success",
                 delta_pct=_delta("mtd_income"),

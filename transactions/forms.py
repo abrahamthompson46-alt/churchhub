@@ -11,6 +11,11 @@ from transactions.services import resolve_transaction_date
 _MONEY = lambda **extra: input_attrs(step="0.01", placeholder="0.00", **extra)
 
 
+def category_choice_label(obj):
+    """Show the category name only; the form already implies receipt vs expense."""
+    return obj.name
+
+
 class ReceiptForm(forms.Form):
     """Category-driven teller receipt: one category, one amount, description preserved."""
 
@@ -67,6 +72,7 @@ class ReceiptForm(forms.Form):
             self.fields["category"].queryset = ledger_selectors.categories_for_type_qs(
                 church, "RECEIPT"
             )
+            self.fields["category"].label_from_instance = category_choice_label
             self.fields["member"].queryset = Member.objects.filter(
                 church=church, is_active=True
             )
@@ -244,6 +250,7 @@ class ExpenseForm(forms.Form):
             self.fields["category"].queryset = ledger_selectors.categories_for_type_qs(
                 church, "EXPENSE"
             )
+            self.fields["category"].label_from_instance = category_choice_label
             self.fields["member"].queryset = Member.objects.filter(
                 church=church, is_active=True
             )

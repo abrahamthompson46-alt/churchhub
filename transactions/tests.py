@@ -462,6 +462,21 @@ class TransactionViewTests(FinancialServicesTests):
         self.assertContains(response, "preview-debit")
         self.assertContains(response, "preview-credit")
         self.assertContains(response, "expense-category-data")
+        html = response.content.decode()
+        self.assertNotIn(" (Expense)</option>", html)
+        self.assertIn("category-picker", html)
+
+    def test_record_receipt_page_omits_type_suffix_on_categories(self):
+        from ledger.services import seed_ledger
+        from transactions.services import create_default_accounts
+
+        create_default_accounts(self.church)
+        seed_ledger(self.church)
+        response = self.client.get(reverse("transactions:record_receipt"))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("js-category-picker", html)
+        self.assertNotIn(" (Receipt)</option>", html)
 
     def test_remittance_payment_get_not_405(self):
         session = self.client.session

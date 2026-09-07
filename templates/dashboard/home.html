@@ -126,6 +126,9 @@
 
     {% if dashboard_kpi_widgets or show_finance_chart %}
     <section class="cc-insight-band" aria-label="Key figures">
+        {% if church_focused and finance_as_of %}
+        <p class="cc-insight-band__asof">Figures use working day {{ finance_as_of|date:"j M Y" }}</p>
+        {% endif %}
         {% if dashboard_kpi_widgets %}
         <div class="cc-kpi-grid" aria-label="Dashboard KPIs">
             {% for widget in dashboard_kpi_widgets %}

@@ -71,13 +71,13 @@
             state.results.innerHTML = items
                 .map(function (opt, idx) {
                     return (
-                        '<button type="button" class="category-picker__option' +
+                        '<div class="category-picker__option' +
                         (idx === 0 ? " is-active" : "") +
                         '" role="option" data-value="' +
                         esc(opt.value) +
                         '">' +
                         esc(opt.textContent) +
-                        "</button>"
+                        "</div>"
                     );
                 })
                 .join("");

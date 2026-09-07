@@ -94,20 +94,20 @@ Key helpers: `get_user_denomination`, `get_active_denomination`, `filter_by_deno
 ```mermaid
 flowchart TD
   A[get_active_church] --> B{GET church= or session current_church_id?}
-  B -->|yes| C[Lookup in get_manageable_churches]
-  C --> D{Found in manageable set?}
-  D -->|yes| E[assert_church_in_active_denomination]
-  D -->|no| F[Return None — no unscoped fallback]
-  B -->|no| G{user.church?}
-  G -->|yes| H[Return home church]
+  B -->|yes and in manageable set| E[assert_church_in_active_denomination]
+  B -->|stale/invalid explicit id| H[Return home church if in scope]
+  B -->|no explicit id| T{tree admin and more than one church?}
+  T -->|yes| K[Return None — All churches]
+  T -->|no| G{user.church in scope?}
+  G -->|yes| H
   G -->|no| I{exactly one manageable?}
   I -->|yes| J[Return that church]
-  I -->|no| K[Return None]
+  I -->|no| K
 ```
 
 | Function | Behavior |
 |----------|----------|
-| `get_active_church` | Resolve context church within manageable set |
+| `get_active_church` | Resolve context church within manageable set; hierarchy multi-church with no session stays unfocused |
 | `filter_by_church` | Filter queryset to active church, or manageable set if user can view all churches |
 | `require_church` | Raise `PermissionDenied` if no context |
 | `get_available_churches` | Toolbar switch list (denomination-filtered) |

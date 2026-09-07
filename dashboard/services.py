@@ -117,15 +117,18 @@ def _sum_remittance_payable_mtd_for_churches(churches, month_start_date):
 
 
 def get_workspace_finance_mtd(request):
-    """MTD finance snapshot for the workspace status bar (active church)."""
-    from accounts.permissions import can_view_dashboard_finance
+    """MTD finance snapshot for the workspace status bar (focused church only)."""
+    from dashboard.scope import resolve_dashboard_scope
+    from dashboard.widgets import user_can_use_finance_kpis
 
-    if not request.user.is_authenticated or not can_view_dashboard_finance(request.user):
+    if not request.user.is_authenticated or not user_can_use_finance_kpis(request.user):
         return None
 
-    church = get_active_church(request)
-    if not church:
+    scope = resolve_dashboard_scope(request)
+    if scope.level != "CHURCH" or not scope.primary_church:
         return None
+
+    church = scope.primary_church
 
     _, _, month_start_date = _month_bounds()
     mtd_lines = selectors.mtd_lines_for_churches([church.pk], month_start_date)
@@ -851,6 +854,91 @@ def get_church_leaderboard(request, user, limit=8):
     return rows[:limit]
 
 
+def get_scope_exception_board(user, *, church_ids, limit=8):
+    """Churches in a subtree that need attention (finance, attendance, transfers)."""
+    from datetime import timedelta
+
+    from django.urls import reverse
+    from organization.models import Church
+
+    if not church_ids or len(church_ids) < 2:
+        return None
+    if not (
+        can_view_all_churches(user)
+        or can_manage_finances(user)
+        or can_run_cutoff(user)
+        or can_approve_transactions(user)
+    ):
+        return None
+
+    _, _, month_start_date = _month_bounds()
+    now = timezone.now()
+    prior_month = (now.replace(day=1) - relativedelta(months=1)).date().replace(day=1)
+    worship_since = timezone.localdate() - timedelta(days=10)
+
+    churches = list(
+        Church.objects.filter(pk__in=church_ids).select_related("district").order_by("name")
+    )
+    overdue_map = {
+        row.church_id: row
+        for row in selectors.overdue_cutoffs_for_churches(church_ids, prior_month)
+    }
+    pending_map = selectors.pending_transaction_counts_by_church(church_ids)
+    giving_map = selectors.church_mtd_giving_totals(church_ids, month_start_date)
+    member_map = selectors.member_counts_by_church(church_ids)
+    open_days = selectors.open_working_day_church_ids(church_ids)
+    worship_recent = selectors.churches_with_recent_worship(church_ids, worship_since)
+    stale_visitors = selectors.stale_open_visitor_counts_by_church(church_ids)
+    transfer_map = selectors.pending_transfer_counts_by_church(church_ids)
+    home_url = reverse("dashboard:home")
+
+    rows = []
+    for church in churches:
+        issues = []
+        overdue = overdue_map.get(church.pk)
+        pending = pending_map.get(church.pk, 0)
+        members = member_map.get(church.pk, 0)
+        giving = giving_map.get(church.pk, Decimal("0"))
+        stale = stale_visitors.get(church.pk, 0)
+        transfers = transfer_map.get(church.pk, 0)
+        severity = 0
+        if overdue:
+            issues.append("Overdue remittance")
+            severity += 3
+        if pending:
+            issues.append(f"{pending} pending journal(s)")
+            severity += 2
+        if members and church.pk not in open_days and (pending or overdue or giving > 0):
+            issues.append("Working day closed")
+            severity += 2
+        if members and church.pk not in worship_recent:
+            issues.append("No recent worship attendance")
+            severity += 2
+        if stale:
+            issues.append(f"{stale} stale visitor(s)")
+            severity += 1
+        if transfers:
+            issues.append(f"{transfers} pending transfer(s)")
+            severity += 1
+        if members and giving == 0:
+            issues.append("No giving MTD")
+            severity += 1
+        if not issues:
+            continue
+        rows.append({
+            "church": church.name,
+            "district": church.district.name if church.district_id else "—",
+            "issues": issues,
+            "severity": severity,
+            "pending": pending,
+            "giving_mtd": giving,
+            "focus_url": f"{home_url}?church={church.pk}",
+        })
+
+    rows.sort(key=lambda r: (-r["severity"], r["church"]))
+    return rows[:limit]
+
+
 def get_organization_health(request, user, *, compliance=None, kpis=None, pastoral=None):
     """Traffic-light health summary for mission control header."""
     if compliance is None:
@@ -1017,17 +1105,18 @@ def get_this_week_pulse(request):
 def build_home_context(request):
     """Assemble full dashboard context for the home view."""
     from dashboard import metrics
-    from dashboard.scope import resolve_dashboard_scope, scope_selection_banner
-    from dashboard.widgets import build_kpi_widgets
+    from dashboard.scope import (
+        resolve_dashboard_scope,
+        scope_selection_banner,
+        scope_switcher_context,
+    )
+    from dashboard.widgets import build_kpi_widgets, user_can_use_finance_kpis
 
     user = request.user
     role = get_dashboard_role(user)
-    show_finance = (
-        can_manage_finances(user)
-        or can_view_dashboard_finance(user)
-        or can_approve_transactions(user)
-    )
-    show_treasury_ops = show_finance or can_view_transactions(user)
+    show_money_kpis = user_can_use_finance_kpis(user)
+    show_finance = show_money_kpis
+    show_treasury_ops = show_finance or can_view_transactions(user) or can_manage_receipts(user)
     show_members = can_view_members(user) or can_manage_members(user)
     show_admin = can_view_all_churches(user) or user.is_superuser
     show_hierarchy = role in ("admin", "overseer", "district_overseer") or show_admin
@@ -1035,10 +1124,12 @@ def build_home_context(request):
 
     scope = resolve_dashboard_scope(request)
     scope_banner = scope_selection_banner(scope, user)
+    scope_switcher = scope_switcher_context(scope, request)
+    church_focused = scope.level == "CHURCH" and scope.primary_church is not None
 
     actions = apply_pinned_quick_actions(request, get_quick_actions(user))
     alerts = get_alerts(request, user)
-    show_finance_charts = show_finance and role in (
+    show_finance_charts = show_money_kpis and role in (
         "treasury",
         "admin",
         "finance",
@@ -1049,16 +1140,17 @@ def build_home_context(request):
     show_member_kpis = show_members and role in ("secretary", "members", "member", "leadership")
     show_upcoming_panel = role in ("secretary", "leadership", "members", "member")
     show_announcements_panel = role not in ("treasury",)
-    show_this_week_pulse = show_members and role in (
-        "secretary", "leadership", "members", "admin", "overseer", "district_overseer",
+    show_this_week_pulse = (
+        church_focused
+        and show_members
+        and role in (
+            "secretary", "leadership", "members", "admin", "overseer", "district_overseer",
+        )
     )
     # Mission Control finance KPIs live in the top strip; net MTD is on the workspace bar.
 
     # One primary work surface: teller for treasury ops, otherwise action queue.
-    show_teller = False
-    if show_treasury_ops:
-        church = get_active_church(request)
-        show_teller = bool(church) and role == "treasury"
+    show_teller = church_focused and role == "treasury" and show_treasury_ops
     primary_work = "teller" if show_teller else "queue"
     show_action_queue = True
     # Treasury: teller leads; queue stays but does not compete for first attention.
@@ -1098,31 +1190,38 @@ def build_home_context(request):
         "is_control_center": is_control_center,
         "dashboard_scope": scope,
         "scope_banner": scope_banner,
+        "scope_switcher": scope_switcher,
         "emphasize_approvals": role == "leadership",
         "primary_work": primary_work,
         "show_action_queue": show_action_queue,
         "show_action_queue_sidebar": show_action_queue_sidebar,
-        "show_role_focus_chips": False,
+        "church_focused": church_focused,
+        "show_money_kpis": show_money_kpis,
     }
 
     if is_control_center:
         manageable = get_manageable_churches(user)
-        church_ids = list(manageable.values_list("id", flat=True)) if manageable.exists() else []
+        church_ids = list(scope.church_ids)
         compliance = get_compliance_snapshot(
             request, user, church_ids=church_ids, manageable=manageable
         )
-        active_church = get_active_church(request)
         executive_kpis = get_executive_kpis(
             request,
             user,
             church_ids=church_ids,
             manageable=manageable,
             compliance=compliance,
-            active_church=active_church,
+            active_church=scope.primary_church,
         )
         context["executive_kpis"] = executive_kpis
         context["compliance_snapshot"] = compliance
         context["church_leaderboard"] = get_church_leaderboard(request, user)
+        if scope.level == "SUBTREE":
+            context["exception_board"] = get_scope_exception_board(
+                user, church_ids=church_ids
+            )
+        else:
+            context["exception_board"] = None
         context["org_health"] = get_organization_health(
             request, user, compliance=compliance, kpis=executive_kpis or {}
         )
@@ -1133,9 +1232,6 @@ def build_home_context(request):
     if role == "secretary" or user.role == UserRole.SECRETARY:
         context.update(get_secretary_summary(request))
 
-    if show_finance:
-        context.update(get_financial_summary(request))
-
     if is_control_center and context.get("executive_kpis"):
         ek = context["executive_kpis"]
         context["tithe_total"] = ek["mtd_tithe"]
@@ -1145,24 +1241,26 @@ def build_home_context(request):
         context["expense_total"] = ek["mtd_expense"]
         context["net_balance"] = ek["mtd_net"]
 
-    if show_treasury_ops:
-        church = get_active_church(request)
-        if church:
-            from transactions.treasury import get_cash_position, get_teller_daily_summary
+    if show_teller and church_focused:
+        from transactions.treasury import get_cash_position, get_teller_daily_summary
 
-            context["cash_position"] = get_cash_position(church)
-            context["teller_console"] = get_teller_daily_summary(church)
-            context["show_teller_console"] = True
-            context["suppress_workspace_cash"] = False
-        else:
-            context["show_teller_console"] = False
-            context["suppress_workspace_cash"] = False
+        ops_church = scope.primary_church
+        context["cash_position"] = get_cash_position(ops_church)
+        context["teller_console"] = get_teller_daily_summary(ops_church)
+        context["show_teller_console"] = True
+        context["suppress_workspace_cash"] = False
     else:
         context["show_teller_console"] = False
         context["suppress_workspace_cash"] = False
+        if not church_focused:
+            context["cash_position"] = None
 
     if show_members:
         context.update(get_member_summary(request))
+        if scope.level == "SUBTREE" and scope.church_ids:
+            context["pending_transfers"] = selectors.pending_transfers_for_church_ids(
+                list(scope.church_ids)
+            ).count()
 
     if show_this_week_pulse:
         context["this_week_pulse"] = get_this_week_pulse(request)
@@ -1222,14 +1320,25 @@ def build_home_context(request):
                 "member_count": metrics.aggregate_member_count(scope.church_ids),
             }
 
+    from sitecontrol.services import church_has_feature
+
+    remittance_enabled = True
+    if church_focused:
+        remittance_enabled = church_has_feature(scope.primary_church, "remittance")
+
+    kpi_role = role
+    if church_focused and role in ("district_overseer", "overseer", "admin"):
+        kpi_role = "leadership"
+
     context["dashboard_kpi_widgets"] = build_kpi_widgets(
         user=user,
-        dashboard_role=role,
+        dashboard_role=kpi_role,
         scope=scope,
         finance_bundle=finance_bundle,
         pending_transfers=context.get("pending_transfers", 0),
         member_home_kpis=context.get("member_home_kpis"),
-        is_control_center=is_control_center,
+        is_control_center=is_control_center and scope.level == "SUBTREE",
+        remittance_enabled=remittance_enabled,
     )
 
     if show_finance_charts and scope.finance_church_ids:
@@ -1249,10 +1358,17 @@ def build_home_context(request):
     from dashboard import home_panels
 
     context["notification_inbox"] = home_panels.get_notification_inbox(user)
-    context["attendance_panel"] = home_panels.get_attendance_panel(request)
-    context["visitor_funnel"] = home_panels.get_visitor_funnel_panel(request)
-    context["settlement_strip"] = home_panels.get_settlement_strip(request, list(scope.church_ids))
-    context["budget_glance"] = home_panels.get_budget_glance(request)
+    if church_focused:
+        context["attendance_panel"] = home_panels.get_attendance_panel(request)
+        context["visitor_funnel"] = home_panels.get_visitor_funnel_panel(request)
+        context["budget_glance"] = home_panels.get_budget_glance(request)
+    else:
+        context["attendance_panel"] = None
+        context["visitor_funnel"] = None
+        context["budget_glance"] = None
+    context["settlement_strip"] = home_panels.get_settlement_strip(
+        request, list(scope.church_ids)
+    ) if show_money_kpis else None
     context["recent_activity"] = home_panels.get_recent_activity_panel(
         request, list(scope.finance_church_ids or scope.church_ids)
     )
@@ -1271,7 +1387,7 @@ def build_home_context(request):
         from portal.spiritual_services import count_new_submissions_scope
 
         pastoral = {"new_portal_submissions": count_new_submissions_scope(user, request)}
-        church_ref = scope.primary_church or get_active_church(request)
+        church_ref = scope.primary_church
         if church_ref and show_members:
             funnel = selectors.visitor_funnel_counts_for_church(church_ref)
             pastoral["visitor_stale"] = funnel.get("stale", 0)

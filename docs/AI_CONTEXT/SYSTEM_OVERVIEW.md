@@ -72,7 +72,7 @@ From `church_system/settings.py` `INSTALLED_APPS`:
 | `organization` | Org hierarchy + Church (operational tenant) |
 | `members` | Membership, families, transfers, records, gifts, leadership |
 | `transactions` | Chart of accounts, journals, budgets, cutoffs, periods, reconciliation |
-| `dashboard` | Home dashboard, notifications, church context switch |
+| `dashboard` | Home dashboard, notifications, church context switch. Church vs subtree surfaces: local ops vs district exception board |
 | `announcements` | Church-level announcements |
 | `reports` | Report center and export jobs |
 | `meetings` | Meetings, minutes workflow, worship attendance |

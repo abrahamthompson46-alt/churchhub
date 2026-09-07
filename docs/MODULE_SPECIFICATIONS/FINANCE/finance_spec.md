@@ -30,7 +30,7 @@ Describe how ChurchHub implements church finance end-to-end: chart of accounts, 
 | Remit policies, settlements, welfare | **`remittance`** |
 | Payroll → journals | **`payroll`** |
 | Fixed assets → CAPITAL journals | **`assets`** |
-| Cash/teller widgets | **`dashboard`** (+ `transactions.treasury`) |
+| Cash/teller widgets | **`dashboard`** (+ `transactions.treasury`). Teller console is church-focused treasury only. |
 
 ---
 
@@ -203,6 +203,8 @@ Ledger posts typically land **PENDING** then go to transactions approval queue.
 ## 16. Permissions (Current)
 
 Finance codenames include (among others): `view_transactions`, `manage_finances`, `manage_receipts`, `manage_expenses`, `approve_transactions`, `void_transactions`, `reject_transactions`, `lock_periods`, `unlock_periods`, `manage_working_day`, reconciliation/cutoff/export codes, `view_ledger`, `manage_ledger_entries`, `manage_gl_categories`, `manage_chart_of_accounts`, budget/giving codes.
+
+Default `manage_finances` is treasury ops plus union/zone/district/local pastors — not SECRETARY. Clerks still have `manage_receipts` / `manage_expenses`. Remittance payment uses `manage_finances`.
 
 **Debt:** some POST paths gate mainly on `can_approve_transactions` while finer `can_*` appear only in templates — see `transactions_spec.md`.
 

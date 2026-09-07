@@ -1,0 +1,34 @@
+{% if exception_board %}
+<section class="cc-panel mb-4" aria-label="Churches needing attention">
+    <div class="cc-panel__header">
+        <h2 class="cc-panel__title"><i class="bi bi-exclamation-octagon"></i> Churches needing attention</h2>
+        <span class="cc-panel__badge">{{ exception_board|length }}</span>
+    </div>
+    <div class="table-responsive table-in-card">
+        <table class="table table-sm table-hover mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Church</th>
+                    <th>District</th>
+                    <th>Issues</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in exception_board %}
+                <tr>
+                    <td class="fw-medium">{{ row.church }}</td>
+                    <td class="text-muted small">{{ row.district }}</td>
+                    <td>
+                        {% for issue in row.issues %}
+                        <span class="badge text-bg-warning-subtle text-warning-emphasis me-1">{{ issue }}</span>
+                        {% endfor %}
+                    </td>
+                    <td class="text-end"><a href="{{ row.focus_url }}" class="small">Open church</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}

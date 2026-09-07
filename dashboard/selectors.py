@@ -353,6 +353,90 @@ def pending_transactions_for_churches_count(church_ids):
     ).count()
 
 
+def pending_transaction_counts_by_church(church_ids):
+    if not church_ids:
+        return {}
+    rows = (
+        Transaction.objects.filter(
+            church_id__in=church_ids,
+            approval_status="PENDING",
+        )
+        .values("church_id")
+        .annotate(count=Count("id"))
+    )
+    return {row["church_id"]: row["count"] for row in rows}
+
+
+def pending_transfer_counts_by_church(church_ids):
+    """Pending transfers touching each church (from or to)."""
+    if not church_ids:
+        return {}
+    ids = list(church_ids)
+    counts = {}
+    outgoing = (
+        MemberTransfer.objects.filter(
+            status=TransferStatus.PENDING,
+            from_church_id__in=ids,
+        )
+        .values("from_church_id")
+        .annotate(count=Count("id"))
+    )
+    incoming = (
+        MemberTransfer.objects.filter(
+            status=TransferStatus.PENDING,
+            to_church_id__in=ids,
+        )
+        .values("to_church_id")
+        .annotate(count=Count("id"))
+    )
+    for row in outgoing:
+        counts[row["from_church_id"]] = counts.get(row["from_church_id"], 0) + row["count"]
+    for row in incoming:
+        counts[row["to_church_id"]] = counts.get(row["to_church_id"], 0) + row["count"]
+    return counts
+
+
+def churches_with_recent_worship(church_ids, since_date):
+    """Church PKs with WORSHIP or SABBATH_SCHOOL attendance on/after since_date."""
+    from meetings.models import AttendanceEvent
+
+    if not church_ids:
+        return set()
+    return set(
+        AttendanceEvent.objects.filter(
+            church_id__in=list(church_ids),
+            event_type__in=("WORSHIP", "SABBATH_SCHOOL"),
+            event_date__gte=since_date,
+        ).values_list("church_id", flat=True)
+    )
+
+
+def stale_open_visitor_counts_by_church(church_ids, stale_days=30):
+    from datetime import timedelta
+
+    from members.models import Visitor, VisitorFollowUpStatus
+
+    if not church_ids:
+        return {}
+    stale_before = timezone.localdate() - timedelta(days=stale_days)
+    open_statuses = (
+        VisitorFollowUpStatus.NEW,
+        VisitorFollowUpStatus.CONTACTED,
+        VisitorFollowUpStatus.IN_PROGRESS,
+    )
+    rows = (
+        Visitor.objects.filter(
+            church_id__in=list(church_ids),
+            is_deleted=False,
+            follow_up_status__in=open_statuses,
+            visit_date__lte=stale_before,
+        )
+        .values("church_id")
+        .annotate(count=Count("id"))
+    )
+    return {row["church_id"]: row["count"] for row in rows}
+
+
 def pending_assets_for_churches_count(church_ids):
     from assets.models import FixedAsset
 

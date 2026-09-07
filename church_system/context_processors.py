@@ -224,35 +224,35 @@ def working_day_context(request):
     """System clock, working day, and cash position for the workspace status bar."""
     from django.utils import timezone
 
-    from accounts.permissions import can_manage_working_day, can_view_dashboard_finance
-    from church_system.church_scope import get_active_church, get_user_church
-    from permissions.checks import can_view_transactions
+    from accounts.permissions import can_manage_working_day
+    from dashboard.scope import resolve_dashboard_scope
+    from dashboard.widgets import user_can_use_finance_kpis
     from transactions.services import get_working_day_status
 
     if not request.user.is_authenticated or getattr(request.user, "is_platform_user", False):
         return {}
 
-    church = get_active_church(request) or get_user_church(request.user)
+    scope = resolve_dashboard_scope(request)
+    church = scope.primary_church if scope.level == "CHURCH" else None
+    show_money = user_can_use_finance_kpis(request.user)
+
     if not church:
         return {
             "system_date": timezone.localdate(),
             "show_working_day_status": False,
             "show_cash_position": False,
             "cash_position": None,
+            "workspace_finance_mtd": None,
         }
 
     status = get_working_day_status(church)
-    show_finance = can_view_dashboard_finance(request.user) or can_view_transactions(request.user)
     cash_position = None
-    if show_finance:
-        from transactions.treasury import get_cash_position
-
-        cash_position = get_cash_position(church)
-
     workspace_finance_mtd = None
-    if show_finance:
+    if show_money:
+        from transactions.treasury import get_cash_position
         from dashboard.services import get_workspace_finance_mtd
 
+        cash_position = get_cash_position(church)
         workspace_finance_mtd = get_workspace_finance_mtd(request)
 
     return {
@@ -261,9 +261,9 @@ def working_day_context(request):
         "active_working_day": status["active_working_day"],
         "working_date": status["working_date"],
         "working_day_is_open": status["is_open"],
-        "show_working_day_status": can_view_dashboard_finance(request.user),
+        "show_working_day_status": show_money,
         "can_manage_working_day": can_manage_working_day(request.user),
-        "show_cash_position": show_finance,
+        "show_cash_position": show_money,
         "cash_position": cash_position,
         "workspace_finance_mtd": workspace_finance_mtd,
     }

@@ -55,6 +55,10 @@ def create_tenant_subscription(**fields):
     return TenantSubscription.objects.create(**fields)
 
 
+def get_or_create_tenant_subscription(*, church, defaults):
+    return TenantSubscription.objects.get_or_create(church=church, defaults=defaults)
+
+
 def create_activation_request(**fields):
     return SubscriptionActivationRequest.objects.create(**fields)
 

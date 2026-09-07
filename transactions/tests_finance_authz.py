@@ -176,7 +176,7 @@ class FinanceAuthorizationBoundaryTests(TestCase):
         recon.items.update()
         self.assertFalse(recon.items.filter(is_matched=True).exists())
 
-    def test_secretary_can_create_receipt_and_open_remittance(self):
+    def test_secretary_can_create_receipt_but_cannot_remit(self):
         seed = record_receipt(
             church=self.church,
             created_by=self.treasurer,
@@ -189,7 +189,7 @@ class FinanceAuthorizationBoundaryTests(TestCase):
 
         self._login("fin_secretary")
         remit_get = self.client.get(reverse("transactions:record_remittance"))
-        self.assertEqual(remit_get.status_code, 200)
+        self.assertEqual(remit_get.status_code, 403)
 
         before_transfers = Transaction.objects.filter(
             church=self.church, transaction_type="TRANSFER"
@@ -201,27 +201,12 @@ class FinanceAuthorizationBoundaryTests(TestCase):
                 "idempotency_key": f"sec-remit-{uuid.uuid4()}",
             },
         )
-        self.assertEqual(remit_post.status_code, 302)
-        self.assertEqual(remit_post.url, reverse("dashboard:cutoff"))
+        self.assertEqual(remit_post.status_code, 403)
         self.assertEqual(
             Transaction.objects.filter(
                 church=self.church, transaction_type="TRANSFER"
             ).count(),
-            before_transfers + 1,
-        )
-        remit_txn = Transaction.objects.get(
-            church=self.church,
-            transaction_type="TRANSFER",
-            created_by=self.secretary,
-        )
-        self.assertEqual(remit_txn.approval_status, "PENDING")
-        self.assertFalse(remit_txn.is_voided)
-        self.assertTrue(
-            FinancialAuditLog.objects.filter(
-                church=self.church,
-                transaction=remit_txn,
-                action="REMIT",
-            ).exists()
+            before_transfers,
         )
 
         before = Transaction.objects.filter(

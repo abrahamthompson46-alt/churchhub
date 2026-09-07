@@ -115,6 +115,8 @@ Note: thin wrappers of some welfare functions also exist on `services.py` for co
 
 Views also accept `manage_finances` on some finance/policy gates.
 
+**Current:** District remittance **payment** (`transactions:record_remittance`) requires `manage_finances`. Default SECRETARY does **not** have that code (receipts/expenses remain). Hierarchy and treasury still do. Re-seed with `python manage.py seed_permissions --reset` to apply on existing databases.
+
 ---
 
 ## 6. URL structure (Current)

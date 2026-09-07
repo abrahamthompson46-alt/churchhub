@@ -50,6 +50,18 @@ class HealthRedactionTests(SimpleTestCase):
 
     def test_redis_failure_on_readiness(self):
         with mock.patch(
+            "church_system.health.check_database",
+            return_value="ok",
+        ), mock.patch(
+            "church_system.health.check_migrations",
+            return_value="ok",
+        ), mock.patch(
+            "church_system.health.check_cache",
+            return_value="ok",
+        ), mock.patch(
+            "church_system.health.check_debug_safe",
+            return_value="ok",
+        ), mock.patch(
             "church_system.health.check_redis_configured",
             side_effect=RuntimeError("Error 111 connecting to redis:6379"),
         ):

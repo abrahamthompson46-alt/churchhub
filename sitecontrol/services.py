@@ -1,6 +1,7 @@
 """Platform settings, subscription entitlements, and tenant limits."""
 
 from django.core.cache import cache
+from django.db import IntegrityError
 from django.utils import timezone
 
 from sitecontrol import repositories as repo
@@ -356,10 +357,18 @@ def get_church_subscription(church):
     try:
         return church.subscription
     except TenantSubscription.DoesNotExist:
-        return None
+        sub = TenantSubscription.objects.filter(church_id=church.pk).select_related("plan").first()
+        if sub is not None:
+            church.subscription = sub
+        return sub
 
 
 def ensure_church_subscription(church):
+    """Return the church subscription, creating one if missing.
+
+    Safe to call repeatedly on the same in-memory Church: Django caches a missing
+    reverse OneToOne, so a later create must not collide with a row from the first call.
+    """
     sub = get_church_subscription(church)
     if sub:
         return sub
@@ -367,7 +376,15 @@ def ensure_church_subscription(church):
     if not plan:
         ensure_default_plans()
         plan = get_default_plan()
-    return repo.create_tenant_subscription(church=church, plan=plan, status="ACTIVE")
+    try:
+        sub, _created = repo.get_or_create_tenant_subscription(
+            church=church,
+            defaults={"plan": plan, "status": "ACTIVE"},
+        )
+    except IntegrityError:
+        sub = TenantSubscription.objects.select_related("plan").get(church=church)
+    church.subscription = sub
+    return sub
 
 
 def _plan_for_church(church):

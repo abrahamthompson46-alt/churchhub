@@ -10,9 +10,10 @@ from church_system.church_scope import get_active_church
 from dashboard import selectors
 from permissions.checks import (
     can_manage_finances,
-    can_view_dashboard_finance,
-    can_view_members,
     can_manage_members,
+    can_manage_receipts,
+    can_run_cutoff,
+    can_view_members,
     can_view_meetings,
     can_view_transactions,
 )
@@ -68,8 +69,8 @@ def get_settlement_strip(request, church_ids):
     user = request.user
     if not (
         can_manage_finances(user)
-        or can_view_dashboard_finance(user)
-        or can_view_transactions(user)
+        or can_run_cutoff(user)
+        or can_manage_receipts(user)
     ):
         return None
     from organization.models import Church
@@ -94,7 +95,7 @@ def get_budget_glance(request):
 
     user = request.user
     church = get_active_church(request)
-    if not church or not (can_manage_finances(user) or can_view_dashboard_finance(user)):
+    if not church or not can_manage_finances(user):
         return None
     if not church_has_feature(church, "budgets"):
         return None
@@ -121,7 +122,7 @@ def get_recent_activity_panel(request, church_ids, *, limit=8):
         return None
     if not (
         can_manage_finances(user)
-        or can_view_dashboard_finance(user)
+        or can_manage_receipts(user)
         or can_view_transactions(user)
     ):
         return None
@@ -172,10 +173,16 @@ def get_dashboard_coaching_hints(context):
     queue = context.get("action_queue") or []
     if not queue:
         if role == "treasury":
-            hints.append({
-                "text": "Open the business day before recording receipts.",
-                "url_name": "transactions:period_list",
-            })
+            if context.get("church_focused"):
+                hints.append({
+                    "text": "Open the business day, then record a receipt.",
+                    "url_name": "transactions:record_receipt",
+                })
+            else:
+                hints.append({
+                    "text": "Select a congregation to open the teller and record receipts.",
+                    "url_name": "dashboard:home",
+                })
         elif role in ("leadership", "secretary"):
             hints.append({
                 "text": "Review visitor follow-ups and record Sabbath attendance.",

@@ -640,6 +640,7 @@ class ThisWeekPulseTests(DashboardTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         # Treasury layout does not enable the pastoral pulse panel.
         self.assertFalse(response.context.get("show_this_week_pulse"))
+        self.assertTrue(response.context.get("show_teller_console"))
 
 
 class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
@@ -683,13 +684,22 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
             user=user,
             dashboard_role="leadership",
             scope=scope,
-            finance_bundle={"member_count": 3},
+            finance_bundle={
+                "member_count": 3,
+                "church_count": 9,
+                "district_count": 2,
+                "action_items": 2,
+                "pending_transactions": 1,
+                "overdue_remittances": 0,
+            },
             pending_transfers=1,
-            is_control_center=False,
+            is_control_center=True,
         )
         ids = [w["id"] for w in widgets]
         self.assertIn("active_members", ids)
         self.assertIn("pending_transfers", ids)
+        self.assertNotIn("churches", ids)
+        self.assertNotIn("action_items", ids)
         self.assertLess(ids.index("pending_transfers"), ids.index("active_members"))
 
     def test_pastor_home_renders_unified_kpi_strip(self):
@@ -715,5 +725,91 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         widgets = response.context.get("dashboard_kpi_widgets") or []
         self.assertTrue(widgets)
-        self.assertContains(response, "Active Members")
+        self.assertContains(response, "Active members")
         self.assertTrue(response.context.get("show_finance_charts"))
+        ids = [w["id"] for w in widgets]
+        self.assertIn("income_mtd", ids)
+
+    def test_secretary_home_omits_finance_kpis(self):
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        User.objects.create_user(
+            username="sec_home_kpi",
+            password="pass12345",
+            role=UserRole.SECRETARY,
+            church=self.church,
+        )
+        client = Client()
+        client.login(username="sec_home_kpi", password="pass12345")
+        session = client.session
+        session["current_church_id"] = str(self.church.id)
+        from accounts.mfa import SESSION_MFA_VERIFIED
+
+        session[SESSION_MFA_VERIFIED] = True
+        session.save()
+
+        response = client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        ids = [w["id"] for w in (response.context.get("dashboard_kpi_widgets") or [])]
+        self.assertIn("active_members", ids)
+        self.assertNotIn("mtd_tithe", ids)
+        self.assertNotIn("income_mtd", ids)
+        self.assertFalse(response.context.get("show_teller_console"))
+        self.assertContains(response, "Active members")
+        self.assertNotContains(response, "Tithe MTD")
+
+    def test_district_pastor_defaults_to_subtree_exception_board(self):
+        from permissions.org_scope import apply_org_scope
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        Church.objects.create(district=self.district, code="C2", name="Second Church")
+        prior = (timezone.now().date().replace(day=1) - timedelta(days=1)).replace(day=1)
+        MonthlyCutoff.objects.create(
+            church=self.church,
+            month=prior,
+            transferred=False,
+            total_tithe=Decimal("40.00"),
+            total_combined=Decimal("0"),
+        )
+        user = User.objects.create_user(
+            username="dp_home",
+            password="pass12345",
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+        )
+        apply_org_scope(
+            user,
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+            district=self.district,
+        )
+        user.save()
+        client = Client()
+        client.login(username="dp_home", password="pass12345")
+        session = client.session
+        from accounts.mfa import SESSION_MFA_VERIFIED
+
+        session[SESSION_MFA_VERIFIED] = True
+        session.save()
+
+        response = client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_scope"].level, "SUBTREE")
+        self.assertFalse(response.context.get("church_focused"))
+        self.assertFalse(response.context.get("show_teller_console"))
+        self.assertIsNone(response.context.get("attendance_panel"))
+        ids = [w["id"] for w in (response.context.get("dashboard_kpi_widgets") or [])]
+        self.assertIn("giving_mtd", ids)
+        self.assertIn("churches", ids)
+        self.assertNotIn("income_mtd", ids)
+        self.assertContains(response, "Giving MTD")
+        self.assertContains(response, "Churches needing attention")
+        self.assertContains(response, "Congregation")
+        self.assertIsNone(response.context.get("active_church"))
+        self.assertIsNotNone(response.context.get("scope_switcher"))
+        board = response.context.get("exception_board") or []
+        self.assertTrue(any(row["church"] == "Test Church" for row in board))
+        test_row = next(row for row in board if row["church"] == "Test Church")
+        self.assertTrue(any("Overdue remittance" in issue for issue in test_row["issues"]))

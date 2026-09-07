@@ -198,8 +198,16 @@ PERMISSION_REGISTRY = {
     "manage_finances": {
         "name": "Manage Finances",
         "category": "Finance",
-        "description": "Legacy finance ops gate (implies receipts, expenses, ledgers).",
-        "default_roles": _ROLE_ALL_STAFF,
+        "description": (
+            "Legacy finance ops gate (implies receipts, expenses, ledgers). "
+            "Not granted to SECRETARY by default; clerks keep manage_receipts / manage_expenses."
+        ),
+        "default_roles": _ROLE_TREASURY_OPS | {
+            "UNION_ADMIN",
+            "ZONE_DIRECTOR",
+            "DISTRICT_PASTOR",
+            "LOCAL_PASTOR",
+        },
         "implies": [
             "view_transactions", "manage_receipts", "manage_expenses",
             "view_ledger", "manage_ledger_entries", "manage_gl_categories",

@@ -169,12 +169,12 @@ Scope for every cell: denomination wall + `get_manageable_churches` (or portal s
 | ZONE_DIRECTOR | Yes | Yes | Yes | Archive; void | Journals etc. Yes. Recon create/match: **No** | Yes | Zone subtree |
 | DISTRICT_PASTOR | Yes | Yes | Yes | Archive; void | Yes including recon mutate | Yes | District subtree; unlock periods |
 | LOCAL_PASTOR | Yes | Yes | Own church | Archive; void | Yes including recon mutate | Yes | Own church users/working day/lock periods. Not matrix (`manage_permissions` is policy) |
-| SECRETARY | Yes finance **view** + `manage_finances` create | Members, receipts, expenses, remittance **payment**, welfare cases, campaigns, meetings | Members/meetings/announcements they may manage | Archive announcements; **not** void journals | **MUST NOT** approve/void journals, minutes (approve_minutes is leadership), welfare, assets, payroll, budgets, recon match | **MUST NOT** | Not `manage_users` / matrix / org tree |
+| SECRETARY | Yes finance **view**; receipts/expenses via those codes | Members, receipts, expenses, welfare cases, campaigns, meetings. **MUST NOT** remittance **payment** (no default `manage_finances`) | Members/meetings/announcements they may manage | Archive announcements; **not** void journals | **MUST NOT** approve/void journals, minutes (approve_minutes is leadership), welfare, assets, payroll, budgets, recon match | **MUST NOT** | Not `manage_users` / matrix / org tree |
 | TREASURY | Yes | Receipts/expenses/ledger/contributions/remittance payment/recon create | Giving/campaigns/assets (manage_assets) / payroll prepare | Not void | Recon **finalize** Yes. Journal approve/void: **No**. Asset approve/dispose: Yes. Payroll approve: **No** | **MUST NOT** | Not users/org/matrix |
 | BOARD_MEMBER | Members, transactions, recon **view**, ledger **view**, remittance **view**, welfare **view**, reports, announcements | **MUST NOT** finance writes | **MUST NOT** | **MUST NOT** | **MUST NOT** | **MUST NOT** | **MUST NOT** |
 | MEMBER | Own portal profile; `view_members` is granted but **media/directory staff actions** follow §4; own giving/contributions; published in-audience announcements | May `create_announcements` (pending); portal self-service | Own portal profile | **MUST NOT** | **MUST NOT** | **MUST NOT** | **MUST NOT** |
 
-SECRETARY **may** record receipts/expenses and initiate remittance payments under the default matrix; those journals stay PENDING unless receipt auto-approve applies. SECRETARY **must not** approve, void, or run recon worksheets.
+SECRETARY **may** record receipts/expenses under the default matrix (`manage_receipts` / `manage_expenses`); those journals stay PENDING unless receipt auto-approve applies. SECRETARY **must not** initiate remittance payment, approve, void, or run recon worksheets. Existing deployments that already seeded SECRETARY `manage_finances=True` keep that cell until `seed_permissions --reset` (or an equivalent matrix reset).
 
 TREASURY **may** create money movement and (with `finalize_reconciliation`) lock recon; **must not** approve others’ journals unless granted `approve_transactions`.
 
@@ -185,9 +185,9 @@ BOARD_MEMBER **may** view in-scope journals and recon worksheets; **must not** P
 | Permission | SA/GO | UA | CA | ZD | DP | LP | SEC | TRE | BM | MEM |
 |------------|-------|----|----|----|----|----|-----|-----|----|-----|
 | `view_transactions` | Y | Y | Y | Y | Y | Y | Y | Y | Y | N |
-| `manage_finances` | Y | Y | Y | Y | Y | Y | Y | Y | **N** | N |
+| `manage_finances` | Y | Y | Y | Y | Y | Y | **N** | Y | **N** | N |
 | `manage_receipts` / `manage_expenses` | Y | Y | Y | Y | Y | Y | Y | Y | N | N |
-| District remittance **payment** (contract = `manage_finances`) | Y | Y | Y | Y | Y | Y | **Y** | Y | **N** | N |
+| District remittance **payment** (contract = `manage_finances`) | Y | Y | Y | Y | Y | Y | **N** | Y | **N** | N |
 | `view_reconciliation` | Y | Y | Y | Y | Y | Y | Y | Y | Y | N |
 | `manage_reconciliation` | Y | **N** | Y | **N** | Y | Y | **N** | Y | **N** | N |
 | `finalize_reconciliation` | Y | Y | Y | Y | Y | Y | **N** | Y | N | N |
@@ -373,7 +373,7 @@ Default BOARD_MEMBER has `view_transactions` and `view_reconciliation`. Remittan
 
 ### INV-FIN-04 — SECRETARY
 
-Default SECRETARY has `manage_finances` and `manage_expenses`. They MAY create in-scope receipts/expenses/remittance payments (pending). They MUST obey period, working day, amount > 0, church scope, and MUST NOT approve/void/recon-match unless the matrix grants those codes.
+Default SECRETARY has `manage_receipts` and `manage_expenses`, **not** `manage_finances`. They MAY create in-scope receipts/expenses (pending). They MUST NOT POST remittance payment, and MUST obey period, working day, amount > 0, church scope, and MUST NOT approve/void/recon-match unless the matrix grants those codes.
 
 ### INV-FIN-05 — Posted journals
 

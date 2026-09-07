@@ -294,7 +294,7 @@
             {% include "dashboard/includes/visitor_funnel.html" %}
             {% include "dashboard/includes/budget_glance.html" %}
 
-            {% if dashboard_role == 'secretary' and upcoming_meetings is not None and not this_week_pulse %}
+            {% if dashboard_role == 'secretary' and upcoming_meetings is not None %}
             <section class="cc-panel mb-4">
                 <div class="cc-panel__header">
                     <h2 class="cc-panel__title"><i class="bi bi-calendar-event"></i> Upcoming Meetings</h2>

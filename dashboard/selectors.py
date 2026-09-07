@@ -242,6 +242,21 @@ def member_counts_by_church(church_ids):
     }
 
 
+def membership_growth_by_church(church_ids, month_start):
+    """Active members now vs those already joined before this posting month."""
+    if not church_ids:
+        return {}
+    rows = (
+        Member.objects.filter(church_id__in=church_ids, is_active=True)
+        .values("church_id")
+        .annotate(
+            current=Count("id"),
+            new_mtd=Count("id", filter=Q(date_joined__gte=month_start)),
+        )
+    )
+    return {row["church_id"]: row for row in rows}
+
+
 # ---------------------------------------------------------------------------
 # Admin / hierarchy / executive
 # ---------------------------------------------------------------------------

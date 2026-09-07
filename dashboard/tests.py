@@ -758,6 +758,8 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertFalse(response.context.get("show_teller_console"))
         self.assertContains(response, "Active members")
         self.assertNotContains(response, "Tithe MTD")
+        self.assertIsNotNone(response.context.get("membership_analysis"))
+        self.assertContains(response, "Membership")
 
     def test_district_pastor_defaults_to_subtree_exception_board(self):
         from permissions.org_scope import apply_org_scope
@@ -801,10 +803,12 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertFalse(response.context.get("show_teller_console"))
         self.assertIsNone(response.context.get("attendance_panel"))
         ids = [w["id"] for w in (response.context.get("dashboard_kpi_widgets") or [])]
-        self.assertIn("giving_mtd", ids)
+        self.assertIn("mtd_net", ids)
+        self.assertIn("mtd_combined", ids)
         self.assertIn("churches", ids)
         self.assertNotIn("income_mtd", ids)
-        self.assertContains(response, "Giving MTD")
+        self.assertContains(response, "Combined MTD")
+        self.assertContains(response, "Net MTD")
         self.assertContains(response, "Churches needing attention")
         self.assertContains(response, "Congregation")
         self.assertIsNone(response.context.get("active_church"))
@@ -863,7 +867,10 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         by_id = {w["id"]: w for w in (response.context.get("dashboard_kpi_widgets") or [])}
         self.assertIn("mtd_tithe", by_id)
+        self.assertIn("mtd_net", by_id)
+        self.assertIn("mtd_combined", by_id)
         self.assertEqual(by_id["mtd_tithe"]["value"], Decimal("80.00"))
+        self.assertEqual(by_id["mtd_combined"]["value"], Decimal("20.00"))
         self.assertEqual(response.context.get("finance_as_of"), posting)
         self.assertIn("January", by_id["mtd_tithe"]["hint"])
         self.assertTrue(response.context.get("chart_has_activity"))

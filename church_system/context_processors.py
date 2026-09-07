@@ -254,6 +254,9 @@ def working_day_context(request):
 
         cash_position = get_cash_position(church)
         workspace_finance_mtd = get_workspace_finance_mtd(request)
+        match = getattr(request, "resolver_match", None)
+        if match and match.namespace == "dashboard" and match.url_name == "home":
+            workspace_finance_mtd = None
 
     return {
         "system_date": status["system_date"],

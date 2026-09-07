@@ -857,6 +857,7 @@ def user_has_asset_approval(user):
 def get_church_leaderboard(request, user, limit=8):
     """Rank churches in scope by MTD giving performance."""
     from django.urls import reverse
+    from dashboard import metrics
     from dashboard.scope import resolve_dashboard_scope
 
     manageable = get_manageable_churches(user).select_related("district")
@@ -868,16 +869,21 @@ def get_church_leaderboard(request, user, limit=8):
     church_ids = list(manageable.values_list("id", flat=True))
 
     totals = selectors.church_mtd_giving_totals(church_ids, month_start_date)
-    member_counts = selectors.member_counts_by_church(church_ids)
+    growth = selectors.membership_growth_by_church(church_ids, month_start_date)
 
     rows = []
     for church in manageable:
         mtd = totals.get(church.id, Decimal("0"))
+        stats = growth.get(church.id, {"current": 0, "new_mtd": 0})
+        current = int(stats.get("current") or 0)
+        new_mtd = int(stats.get("new_mtd") or 0)
+        prior = max(current - new_mtd, 0)
         rows.append({
             "church_id": church.id,
             "church": church.name,
             "district": church.district.name if church.district_id else "—",
-            "members": member_counts.get(church.id, 0),
+            "members": current,
+            "member_delta_pct": metrics.pct_change(current, prior),
             "mtd_giving": mtd,
             "focus_url": f"{reverse('dashboard:home')}?church={church.id}",
         })
@@ -1414,6 +1420,12 @@ def build_home_context(request):
     context["settlement_strip"] = home_panels.get_settlement_strip(
         request, list(scope.church_ids)
     ) if show_money_kpis else None
+    if show_members and role in ("secretary", "leadership", "members") and scope.church_ids:
+        context["membership_analysis"] = home_panels.get_membership_analysis(
+            list(scope.church_ids), as_of.replace(day=1)
+        )
+    else:
+        context["membership_analysis"] = None
     context["recent_activity"] = home_panels.get_recent_activity_panel(
         request, list(scope.finance_church_ids or scope.church_ids)
     )

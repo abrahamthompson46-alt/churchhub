@@ -87,7 +87,7 @@ def attach_finance_deltas(bundle, finance_church_ids, month_start_date):
         return bundle
     prior_start = (month_start_date - relativedelta(months=1)).replace(day=1)
     prior = aggregate_giving_calendar_month(finance_church_ids, prior_start)
-    for key in ("mtd_tithe", "mtd_combined", "mtd_income", "mtd_expense"):
+    for key in ("mtd_tithe", "mtd_combined", "mtd_income", "mtd_expense", "mtd_net"):
         bundle[f"{key}_delta_pct"] = pct_change(bundle[key], prior[key])
     bundle["compare_label"] = prior_start.strftime("%b %Y")
     return bundle

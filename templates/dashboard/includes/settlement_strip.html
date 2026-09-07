@@ -1,5 +1,5 @@
 {% if settlement_strip %}
-<section class="cc-settlement-strip mb-4" aria-label="Remittance and settlement status">
+<section class="cc-settlement-strip" aria-label="Remittance and settlement status">
     <div class="cc-settlement-strip__label">Remittance · {{ settlement_strip.period_label }}</div>
     <div class="cc-settlement-strip__metrics">
         <a href="{% url 'dashboard:cutoff' %}" class="cc-settlement-strip__chip{% if settlement_strip.overdue %} cc-settlement-strip__chip--danger{% endif %}">

@@ -813,3 +813,57 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertTrue(any(row["church"] == "Test Church" for row in board))
         test_row = next(row for row in board if row["church"] == "Test Church")
         self.assertTrue(any("Overdue remittance" in issue for issue in test_row["issues"]))
+
+    def test_home_kpis_follow_open_working_month_not_clock(self):
+        from datetime import date
+
+        from accounts.mfa import SESSION_MFA_VERIFIED
+        from permissions.services import ensure_permission_matrix
+        from remittance.models import RemittancePolicy
+        from remittance.services import ensure_default_policies_for_church
+
+        ensure_permission_matrix()
+        posting = date(2026, 1, 15)
+        ensure_default_policies_for_church(self.church)
+        RemittancePolicy.objects.filter(unit_type="CHURCH", unit_id=self.church.pk).update(
+            effective_from=date(2025, 1, 1)
+        )
+        pastor = User.objects.create_user(
+            username="wd_pastor",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=self.church,
+        )
+        User.objects.create_user(
+            username="wd_treasury",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        open_working_day(self.church, posting, pastor)
+        txn = record_receipt(
+            church=self.church,
+            created_by=User.objects.get(username="wd_treasury"),
+            tithe_amount=Decimal("80.00"),
+            combined_amount=Decimal("20.00"),
+            income_amount=Decimal("10.00"),
+        )
+        approve_transaction(txn, pastor)
+        self.assertEqual(txn.date, posting)
+        self.assertNotEqual(timezone.localdate().month, 1)
+
+        client = Client()
+        client.login(username="wd_treasury", password="pass12345")
+        session = client.session
+        session["current_church_id"] = str(self.church.id)
+        session[SESSION_MFA_VERIFIED] = True
+        session.save()
+
+        response = client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        by_id = {w["id"]: w for w in (response.context.get("dashboard_kpi_widgets") or [])}
+        self.assertIn("mtd_tithe", by_id)
+        self.assertEqual(by_id["mtd_tithe"]["value"], Decimal("80.00"))
+        self.assertIn("January", by_id["mtd_tithe"]["hint"])
+        self.assertTrue(response.context.get("chart_has_activity"))
+        self.assertIn("Jan 2026", response.context["trend_labels"])

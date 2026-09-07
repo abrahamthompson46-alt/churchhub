@@ -297,7 +297,8 @@ def district_remit_income_aggregates(church_ids, month_start_date):
     return (
         TransactionLine.objects.filter(
             transaction__church_id__in=church_ids,
-            transaction__date__gte=month_start_date,
+            transaction__date__year=month_start_date.year,
+            transaction__date__month=month_start_date.month,
             transaction__approval_status="APPROVED",
             transaction__is_voided=False,
             account__account_type__in=REMIT_PAYABLE_TYPES + INCOME_REMIT_TYPES,
@@ -450,7 +451,8 @@ def church_mtd_giving_totals(church_ids, month_start_date):
     line_aggs = (
         TransactionLine.objects.filter(
             transaction__church_id__in=church_ids,
-            transaction__date__gte=month_start_date,
+            transaction__date__year=month_start_date.year,
+            transaction__date__month=month_start_date.month,
             transaction__approval_status="APPROVED",
             transaction__is_voided=False,
             account__account_type__in=INCOME_REMIT_TYPES,

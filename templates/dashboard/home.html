@@ -90,59 +90,79 @@
     {% include "includes/alert_banners.html" %}
     {% endif %}
 
-    {% if show_this_week_pulse and this_week_pulse %}
-    <section class="cc-pulse-bar">
-        {% include "dashboard/includes/this_week_pulse.html" %}
-    </section>
+    {% if show_this_week_pulse and this_week_pulse or settlement_strip %}
+    <div class="cc-ops-row">
+        {% if show_this_week_pulse and this_week_pulse %}
+        <section class="cc-pulse-bar">
+            {% include "dashboard/includes/this_week_pulse.html" %}
+        </section>
+        {% endif %}
+        {% if settlement_strip %}
+        {% include "dashboard/includes/settlement_strip.html" %}
+        {% endif %}
+    </div>
     {% endif %}
 
     {% if scope_switcher %}
-    <section class="alert-banner alert-info mb-4" role="region" aria-label="Church context">
-        <form method="get" action="{% url 'dashboard:home' %}" class="d-flex flex-wrap align-items-center gap-2 mb-0">
-            <label class="small mb-0" for="dash-church-scope">Congregation</label>
-            <select id="dash-church-scope" name="church" class="form-select form-select-sm" style="max-width:20rem" onchange="this.form.submit()">
+    <section class="cc-scope-bar" role="region" aria-label="Church context">
+        <form method="get" action="{% url 'dashboard:home' %}" class="cc-scope-bar__form">
+            <label class="cc-scope-bar__label" for="dash-church-scope">Congregation</label>
+            <select id="dash-church-scope" name="church" class="form-select form-select-sm cc-scope-bar__select" onchange="this.form.submit()">
                 <option value="all"{% if not scope_switcher.focused_id %} selected{% endif %}>All churches</option>
                 {% for c in scope_switcher.churches %}
                 <option value="{{ c.id }}"{% if scope_switcher.focused_id == c.id|stringformat:"s" %} selected{% endif %}>{{ c.name }}</option>
                 {% endfor %}
             </select>
             {% if dashboard_scope.level == "SUBTREE" %}
-            <span class="small">Teller, attendance, and receipts need a congregation.</span>
+            <span class="cc-scope-bar__hint">Teller, attendance, and receipts need a congregation.</span>
             {% endif %}
         </form>
     </section>
     {% elif scope_banner %}
-    <div class="alert-banner alert-info mb-4" role="status">{{ scope_banner }}</div>
-    {% endif %}
-
-    {% if settlement_strip %}
-    {% include "dashboard/includes/settlement_strip.html" %}
+    <div class="cc-scope-bar" role="status">{{ scope_banner }}</div>
     {% endif %}
 
     {% include "dashboard/includes/exception_board.html" %}
 
-    {% if dashboard_kpi_widgets %}
-    <section class="cc-kpi-grid mb-4" aria-label="Dashboard KPIs">
-        {% for widget in dashboard_kpi_widgets %}
-        <a href="{% if widget.report_key %}{% url 'reports:run' widget.report_key %}{% else %}{% url widget.url_name %}{% endif %}" class="cc-kpi-card{% if widget.card_class %} {{ widget.card_class }}{% endif %}">
-            <span class="cc-kpi-card__label">{{ widget.label }}</span>
-            {% if widget.value_is_money %}
-            <span class="cc-kpi-card__value text-currency">{% if is_control_center %}{% money widget.value 0 %}{% else %}{% money widget.value 2 %}{% endif %}</span>
-            {% else %}
-            <span class="cc-kpi-card__value">{{ widget.value|intcomma }}</span>
-            {% endif %}
-            {% if widget.delta_pct is not None %}
-            <span class="cc-kpi-card__delta{% if widget.delta_pct >= 0 %} cc-kpi-card__delta--up{% else %} cc-kpi-card__delta--down{% endif %}">
-                {% if widget.delta_pct >= 0 %}+{% endif %}{{ widget.delta_pct|floatformat:1 }}% vs {{ widget.compare_label|default:"prior month" }}
-            </span>
-            {% endif %}
-            {% if widget.value_is_money and widget.empty_cta %}
-            <span class="cc-kpi-card__hint">{{ widget.empty_cta }}</span>
-            {% else %}
-            <span class="cc-kpi-card__hint">{{ widget.hint }}</span>
-            {% endif %}
-        </a>
-        {% endfor %}
+    {% if dashboard_kpi_widgets or show_finance_chart %}
+    <section class="cc-insight-band" aria-label="Key figures">
+        {% if dashboard_kpi_widgets %}
+        <div class="cc-kpi-grid" aria-label="Dashboard KPIs">
+            {% for widget in dashboard_kpi_widgets %}
+            <a href="{% if widget.report_key %}{% url 'reports:run' widget.report_key %}{% else %}{% url widget.url_name %}{% endif %}" class="cc-kpi-card{% if widget.card_class %} {{ widget.card_class }}{% endif %}"{% if widget.value_is_money and widget.empty_cta %} title="{{ widget.empty_cta }}"{% endif %}>
+                <span class="cc-kpi-card__label">{{ widget.label }}</span>
+                {% if widget.value_is_money %}
+                <span class="cc-kpi-card__value text-currency">{% if is_control_center %}{% money widget.value 0 %}{% else %}{% money widget.value 2 %}{% endif %}</span>
+                {% else %}
+                <span class="cc-kpi-card__value">{{ widget.value|intcomma }}</span>
+                {% endif %}
+                {% if widget.delta_pct is not None %}
+                <span class="cc-kpi-card__delta{% if widget.delta_pct >= 0 %} cc-kpi-card__delta--up{% else %} cc-kpi-card__delta--down{% endif %}">
+                    {% if widget.delta_pct >= 0 %}+{% endif %}{{ widget.delta_pct|floatformat:1 }}% vs {{ widget.compare_label|default:"prior month" }}
+                </span>
+                {% endif %}
+                <span class="cc-kpi-card__hint">{{ widget.hint }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if show_finance_chart %}
+        <section class="cc-panel cc-panel--chart mb-0">
+            <div class="cc-panel__header">
+                <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Income vs expense{% if dashboard_scope.finance_scope_label %} · {{ dashboard_scope.finance_scope_label }}{% endif %}</h2>
+            </div>
+            <div class="cc-panel__body cc-panel__body--chart">
+                {% if chart_has_activity %}
+                <canvas id="trendChart" height="72"></canvas>
+                {% else %}
+                <p class="text-muted text-center mb-0 py-3">No approved income or expense in the last 6 posting months for this church.</p>
+                {% endif %}
+            </div>
+        </section>
+        {% elif show_finance and not dashboard_scope.finance_church_ids %}
+        <div class="cc-scope-bar" role="status">Select a church from the toolbar to view financial charts.</div>
+        {% endif %}
     </section>
     {% endif %}
 
@@ -151,7 +171,7 @@
     {% endif %}
 
     {% if show_teller_console and teller_console %}
-    <section class="cc-panel mb-4{% if primary_work == 'teller' %} cc-panel--priority{% endif %}" id="teller-console" data-currency-symbol="{{ currency_symbol }}" data-refresh-url="{% url 'dashboard:teller_console_api' %}" aria-label="Teller console">
+    <section class="cc-panel mb-3{% if primary_work == 'teller' %} cc-panel--priority{% endif %}" id="teller-console" data-currency-symbol="{{ currency_symbol }}" data-refresh-url="{% url 'dashboard:teller_console_api' %}" aria-label="Teller console">
         <div class="cc-panel__header">
             <h2 class="cc-panel__title"><i class="bi bi-person-badge"></i> Teller Console</h2>
             <div class="d-flex align-items-center gap-2">
@@ -222,7 +242,7 @@
     </section>
     {% endif %}
 
-    <div class="row g-4">
+    <div class="row g-3 cc-home-body">
         <div class="{% if is_control_center %}col-xl-5{% else %}col-xl-4{% endif %}">
             {% if show_action_queue %}
             <section class="cc-panel{% if primary_work == 'queue' %} cc-panel--priority{% endif %} mb-4">
@@ -269,6 +289,28 @@
             {% include "dashboard/includes/attendance_panel.html" %}
             {% include "dashboard/includes/visitor_funnel.html" %}
             {% include "dashboard/includes/budget_glance.html" %}
+
+            {% if dashboard_role == 'secretary' and upcoming_meetings is not None %}
+            <section class="cc-panel mb-4">
+                <div class="cc-panel__header">
+                    <h2 class="cc-panel__title"><i class="bi bi-calendar-event"></i> Upcoming Meetings</h2>
+                    <a href="{% url 'meetings:list' %}" class="dash-section__link">All meetings →</a>
+                </div>
+                <ul class="list-plain dash-panel dash-panel--flat mb-0 px-3 pb-3">
+                    {% for meeting in next_meetings %}
+                    <li class="d-flex justify-content-between align-items-start gap-2 py-2">
+                        <div>
+                            <a href="{% url 'meetings:detail' meeting.pk %}" class="table-link">{{ meeting.title }}</a>
+                            <div class="text-muted calendar-preview-item__meta">{{ meeting.scheduled_at|date:"M j, Y · g:i A" }}</div>
+                        </div>
+                        <span class="chip chip--muted">{{ meeting.get_meeting_type_display }}</span>
+                    </li>
+                    {% empty %}
+                    <li class="text-muted text-center py-3">No upcoming meetings scheduled.</li>
+                    {% endfor %}
+                </ul>
+            </section>
+            {% endif %}
 
             {% if compliance_snapshot and compliance_snapshot.overdue_remittances %}
             <section class="cc-panel mb-4">
@@ -361,29 +403,6 @@
             </section>
             {% endif %}
 
-            {% if show_finance_chart %}
-            <div class="row g-4 mb-4">
-                <div class="col-12">
-                    <section class="cc-panel mb-0">
-                        <div class="cc-panel__header">
-                            <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Income vs Expense — 6 months{% if dashboard_scope.finance_scope_label %} · {{ dashboard_scope.finance_scope_label }}{% endif %}</h2>
-                        </div>
-                        <div class="cc-panel__body">
-                            {% if chart_has_activity %}
-                            <canvas id="trendChart" height="90"></canvas>
-                            {% else %}
-                            <p class="text-muted text-center mb-0 py-4">No approved income or expense in the last 6 posting months for this church.</p>
-                            {% endif %}
-                        </div>
-                    </section>
-                </div>
-            </div>
-            {% elif show_finance and not dashboard_scope.finance_church_ids %}
-            <div class="alert-banner alert-warning mb-4">
-                <span>Select a church from the toolbar to view financial charts.</span>
-            </div>
-            {% endif %}
-
             {% include "dashboard/includes/recent_activity.html" %}
 
             {% if show_upcoming_panel and upcoming_preview %}
@@ -419,53 +438,27 @@
                 </ul>
             </section>
             {% endif %}
-        </div>
-    </div>
 
-    {% if show_announcements_panel and recent_announcements %}
-    <section class="cc-panel mb-4">
-        <div class="cc-panel__header">
-            <h2 class="cc-panel__title"><i class="bi bi-megaphone"></i> Announcements</h2>
-            <a href="{% url 'announcements:announcement_list' %}" class="dash-section__link">View all →</a>
-        </div>
-        <ul class="list-plain dash-panel dash-panel--flat mb-0 px-3 pb-3">
-            {% for ann in recent_announcements|slice:":4" %}
-            <li class="d-flex justify-content-between align-items-start gap-2 py-2">
-                <div>
-                    <a href="{% url 'announcements:announcement_detail' ann.pk %}" class="table-link">{{ ann.title }}</a>
-                    <div class="text-muted calendar-preview-item__meta">{{ ann.created_at|date:"M j, Y" }}</div>
-                </div>
-            </li>
-            {% endfor %}
-        </ul>
-    </section>
-    {% endif %}
-
-    {% if dashboard_role == 'secretary' and upcoming_meetings is not None %}
-    <div class="row g-4 mt-1">
-        <div class="col-lg-6">
-            <section class="cc-panel mb-0">
+            {% if show_announcements_panel and recent_announcements %}
+            <section class="cc-panel mb-4">
                 <div class="cc-panel__header">
-                    <h2 class="cc-panel__title"><i class="bi bi-calendar-event"></i> Upcoming Meetings</h2>
-                    <a href="{% url 'meetings:list' %}" class="dash-section__link">All meetings →</a>
+                    <h2 class="cc-panel__title"><i class="bi bi-megaphone"></i> Announcements</h2>
+                    <a href="{% url 'announcements:announcement_list' %}" class="dash-section__link">View all →</a>
                 </div>
                 <ul class="list-plain dash-panel dash-panel--flat mb-0 px-3 pb-3">
-                    {% for meeting in next_meetings %}
+                    {% for ann in recent_announcements|slice:":4" %}
                     <li class="d-flex justify-content-between align-items-start gap-2 py-2">
                         <div>
-                            <a href="{% url 'meetings:detail' meeting.pk %}" class="table-link">{{ meeting.title }}</a>
-                            <div class="text-muted calendar-preview-item__meta">{{ meeting.scheduled_at|date:"M j, Y · g:i A" }}</div>
+                            <a href="{% url 'announcements:announcement_detail' ann.pk %}" class="table-link">{{ ann.title }}</a>
+                            <div class="text-muted calendar-preview-item__meta">{{ ann.created_at|date:"M j, Y" }}</div>
                         </div>
-                        <span class="chip chip--muted">{{ meeting.get_meeting_type_display }}</span>
                     </li>
-                    {% empty %}
-                    <li class="text-muted text-center py-3">No upcoming meetings scheduled.</li>
                     {% endfor %}
                 </ul>
             </section>
+            {% endif %}
         </div>
     </div>
-    {% endif %}
 
 </div>
 {% endblock %}
@@ -486,7 +479,8 @@ if (ctx) {
         },
         options: {
             responsive: true,
-            plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 12, font: { size: 11 } } } },
+            plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 8, font: { size: 10 } } } },
+            maintainAspectRatio: true,
             scales: {
                 y: { beginAtZero: true, grid: { color: '#e8edf4' }, border: { display: false }, ticks: { font: { size: 10 } } },
                 x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 10 } } }

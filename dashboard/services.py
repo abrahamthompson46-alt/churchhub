@@ -1230,6 +1230,7 @@ def build_home_context(request):
         "show_action_queue_sidebar": show_action_queue_sidebar,
         "church_focused": church_focused,
         "show_money_kpis": show_money_kpis,
+        "finance_as_of": as_of,
     }
 
     if is_control_center:

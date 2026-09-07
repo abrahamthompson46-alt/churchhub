@@ -864,6 +864,7 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         by_id = {w["id"]: w for w in (response.context.get("dashboard_kpi_widgets") or [])}
         self.assertIn("mtd_tithe", by_id)
         self.assertEqual(by_id["mtd_tithe"]["value"], Decimal("80.00"))
+        self.assertEqual(response.context.get("finance_as_of"), posting)
         self.assertIn("January", by_id["mtd_tithe"]["hint"])
         self.assertTrue(response.context.get("chart_has_activity"))
         self.assertIn("Jan 2026", response.context["trend_labels"])

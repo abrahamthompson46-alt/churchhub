@@ -1,0 +1,50 @@
+{% load humanize %}
+{% if membership_analysis %}
+<section class="cc-panel mb-3" aria-label="Membership analysis">
+    <div class="cc-panel__header">
+        <h2 class="cc-panel__title"><i class="bi bi-people"></i> Membership · {{ membership_analysis.period_label }}</h2>
+        <a href="{% url 'members:list' %}" class="dash-section__link">Directory →</a>
+    </div>
+    <div class="table-responsive table-in-card">
+        <table class="table table-sm table-hover mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Church</th>
+                    {% if membership_analysis.churches|length > 1 %}<th>District</th>{% endif %}
+                    <th class="text-end">Members</th>
+                    <th class="text-end">New this month</th>
+                    <th class="text-end">Change</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in membership_analysis.churches %}
+                <tr>
+                    <td class="fw-medium"><a href="{{ row.focus_url }}" class="table-link">{{ row.church }}</a></td>
+                    {% if membership_analysis.churches|length > 1 %}<td class="text-muted small">{{ row.district }}</td>{% endif %}
+                    <td class="text-end">{{ row.members|intcomma }}</td>
+                    <td class="text-end">{{ row.new_mtd|intcomma }}</td>
+                    <td class="text-end{% if row.delta_pct is not None and row.delta_pct < 0 %} text-danger{% elif row.delta_pct %} text-success{% endif %}">
+                        {% if row.delta_pct is not None %}{% if row.delta_pct >= 0 %}+{% endif %}{{ row.delta_pct|floatformat:1 }}%{% else %}—{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if membership_analysis.show_districts %}
+            <tbody>
+                {% for row in membership_analysis.districts %}
+                <tr class="table-light">
+                    <td class="fw-semibold" colspan="{% if membership_analysis.churches|length > 1 %}2{% else %}1{% endif %}">{{ row.district }} · {{ row.church_count }} church{{ row.church_count|pluralize }}</td>
+                    <td class="text-end">{{ row.members|intcomma }}</td>
+                    <td class="text-end">{{ row.new_mtd|intcomma }}</td>
+                    <td class="text-end{% if row.delta_pct is not None and row.delta_pct < 0 %} text-danger{% elif row.delta_pct %} text-success{% endif %}">
+                        {% if row.delta_pct is not None %}{% if row.delta_pct >= 0 %}+{% endif %}{{ row.delta_pct|floatformat:1 }}%{% else %}—{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% endif %}
+        </table>
+    </div>
+    <p class="small text-muted px-3 py-2 mb-0">Change is new active members with a join date in {{ membership_analysis.period_label }} versus the roll already on the books.</p>
+</section>
+{% endif %}

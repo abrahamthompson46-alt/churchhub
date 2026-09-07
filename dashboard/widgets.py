@@ -31,33 +31,34 @@ WIDGET_ORDER = {
     "executive": (
         "churches",
         "action_items",
-        "mtd_tithe",
+        "mtd_net",
         "mtd_combined",
+        "mtd_tithe",
         "remittance_payable",
-        "active_members",
     ),
     "district": (
         "churches",
         "action_items",
-        "giving_mtd",
+        "mtd_net",
+        "mtd_combined",
         "remittance_payable",
         "pending_transfers",
-        "active_members",
     ),
     "pastoral": (
         "pending_approvals",
         "pending_transfers",
         "active_members",
         "income_mtd",
+        "mtd_net",
+        "mtd_combined",
         "remittance_payable",
     ),
     "treasury": (
         "income_mtd",
-        "expense_mtd",
+        "mtd_net",
+        "mtd_combined",
         "mtd_tithe",
         "remittance_payable",
-        "pending_approvals",
-        "action_items",
     ),
     "secretary": (
         "active_members",
@@ -229,51 +230,47 @@ def build_kpi_widgets(
             return finance_bundle.get(f"{key}_delta_pct")
 
         receipts_url = _receipts_url(user)
-        giving_total = finance_bundle["mtd_tithe"] + finance_bundle["mtd_combined"]
+        hover_hint = f"{hint_scope} · {period}" if hint_scope else period
 
-        if subtree:
-            widgets["giving_mtd"] = _money_widget(
-                "giving_mtd",
-                "Giving MTD",
-                giving_total,
-                f"{hint_scope} · {period}",
-                "reports:run",
-                card_class="cc-kpi-card--primary",
-                report_key="hierarchy_rollup",
-                delta_pct=_delta("mtd_tithe"),
-                compare_label=compare,
-                empty_cta=_zero_receipt_cta(giving_total),
-            )
-        else:
-            widgets["mtd_tithe"] = _money_widget(
-                "mtd_tithe",
-                "Tithe MTD",
-                finance_bundle["mtd_tithe"],
-                f"{hint_scope} · {period}",
-                receipts_url,
-                card_class="cc-kpi-card--primary",
-                delta_pct=_delta("mtd_tithe"),
-                compare_label=compare,
-                empty_cta=_zero_receipt_cta(finance_bundle["mtd_tithe"]),
-            )
-            widgets["mtd_combined"] = _money_widget(
-                "mtd_combined",
-                "Combined MTD",
-                finance_bundle["mtd_combined"],
-                f"{hint_scope} · {period}",
-                receipts_url,
-                card_class="cc-kpi-card--accent",
-                delta_pct=_delta("mtd_combined"),
-                compare_label=compare,
-                empty_cta=_zero_receipt_cta(finance_bundle["mtd_combined"]),
-            )
+        widgets["mtd_net"] = _money_widget(
+            "mtd_net",
+            "Net MTD",
+            finance_bundle["mtd_net"],
+            hover_hint,
+            "transactions:transaction_list",
+            card_class="cc-kpi-card--success",
+            delta_pct=_delta("mtd_net"),
+            compare_label=compare,
+        )
+        widgets["mtd_combined"] = _money_widget(
+            "mtd_combined",
+            "Combined MTD",
+            finance_bundle["mtd_combined"],
+            hover_hint,
+            receipts_url,
+            card_class="cc-kpi-card--accent",
+            delta_pct=_delta("mtd_combined"),
+            compare_label=compare,
+            empty_cta=_zero_receipt_cta(finance_bundle["mtd_combined"]),
+        )
+        widgets["mtd_tithe"] = _money_widget(
+            "mtd_tithe",
+            "Tithe MTD",
+            finance_bundle["mtd_tithe"],
+            hover_hint,
+            receipts_url,
+            card_class="cc-kpi-card--primary",
+            delta_pct=_delta("mtd_tithe"),
+            compare_label=compare,
+            empty_cta=_zero_receipt_cta(finance_bundle["mtd_tithe"]),
+        )
 
         if not subtree:
             widgets["income_mtd"] = _money_widget(
                 "income_mtd",
                 "Income MTD",
                 finance_bundle["mtd_income"],
-                f"{hint_scope} · {period}",
+                hover_hint,
                 receipts_url,
                 card_class="cc-kpi-card--success",
                 delta_pct=_delta("mtd_income"),
@@ -284,7 +281,7 @@ def build_kpi_widgets(
                 "expense_mtd",
                 "Expenses MTD",
                 finance_bundle["mtd_expense"],
-                f"{hint_scope} · {period}",
+                hover_hint,
                 "transactions:transaction_list",
                 card_class="cc-kpi-card--danger",
                 delta_pct=_delta("mtd_expense"),
@@ -296,7 +293,7 @@ def build_kpi_widgets(
                 "remittance_payable",
                 "Remittance payable",
                 finance_bundle["mtd_remittance_payable"],
-                f"{hint_scope} · MTD",
+                hover_hint,
                 "dashboard:cutoff",
                 card_class="cc-kpi-card--warning",
             )

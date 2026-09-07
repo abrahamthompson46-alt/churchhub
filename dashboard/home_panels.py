@@ -7,7 +7,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from church_system.church_scope import get_active_church
-from dashboard import selectors
+from dashboard import metrics, selectors
+from organization.models import Church
 from permissions.checks import (
     can_manage_finances,
     can_manage_members,
@@ -163,6 +164,72 @@ def get_member_role_extras(request):
     extras["portal_url"] = reverse("portal:home")
     extras["calendar_url"] = reverse("announcements:upcoming_calendar")
     return extras
+
+
+def get_membership_analysis(church_ids, month_start):
+    """Per-church and district membership with month-to-date join growth."""
+    if not church_ids:
+        return None
+    churches = list(
+        Church.objects.filter(pk__in=church_ids)
+        .select_related("district")
+        .order_by("district__name", "name")
+    )
+    if not churches:
+        return None
+    growth = selectors.membership_growth_by_church(list(church_ids), month_start)
+    church_rows = []
+    district_map = {}
+    for church in churches:
+        stats = growth.get(church.pk, {"current": 0, "new_mtd": 0})
+        current = int(stats.get("current") or 0)
+        new_mtd = int(stats.get("new_mtd") or 0)
+        prior = max(current - new_mtd, 0)
+        row = {
+            "church_id": church.pk,
+            "church": church.name,
+            "district": church.district.name if church.district_id else "—",
+            "district_id": church.district_id,
+            "members": current,
+            "new_mtd": new_mtd,
+            "delta_pct": metrics.pct_change(current, prior),
+            "focus_url": f"{reverse('dashboard:home')}?church={church.id}",
+        }
+        church_rows.append(row)
+        bucket = district_map.setdefault(
+            church.district_id or "none",
+            {
+                "district": row["district"],
+                "members": 0,
+                "new_mtd": 0,
+                "church_count": 0,
+            },
+        )
+        bucket["members"] += current
+        bucket["new_mtd"] += new_mtd
+        bucket["church_count"] += 1
+
+    district_rows = []
+    for bucket in district_map.values():
+        prior = max(bucket["members"] - bucket["new_mtd"], 0)
+        bucket["delta_pct"] = metrics.pct_change(bucket["members"], prior)
+        district_rows.append(bucket)
+    district_rows.sort(key=lambda r: r["district"])
+
+    total_members = sum(r["members"] for r in church_rows)
+    total_new = sum(r["new_mtd"] for r in church_rows)
+    return {
+        "churches": church_rows,
+        "districts": district_rows,
+        "show_districts": len(district_rows) > 1 or (len(church_rows) > 1 and district_rows),
+        "totals": {
+            "members": total_members,
+            "new_mtd": total_new,
+            "delta_pct": metrics.pct_change(total_members, max(total_members - total_new, 0)),
+            "church_count": len(church_rows),
+        },
+        "period_label": month_start.strftime("%B %Y"),
+    }
 
 
 def get_dashboard_coaching_hints(context):

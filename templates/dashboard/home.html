@@ -91,16 +91,18 @@
     {% endif %}
 
     {% if show_this_week_pulse and this_week_pulse or settlement_strip %}
-    <div class="cc-ops-row">
-        {% if show_this_week_pulse and this_week_pulse %}
-        <section class="cc-pulse-bar">
-            {% include "dashboard/includes/this_week_pulse.html" %}
-        </section>
-        {% endif %}
+    <section class="cc-week-strip" aria-label="This week and remittance">
         {% if settlement_strip %}
-        {% include "dashboard/includes/settlement_strip.html" %}
+        <div class="cc-week-strip__pane cc-week-strip__pane--remit">
+            {% include "dashboard/includes/settlement_strip.html" %}
+        </div>
         {% endif %}
-    </div>
+        {% if show_this_week_pulse and this_week_pulse %}
+        <div class="cc-week-strip__pane cc-week-strip__pane--pulse">
+            {% include "dashboard/includes/this_week_pulse.html" %}
+        </div>
+        {% endif %}
+    </section>
     {% endif %}
 
     {% if scope_switcher %}
@@ -124,15 +126,14 @@
 
     {% include "dashboard/includes/exception_board.html" %}
 
-    {% if dashboard_kpi_widgets or show_finance_chart %}
+    {% if dashboard_kpi_widgets %}
     <section class="cc-insight-band" aria-label="Key figures">
         {% if church_focused and finance_as_of %}
         <p class="cc-insight-band__asof">Figures use working day {{ finance_as_of|date:"j M Y" }}</p>
         {% endif %}
-        {% if dashboard_kpi_widgets %}
         <div class="cc-kpi-grid" aria-label="Dashboard KPIs">
             {% for widget in dashboard_kpi_widgets %}
-            <a href="{% if widget.report_key %}{% url 'reports:run' widget.report_key %}{% else %}{% url widget.url_name %}{% endif %}" class="cc-kpi-card{% if widget.card_class %} {{ widget.card_class }}{% endif %}"{% if widget.value_is_money and widget.empty_cta %} title="{{ widget.empty_cta }}"{% endif %}>
+            <a href="{% if widget.report_key %}{% url 'reports:run' widget.report_key %}{% else %}{% url widget.url_name %}{% endif %}" class="cc-kpi-card{% if widget.card_class %} {{ widget.card_class }}{% endif %}" title="{% if widget.hint %}{{ widget.hint }}{% endif %}{% if widget.hint and widget.empty_cta %} — {% endif %}{{ widget.empty_cta }}">
                 <span class="cc-kpi-card__label">{{ widget.label }}</span>
                 {% if widget.value_is_money %}
                 <span class="cc-kpi-card__value text-currency">{% if is_control_center %}{% money widget.value 0 %}{% else %}{% money widget.value 2 %}{% endif %}</span>
@@ -141,32 +142,15 @@
                 {% endif %}
                 {% if widget.delta_pct is not None %}
                 <span class="cc-kpi-card__delta{% if widget.delta_pct >= 0 %} cc-kpi-card__delta--up{% else %} cc-kpi-card__delta--down{% endif %}">
-                    {% if widget.delta_pct >= 0 %}+{% endif %}{{ widget.delta_pct|floatformat:1 }}% vs {{ widget.compare_label|default:"prior month" }}
+                    {% if widget.delta_pct >= 0 %}+{% endif %}{{ widget.delta_pct|floatformat:1 }}%
                 </span>
                 {% endif %}
-                <span class="cc-kpi-card__hint">{{ widget.hint }}</span>
             </a>
             {% endfor %}
         </div>
-        {% endif %}
-
-        {% if show_finance_chart %}
-        <section class="cc-panel cc-panel--chart mb-0">
-            <div class="cc-panel__header">
-                <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Income vs expense{% if dashboard_scope.finance_scope_label %} · {{ dashboard_scope.finance_scope_label }}{% endif %}</h2>
-            </div>
-            <div class="cc-panel__body cc-panel__body--chart">
-                {% if chart_has_activity %}
-                <canvas id="trendChart" height="72"></canvas>
-                {% else %}
-                <p class="text-muted text-center mb-0 py-3">No approved income or expense in the last 6 posting months for this church.</p>
-                {% endif %}
-            </div>
-        </section>
-        {% elif show_finance and not dashboard_scope.finance_church_ids %}
-        <div class="cc-scope-bar" role="status">Select a church from the toolbar to view financial charts.</div>
-        {% endif %}
     </section>
+    {% elif show_finance and not dashboard_scope.finance_church_ids %}
+    <div class="cc-scope-bar" role="status">Select a church from the toolbar to view financial charts.</div>
     {% endif %}
 
     {% if member_role_extras %}
@@ -244,6 +228,23 @@
         </div>
     </section>
     {% endif %}
+
+    {% if show_finance_chart %}
+    <section class="cc-panel cc-panel--chart mb-3">
+        <div class="cc-panel__header">
+            <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Income vs expense{% if dashboard_scope.finance_scope_label %} · {{ dashboard_scope.finance_scope_label }}{% endif %}</h2>
+        </div>
+        <div class="cc-panel__body cc-panel__body--chart">
+            {% if chart_has_activity %}
+            <canvas id="trendChart" height="72"></canvas>
+            {% else %}
+            <p class="text-muted text-center mb-0 py-3">No approved income or expense in the last 6 posting months for this church.</p>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% include "dashboard/includes/membership_analysis.html" %}
 
     <div class="row g-3 cc-home-body">
         <div class="{% if is_control_center %}col-xl-5{% else %}col-xl-4{% endif %}">
@@ -350,6 +351,7 @@
                                 <th>Church</th>
                                 <th>District</th>
                                 <th class="text-end">Members</th>
+                                <th class="text-end">Members Δ</th>
                                 <th class="text-end">Giving MTD</th>
                             </tr>
                         </thead>
@@ -360,10 +362,13 @@
                                 <td class="fw-medium"><a href="{{ row.focus_url }}" class="table-link">{{ row.church }}</a></td>
                                 <td class="text-muted small">{{ row.district }}</td>
                                 <td class="text-end">{{ row.members|intcomma }}</td>
+                                <td class="text-end{% if row.member_delta_pct is not None and row.member_delta_pct < 0 %} text-danger{% elif row.member_delta_pct %} text-success{% endif %}">
+                                    {% if row.member_delta_pct is not None %}{% if row.member_delta_pct >= 0 %}+{% endif %}{{ row.member_delta_pct|floatformat:1 }}%{% else %}—{% endif %}
+                                </td>
                                 <td class="text-end text-currency fw-semibold">{% money row.mtd_giving 0 %}</td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="5" class="text-muted text-center py-3">No giving data for this period.</td></tr>
+                            <tr><td colspan="6" class="text-muted text-center py-3">No giving data for this period.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -414,6 +419,7 @@
                     <h2 class="cc-panel__title"><i class="bi bi-calendar-heart"></i> Upcoming</h2>
                     <a href="{% url 'announcements:upcoming_calendar' %}" class="dash-section__link">Calendar →</a>
                 </div>
+                {% if not this_week_pulse %}
                 <div class="calendar-metrics calendar-metrics--compact mb-3 px-3 pt-3">
                     <span class="calendar-metric calendar-metric--birthday calendar-metric--sm">
                         <span class="calendar-metric__value">{{ upcoming_counts.birthdays }}</span>
@@ -428,6 +434,7 @@
                         <span class="calendar-metric__label">Events</span>
                     </span>
                 </div>
+                {% endif %}
                 <ul class="list-plain dash-panel dash-panel--flat mb-0 px-3 pb-3">
                     {% for item in upcoming_preview|slice:":5" %}
                     <li class="calendar-preview-item calendar-preview-item--{{ item.kind }}">

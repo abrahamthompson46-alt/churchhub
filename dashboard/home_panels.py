@@ -213,6 +213,24 @@ def get_member_role_extras(request):
 
 
 _CHART_CHURCH_LIMIT = 40
+_CHART_SHORT_LABEL = 12
+
+
+def _membership_chart_short_label(name, code=""):
+    """Axis label: keep a short church name so bars stay readable."""
+    name = (name or "").strip()
+    if not name:
+        return (code or "—")[:_CHART_SHORT_LABEL]
+    if len(name) <= _CHART_SHORT_LABEL:
+        return name
+    words = name.split()
+    if len(words) >= 2 and len(words[0]) <= 10:
+        initials = "".join(w[0] for w in words[1:3] if w and not w.isdigit())
+        tail = words[-1] if words[-1].isdigit() else ""
+        candidate = f"{words[0]} {initials} {tail}".strip()
+        if len(candidate) <= _CHART_SHORT_LABEL + 4:
+            return candidate
+    return name[: _CHART_SHORT_LABEL - 1] + "…"
 
 
 def get_membership_analysis(
@@ -228,6 +246,8 @@ def get_membership_analysis(
 
     if not church_ids:
         return None
+    filter_district_id = str(district_id or "")
+    filter_conference_id = str(conference_id or "")
     churches = list(
         Church.objects.filter(pk__in=church_ids)
         .select_related("district__zone__conference")
@@ -248,8 +268,9 @@ def get_membership_analysis(
         prior = max(current - new_mtd, 0)
         district = church.district
         conference = getattr(getattr(district, "zone", None), "conference", None) if district else None
-        district_id = str(church.district_id) if church.district_id else ""
-        conference_id = str(conference.pk) if conference else ""
+        district_key = church.district_id or "none"
+        district_id_str = str(church.district_id) if church.district_id else ""
+        conference_id_str = str(conference.pk) if conference else ""
         row = {
             "church_id": church.pk,
             "church": church.name,
@@ -266,21 +287,24 @@ def get_membership_analysis(
         church_points.append(
             {
                 "label": church.name,
+                "short": _membership_chart_short_label(church.name, church.code),
+                "full": church.name,
                 "value": current,
                 "url": row["focus_url"],
-                "district_id": district_id,
+                "district_id": district_id_str,
+                "district_key": district_key,
                 "district": row["district"],
-                "conference_id": conference_id,
+                "conference_id": conference_id_str,
                 "conference": row["conference"],
                 "sub": row["district"],
             }
         )
         bucket = district_map.setdefault(
-            church.district_id or "none",
+            district_key,
             {
                 "district": row["district"],
-                "district_id": district_id,
-                "conference_id": conference_id,
+                "district_id": district_id_str,
+                "conference_id": conference_id_str,
                 "members": 0,
                 "new_mtd": 0,
                 "church_count": 0,
@@ -293,7 +317,7 @@ def get_membership_analysis(
             conference.pk if conference else "none",
             {
                 "conference": row["conference"],
-                "conference_id": conference_id,
+                "conference_id": conference_id_str,
                 "members": 0,
                 "new_mtd": 0,
                 "church_count": 0,
@@ -321,6 +345,11 @@ def get_membership_analysis(
         conference_rows.append(bucket)
     conference_rows.sort(key=lambda r: (-r["members"], r["conference"]))
 
+    for point in church_points:
+        tot = district_map.get(point.get("district_key") or "none", {}).get("members") or 0
+        point["share_pct"] = int(round(100 * point["value"] / tot)) if tot else 0
+        point.pop("district_key", None)
+
     church_points.sort(key=lambda r: (-r["value"], r["label"]))
     truncated = 0
     chart_points = church_points
@@ -328,9 +357,12 @@ def get_membership_analysis(
         head = church_points[: _CHART_CHURCH_LIMIT - 1]
         rest = church_points[_CHART_CHURCH_LIMIT - 1 :]
         truncated = len(rest)
+        other_label = f"Other ({truncated} churches)"
         chart_points = head + [
             {
-                "label": f"Other ({truncated} churches)",
+                "label": other_label,
+                "short": "Other",
+                "full": other_label,
                 "value": sum(p["value"] for p in rest),
                 "url": "",
                 "district_id": "",
@@ -338,6 +370,7 @@ def get_membership_analysis(
                 "conference_id": "",
                 "conference": "",
                 "sub": "",
+                "share_pct": None,
             }
         ]
 
@@ -359,13 +392,15 @@ def get_membership_analysis(
         "total": total_members,
         "levels": levels,
         "default_level": default_level,
-        "selected_district": district_id or "",
-        "selected_conference": conference_id or "",
+        "selected_district": filter_district_id,
+        "selected_conference": filter_conference_id,
         "truncated": truncated,
         "churches": chart_points,
         "districts": [
             {
                 "label": r["district"],
+                "short": _membership_chart_short_label(r["district"]),
+                "full": r["district"],
                 "value": r["members"],
                 "sub": f"{r['church_count']} church{'es' if r['church_count'] != 1 else ''}",
                 "district_id": r["district_id"],
@@ -376,6 +411,8 @@ def get_membership_analysis(
         "conferences": [
             {
                 "label": r["conference"],
+                "short": _membership_chart_short_label(r["conference"]),
+                "full": r["conference"],
                 "value": r["members"],
                 "sub": f"{r['church_count']} churches · {r['district_count']} districts",
                 "conference_id": r["conference_id"],
@@ -463,16 +500,24 @@ def get_portal_staff_alerts(request):
         "praise_new": praise_new,
         "prayer_url": reverse("portal:staff_submissions") + "?kind=PRAYER",
         "praise_url": reverse("portal:staff_submissions") + "?kind=THANKSGIVING",
+        "announcement_url": reverse("announcements:announcement_list"),
     }
 
 
 def get_member_portal_banner(user):
+    from permissions.checks import can_create_announcements
     from portal.views import user_can_use_member_portal
 
     if not user_can_use_member_portal(user):
         return None
+    announcement_url = (
+        reverse("announcements:create_announcement")
+        if can_create_announcements(user)
+        else reverse("announcements:announcement_list")
+    )
     return {
         "portal_home_url": reverse("portal:home"),
         "prayer_url": reverse("portal:prayer_request"),
         "thanksgiving_url": reverse("portal:thanksgiving_testimony"),
+        "announcement_url": announcement_url,
     }

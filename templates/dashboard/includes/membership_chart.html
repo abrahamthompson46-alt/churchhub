@@ -59,7 +59,7 @@
         {% if membership_analysis.chart.truncated %}
         <p class="small text-muted px-1 pt-2 mb-0">Showing the {{ membership_analysis.chart.churches|length }} largest groups. {{ membership_analysis.chart.truncated }} smaller churches are combined as Other.</p>
         {% endif %}
-        <p class="small text-muted px-1 pt-2 mb-0">Counts use membership status Active. Only churches you are allowed to manage are included. Click a church bar to focus that congregation, a district bar to filter that district, or a conference bar to filter that conference.</p>
+        <p class="small text-muted px-1 pt-2 mb-0">Counts use membership status Active. Axis labels are abbreviated; the full congregation name is drawn on the bar. When a district’s churches are shown together, each bar also shows that church’s share of the district. Click a church bar to focus that congregation, a district bar to filter that district, or a conference bar to filter that conference.</p>
     </div>
     {{ membership_analysis.chart|json_script:"membership-chart-data" }}
 </section>

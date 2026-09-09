@@ -3046,48 +3046,22 @@ body.app-body.auth-page {
 .chip--danger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
 .chip--muted { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
 
-/* Permission matrix — role labels stick under the app navbar on page scroll */
+/* Permission matrix — freeze header inside a two-way scroll pane */
 form.data-card.permission-matrix-card {
-    overflow: visible;
+    overflow: hidden;
 }
-.permission-matrix-sticky-head {
+.permission-matrix-scroll {
+    overflow: auto;
+    max-height: min(70vh, calc(100vh - 16rem));
+    overscroll-behavior: contain;
+}
+.permission-matrix thead th {
     position: sticky;
     top: 0;
-    z-index: 20;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
+    z-index: 3;
     background: var(--ch-table-head-bg);
     color: var(--ch-table-head-text);
-    border-radius: var(--ch-radius) var(--ch-radius) 0 0;
-    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.25);
-}
-.permission-matrix-sticky-head::-webkit-scrollbar { height: 0; display: none; }
-    display: grid;
-    align-items: center;
-    min-height: 2.6rem;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-.permission-matrix-sticky-head__perm,
-.permission-matrix-sticky-head__role {
-    padding: 0.5rem 0.65rem;
-    white-space: nowrap;
-}
-.permission-matrix-sticky-head__role { text-align: center; }
-.permission-matrix-scroll {
-    overflow-x: auto;
-    overflow-y: visible;
-    max-height: none;
-}
-.permission-matrix thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.12);
 }
 .permission-matrix .matrix-sticky {
     position: sticky;
@@ -3098,6 +3072,8 @@ form.data-card.permission-matrix-card {
 }
 .permission-matrix thead th.matrix-sticky {
     z-index: 4;
+    left: 0;
+    top: 0;
     background: var(--ch-table-head-bg);
 }
 .permission-matrix .matrix-role-col { min-width: 90px; font-size: 0.75rem; }
@@ -4264,6 +4240,7 @@ main .page-container,
     font-size: 0.72rem;
 }
 .cc-portal-alert--prayer { border-left: 3px solid var(--ch-accent); }
+.cc-portal-alert--announce { border-left: 3px solid var(--ch-primary); }
 .cc-portal-alert--praise { border-left: 3px solid var(--ch-warning); }
 
 .portal-page__header {
@@ -5673,36 +5650,54 @@ a.alert-banner:hover {
 }
 
 .cc-member-chart__plot {
-    min-height: 10rem;
+    min-height: 14rem;
+    height: 16rem;
     position: relative;
+}
+.cc-member-chart__plot canvas {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 .cc-seg {
     display: inline-flex;
-    border: 1px solid var(--ch-border);
-    border-radius: 4px;
-    overflow: hidden;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.22rem;
+    background: linear-gradient(180deg, #f4f7fb 0%, #e8eef5 100%);
+    border: 1px solid #cfd9e6;
+    border-radius: 999px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .cc-seg__btn {
     border: 0;
-    background: #fff;
-    color: var(--ch-muted);
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    padding: 0.35rem 0.7rem;
+    background: transparent;
+    color: #3d5670;
+    font-size: 0.8rem;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    padding: 0.4rem 0.95rem;
+    border-radius: 999px;
     cursor: pointer;
+    line-height: 1.2;
+    transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .cc-seg__btn + .cc-seg__btn {
-    border-left: 1px solid var(--ch-border);
+    border-left: 0;
+}
+
+.cc-seg__btn:hover {
+    color: #1e3a5f;
+    background: rgba(255, 255, 255, 0.65);
 }
 
 .cc-seg__btn.is-active {
-    background: #1e3a5f;
+    background: linear-gradient(180deg, #2c5282 0%, #1e3a5f 100%);
     color: #fff;
+    box-shadow: 0 1px 3px rgba(30, 58, 95, 0.35);
 }
 
 .cc-activity-disclosure {

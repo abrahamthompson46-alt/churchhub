@@ -188,6 +188,49 @@ class ServiceTests(DashboardTestMixin, TestCase):
         self.assertIn("GHS ", remittance[0]["text"])
         self.assertNotIn("₵", remittance[0]["text"])
 
+    def test_admins_get_weekly_notice_for_missing_budgets(self):
+        from unittest.mock import patch
+
+        from dashboard.models import Notification
+        from permissions.org_scope import apply_org_scope
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        admin = User.objects.create_user(
+            username="budget_admin",
+            password="pass12345",
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+        )
+        apply_org_scope(
+            admin,
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+            district=self.district,
+        )
+        admin.save()
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = admin
+        request.session = {}
+        with patch("sitecontrol.services.church_has_feature", return_value=True):
+            alerts = get_alerts(request, admin)
+        gap = [a for a in alerts if "church budget" in a["text"]]
+        self.assertEqual(len(gap), 1)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=admin, title="Churches without annual budgets"
+            ).exists()
+        )
+        alerts_again = get_alerts(request, admin)
+        self.assertEqual(len([a for a in alerts_again if "church budget" in a["text"]]), 0)
+        self.assertEqual(
+            Notification.objects.filter(
+                user=admin, title="Churches without annual budgets"
+            ).count(),
+            1,
+        )
+
 
 class HierarchyScopeTests(TestCase):
     @classmethod
@@ -832,6 +875,7 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertIsNone(response.context.get("attendance_panel"))
         ids = [w["id"] for w in (response.context.get("dashboard_kpi_widgets") or [])]
         self.assertIn("mtd_net", ids)
+        self.assertIn("expense_mtd", ids)
         self.assertIn("mtd_combined", ids)
         self.assertIn("churches", ids)
         self.assertNotIn("income_mtd", ids)
@@ -880,6 +924,7 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         ids = [w["id"] for w in (response.context.get("dashboard_kpi_widgets") or [])]
         self.assertIn("mtd_tithe", ids)
         self.assertIn("mtd_combined", ids)
+        self.assertIn("expense_mtd", ids)
         self.assertTrue(response.context.get("show_finance_chart"))
         self.assertEqual(response.context.get("finance_chart_series"), "tithe")
         self.assertContains(response, 'data-finance-chart="combined"')
@@ -936,7 +981,12 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         by_id = {w["id"]: w for w in (response.context.get("dashboard_kpi_widgets") or [])}
         self.assertIn("mtd_tithe", by_id)
         self.assertIn("mtd_net", by_id)
+        self.assertIn("expense_mtd", by_id)
         self.assertIn("mtd_combined", by_id)
+        self.assertEqual(by_id["mtd_net"]["report_key"], "financial_summary")
+        self.assertEqual(by_id["expense_mtd"]["report_key"], "financial_summary")
+        self.assertIn("period=monthly", by_id["mtd_net"]["url_query"])
+        self.assertContains(response, "/reports/financial_summary/?period=monthly")
         self.assertEqual(by_id["mtd_tithe"]["value"], Decimal("80.00"))
         self.assertEqual(by_id["mtd_combined"]["value"], Decimal("20.00"))
         self.assertEqual(response.context.get("finance_as_of"), posting)

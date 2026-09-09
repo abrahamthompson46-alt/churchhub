@@ -11,6 +11,7 @@ from permissions.checks import (
     can_manage_finances,
     can_manage_members,
     can_view_all_churches,
+    can_view_finance_reports,
     can_view_members,
     can_view_reports,
 )
@@ -65,7 +66,7 @@ def user_may_access_report(user, report_key, active_church=None):
 
     perm = meta["permission"]
     if perm == "finance":
-        if not can_manage_finances(user):
+        if not (can_manage_finances(user) or can_view_finance_reports(user)):
             return False
     elif perm == "members":
         if not (can_view_members(user) or can_manage_members(user)):

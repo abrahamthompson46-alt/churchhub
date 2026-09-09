@@ -58,6 +58,8 @@ class MembershipComparisonChartTests(TestCase):
         self.assertEqual(snap["totals"]["members"], 11)
         labels = [p["label"] for p in snap["chart"]["churches"]]
         self.assertEqual(labels[0], "Church A")
+        self.assertEqual(snap["chart"]["churches"][0]["short"], "Church A")
+        self.assertEqual(snap["chart"]["churches"][0]["full"], "Church A")
         self.assertNotIn("Outsider", labels)
         by_church = {p["label"]: p["value"] for p in snap["chart"]["churches"]}
         self.assertEqual(by_church["Church A"], 5)
@@ -109,3 +111,34 @@ class MembershipComparisonChartTests(TestCase):
             scoped, timezone.localdate().replace(day=1), view="church"
         )
         self.assertEqual(snap_view["chart"]["default_level"], "church")
+
+    def test_abbreviates_long_names_and_district_shares(self):
+        district = District.objects.create(zone=self.dist_a.zone, code="D5", name="Five Church District")
+        counts = (10, 6, 2, 1, 1)
+        churches = []
+        for i, n in enumerate(counts, start=1):
+            church = Church.objects.create(
+                district=district,
+                code=f"F{i}",
+                name=f"Northridge Community Fellowship {i}",
+            )
+            churches.append(church)
+            for _ in range(n):
+                Member.objects.create(
+                    church=church,
+                    first_name="M",
+                    last_name=str(_),
+                    gender=Gender.FEMALE,
+                    membership_status=MembershipStatus.ACTIVE,
+                )
+        snap = get_membership_analysis(
+            [c.id for c in churches], timezone.localdate().replace(day=1)
+        )
+        points = snap["chart"]["churches"]
+        self.assertEqual(len(points), 5)
+        by_full = {p["full"]: p for p in points}
+        self.assertEqual(by_full["Northridge Community Fellowship 1"]["share_pct"], 50)
+        self.assertEqual(by_full["Northridge Community Fellowship 2"]["share_pct"], 30)
+        self.assertEqual(by_full["Northridge Community Fellowship 3"]["share_pct"], 10)
+        self.assertEqual(by_full["Northridge Community Fellowship 1"]["short"], "Northridge CF 1")
+        self.assertLessEqual(len(points[0]["short"]), 16)

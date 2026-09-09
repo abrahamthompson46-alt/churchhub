@@ -34,6 +34,7 @@ WIDGET_ORDER = {
         "churches",
         "action_items",
         "mtd_net",
+        "expense_mtd",
         "mtd_combined",
         "mtd_tithe",
         "remittance_payable",
@@ -42,6 +43,7 @@ WIDGET_ORDER = {
         "churches",
         "action_items",
         "mtd_net",
+        "expense_mtd",
         "mtd_combined",
         "remittance_payable",
         "pending_transfers",
@@ -50,6 +52,7 @@ WIDGET_ORDER = {
         "churches",
         "action_items",
         "mtd_net",
+        "expense_mtd",
         "mtd_tithe",
         "mtd_combined",
         "remittance_payable",
@@ -60,12 +63,14 @@ WIDGET_ORDER = {
         "active_members",
         "income_mtd",
         "mtd_net",
+        "expense_mtd",
         "mtd_combined",
         "remittance_payable",
     ),
     "treasury": (
         "income_mtd",
         "mtd_net",
+        "expense_mtd",
         "mtd_combined",
         "mtd_tithe",
         "remittance_payable",
@@ -106,6 +111,7 @@ def _money_widget(
     url_name,
     card_class="",
     report_key="",
+    url_query="",
     delta_pct=None,
     compare_label="",
     empty_cta="",
@@ -120,6 +126,7 @@ def _money_widget(
         "empty_cta": empty_cta,
         "url_name": url_name,
         "report_key": report_key,
+        "url_query": url_query,
         "card_class": card_class,
         "delta_pct": delta_pct,
         "compare_label": compare_label,
@@ -136,6 +143,7 @@ def _count_widget(widget_id, label, value, hint, url_name, card_class="", report
         "hint": hint,
         "url_name": url_name,
         "report_key": report_key,
+        "url_query": "",
         "card_class": card_class,
         "empty_cta": "",
     }
@@ -243,6 +251,8 @@ def build_kpi_widgets(
 
         receipts_url = _receipts_url(user)
         hover_hint = f"{hint_scope} · {period}" if hint_scope else period
+        figures_report = "financial_summary"
+        figures_query = "?period=monthly"
 
         widgets["mtd_net"] = _money_widget(
             "mtd_net",
@@ -251,6 +261,8 @@ def build_kpi_widgets(
             hover_hint,
             "transactions:transaction_list",
             card_class="cc-kpi-card--success",
+            report_key=figures_report,
+            url_query=figures_query,
             delta_pct=_delta("mtd_net"),
             compare_label=compare,
         )
@@ -289,16 +301,18 @@ def build_kpi_widgets(
                 compare_label=compare,
                 empty_cta=_zero_receipt_cta(finance_bundle["mtd_income"]),
             )
-            widgets["expense_mtd"] = _money_widget(
-                "expense_mtd",
-                "Expenses MTD",
-                finance_bundle["mtd_expense"],
-                hover_hint,
-                "transactions:transaction_list",
-                card_class="cc-kpi-card--danger",
-                delta_pct=_delta("mtd_expense"),
-                compare_label=compare,
-            )
+        widgets["expense_mtd"] = _money_widget(
+            "expense_mtd",
+            "Expenses MTD",
+            finance_bundle["mtd_expense"],
+            hover_hint,
+            "transactions:transaction_list",
+            card_class="cc-kpi-card--danger",
+            report_key=figures_report,
+            url_query=figures_query,
+            delta_pct=_delta("mtd_expense"),
+            compare_label=compare,
+        )
 
         if remittance_enabled:
             widgets["remittance_payable"] = _money_widget(

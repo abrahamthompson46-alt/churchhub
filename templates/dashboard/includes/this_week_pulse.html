@@ -6,22 +6,30 @@
         <span class="cc-pulse-hero__dates">{{ this_week_pulse.week_label }}</span>
     </div>
     <div class="cc-pulse-hero__chips">
+        {% if this_week_pulse.counts.visitors %}
         <a href="{% url 'members:visitor_list' %}" class="cc-pulse-hero__chip cc-pulse-hero__chip--visitors" title="Open visitor follow-ups">
             <strong>{{ this_week_pulse.counts.visitors }}</strong>
             <span>Visitors</span>
         </a>
+        {% endif %}
+        {% if this_week_pulse.counts.birthdays %}
         <a href="{% url 'announcements:upcoming_calendar' %}" class="cc-pulse-hero__chip cc-pulse-hero__chip--birthdays" title="Birthdays this week">
             <strong>{{ this_week_pulse.counts.birthdays }}</strong>
             <span>Birthdays</span>
         </a>
+        {% endif %}
+        {% if this_week_pulse.counts.transfers %}
         <a href="{% url 'members:transfer_list' %}" class="cc-pulse-hero__chip cc-pulse-hero__chip--transfers" title="Pending transfers">
             <strong>{{ this_week_pulse.counts.transfers }}</strong>
             <span>Transfers</span>
         </a>
+        {% endif %}
+        {% if this_week_pulse.counts.meetings %}
         <a href="{% url 'meetings:list' %}" class="cc-pulse-hero__chip cc-pulse-hero__chip--meetings" title="Meetings this week">
             <strong>{{ this_week_pulse.counts.meetings }}</strong>
             <span>Meetings</span>
         </a>
+        {% endif %}
     </div>
 </div>
 {% endif %}

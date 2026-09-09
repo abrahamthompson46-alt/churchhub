@@ -461,12 +461,14 @@ class PermissionViewTests(ChurchHubTestMixin, TestCase):
         response = self.client.get(reverse("permissions:matrix"))
         self.assertEqual(response.status_code, 403)
 
-    def test_matrix_keeps_sticky_role_header(self):
+    def test_matrix_scrolls_with_frozen_table_header(self):
         self._login("perm_super")
         response = self.client.get(reverse("permissions:matrix"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "permission-matrix-sticky-head")
+        self.assertContains(response, "permission-matrix-scroll")
         self.assertContains(response, "permission-matrix-card")
+        self.assertNotContains(response, "permission-matrix-sticky-head")
+        self.assertContains(response, "<thead>")
 
     def test_index_renders_for_superuser(self):
         self._login("perm_super")

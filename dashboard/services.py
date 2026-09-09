@@ -1,6 +1,7 @@
 """Dashboard services — role context, metrics, notifications."""
 
 import json
+from datetime import timedelta
 from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
@@ -26,7 +27,9 @@ from permissions.checks import (
     can_run_cutoff,
     can_transfer_members,
     can_view_all_churches,
+    can_view_budgets,
     can_view_dashboard_finance,
+    can_manage_budgets,
     can_view_meetings,
     can_view_members,
     can_view_pending_approvals,
@@ -456,6 +459,55 @@ def get_nav_badges(request):
     return badges
 
 
+_BUDGET_GAP_TITLE = "Churches without annual budgets"
+
+
+def _budget_gap_notice(user):
+    """Once per week, remind admins of churches with no current-year church budget."""
+    if not (can_view_budgets(user) or can_manage_budgets(user)):
+        return None
+    if user.role not in UserRole.TREE_ADMIN_ROLES and user.role != UserRole.LOCAL_PASTOR:
+        if not getattr(user, "is_superuser", False):
+            return None
+    churches = list(get_manageable_churches(user).filter(is_active=True)[:80])
+    if not churches:
+        return None
+    from sitecontrol.services import church_has_feature
+    from transactions.models import Budget
+
+    churches = [c for c in churches if church_has_feature(c, "budgets")]
+    if not churches:
+        return None
+    year = timezone.localdate().year
+    have = set(
+        Budget.objects.filter(
+            year=year, level="CHURCH", church_id__in=[c.pk for c in churches]
+        ).values_list("church_id", flat=True)
+    )
+    missing = [c for c in churches if c.pk not in have]
+    if not missing:
+        return None
+    from django.urls import reverse
+    from dashboard.models import Notification
+
+    today = timezone.localdate()
+    week_start = today - timedelta(days=today.weekday())
+    already = Notification.objects.filter(
+        user=user,
+        category="FINANCE",
+        title=_BUDGET_GAP_TITLE,
+        created_at__date__gte=week_start,
+    ).exists()
+    names = ", ".join(c.name for c in missing[:4])
+    extra = f" and {len(missing) - 4} more" if len(missing) > 4 else ""
+    message = f"{len(missing)} church(es) have no {year} church budget: {names}{extra}."
+    url = reverse("budgets:list") + f"?year={year}&level=CHURCH"
+    if already:
+        return None
+    notify_user(user, _BUDGET_GAP_TITLE, message, category="FINANCE", action_url=url)
+    return {"level": "info", "text": message, "url": url}
+
+
 def get_alerts(request, user):
     """Actionable alert items for the dashboard banner."""
     from church_system.currency import currency_symbol
@@ -533,6 +585,10 @@ def get_alerts(request, user):
             "text": "Your account is not assigned to a church.",
             "url_name": "accounts:profile",
         })
+
+    budget_notice = _budget_gap_notice(user)
+    if budget_notice:
+        alerts.append(budget_notice)
 
     return alerts
 
@@ -1314,7 +1370,11 @@ def build_home_context(request):
             ).count()
 
     if show_this_week_pulse:
-        context["this_week_pulse"] = get_this_week_pulse(request)
+        pulse = get_this_week_pulse(request)
+        if pulse and not pulse.get("has_items"):
+            pulse = None
+        context["this_week_pulse"] = pulse
+        context["show_this_week_pulse"] = bool(pulse)
     else:
         context["this_week_pulse"] = None
 

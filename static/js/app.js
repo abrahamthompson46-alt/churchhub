@@ -71,19 +71,6 @@
         });
     }
 
-    function initPermissionMatrixSticky() {
-        var head = document.querySelector("[data-matrix-sticky-head]");
-        var scroll = document.querySelector("[data-matrix-scroll]");
-        if (!head || !scroll) return;
-        var nav = document.querySelector(".ch-navbar");
-        head.style.top = (nav ? Math.round(nav.getBoundingClientRect().height) : 0) + "px";
-        if (scroll.dataset.matrixScrollBound === "1") return;
-        scroll.dataset.matrixScrollBound = "1";
-        scroll.addEventListener("scroll", function () {
-            head.scrollLeft = scroll.scrollLeft;
-        });
-    }
-
     document.addEventListener("DOMContentLoaded", function () {
         initStickyModuleTabs();
         initActiveModuleTabScroll();
@@ -91,11 +78,9 @@
         initTableRowFocus();
         initNavCollapseClose();
         initPasswordToggles();
-        initPermissionMatrixSticky();
         window.addEventListener("resize", function () {
             initStickyModuleTabs();
             initFilterBarSticky();
-            initPermissionMatrixSticky();
         });
     });
 })();

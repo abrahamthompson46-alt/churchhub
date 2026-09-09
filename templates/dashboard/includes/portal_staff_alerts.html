@@ -5,6 +5,10 @@
         <span>Prayer requests</span>
         {% if portal_staff_alerts.prayer_new %}<strong class="cc-portal-alert__badge">{{ portal_staff_alerts.prayer_new }}</strong>{% endif %}
     </a>
+    <a href="{{ portal_staff_alerts.announcement_url }}" class="cc-portal-alert cc-portal-alert--announce">
+        <i class="bi bi-megaphone"></i>
+        <span>Announcements</span>
+    </a>
     <a href="{{ portal_staff_alerts.praise_url }}" class="cc-portal-alert cc-portal-alert--praise">
         <i class="bi bi-stars"></i>
         <span>Thanksgiving &amp; testimony</span>

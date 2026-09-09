@@ -22,6 +22,7 @@
                 <div class="cc-hero__portal-cta d-flex flex-wrap gap-2 mt-2">
                     <a href="{{ member_portal_banner.portal_home_url }}" class="btn btn-sm btn-primary"><i class="bi bi-house-heart me-1"></i>Member portal</a>
                     <a href="{{ member_portal_banner.prayer_url }}" class="btn btn-sm btn-outline-primary">Prayer request</a>
+                    <a href="{{ member_portal_banner.announcement_url }}" class="btn btn-sm btn-outline-primary">Announcement</a>
                     <a href="{{ member_portal_banner.thanksgiving_url }}" class="btn btn-sm btn-outline-primary">Thanksgiving</a>
                 </div>
                 {% endif %}
@@ -122,7 +123,7 @@
     <section class="cc-insight-band" aria-label="Key figures">
         <div class="cc-kpi-grid" aria-label="Dashboard KPIs">
             {% for widget in dashboard_kpi_widgets %}
-            <a href="{% if widget.report_key %}{% url 'reports:run' widget.report_key %}{% else %}{% url widget.url_name %}{% endif %}" class="cc-kpi-card{% if widget.card_class %} {{ widget.card_class }}{% endif %}" title="{% if widget.hint %}{{ widget.hint }}{% endif %}{% if widget.hint and widget.empty_cta %} — {% endif %}{{ widget.empty_cta }}">
+            <a href="{% if widget.report_key %}{% url 'reports:run' widget.report_key %}{{ widget.url_query }}{% else %}{% url widget.url_name %}{{ widget.url_query }}{% endif %}" class="cc-kpi-card{% if widget.card_class %} {{ widget.card_class }}{% endif %}" title="{% if widget.hint %}{{ widget.hint }}{% endif %}{% if widget.hint and widget.empty_cta %} — {% endif %}{{ widget.empty_cta }}">
                 <span class="cc-kpi-card__label">{{ widget.label }}</span>
                 {% if widget.value_is_money %}
                 <span class="cc-kpi-card__value text-currency">{% if is_control_center %}{% money widget.value 0 %}{% else %}{% money widget.value 2 %}{% endif %}</span>
@@ -546,11 +547,56 @@
         });
     }
 
+    function showDistrictShares(rows) {
+        if (level !== 'church' || rows.length < 2) return false;
+        const ids = rows.map(function (r) { return r.district_id; }).filter(Boolean);
+        return ids.length === rows.length && new Set(ids).size === 1;
+    }
+
+    const barLabelsPlugin = {
+        id: 'memberBarLabels',
+        afterDatasetsDraw: function (chart) {
+            try {
+            const rows = rowsForLevel();
+            const meta = chart.getDatasetMeta(0);
+            if (!meta || !meta.data) return;
+            const ctx = chart.ctx;
+            const shares = showDistrictShares(rows);
+            meta.data.forEach(function (el, i) {
+                const row = rows[i];
+                if (!row) return;
+                const x = el.x;
+                const y = el.y;
+                const base = (el.base != null) ? el.base : 0;
+                const left = Math.min(x, base);
+                const right = Math.max(x, base);
+                const width = right - left;
+                const full = row.full || row.label || '';
+                ctx.save();
+                ctx.textBaseline = 'middle';
+                if (width > 44 && full) {
+                    ctx.font = '600 11px system-ui, "Segoe UI", sans-serif';
+                    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(full, left + 8, y, Math.max(width - 16, 10));
+                }
+                if (shares && row.share_pct != null && row.share_pct !== '') {
+                    ctx.font = '600 11px system-ui, "Segoe UI", sans-serif';
+                    ctx.fillStyle = '#334155';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(row.share_pct + '%', right + 6, y);
+                }
+                ctx.restore();
+            });
+            } catch (err) { /* keep bars visible if labels fail */ }
+        }
+    };
+
     function apply() {
         const rows = rowsForLevel();
-        const labels = rows.map(function (r) { return r.label; });
+        const labels = rows.map(function (r) { return r.short || r.label; });
         const values = rows.map(function (r) { return r.value; });
-        const height = Math.max(160, 28 * Math.max(rows.length, 1) + 48);
+        const height = Math.max(160, 36 * Math.max(rows.length, 1) + 48);
         const plot = el.parentElement;
         if (plot) plot.style.height = height + 'px';
         const payload = {
@@ -561,21 +607,25 @@
                 backgroundColor: palette(values.length),
                 borderSkipped: false,
                 borderRadius: 3,
-                maxBarThickness: 22
+                minBarLength: 4,
+                maxBarThickness: 28
             }]
         };
         if (chart) {
             chart.data = payload;
+            chart.options.layout.padding.right = showDistrictShares(rows) ? 40 : 8;
             chart.update();
             return;
         }
         chart = new Chart(el, {
             type: 'bar',
             data: payload,
+            plugins: [barLabelsPlugin],
             options: {
                 indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: { padding: { right: showDistrictShares(rows) ? 40 : 8 } },
                 onClick: function (_evt, items) {
                     if (!items.length) return;
                     const row = rowsForLevel()[items[0].index];
@@ -608,6 +658,19 @@
                     legend: { display: false },
                     tooltip: {
                         callbacks: {
+                            title: function (items) {
+                                if (!items.length) return '';
+                                const row = rowsForLevel()[items[0].dataIndex];
+                                return (row && (row.full || row.label)) || '';
+                            },
+                            label: function (ctx) {
+                                const row = rowsForLevel()[ctx.dataIndex];
+                                let line = (ctx.formattedValue || '0') + ' active';
+                                if (showDistrictShares(rowsForLevel()) && row && row.share_pct != null) {
+                                    line += ' · ' + row.share_pct + '% of district';
+                                }
+                                return line;
+                            },
                             afterLabel: function (ctx) {
                                 const row = rowsForLevel()[ctx.dataIndex];
                                 return row && row.sub ? row.sub : '';
@@ -625,7 +688,7 @@
                     y: {
                         grid: { display: false },
                         border: { display: false },
-                        ticks: { font: { size: 11 } }
+                        ticks: { font: { size: 11 }, autoSkip: false }
                     }
                 }
             }
@@ -674,7 +737,8 @@
     }
 
     const pack = seriesPack[series];
-    const chart = (ctx && typeof Chart !== 'undefined') ? new Chart(ctx, {
+        const chart = (ctx && typeof Chart !== 'undefined') ? new Chart(ctx, {
+        type: 'bar',
         data: {
             labels: {{ trend_labels|safe }},
             datasets: [

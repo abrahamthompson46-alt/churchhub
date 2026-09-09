@@ -32,6 +32,14 @@
 
                 <div class="form-card-inner card scope-invite-card">
                     <div class="card-body p-4 p-md-5">
+                        {% if smtp_status and not smtp_status.configured %}
+                        <div class="alert alert-warning" role="status">
+                            Invitation emails will not reach the inbox until a platform operator
+                            sets a real SMTP host and from-address under
+                            <strong>Platform → Email</strong>. You can still create the invite and
+                            copy the accept link.
+                        </div>
+                        {% endif %}
                         <form method="post" novalidate id="invite-scope-form">
                             {% csrf_token %}
                             {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}

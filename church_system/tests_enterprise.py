@@ -72,6 +72,34 @@ class EmailConfigTests(TestCase):
     def test_smtp_not_configured_by_default(self):
         self.assertFalse(smtp_configured())
 
+    def test_support_email_does_not_count_as_from_address(self):
+        from church_system.email_service import resolve_smtp_config
+        from sitecontrol.services import clear_settings_cache
+
+        site = SiteSettings.load()
+        site.smtp_host = "smtp.example.com"
+        site.default_from_email = ""
+        site.smtp_username = ""
+        site.support_email = "support@churchhub.local"
+        site.save()
+        clear_settings_cache()
+        self.assertFalse(smtp_configured())
+        self.assertIsNone(resolve_smtp_config())
+
+    def test_smtp_username_used_as_from_when_default_from_blank(self):
+        from church_system.email_service import resolve_smtp_config
+        from sitecontrol.services import clear_settings_cache
+
+        site = SiteSettings.load()
+        site.smtp_host = "smtp.example.com"
+        site.default_from_email = ""
+        site.smtp_username = "mailer@example.com"
+        site.save()
+        clear_settings_cache()
+        cfg = resolve_smtp_config()
+        self.assertIsNotNone(cfg)
+        self.assertEqual(cfg.from_email, "mailer@example.com")
+
     def test_smtp_configured_from_site_settings(self):
         from church_system.email_service import resolve_smtp_config
         from sitecontrol.services import clear_settings_cache

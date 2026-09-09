@@ -343,9 +343,11 @@ def invite_user(request):
                     return redirect("accounts:invite_detail", pk=inv.pk)
 
     from accounts.control_center import ucc_context
+    from church_system.email_service import smtp_status
 
     return render(request, "accounts/invite.html", {
         "form": form,
+        "smtp_status": smtp_status(),
         **ucc_context(request.user, active="invite"),
     })
 
@@ -407,24 +409,36 @@ def invite_resend(request, pk):
             performed_by=request.user,
             ip_address=get_client_ip(request),
             request=request,
+            fail_silently=False,
         )
-        if emailed:
-            flash_success(
-                request,
-                f"Invitation resent to {invitation.email}.",
-                title="Invitation resent",
-            )
-        else:
-            flash_warning(
-                request,
-                (
-                    f"Invitation updated for {invitation.email}, but the email was not delivered. "
-                    "Share the invite link below, and configure SMTP under Platform → Email."
-                ),
-                title="Invitation updated — email not sent",
-            )
     except ValueError as exc:
         flash_exception(request, exc, title="Could not resend invitation")
+        return redirect("accounts:invite_detail", pk=pk)
+    except Exception as exc:
+        flash_warning(
+            request,
+            (
+                f"Invitation was refreshed for {invitation.email}, but email delivery failed "
+                f"({exc}). Share the invite link on this page and verify Platform → Email."
+            ),
+            title="Invitation updated — email failed",
+        )
+        return redirect("accounts:invite_detail", pk=pk)
+    if emailed:
+        flash_success(
+            request,
+            f"Invitation resent to {invitation.email}.",
+            title="Invitation resent",
+        )
+    else:
+        flash_warning(
+            request,
+            (
+                f"Invitation updated for {invitation.email}, but the email was not delivered. "
+                "Share the invite link below, and configure SMTP under Platform → Email."
+            ),
+            title="Invitation updated — email not sent",
+        )
     return redirect("accounts:invite_detail", pk=pk)
 
 

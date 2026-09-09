@@ -130,31 +130,35 @@ def apply_org_scope(
         district = district or (user.church.district if user.church_id else None)
         user.scope_district = district
         if district and not user.church_id:
-            # Prefer a home church in-district when available later
             pass
-        denomination = denomination or (
-            district.zone.conference.denomination if district and district.zone_id else None
-        )
+        zone = getattr(district, "zone", None) if district else None
+        conference = getattr(zone, "conference", None) if zone else None
+        denomination = denomination or getattr(conference, "denomination", None)
     elif level == OrgScopeLevel.ZONE:
         zone = zone or (
-            user.church.district.zone if user.church_id and user.church.district_id else None
+            user.church.district.zone
+            if user.church_id and getattr(user.church, "district_id", None)
+            else None
         )
         user.scope_zone = zone
-        denomination = denomination or (
-            zone.conference.denomination if zone and zone.conference_id else None
-        )
+        conference = getattr(zone, "conference", None) if zone else None
+        denomination = denomination or getattr(conference, "denomination", None)
     elif level == OrgScopeLevel.CONFERENCE:
         conference = conference or (
-            user.church.district.zone.conference
-            if user.church_id and user.church.district_id
+            getattr(getattr(getattr(user.church, "district", None), "zone", None), "conference", None)
+            if user.church_id
             else None
         )
         user.scope_conference = conference
-        denomination = denomination or (conference.denomination if conference else None)
+        denomination = denomination or (getattr(conference, "denomination", None) if conference else None)
     elif level == OrgScopeLevel.UNION:
         if union is None and user.church_id:
-            conf = user.church.district.zone.conference
-            union = conf.union if conf else None
+            conf = getattr(
+                getattr(getattr(user.church, "district", None), "zone", None),
+                "conference",
+                None,
+            )
+            union = getattr(conf, "union", None) if conf else None
         user.scope_union = union
         if denomination is None and union is not None:
             from permissions import selectors
@@ -175,60 +179,75 @@ def apply_org_scope(
 
 
 def scope_display(user) -> dict:
-    """UI-friendly scope summary."""
+    """UI-friendly scope summary. Never assume the full org chain is populated."""
     level = infer_scope_level(user)
     name = "—"
     breadcrumb = []
 
-    if level == OrgScopeLevel.CHURCH and user.church_id:
-        church = user.church
-        name = church.name
-        breadcrumb = [
-            church.district.zone.conference.name,
-            church.district.zone.name,
-            church.district.name,
-            church.name,
-        ]
-    elif level == OrgScopeLevel.DISTRICT:
-        district = user.scope_district or (user.church.district if user.church_id else None)
-        if district:
-            name = district.name
-            breadcrumb = [
-                district.zone.conference.name,
-                district.zone.name,
-                district.name,
-            ]
-    elif level == OrgScopeLevel.ZONE:
-        zone = user.scope_zone
-        if not zone and user.church_id:
-            zone = user.church.district.zone
-        if zone:
-            name = zone.name
-            breadcrumb = [zone.conference.name, zone.name]
-    elif level == OrgScopeLevel.CONFERENCE:
-        conference = user.scope_conference
-        if not conference and user.church_id:
-            conference = user.church.district.zone.conference
-        if conference:
-            name = conference.name
-            breadcrumb = [conference.name]
-    elif level == OrgScopeLevel.UNION:
-        union = user.scope_union
-        if union:
-            name = union.name
-            breadcrumb = [union.name]
-    elif level == OrgScopeLevel.GENERAL_CONFERENCE:
-        gc = user.scope_general_conference
-        if gc:
-            name = gc.name
-            breadcrumb = [gc.name]
-    elif level == OrgScopeLevel.DENOMINATION:
-        denom = user.denomination or (
-            user.church.denomination if user.church_id else None
+    def _names(*parts):
+        return [part for part in parts if part]
+
+    def _district_parts(district):
+        if not district:
+            return []
+        zone = getattr(district, "zone", None)
+        conference = getattr(zone, "conference", None) if zone else None
+        return _names(
+            getattr(conference, "name", None),
+            getattr(zone, "name", None),
+            getattr(district, "name", None),
         )
-        if denom:
-            name = denom.name
-            breadcrumb = [denom.name]
+
+    try:
+        if level == OrgScopeLevel.CHURCH and user.church_id:
+            church = user.church
+            name = church.name
+            district = getattr(church, "district", None)
+            breadcrumb = _district_parts(district) + [church.name]
+        elif level == OrgScopeLevel.DISTRICT:
+            district = user.scope_district or (
+                user.church.district if user.church_id else None
+            )
+            if district:
+                name = district.name
+                breadcrumb = _district_parts(district)
+        elif level == OrgScopeLevel.ZONE:
+            zone = user.scope_zone
+            if not zone and user.church_id:
+                district = getattr(user.church, "district", None)
+                zone = getattr(district, "zone", None) if district else None
+            if zone:
+                name = zone.name
+                conference = getattr(zone, "conference", None)
+                breadcrumb = _names(getattr(conference, "name", None), zone.name)
+        elif level == OrgScopeLevel.CONFERENCE:
+            conference = user.scope_conference
+            if not conference and user.church_id:
+                district = getattr(user.church, "district", None)
+                zone = getattr(district, "zone", None) if district else None
+                conference = getattr(zone, "conference", None) if zone else None
+            if conference:
+                name = conference.name
+                breadcrumb = [conference.name]
+        elif level == OrgScopeLevel.UNION:
+            union = user.scope_union
+            if union:
+                name = union.name
+                breadcrumb = [union.name]
+        elif level == OrgScopeLevel.GENERAL_CONFERENCE:
+            gc = user.scope_general_conference
+            if gc:
+                name = gc.name
+                breadcrumb = [gc.name]
+        elif level == OrgScopeLevel.DENOMINATION:
+            denom = user.denomination or (
+                user.church.denomination if user.church_id else None
+            )
+            if denom:
+                name = denom.name
+                breadcrumb = [denom.name]
+    except AttributeError:
+        pass
 
     return {
         "level": level,
@@ -277,7 +296,9 @@ def church_q_for_scope(user) -> models.Q | None:
     if level == OrgScopeLevel.CONFERENCE:
         conf_id = getattr(user, "scope_conference_id", None)
         if not conf_id and user.church_id:
-            conf_id = user.church.district.zone.conference_id
+            district = getattr(user.church, "district", None)
+            zone = getattr(district, "zone", None) if district else None
+            conf_id = getattr(zone, "conference_id", None) if zone else None
         if not conf_id:
             return models.Q(pk__in=[])
         return models.Q(district__zone__conference_id=conf_id)
@@ -285,7 +306,8 @@ def church_q_for_scope(user) -> models.Q | None:
     if level == OrgScopeLevel.ZONE:
         zone_id = getattr(user, "scope_zone_id", None)
         if not zone_id and user.church_id:
-            zone_id = user.church.district.zone_id
+            district = getattr(user.church, "district", None)
+            zone_id = getattr(district, "zone_id", None) if district else None
         if not zone_id:
             return models.Q(pk__in=[])
         return models.Q(district__zone_id=zone_id)

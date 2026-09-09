@@ -78,3 +78,34 @@ class MembershipComparisonChartTests(TestCase):
         labels = [p["label"] for p in snap["chart"]["churches"]]
         self.assertEqual(labels, ["Church A"])
         self.assertNotIn("conference", snap["chart"]["levels"])
+
+    def test_defaults_to_districts_when_many_churches(self):
+        extras = []
+        for i in range(3):
+            extras.append(
+                Church.objects.create(
+                    district=self.dist_a, code=f"E{i}", name=f"Extra {i}"
+                )
+            )
+            Member.objects.create(
+                church=extras[-1],
+                first_name="Extra",
+                last_name=str(i),
+                gender=Gender.FEMALE,
+                membership_status=MembershipStatus.ACTIVE,
+            )
+        scoped = [
+            self.church_a.id,
+            self.church_d.id,
+            self.church_f.id,
+            self.church_g.id,
+            extras[0].id,
+            extras[1].id,
+            extras[2].id,
+        ]
+        snap = get_membership_analysis(scoped, timezone.localdate().replace(day=1))
+        self.assertEqual(snap["chart"]["default_level"], "district")
+        snap_view = get_membership_analysis(
+            scoped, timezone.localdate().replace(day=1), view="church"
+        )
+        self.assertEqual(snap_view["chart"]["default_level"], "church")

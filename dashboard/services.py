@@ -1226,7 +1226,7 @@ def build_home_context(request):
         "show_upcoming_panel": show_upcoming_panel,
         "show_announcements_panel": show_announcements_panel,
         "show_this_week_pulse": show_this_week_pulse,
-        "show_leaderboard": is_control_center,
+        "show_leaderboard": is_control_center and not church_focused,
         "show_members": show_members,
         "show_admin": show_admin,
         "show_hierarchy": show_hierarchy,
@@ -1425,7 +1425,11 @@ def build_home_context(request):
     ) if show_money_kpis else None
     if show_members and scope.church_ids:
         context["membership_analysis"] = home_panels.get_membership_analysis(
-            list(scope.church_ids), as_of.replace(day=1)
+            list(scope.church_ids),
+            as_of.replace(day=1),
+            view=request.GET.get("member_view"),
+            district_id=request.GET.get("member_district"),
+            conference_id=request.GET.get("member_conference"),
         )
     else:
         context["membership_analysis"] = None

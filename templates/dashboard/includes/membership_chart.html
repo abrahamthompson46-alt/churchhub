@@ -10,17 +10,22 @@
                 in your scope
             </p>
         </div>
-        <a href="{% url 'reports:run' 'member_summary' %}" class="dash-section__link">Member report →</a>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            {% if church_focused and scope_switcher %}
+            <a href="?church=all" class="dash-section__link">Compare churches</a>
+            {% endif %}
+            <a href="{% url 'reports:run' 'member_summary' %}" class="dash-section__link">Member report →</a>
+        </div>
     </div>
     <div class="cc-member-chart__controls px-3 pt-2">
         {% if membership_analysis.chart.levels|length > 1 %}
         <div class="cc-seg" role="tablist" aria-label="Membership grouping">
-            <button type="button" class="cc-seg__btn is-active" data-member-level="church" role="tab" aria-selected="true">Churches</button>
+            <button type="button" class="cc-seg__btn{% if membership_analysis.chart.default_level == 'church' %} is-active{% endif %}" data-member-level="church" role="tab" aria-selected="{% if membership_analysis.chart.default_level == 'church' %}true{% else %}false{% endif %}">Churches</button>
             {% if "district" in membership_analysis.chart.levels %}
-            <button type="button" class="cc-seg__btn" data-member-level="district" role="tab" aria-selected="false">Districts</button>
+            <button type="button" class="cc-seg__btn{% if membership_analysis.chart.default_level == 'district' %} is-active{% endif %}" data-member-level="district" role="tab" aria-selected="{% if membership_analysis.chart.default_level == 'district' %}true{% else %}false{% endif %}">Districts</button>
             {% endif %}
             {% if "conference" in membership_analysis.chart.levels %}
-            <button type="button" class="cc-seg__btn" data-member-level="conference" role="tab" aria-selected="false">Conferences</button>
+            <button type="button" class="cc-seg__btn{% if membership_analysis.chart.default_level == 'conference' %} is-active{% endif %}" data-member-level="conference" role="tab" aria-selected="{% if membership_analysis.chart.default_level == 'conference' %}true{% else %}false{% endif %}">Conferences</button>
             {% endif %}
         </div>
         {% endif %}
@@ -30,7 +35,7 @@
             <select id="memberChartDistrict" class="form-select form-select-sm" data-member-filter="district">
                 <option value="">All districts</option>
                 {% for row in membership_analysis.chart.district_filters %}
-                <option value="{{ row.id }}">{{ row.label }}</option>
+                <option value="{{ row.id }}"{% if membership_analysis.chart.selected_district == row.id %} selected{% endif %}>{{ row.label }}</option>
                 {% endfor %}
             </select>
         </label>
@@ -41,7 +46,7 @@
             <select id="memberChartConference" class="form-select form-select-sm" data-member-filter="conference">
                 <option value="">All conferences</option>
                 {% for row in membership_analysis.chart.conference_filters %}
-                <option value="{{ row.id }}">{{ row.label }}</option>
+                <option value="{{ row.id }}"{% if membership_analysis.chart.selected_conference == row.id %} selected{% endif %}>{{ row.label }}</option>
                 {% endfor %}
             </select>
         </label>
@@ -54,7 +59,7 @@
         {% if membership_analysis.chart.truncated %}
         <p class="small text-muted px-1 pt-2 mb-0">Showing the {{ membership_analysis.chart.churches|length }} largest groups. {{ membership_analysis.chart.truncated }} smaller churches are combined as Other.</p>
         {% endif %}
-        <p class="small text-muted px-1 pt-2 mb-0">Counts use membership status Active. Only churches you are allowed to manage are included. Click a church bar to focus that congregation.</p>
+        <p class="small text-muted px-1 pt-2 mb-0">Counts use membership status Active. Only churches you are allowed to manage are included. Click a church bar to focus that congregation, a district bar to filter that district, or a conference bar to filter that conference.</p>
     </div>
     {{ membership_analysis.chart|json_script:"membership-chart-data" }}
 </section>

@@ -3,7 +3,7 @@
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError as DjangoValidationError
 from django.core.paginator import Paginator
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
@@ -129,7 +129,13 @@ def user_detail(request, pk):
     if not can_manage_users(request.user):
         raise PermissionDenied
     user_obj = selectors.get_manageable_user_or_404(request.user, pk)
-    form = UserManageForm(instance=user_obj, manager=request.user)
+    initial = {}
+    if request.method == "GET":
+        if request.GET.get("role"):
+            initial["role"] = request.GET.get("role")
+        if request.GET.get("scope_level"):
+            initial["scope_level"] = request.GET.get("scope_level")
+    form = UserManageForm(instance=user_obj, manager=request.user, initial=initial)
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -170,6 +176,9 @@ def user_detail(request, pk):
                 repo.save_user(saved)
                 form.save_m2m()
             except ValueError as exc:
+                flash_exception(request, exc, title="User could not be updated")
+                return redirect("accounts:user_detail", pk=pk)
+            except DjangoValidationError as exc:
                 flash_exception(request, exc, title="User could not be updated")
                 return redirect("accounts:user_detail", pk=pk)
 

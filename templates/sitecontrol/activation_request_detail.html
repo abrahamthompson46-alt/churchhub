@@ -49,7 +49,7 @@
                 {% if activation_request.church_id %}
                 <a class="btn btn-primary w-100 mb-2" href="{% url 'sitecontrol:tenant_detail' activation_request.church_id %}">Open tenant</a>
                 {% if activation_request.subscription_id %}
-                <a class="btn btn-outline-primary w-100" href="{% url 'sitecontrol:subscription_record_payment' activation_request.subscription_id %}">Record payment</a>
+                <a class="btn btn-outline-primary w-100" href="{% url 'sitecontrol:subscription_record_payment' activation_request.subscription_id %}?activation={{ activation_request.pk }}">Record payment</a>
                 {% endif %}
                 {% endif %}
             </div>

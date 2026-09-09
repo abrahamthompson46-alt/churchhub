@@ -322,6 +322,19 @@ def get_activation_request_or_404(pk):
     return get_object_or_404(activation_requests_list_base(), pk=pk)
 
 
+def open_activation_request_for_subscription(subscription):
+    if not subscription:
+        return None
+    return (
+        activation_requests_list_base()
+        .filter(
+            subscription=subscription,
+            status__in=["PENDING", "ACKNOWLEDGED"],
+        )
+        .first()
+    )
+
+
 # ---------------------------------------------------------------------------
 # Audit / announcements
 # ---------------------------------------------------------------------------

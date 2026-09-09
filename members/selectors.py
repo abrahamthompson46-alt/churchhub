@@ -38,34 +38,39 @@ def _years_ago(today, years):
         return today.replace(year=today.year - years, day=28)
 
 
+def age_group_q_map(today=None):
+    """SQL Q objects for AGE_GROUP_CHOICES (Child 0–12 … Senior 60+)."""
+    today = today or timezone.localdate()
+    return {
+        "CHILD": Q(date_of_birth__isnull=False, date_of_birth__gt=_years_ago(today, 13)),
+        "TEEN": Q(
+            date_of_birth__isnull=False,
+            date_of_birth__lte=_years_ago(today, 13),
+            date_of_birth__gt=_years_ago(today, 18),
+        ),
+        "YOUTH": Q(
+            date_of_birth__isnull=False,
+            date_of_birth__lte=_years_ago(today, 18),
+            date_of_birth__gt=_years_ago(today, 36),
+        ),
+        "ADULT": Q(
+            date_of_birth__isnull=False,
+            date_of_birth__lte=_years_ago(today, 36),
+            date_of_birth__gt=_years_ago(today, 60),
+        ),
+        "SENIOR": Q(date_of_birth__isnull=False, date_of_birth__lte=_years_ago(today, 60)),
+    }
+
+
 def apply_age_group_filter(qs, age_group):
     """Filter by age-group using DOB date bounds (SQL), matching age_group_for_age()."""
     if not age_group:
         return qs
-    today = timezone.localdate()
-    if age_group == "CHILD":
-        return qs.filter(date_of_birth__isnull=False, date_of_birth__gt=_years_ago(today, 13))
-    if age_group == "TEEN":
-        return qs.filter(
-            date_of_birth__isnull=False,
-            date_of_birth__lte=_years_ago(today, 13),
-            date_of_birth__gt=_years_ago(today, 18),
-        )
-    if age_group == "YOUTH":
-        return qs.filter(
-            date_of_birth__isnull=False,
-            date_of_birth__lte=_years_ago(today, 18),
-            date_of_birth__gt=_years_ago(today, 36),
-        )
-    if age_group == "ADULT":
-        return qs.filter(
-            date_of_birth__isnull=False,
-            date_of_birth__lte=_years_ago(today, 36),
-            date_of_birth__gt=_years_ago(today, 60),
-        )
-    if age_group == "SENIOR":
-        return qs.filter(date_of_birth__isnull=False, date_of_birth__lte=_years_ago(today, 60))
-    return qs
+    q_map = age_group_q_map()
+    q = q_map.get(age_group)
+    if q is None:
+        return qs
+    return qs.filter(q)
 
 
 # ---------------------------------------------------------------------------

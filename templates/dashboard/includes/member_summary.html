@@ -1,0 +1,165 @@
+{% load humanize %}
+{% if member_dashboard %}
+<section class="cc-member-dash" aria-label="Member summary">
+    <div class="cc-member-dash__head">
+        <div>
+            <h2 class="cc-member-dash__title">Member Summary</h2>
+            <p class="cc-member-dash__meta">{{ member_dashboard.period_label }}</p>
+        </div>
+        <form method="get" action="{% url 'dashboard:home' %}" class="cc-member-dash__period">
+            {% if request.GET.church %}
+            <input type="hidden" name="church" value="{{ request.GET.church }}">
+            {% endif %}
+            <label class="visually-hidden" for="member-months">Trend period</label>
+            <select id="member-months" name="member_months" class="form-select form-select-sm" onchange="this.form.submit()">
+                {% for n in member_dashboard.trend_month_choices %}
+                <option value="{{ n }}"{% if member_dashboard.trend_months == n %} selected{% endif %}>Last {{ n }} months</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
+    <div class="cc-member-dash__kpis" aria-label="Membership KPIs">
+        <div class="cc-member-kpi"><span class="cc-member-kpi__label">Total members</span><strong class="cc-member-kpi__value">{{ member_dashboard.kpis.total|intcomma }}</strong></div>
+        <div class="cc-member-kpi"><span class="cc-member-kpi__label">Active</span><strong class="cc-member-kpi__value">{{ member_dashboard.kpis.active|intcomma }}</strong></div>
+        <div class="cc-member-kpi"><span class="cc-member-kpi__label">Inactive</span><strong class="cc-member-kpi__value">{{ member_dashboard.kpis.inactive|intcomma }}</strong></div>
+        <div class="cc-member-kpi"><span class="cc-member-kpi__label">New this month</span><strong class="cc-member-kpi__value">{{ member_dashboard.kpis.new_this_month|intcomma }}</strong></div>
+        <div class="cc-member-kpi"><span class="cc-member-kpi__label">Transferred / former</span><strong class="cc-member-kpi__value">{{ member_dashboard.kpis.left|intcomma }}</strong></div>
+        <div class="cc-member-kpi"><span class="cc-member-kpi__label">Baptized</span><strong class="cc-member-kpi__value">{{ member_dashboard.kpis.baptized|intcomma }}</strong></div>
+        <div class="cc-member-kpi"><span class="cc-member-kpi__label">Unbaptized</span><strong class="cc-member-kpi__value">{{ member_dashboard.kpis.unbaptized|intcomma }}</strong></div>
+    </div>
+
+    {% if member_dashboard.insights %}
+    <ul class="cc-member-insights">
+        {% if member_dashboard.insights.largest_age_label %}
+        <li>Largest age group: <strong>{{ member_dashboard.insights.largest_age_label }}</strong> ({{ member_dashboard.insights.largest_age_count }})</li>
+        {% endif %}
+        {% if member_dashboard.insights.male_pct is not None %}
+        <li>Gender: {{ member_dashboard.insights.male_pct }}% male · {{ member_dashboard.insights.female_pct }}% female</li>
+        {% endif %}
+        <li>New members this month: {{ member_dashboard.insights.new_this_month }}</li>
+        {% if member_dashboard.insights.new_period_delta_pct is not None %}
+        <li>Joins vs prior {{ member_dashboard.trend_months }} months:
+            {% if member_dashboard.insights.new_period_delta_pct >= 0 %}+{% endif %}{{ member_dashboard.insights.new_period_delta_pct|floatformat:1 }}%
+        </li>
+        {% endif %}
+        {% if member_dashboard.insights.active_pct is not None %}
+        <li>Active share: {{ member_dashboard.insights.active_pct }}%</li>
+        {% endif %}
+        <li>Incomplete gender or date of birth: {{ member_dashboard.insights.incomplete_demographics }}</li>
+    </ul>
+    {% endif %}
+
+    <div class="row g-3 cc-member-dash__charts">
+        <div class="col-lg-8">
+            <section class="cc-panel mb-0">
+                <div class="cc-panel__header">
+                    <h3 class="cc-panel__title">Membership trend</h3>
+                </div>
+                <div class="cc-panel__body cc-panel__body--chart">
+                    {% if member_dashboard.trend.has_activity %}
+                    <canvas id="memberTrendChart" height="88" aria-label="New members by month and cumulative net"></canvas>
+                    <p class="small text-muted mb-0 mt-2">Bars: new members by join date. Line: cumulative net (joins minus completed outbound transfers).</p>
+                    {% else %}
+                    <p class="text-muted mb-0 py-3">No join or completed transfer dates in this period.</p>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+        <div class="col-lg-4">
+            <section class="cc-panel mb-0">
+                <div class="cc-panel__header">
+                    <h3 class="cc-panel__title">Membership status</h3>
+                </div>
+                <div class="cc-panel__body cc-panel__body--chart">
+                    {% if member_dashboard.status_chart.has_activity %}
+                    <canvas id="memberStatusChart" height="200" aria-label="Members by status"></canvas>
+                    {% else %}
+                    <p class="text-muted mb-0 py-3">No members in this church scope.</p>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-1">
+        <div class="col-md-6">
+            <section class="cc-panel mb-0">
+                <div class="cc-panel__header"><h3 class="cc-panel__title">Gender</h3></div>
+                <ul class="cc-member-dist list-plain mb-0">
+                    {% for row in member_dashboard.gender_rows %}
+                    <li>
+                        <span>{{ row.label }}</span>
+                        <span>{{ row.count|intcomma }}{% if row.pct is not None %} · {{ row.pct }}%{% endif %}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </section>
+        </div>
+        <div class="col-md-6">
+            <section class="cc-panel mb-0">
+                <div class="cc-panel__header"><h3 class="cc-panel__title">Age groups</h3></div>
+                <ul class="cc-member-dist list-plain mb-0">
+                    {% for row in member_dashboard.age_rows %}
+                    <li>
+                        <span>{{ row.label }}</span>
+                        <span>{{ row.count|intcomma }}{% if row.pct is not None %} · {{ row.pct }}%{% endif %}</span>
+                    </li>
+                    {% endfor %}
+                    <li class="text-muted">
+                        <span>No date of birth</span>
+                        <span>{{ member_dashboard.age_missing_dob|intcomma }}</span>
+                    </li>
+                </ul>
+                <p class="small text-muted px-3 pb-2 mb-0">Age bands match the directory: Child 0–12, Teen 13–17, Youth 18–35, Adult 36–59, Senior 60+.</p>
+            </section>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-1">
+        <div class="col-lg-7">
+            <section class="cc-panel mb-0">
+                <div class="cc-panel__header"><h3 class="cc-panel__title">Recent member activity</h3></div>
+                <ul class="list-plain dash-panel dash-panel--flat mb-0 px-3 pb-3">
+                    {% for item in member_dashboard.activity %}
+                    <li class="d-flex justify-content-between gap-2 py-2">
+                        <div>
+                            <a href="{{ item.url }}" class="table-link">{{ item.title }}</a>
+                            <div class="text-muted calendar-preview-item__meta">{{ item.subtitle }}</div>
+                        </div>
+                        <span class="text-muted small">
+                            {% if item.when %}{% if item.when.year %}{{ item.when|date:"j M Y" }}{% else %}{{ item.when }}{% endif %}{% endif %}
+                        </span>
+                    </li>
+                    {% empty %}
+                    <li class="text-muted text-center py-3">No recent membership activity.</li>
+                    {% endfor %}
+                </ul>
+            </section>
+        </div>
+        <div class="col-lg-5">
+            <section class="cc-panel mb-0">
+                <div class="cc-panel__header"><h3 class="cc-panel__title">Data quality</h3></div>
+                <ul class="cc-member-dist list-plain mb-0">
+                    {% for row in member_dashboard.quality %}
+                    <li>
+                        <span>{{ row.label }}</span>
+                        <span>{{ row.count|intcomma }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </section>
+        </div>
+    </div>
+
+    <nav class="cc-member-dash__links" aria-label="Membership shortcuts">
+        {% for link in member_dashboard.links %}
+            {% if link.report_key %}
+            <a href="{% url 'reports:run' link.report_key %}">{{ link.label }}</a>
+            {% else %}
+            <a href="{% url link.url_name %}">{{ link.label }}</a>
+            {% endif %}
+        {% endfor %}
+    </nav>
+</section>
+{% endif %}

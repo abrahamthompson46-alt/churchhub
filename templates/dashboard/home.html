@@ -9,7 +9,6 @@
     <header class="cc-hero dashboard-welcome dashboard-welcome--{{ dashboard_role }}">
         <div class="cc-hero__grid">
             <div class="cc-hero__main">
-                <p class="cc-kicker cc-kicker--on-dark">Command center</p>
                 <h1 class="cc-hero__title">Good day{% if user.first_name %}, {{ user.first_name }}{% endif %}</h1>
                 <p class="cc-hero__meta">
                     <span class="cc-hero__badge">{% if is_control_center %}Mission Control{% else %}Operations{% endif %}</span>
@@ -73,24 +72,6 @@
             {% endif %}
         </div>
 		   
-        <div class="cc-integrity" aria-label="Audit context">
-            <span class="cc-integrity__item">
-                <span class="cc-integrity__k">Books</span>
-                transactions ledger
-            </span>
-            <span class="cc-integrity__item">
-                <span class="cc-integrity__k">Working day</span>
-                {% if finance_as_of %}{{ finance_as_of|date:"j M Y" }}{% else %}{% now "j M Y" %}{% endif %}
-            </span>
-            <span class="cc-integrity__item">
-                <span class="cc-integrity__k">Scope</span>
-                {% if dashboard_scope.label %}{{ dashboard_scope.label }}{% elif active_church %}{{ active_church.name }}{% else %}{{ role_label }}{% endif %}
-            </span>
-            <span class="cc-integrity__item cc-integrity__item--end">
-                <span class="cc-integrity__k">As of</span>
-                {% now "j M, g:i A" %}
-            </span>
-        </div>
         <div class="cc-hero__footer cc-hero__footer--compact">
             Updated {% now "j M, g:i A" %}
         </div>
@@ -145,13 +126,7 @@
     {% include "dashboard/includes/exception_board.html" %}
 
     {% if dashboard_kpi_widgets %}
-    <section class="cc-insight-band cc-statement" aria-label="Key figures">
-        <div class="cc-statement__head">
-            <p class="cc-kicker">Statement of position</p>
-            {% if church_focused and finance_as_of %}
-            <p class="cc-insight-band__asof">Figures use working day {{ finance_as_of|date:"j M Y" }}</p>
-            {% endif %}
-        </div>
+    <section class="cc-insight-band" aria-label="Key figures">
         <div class="cc-kpi-grid" aria-label="Dashboard KPIs">
             {% for widget in dashboard_kpi_widgets %}
             <a href="{% if widget.report_key %}{% url 'reports:run' widget.report_key %}{% else %}{% url widget.url_name %}{% endif %}" class="cc-kpi-card{% if widget.card_class %} {{ widget.card_class }}{% endif %}" title="{% if widget.hint %}{{ widget.hint }}{% endif %}{% if widget.hint and widget.empty_cta %} — {% endif %}{{ widget.empty_cta }}">
@@ -173,6 +148,8 @@
     {% elif show_finance and not dashboard_scope.finance_church_ids %}
     <div class="cc-scope-bar" role="status">Select a church from the toolbar to view financial charts.</div>
     {% endif %}
+
+    {% include "dashboard/includes/member_summary.html" %}
 
     {% if member_role_extras %}
     {% include "dashboard/includes/member_extras.html" %}
@@ -497,6 +474,70 @@
 {% endblock %}
 
 {% block extra_js %}
+{% if member_dashboard %}
+<script>
+(function () {
+    const trend = document.getElementById('memberTrendChart');
+    if (trend && typeof Chart !== 'undefined') {
+        new Chart(trend, {
+            data: {
+                labels: {{ member_dashboard.trend.labels_json|safe }},
+                datasets: [
+                    {
+                        type: 'bar',
+                        label: 'New members',
+                        data: {{ member_dashboard.trend.new_json|safe }},
+                        backgroundColor: '#5b7c99',
+                        borderSkipped: false,
+                        order: 2
+                    },
+                    {
+                        type: 'line',
+                        label: 'Cumulative net',
+                        data: {{ member_dashboard.trend.cumulative_net_json|safe }},
+                        borderColor: '#1e3a5f',
+                        backgroundColor: 'rgba(30, 58, 95, 0.10)',
+                        fill: true,
+                        tension: 0.15,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#1e3a5f',
+                        order: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 10, font: { size: 10 } } } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#e8edf4' }, border: { display: false }, ticks: { font: { size: 10 } } },
+                    x: { grid: { color: '#f1f5f9' }, border: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0 } }
+                }
+            }
+        });
+    }
+    const statusEl = document.getElementById('memberStatusChart');
+    if (statusEl && typeof Chart !== 'undefined') {
+        new Chart(statusEl, {
+            type: 'doughnut',
+            data: {
+                labels: {{ member_dashboard.status_chart.labels_json|safe }},
+                datasets: [{
+                    data: {{ member_dashboard.status_chart.data_json|safe }},
+                    backgroundColor: ['#1e3a5f', '#5b7c99', '#94a3b8', '#cbd5e1', '#64748b', '#334155', '#0f172a'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }
+            }
+        });
+    }
+})();
+</script>
+{% endif %}
 {% if show_finance_chart and chart_has_activity %}
 <script>
 const ctx = document.getElementById('trendChart');

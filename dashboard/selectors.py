@@ -214,6 +214,11 @@ def members_for_request(request):
     )
 
 
+def scoped_members_qs(request):
+    """Church-scoped members without select_related (for aggregates)."""
+    return filter_by_church(Member.objects.all(), request)
+
+
 def pending_transfers_for_church(church):
     qs = MemberTransfer.objects.filter(status=TransferStatus.PENDING)
     if church:

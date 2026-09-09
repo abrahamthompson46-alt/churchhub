@@ -5463,7 +5463,7 @@ nav.page-eyebrow .page-eyebrow__page { color: var(--ch-text); }
 }
 
 .control-center--audit .cc-hero__footer--compact {
-    display: none;
+    display: block;
 }
 
 .control-center--audit .cc-statement {
@@ -5565,6 +5565,111 @@ nav.page-eyebrow .page-eyebrow__page { color: var(--ch-text); }
 .control-center--audit .cc-command-grid__workbench,
 .control-center--audit .cc-command-grid__evidence {
     min-width: 0;
+}
+
+.cc-member-dash {
+    background: #fff;
+    border: 1px solid var(--ch-border);
+    border-radius: 4px;
+    padding: 0.85rem 0.9rem 0.75rem;
+}
+
+.cc-member-dash__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.cc-member-dash__title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.cc-member-dash__meta {
+    margin: 0.15rem 0 0;
+    font-size: 0.75rem;
+    color: var(--ch-muted);
+}
+
+.cc-member-dash__period {
+    min-width: 10rem;
+}
+
+.cc-member-dash__kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 0;
+    border: 1px solid var(--ch-border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+
+.cc-member-kpi {
+    padding: 0.55rem 0.7rem;
+    border-right: 1px solid var(--ch-border);
+    border-bottom: 1px solid var(--ch-border);
+}
+
+.cc-member-kpi__label {
+    display: block;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ch-muted);
+}
+
+.cc-member-kpi__value {
+    font-size: 1.05rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+}
+
+.cc-member-insights {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.1rem;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 0.85rem;
+    font-size: 0.78rem;
+    color: var(--ch-text-secondary, #475569);
+}
+
+.cc-member-dist {
+    padding: 0.35rem 0.9rem 0.7rem;
+}
+
+.cc-member-dist li {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--ch-border);
+    font-size: 0.82rem;
+}
+
+.cc-member-dist li:last-child {
+    border-bottom: 0;
+}
+
+.cc-member-dash__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin-top: 0.85rem;
+    font-size: 0.82rem;
+}
+
+@media (max-width: 767.98px) {
+    .cc-member-dash__kpis {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
 .control-center--audit .cc-pin-actions summary {

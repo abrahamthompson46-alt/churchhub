@@ -239,16 +239,20 @@ def get_financial_summary(request):
     }
 
 
-def get_member_summary(request):
-    members = selectors.members_for_request(request)
+def get_member_summary(request, church_ids=None):
+    from dashboard.member_summary import build_member_dashboard
+
+    snapshot = build_member_dashboard(request, church_ids=church_ids)
+    if not snapshot:
+        return {}
     active_church = get_active_church(request)
     transfers = selectors.pending_transfers_for_church(active_church)
-
     return {
-        "member_count": members.filter(is_active=True).count(),
-        "inactive_count": members.filter(is_active=False).count(),
-        "recent_members": members.order_by("-created_at")[:5],
+        "member_count": snapshot["member_count"],
+        "inactive_count": snapshot["inactive_count"],
+        "recent_members": snapshot["recent_members"],
         "pending_transfers": transfers.count(),
+        "member_dashboard": snapshot,
     }
 
 
@@ -287,7 +291,7 @@ def get_role_focus(role):
             "focus": ["Church leaderboard", "Remittance compliance", "Action queue"],
         },
         "admin": {
-            "headline": "System command center — hierarchy health and operational control.",
+            "headline": "Organization KPIs, compliance, and pending actions.",
             "focus": ["Organization KPIs", "Compliance", "Pending actions"],
         },
         "treasury": {
@@ -1296,7 +1300,7 @@ def build_home_context(request):
             context["cash_position"] = None
 
     if show_members:
-        context.update(get_member_summary(request))
+        context.update(get_member_summary(request, church_ids=list(scope.church_ids)))
         if scope.level == "SUBTREE" and scope.church_ids:
             context["pending_transfers"] = selectors.pending_transfers_for_church_ids(
                 list(scope.church_ids)

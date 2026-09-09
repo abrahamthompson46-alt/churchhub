@@ -1,5 +1,5 @@
 {% if exception_board %}
-<section class="cc-panel cc-panel--compact" aria-label="Churches needing attention">
+<section class="cc-panel cc-panel--compact cc-exception-board" aria-label="Churches needing attention">
     <div class="cc-panel__header">
         <h2 class="cc-panel__title"><i class="bi bi-exclamation-octagon"></i> Churches needing attention</h2>
         <span class="cc-panel__badge">{{ exception_board|length }}</span>
@@ -16,7 +16,7 @@
             </thead>
             <tbody>
                 {% for row in exception_board %}
-                <tr>
+                <tr class="cc-exception-row{% if row.issues|length > 2 %} is-critical{% elif row.issues|length %} is-watch{% endif %}">
                     <td class="fw-medium">{{ row.church }}</td>
                     <td class="text-muted small">{{ row.district }}</td>
                     <td>

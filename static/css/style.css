@@ -5392,6 +5392,205 @@ nav.page-eyebrow .page-eyebrow__page { color: var(--ch-text); }
     max-width: 8.35rem;
 }
 
+/* ── Audit command center (competition / books-of-record layout) ── */
+.control-center--audit {
+    gap: 0.85rem;
+}
+
+.control-center--audit .dashboard-welcome {
+    background: #152a46;
+    border-radius: 4px;
+    padding: 0.85rem 1rem 0.55rem;
+    border: 1px solid #0f2138;
+    overflow: visible;
+}
+
+.control-center--audit .dashboard-welcome::before {
+    display: none;
+}
+
+.control-center--audit .cc-kicker {
+    margin: 0 0 0.2rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ch-muted);
+}
+
+.control-center--audit .cc-kicker--on-dark {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.control-center--audit .cc-kicker--section {
+    margin: 0 0 0.45rem;
+}
+
+.control-center--audit .cc-integrity {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.15rem;
+    margin-top: 0.7rem;
+    padding-top: 0.55rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.control-center--audit .cc-integrity__item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.88);
+    font-variant-numeric: tabular-nums;
+}
+
+.control-center--audit .cc-integrity__k {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.48);
+}
+
+.control-center--audit .cc-integrity__item--end {
+    margin-left: auto;
+}
+
+.control-center--audit .cc-pin-actions summary,
+.control-center--audit .cc-pin-actions .btn {
+    color: rgba(255, 255, 255, 0.82);
+    border-color: rgba(255, 255, 255, 0.28);
+}
+
+.control-center--audit .cc-hero__footer--compact {
+    display: none;
+}
+
+.control-center--audit .cc-statement {
+    width: 100%;
+    align-items: stretch;
+    background: #fff;
+    border: 1px solid var(--ch-border);
+    border-radius: 4px;
+    padding: 0.65rem 0.75rem 0.55rem;
+}
+
+.control-center--audit .cc-statement__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.35rem 1rem;
+    margin-bottom: 0.45rem;
+}
+
+.control-center--audit .cc-statement .cc-insight-band__asof {
+    text-align: right;
+}
+
+.page-container.control-center--home.control-center--audit .cc-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    gap: 0;
+    border: 1px solid var(--ch-border);
+    border-radius: 3px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.page-container.control-center--home.control-center--audit .cc-kpi-card {
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    align-items: flex-start;
+    text-align: left;
+    padding: 0.55rem 0.7rem 0.5rem;
+    border: 0;
+    border-right: 1px solid var(--ch-border);
+    border-radius: 0;
+    background: transparent;
+}
+
+.page-container.control-center--home.control-center--audit .cc-kpi-card:last-child {
+    border-right: 0;
+}
+
+.page-container.control-center--home.control-center--audit .cc-kpi-card:hover {
+    background: #f8fafc;
+    border-color: var(--ch-border);
+}
+
+.control-center--audit .cc-kpi-card__label {
+    font-size: 0.58rem;
+}
+
+.control-center--audit .cc-kpi-card__value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+}
+
+.control-center--audit .cc-week-strip {
+    border-radius: 4px;
+    padding: 0.7rem 0.9rem;
+}
+
+.control-center--audit .cc-panel {
+    border-radius: 4px;
+    box-shadow: none;
+}
+
+.control-center--audit .cc-panel__header {
+    background: #f8fafc;
+    padding: 0.55rem 0.85rem;
+}
+
+.control-center--audit .cc-panel__title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.control-center--audit .cc-exception-row.is-watch td:first-child {
+    box-shadow: inset 3px 0 0 #d97706;
+}
+
+.control-center--audit .cc-exception-row.is-critical td:first-child {
+    box-shadow: inset 3px 0 0 #b91c1c;
+}
+
+.control-center--audit .cc-command-grid__workbench,
+.control-center--audit .cc-command-grid__evidence {
+    min-width: 0;
+}
+
+.control-center--audit .cc-pin-actions summary {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.control-center--audit .cc-pin-actions .btn-outline-secondary {
+    color: rgba(255, 255, 255, 0.88);
+    border-color: rgba(255, 255, 255, 0.28);
+}
+
+@media (max-width: 767.98px) {
+    .page-container.control-center--home.control-center--audit .cc-kpi-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .page-container.control-center--home.control-center--audit .cc-kpi-card {
+        border-right: 1px solid var(--ch-border);
+        border-bottom: 1px solid var(--ch-border);
+        width: auto;
+        max-width: none;
+    }
+    .control-center--audit .cc-integrity__item--end {
+        margin-left: 0;
+    }
+}
+
 .control-center--home .cc-hero {
     box-shadow: none;
 }

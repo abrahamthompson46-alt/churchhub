@@ -4,11 +4,12 @@
 {% block title %}Dashboard — {{ institution_display_name|default:"ChurchHub" }}{% endblock %}
 
 {% block content %}
-<div class="page-container control-center control-center--home{% if is_control_center %} control-center--executive{% endif %}">
+<div class="page-container control-center control-center--home control-center--audit{% if is_control_center %} control-center--executive{% endif %}">
 
     <header class="cc-hero dashboard-welcome dashboard-welcome--{{ dashboard_role }}">
         <div class="cc-hero__grid">
             <div class="cc-hero__main">
+                <p class="cc-kicker cc-kicker--on-dark">Command center</p>
                 <h1 class="cc-hero__title">Good day{% if user.first_name %}, {{ user.first_name }}{% endif %}</h1>
                 <p class="cc-hero__meta">
                     <span class="cc-hero__badge">{% if is_control_center %}Mission Control{% else %}Operations{% endif %}</span>
@@ -72,7 +73,24 @@
             {% endif %}
         </div>
 		   
-        <!-- Timestamp footer -->
+        <div class="cc-integrity" aria-label="Audit context">
+            <span class="cc-integrity__item">
+                <span class="cc-integrity__k">Books</span>
+                transactions ledger
+            </span>
+            <span class="cc-integrity__item">
+                <span class="cc-integrity__k">Working day</span>
+                {% if finance_as_of %}{{ finance_as_of|date:"j M Y" }}{% else %}{% now "j M Y" %}{% endif %}
+            </span>
+            <span class="cc-integrity__item">
+                <span class="cc-integrity__k">Scope</span>
+                {% if dashboard_scope.label %}{{ dashboard_scope.label }}{% elif active_church %}{{ active_church.name }}{% else %}{{ role_label }}{% endif %}
+            </span>
+            <span class="cc-integrity__item cc-integrity__item--end">
+                <span class="cc-integrity__k">As of</span>
+                {% now "j M, g:i A" %}
+            </span>
+        </div>
         <div class="cc-hero__footer cc-hero__footer--compact">
             Updated {% now "j M, g:i A" %}
         </div>
@@ -127,10 +145,13 @@
     {% include "dashboard/includes/exception_board.html" %}
 
     {% if dashboard_kpi_widgets %}
-    <section class="cc-insight-band" aria-label="Key figures">
-        {% if church_focused and finance_as_of %}
-        <p class="cc-insight-band__asof">Figures use working day {{ finance_as_of|date:"j M Y" }}</p>
-        {% endif %}
+    <section class="cc-insight-band cc-statement" aria-label="Key figures">
+        <div class="cc-statement__head">
+            <p class="cc-kicker">Statement of position</p>
+            {% if church_focused and finance_as_of %}
+            <p class="cc-insight-band__asof">Figures use working day {{ finance_as_of|date:"j M Y" }}</p>
+            {% endif %}
+        </div>
         <div class="cc-kpi-grid" aria-label="Dashboard KPIs">
             {% for widget in dashboard_kpi_widgets %}
             <a href="{% if widget.report_key %}{% url 'reports:run' widget.report_key %}{% else %}{% url widget.url_name %}{% endif %}" class="cc-kpi-card{% if widget.card_class %} {{ widget.card_class }}{% endif %}" title="{% if widget.hint %}{{ widget.hint }}{% endif %}{% if widget.hint and widget.empty_cta %} — {% endif %}{{ widget.empty_cta }}">
@@ -246,8 +267,9 @@
 
     {% include "dashboard/includes/membership_analysis.html" %}
 
-    <div class="row g-3 cc-home-body">
-        <div class="{% if is_control_center %}col-xl-5{% else %}col-xl-4{% endif %}">
+    <div class="row g-3 cc-home-body cc-command-grid">
+        <div class="{% if is_control_center %}col-xl-5{% else %}col-xl-4{% endif %} cc-command-grid__workbench">
+            <p class="cc-kicker cc-kicker--section">Workbench</p>
             {% if show_action_queue %}
             <section class="cc-panel{% if primary_work == 'queue' %} cc-panel--priority{% endif %} mb-4">
                 <div class="cc-panel__header">
@@ -336,7 +358,8 @@
 
         </div>
 
-        <div class="{% if is_control_center %}col-xl-7{% else %}col-xl-8{% endif %}">
+        <div class="{% if is_control_center %}col-xl-7{% else %}col-xl-8{% endif %} cc-command-grid__evidence">
+            <p class="cc-kicker cc-kicker--section">Evidence</p>
             {% if show_leaderboard and church_leaderboard %}
             <section class="cc-panel mb-4">
                 <div class="cc-panel__header">

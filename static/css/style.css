@@ -5574,6 +5574,15 @@ nav.page-eyebrow .page-eyebrow__page { color: var(--ch-text); }
     padding: 0.85rem 0.9rem 0.75rem;
 }
 
+.cc-member-dash--compact {
+    margin-bottom: 1rem;
+}
+
+.cc-member-dash--compact .cc-member-dash__kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-bottom: 0;
+}
+
 .cc-member-dash__head {
     display: flex;
     flex-wrap: wrap;
@@ -5667,7 +5676,8 @@ nav.page-eyebrow .page-eyebrow__page { color: var(--ch-text); }
 }
 
 @media (max-width: 767.98px) {
-    .cc-member-dash__kpis {
+    .cc-member-dash__kpis,
+    .cc-member-dash--compact .cc-member-dash__kpis {
         grid-template-columns: 1fr 1fr;
     }
 }

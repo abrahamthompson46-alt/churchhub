@@ -61,11 +61,12 @@ def _label_month(d: date) -> str:
     return f"{month_abbr[d.month]} {d.year}"
 
 
-def build_member_dashboard(request, *, church_ids=None):
+def build_member_dashboard(request, *, church_ids=None, compact=False):
     """
     Membership KPIs, demographics, trends, activity, and data-quality counts.
 
     Gated by view/manage members. Uses Member.objects (alive rows only).
+    compact=True: KPI strip only (home dashboard).
     """
     user = request.user
     if not (can_view_members(user) or can_manage_members(user)):
@@ -77,6 +78,30 @@ def build_member_dashboard(request, *, church_ids=None):
     period_start = this_month - relativedelta(months=months - 1)
     prior_start = period_start - relativedelta(months=months)
     qs = selectors.scoped_members_qs(request)
+
+    if compact:
+        compact_agg = qs.aggregate(
+            total=Count("id"),
+            active=Count("id", filter=Q(membership_status=MembershipStatus.ACTIVE)),
+            inactive=Count("id", filter=Q(membership_status=MembershipStatus.INACTIVE)),
+            is_active_true=Count("id", filter=Q(is_active=True)),
+            is_active_false=Count("id", filter=Q(is_active=False)),
+            new_this_month=Count("id", filter=Q(date_joined__gte=this_month)),
+        )
+        return {
+            "visible": True,
+            "compact": True,
+            "kpis": {
+                "total": int(compact_agg["total"] or 0),
+                "active": int(compact_agg["active"] or 0),
+                "inactive": int(compact_agg["inactive"] or 0),
+                "new_this_month": int(compact_agg["new_this_month"] or 0),
+            },
+            "member_count": int(compact_agg["is_active_true"] or 0),
+            "inactive_count": int(compact_agg["is_active_false"] or 0),
+            "recent_members": [],
+        }
+
     age_q = age_group_q_map(today)
     known_gender = (Gender.MALE, Gender.FEMALE)
 
@@ -258,6 +283,7 @@ def build_member_dashboard(request, *, church_ids=None):
 
     return {
         "visible": True,
+        "compact": False,
         "trend_months": months,
         "trend_month_choices": ALLOWED_TREND_MONTHS,
         "period_start": period_start,

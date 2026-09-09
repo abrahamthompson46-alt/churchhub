@@ -130,14 +130,14 @@ def build_executive_finance_bundle(
     return attach_finance_deltas(result, finance_church_ids, month_start_date)
 
 
-def income_expense_trend_chart(finance_church_ids, now=None, months=6):
-    """Six-month income vs expense series for chart.js."""
+def income_expense_trend_chart(finance_church_ids, now=None, months=12):
+    """Monthly income bars plus cumulative income for mixed Chart.js."""
     import json
 
     now = now or timezone.now()
+    empty = json.dumps([]), json.dumps([]), json.dumps([]), json.dumps([])
     if not finance_church_ids:
-        labels = []
-        return json.dumps(labels), json.dumps([]), json.dumps([])
+        return empty
 
     transactions = selectors.approved_transactions(
         selectors.transactions_for_church_ids(list(finance_church_ids))
@@ -167,4 +167,14 @@ def income_expense_trend_chart(finance_church_ids, now=None, months=6):
     trend_labels = list(reversed(list(trend_dict.keys())))
     income_data = [trend_dict[m]["INCOME"] for m in trend_labels]
     expense_data = [trend_dict[m]["EXPENSE"] for m in trend_labels]
-    return json.dumps(trend_labels), json.dumps(income_data), json.dumps(expense_data)
+    running = 0.0
+    cumulative = []
+    for amount in income_data:
+        running += amount
+        cumulative.append(round(running, 2))
+    return (
+        json.dumps(trend_labels),
+        json.dumps(income_data),
+        json.dumps(expense_data),
+        json.dumps(cumulative),
+    )

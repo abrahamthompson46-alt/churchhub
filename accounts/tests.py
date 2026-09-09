@@ -562,6 +562,8 @@ class ViewTests(ChurchHubTestMixin, TestCase):
         self.assertGreater(len(response2.context["page_obj"].object_list), 0)
 
     def test_invite_user_creates_invitation(self):
+        from django.core import mail
+
         self._login("admin")
         response = self.client.post(
             reverse("accounts:invite_user"),
@@ -576,6 +578,9 @@ class ViewTests(ChurchHubTestMixin, TestCase):
         )
         self.assertEqual(response.status_code, 302, getattr(response, "context", None) and response.context.get("form") and response.context["form"].errors)
         self.assertTrue(UserInvitation.objects.filter(username="invited").exists())
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["invite@test.com"])
+        self.assertIn("invited", mail.outbox[0].subject.lower())
 
     def test_duplicate_pending_invite_is_resent(self):
         from unittest.mock import patch

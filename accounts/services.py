@@ -154,29 +154,11 @@ def create_invitation(
 
 def send_invitation_email(invitation, request=None, *, fail_silently=True):
     """
-    Deliver an invitation email.
-
-    Sends synchronously by default so the UI can report real SMTP success/failure.
-    Async (Celery) only when CHURCHHUB_ASYNC_EMAIL is enabled and a broker is usable.
-    Returns True if accepted by SMTP (or queued when async), False if SMTP is not configured.
-    Raises on SMTP delivery errors when fail_silently is False.
+    Deliver an invitation email synchronously so the invite screen can report
+    SMTP success or failure. (Queued Celery send claimed success even when no
+    worker was running.)
     """
-    from django.conf import settings
-
     from church_system.email_service import send_user_invitation_email
-
-    use_async = getattr(settings, "CHURCHHUB_ASYNC_EMAIL", False) and not getattr(
-        settings, "CELERY_TASK_ALWAYS_EAGER", False
-    )
-    if use_async:
-        try:
-            from church_system.tasks import send_invitation_email_task
-
-            send_invitation_email_task.delay(str(invitation.pk))
-            return True
-        except Exception:
-            # Fall through to synchronous send when the broker/worker path fails.
-            pass
 
     return send_user_invitation_email(
         invitation,

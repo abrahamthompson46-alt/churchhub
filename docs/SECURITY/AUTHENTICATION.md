@@ -273,6 +273,7 @@ sequenceDiagram
 | Activation toggle | `activate_user` / `deactivate_user` set `is_active` |
 | Audit | INVITE_*, USER_CREATE on `UserActivityLog` |
 | Gates | `sitecontrol` invite limits / `institution_invites_allowed()` |
+| Email | `send_invitation_email` is **synchronous**. From-address is `default_from_email` or SMTP username — not `support_email` (`support@churchhub.local` is not a valid sender). Tests/dev may use locmem/console; production needs Platform → Email (host + from-address). |
 
 Public tenant onboarding: `/apply/` — when auto-provision is on, instant 30-day TRIAL + login; otherwise platform approve → church + invitation. Hard cutoff: `SubscriptionAccessMiddleware`. See Site Control spec.
 

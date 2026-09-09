@@ -37,6 +37,17 @@ def _env(name: str, default: str = "") -> str:
     return (os.environ.get(name) or default).strip()
 
 
+def _site_from_email(site) -> str:
+    """From-address for SMTP. Never use support@churchhub.local as the sender."""
+    from_email = (getattr(site, "default_from_email", None) or "").strip()
+    if from_email:
+        return from_email
+    username = (getattr(site, "smtp_username", None) or "").strip()
+    if "@" in username:
+        return username
+    return ""
+
+
 def resolve_smtp_config() -> SmtpConfig | None:
     """
     Resolve outbound SMTP settings.
@@ -46,7 +57,7 @@ def resolve_smtp_config() -> SmtpConfig | None:
 
     site = get_site_settings()
     host = (site.smtp_host or "").strip()
-    from_email = (site.default_from_email or site.support_email or "").strip()
+    from_email = _site_from_email(site)
     if host and from_email:
         port = int(site.smtp_port or 587)
         use_tls = bool(site.smtp_use_tls)
@@ -154,7 +165,24 @@ def get_platform_connection():
         use_tls=cfg.use_tls,
         use_ssl=cfg.use_ssl,
         fail_silently=False,
+        timeout=20,
     )
+
+
+def _fallback_mail_connection():
+    """
+    Tests and local console backend: deliver without platform SMTP.
+    Production Platform SMTP wrapper must not be treated as a successful send.
+    """
+    backend = (getattr(settings, "EMAIL_BACKEND", "") or "").strip()
+    if backend in (
+        "django.core.mail.backends.locmem.EmailBackend",
+        "django.core.mail.backends.console.EmailBackend",
+    ):
+        return get_connection()
+    if getattr(settings, "DEBUG", False):
+        return get_connection()
+    return None
 
 
 def send_platform_email(*, subject, to, text_body, html_body=None, fail_silently=False):
@@ -164,31 +192,41 @@ def send_platform_email(*, subject, to, text_body, html_body=None, fail_silently
     """
     cfg = resolve_smtp_config()
     connection = get_platform_connection()
+    from_email = cfg.from_email if cfg else ""
     if not connection or not cfg:
-        if fail_silently:
-            logger.warning("SMTP not configured; skipped email to %s", to)
-            return False
-        raise EmailNotConfiguredError(
-            "SMTP is not configured. Set host and default from-address in Platform → Email "
-            "(or EMAIL_HOST / DEFAULT_FROM_EMAIL in the environment)."
-        )
+        connection = _fallback_mail_connection()
+        from_email = from_email or (getattr(settings, "DEFAULT_FROM_EMAIL", "") or "webmaster@localhost")
+        if not connection:
+            if fail_silently:
+                logger.warning("SMTP not configured; skipped email to %s", to)
+                return False
+            raise EmailNotConfiguredError(
+                "SMTP is not configured. Set host and default from-address in Platform → Email "
+                "(or EMAIL_HOST / DEFAULT_FROM_EMAIL in the environment)."
+            )
+        logger.info("SMTP not configured; using Django EMAIL_BACKEND for %s", to)
 
     message = EmailMultiAlternatives(
         subject=subject,
         body=text_body,
-        from_email=cfg.from_email,
+        from_email=from_email,
         to=[to] if isinstance(to, str) else list(to),
         connection=connection,
     )
     if html_body:
         message.attach_alternative(html_body, "text/html")
     try:
-        message.send()
+        sent = message.send()
     except Exception:
         logger.exception("Failed to send email to %s subject=%s", to, subject)
         if fail_silently:
             return False
         raise
+    if not sent:
+        logger.warning("Email backend accepted 0 messages for %s subject=%s", to, subject)
+        if fail_silently:
+            return False
+        raise EmailNotConfiguredError("The mail server did not accept the invitation email.")
     logger.info("Email sent to %s subject=%s", to, subject)
     return True
 

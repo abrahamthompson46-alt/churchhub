@@ -82,6 +82,11 @@ def get_settlement_strip(request, church_ids):
     now = timezone.now()
     prior_month = (now.replace(day=1) - relativedelta(months=1)).date().replace(day=1)
     counts = selectors.remittance_scope_strip_counts(church_ids, prior_month)
+    if not any(
+        counts.get(key)
+        for key in ("overdue", "transferred", "pending_transfer", "settlement_drafts")
+    ):
+        return None
     counts["period_label"] = prior_month.strftime("%B %Y")
     counts["cutoff_url"] = reverse("dashboard:cutoff")
     if church and church_has_feature(church, "remittance"):
@@ -89,6 +94,47 @@ def get_settlement_strip(request, church_ids):
     else:
         counts["settlements_url"] = ""
     return counts
+
+
+def settlement_alerts_from_strip(strip):
+    """Dashboard banners for remittance posture — omitted when all counts are zero."""
+    if not strip:
+        return []
+    period = strip.get("period_label") or "prior month"
+    items = []
+    overdue = strip.get("overdue") or 0
+    pending = strip.get("pending_transfer") or 0
+    transferred = strip.get("transferred") or 0
+    drafts = strip.get("settlement_drafts") or 0
+    if overdue:
+        items.append({
+            "level": "danger",
+            "text": f"{overdue} remittance overdue ({period}).",
+            "url_name": "dashboard:cutoff",
+        })
+    if pending:
+        items.append({
+            "level": "warning",
+            "text": f"{pending} remittance pending transfer ({period}).",
+            "url_name": "dashboard:cutoff",
+        })
+    if transferred:
+        items.append({
+            "level": "info",
+            "text": f"{transferred} remittance transferred ({period}).",
+            "url_name": "dashboard:cutoff",
+        })
+    if drafts:
+        draft_alert = {
+            "level": "warning",
+            "text": f"{drafts} settlement draft(s) to review.",
+        }
+        if strip.get("settlements_url"):
+            draft_alert["url"] = strip["settlements_url"]
+        else:
+            draft_alert["url_name"] = "dashboard:cutoff"
+        items.append(draft_alert)
+    return items
 
 
 def get_budget_glance(request):

@@ -2699,7 +2699,13 @@ body.app-body.auth-page {
 }
 
 /* ── Category picker (type-to-filter combobox) ── */
-.category-picker { position: relative; z-index: 2; }
+.card:has(.category-picker),
+.data-card:has(.category-picker),
+.form-card-inner:has(.category-picker),
+.form-group:has(.category-picker) {
+    overflow: visible !important;
+}
+.category-picker { position: relative; z-index: 20; overflow: visible; }
 .category-picker.is-enhanced > select,
 .category-picker.is-enhanced .category-picker__native {
     position: absolute !important;
@@ -2714,18 +2720,19 @@ body.app-body.auth-page {
     opacity: 0 !important;
     pointer-events: none !important;
 }
-.category-picker__search-wrap { position: relative; }
+.category-picker__search-wrap { position: relative; z-index: 21; }
 .category-picker__input {
     width: 100%;
 }
 .category-picker__results {
-    position: absolute;
+    position: absolute !important;
     left: 0;
     right: 0;
     top: calc(100% + 4px);
     z-index: 2000;
-    max-height: min(240px, 50vh);
-    overflow-y: scroll;
+    max-height: 12.5rem !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     padding: 0.15rem 0;
@@ -3039,17 +3046,48 @@ body.app-body.auth-page {
 .chip--danger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
 .chip--muted { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
 
-/* Permission matrix */
-.permission-matrix-scroll {
-    max-height: calc(100vh - 11.5rem);
-    overflow: auto;
+/* Permission matrix — role labels stick under the app navbar on page scroll */
+form.data-card.permission-matrix-card {
+    overflow: visible;
 }
-.permission-matrix thead th {
+.permission-matrix-sticky-head {
     position: sticky;
     top: 0;
-    z-index: 3;
+    z-index: 20;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
     background: var(--ch-table-head-bg);
-    box-shadow: inset 0 -1px 0 var(--ch-border);
+    color: var(--ch-table-head-text);
+    border-radius: var(--ch-radius) var(--ch-radius) 0 0;
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.25);
+}
+.permission-matrix-sticky-head::-webkit-scrollbar { height: 0; display: none; }
+    display: grid;
+    align-items: center;
+    min-height: 2.6rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.permission-matrix-sticky-head__perm,
+.permission-matrix-sticky-head__role {
+    padding: 0.5rem 0.65rem;
+    white-space: nowrap;
+}
+.permission-matrix-sticky-head__role { text-align: center; }
+.permission-matrix-scroll {
+    overflow-x: auto;
+    overflow-y: visible;
+    max-height: none;
+}
+.permission-matrix thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
 }
 .permission-matrix .matrix-sticky {
     position: sticky;
@@ -5029,6 +5067,14 @@ nav.page-eyebrow .page-eyebrow__page { color: var(--ch-text); }
     opacity: 0.85;
 }
 .alert-banner__link:hover { opacity: 1; text-decoration: underline; }
+a.alert-banner {
+    text-decoration: none;
+    color: inherit;
+    margin-bottom: 0;
+}
+a.alert-banner:hover {
+    filter: brightness(0.985);
+}
 .alert-banner-more { padding-left: 0.15rem; }
 
 .calendar-preview-item__meta { font-size: 0.75rem; }

@@ -89,18 +89,11 @@
     {% include "includes/alert_banners.html" %}
     {% endif %}
 
-    {% if show_this_week_pulse and this_week_pulse or settlement_strip %}
-    <section class="cc-week-strip" aria-label="This week and remittance">
-        {% if settlement_strip %}
-        <div class="cc-week-strip__pane cc-week-strip__pane--remit">
-            {% include "dashboard/includes/settlement_strip.html" %}
-        </div>
-        {% endif %}
-        {% if show_this_week_pulse and this_week_pulse %}
+    {% if show_this_week_pulse and this_week_pulse %}
+    <section class="cc-week-strip" aria-label="This week">
         <div class="cc-week-strip__pane cc-week-strip__pane--pulse">
             {% include "dashboard/includes/this_week_pulse.html" %}
         </div>
-        {% endif %}
     </section>
     {% endif %}
 

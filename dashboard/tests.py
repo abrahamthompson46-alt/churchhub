@@ -339,6 +339,32 @@ class ViewTests(DashboardTestMixin, TestCase):
         self.assertFalse(response.context["suppress_workspace_cash"])
         self.assertLessEqual(len(response.context["quick_actions"]), 3)
         self.assertEqual(response.context["quick_actions_more"], [])
+        self.assertNotContains(response, "0 overdue")
+        self.assertNotContains(response, "cc-settlement-strip")
+
+    def test_home_remittance_alerts_when_counts_nonzero(self):
+        from unittest.mock import patch
+
+        self._login("treasury")
+        strip = {
+            "overdue": 2,
+            "transferred": 1,
+            "pending_transfer": 3,
+            "settlement_drafts": 0,
+            "period_label": "August 2026",
+            "cutoff_url": reverse("dashboard:cutoff"),
+            "settlements_url": "",
+        }
+        with patch("dashboard.home_panels.get_settlement_strip", return_value=strip), patch(
+            "dashboard.services.get_alerts", return_value=[]
+        ):
+            response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "2 remittance overdue")
+        self.assertContains(response, "3 remittance pending transfer")
+        self.assertContains(response, "1 remittance transferred")
+        self.assertContains(response, reverse("dashboard:cutoff"))
+        self.assertNotContains(response, "cc-settlement-strip")
 
     def test_home_renders_alerts_banner(self):
         from unittest.mock import patch

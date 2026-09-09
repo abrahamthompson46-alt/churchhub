@@ -459,6 +459,7 @@ class TransactionViewTests(FinancialServicesTests):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "js-category-picker")
         self.assertContains(response, "Type to search categories")
+        self.assertContains(response, "category-picker__search-wrap")
         self.assertContains(response, "preview-debit")
         self.assertContains(response, "preview-credit")
         self.assertContains(response, "expense-category-data")
@@ -476,8 +477,8 @@ class TransactionViewTests(FinancialServicesTests):
         self.assertEqual(response.status_code, 200)
         html = response.content.decode()
         self.assertContains(response, "js-category-picker")
+        self.assertContains(response, "js/category-picker.js")
         self.assertNotIn(" (Receipt)</option>", html)
-        self.assertIn('class="category-picker__option', html)
         self.assertNotIn('<button type="button" class="category-picker__option', html)
 
     def test_remittance_payment_get_not_405(self):

@@ -1420,9 +1420,19 @@ def build_home_context(request):
         context["attendance_panel"] = None
         context["visitor_funnel"] = None
         context["budget_glance"] = None
-    context["settlement_strip"] = home_panels.get_settlement_strip(
-        request, list(scope.church_ids)
-    ) if show_money_kpis else None
+    context["settlement_strip"] = None
+    if show_money_kpis:
+        strip = home_panels.get_settlement_strip(request, list(scope.church_ids))
+        extra = home_panels.settlement_alerts_from_strip(strip)
+        has_amount_overdue = any(
+            "Remittance overdue for" in (item.get("text") or "") for item in alerts
+        )
+        if has_amount_overdue:
+            extra = [item for item in extra if "overdue" not in (item.get("text") or "").lower()]
+        if extra:
+            alerts = extra + alerts
+            context["alerts"] = alerts[:3]
+            context["alerts_extra_count"] = max(0, len(alerts) - 3)
     if show_members and scope.church_ids:
         context["membership_analysis"] = home_panels.get_membership_analysis(
             list(scope.church_ids),

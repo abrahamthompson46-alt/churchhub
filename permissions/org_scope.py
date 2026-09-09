@@ -50,6 +50,7 @@ class OrgScopeLevel:
             UserRole.CONFERENCE_ADMIN: cls.CONFERENCE,
             UserRole.ZONE_DIRECTOR: cls.ZONE,
             UserRole.DISTRICT_PASTOR: cls.DISTRICT,
+            UserRole.DISTRICT_TREASURY: cls.DISTRICT,
             UserRole.LOCAL_PASTOR: cls.CHURCH,
             UserRole.SECRETARY: cls.CHURCH,
             UserRole.TREASURY: cls.CHURCH,
@@ -75,6 +76,8 @@ class OrgScopeLevel:
         if role == UserRole.ZONE_DIRECTOR:
             return {cls.ZONE, cls.DISTRICT}
         if role == UserRole.DISTRICT_PASTOR:
+            return {cls.DISTRICT, cls.CHURCH}
+        if role == UserRole.DISTRICT_TREASURY:
             return {cls.DISTRICT, cls.CHURCH}
         return {cls.CHURCH, default}
 

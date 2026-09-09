@@ -15,6 +15,7 @@ from permissions.checks import (
     can_manage_remittance_policy,
     can_manage_settlements,
     can_manage_welfare_cases,
+    can_view_remittance,
     can_view_welfare,
 )
 from sitecontrol.checks import require_feature
@@ -79,15 +80,23 @@ def _policy_required(view_func):
     return _wrapped
 
 
+def _can_mutate_settlements(user):
+    return (
+        can_manage_finances(user)
+        or can_manage_settlements(user)
+        or can_manage_remittance_policy(user)
+    )
+
+
+def _can_view_settlements(user):
+    return _can_mutate_settlements(user) or can_view_remittance(user)
+
+
 def _finance_or_policy(view_func):
     @login_required
     @require_feature("remittance")
     def _wrapped(request, *args, **kwargs):
-        if not (
-            can_manage_finances(request.user)
-            or can_manage_remittance_policy(request.user)
-            or can_manage_settlements(request.user)
-        ):
+        if not _can_mutate_settlements(request.user):
             raise PermissionDenied
         return view_func(request, *args, **kwargs)
     return _wrapped
@@ -99,11 +108,10 @@ def _settlement_access(view_func):
     @login_required
     def _wrapped(request, *args, **kwargs):
         user = request.user
-        if not (
-            can_manage_finances(user)
-            or can_manage_settlements(user)
-            or can_manage_remittance_policy(user)
-        ):
+        if request.method == "GET":
+            if not _can_view_settlements(user):
+                raise PermissionDenied
+        elif not _can_mutate_settlements(user):
             raise PermissionDenied
         church = get_active_church(request)
         if church is None and not user_has_hierarchy_settlement_desk(user, church=church):

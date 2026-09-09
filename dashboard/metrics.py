@@ -131,13 +131,25 @@ def build_executive_finance_bundle(
 
 
 def income_expense_trend_chart(finance_church_ids, now=None, months=12):
-    """Monthly income bars plus cumulative income for mixed Chart.js."""
+    """Monthly income, tithe, and combined series for the home finance chart."""
     import json
 
     now = now or timezone.now()
-    empty = json.dumps([]), json.dumps([]), json.dumps([]), json.dumps([])
+    empty_json = json.dumps([])
+    empty = {
+        "labels": empty_json,
+        "income": empty_json,
+        "expense": empty_json,
+        "income_cumulative": empty_json,
+        "tithe": empty_json,
+        "tithe_cumulative": empty_json,
+        "combined": empty_json,
+        "combined_cumulative": empty_json,
+    }
     if not finance_church_ids:
         return empty
+
+    from dashboard.selectors import COMBINED_GIVING_TYPES, TITHE_GIVING_TYPES
 
     transactions = selectors.approved_transactions(
         selectors.transactions_for_church_ids(list(finance_church_ids))
@@ -147,34 +159,57 @@ def income_expense_trend_chart(finance_church_ids, now=None, months=12):
     six_months_ago_date = (
         timezone.localdate(six_months_ago) if timezone.is_aware(six_months_ago) else six_months_ago.date()
     )
-    trend_qs = selectors.income_expense_trend_aggregates(all_time_lines, six_months_ago_date)
+    type_set = ["INCOME", "EXPENSE", *TITHE_GIVING_TYPES, *COMBINED_GIVING_TYPES]
+    trend_qs = selectors.trend_aggregates_by_account_types(all_time_lines, six_months_ago_date, type_set)
 
-    trend_dict = {}
+    buckets = {}
     for i in range(months):
         m_dt = (now - relativedelta(months=i)).replace(day=1)
         label = m_dt.strftime("%b %Y")
-        trend_dict[label] = {"INCOME": 0.0, "EXPENSE": 0.0}
+        buckets[label] = {"INCOME": 0.0, "EXPENSE": 0.0, "TITHE": 0.0, "COMBINED": 0.0}
 
+    tithe_types = set(TITHE_GIVING_TYPES)
+    combined_types = set(COMBINED_GIVING_TYPES)
     for row in trend_qs:
         month_val = row["month"]
         if not month_val:
             continue
         label = month_val.strftime("%b %Y")
+        if label not in buckets:
+            continue
         acc_type = row["account__account_type"]
-        if label in trend_dict and acc_type in trend_dict[label]:
-            trend_dict[label][acc_type] += float(abs(row["total"] or 0))
+        amount = float(abs(row["total"] or 0))
+        if acc_type in ("INCOME", "EXPENSE"):
+            buckets[label][acc_type] += amount
+        if acc_type in tithe_types:
+            buckets[label]["TITHE"] += amount
+        if acc_type in combined_types:
+            buckets[label]["COMBINED"] += amount
 
-    trend_labels = list(reversed(list(trend_dict.keys())))
-    income_data = [trend_dict[m]["INCOME"] for m in trend_labels]
-    expense_data = [trend_dict[m]["EXPENSE"] for m in trend_labels]
-    running = 0.0
-    cumulative = []
-    for amount in income_data:
-        running += amount
-        cumulative.append(round(running, 2))
-    return (
-        json.dumps(trend_labels),
-        json.dumps(income_data),
-        json.dumps(expense_data),
-        json.dumps(cumulative),
-    )
+    trend_labels = list(reversed(list(buckets.keys())))
+
+    def _series(key):
+        return [round(buckets[m][key], 2) for m in trend_labels]
+
+    def _cumulative(values):
+        running = 0.0
+        out = []
+        for amount in values:
+            running += amount
+            out.append(round(running, 2))
+        return out
+
+    income_data = _series("INCOME")
+    expense_data = _series("EXPENSE")
+    tithe_data = _series("TITHE")
+    combined_data = _series("COMBINED")
+    return {
+        "labels": json.dumps(trend_labels),
+        "income": json.dumps(income_data),
+        "expense": json.dumps(expense_data),
+        "income_cumulative": json.dumps(_cumulative(income_data)),
+        "tithe": json.dumps(tithe_data),
+        "tithe_cumulative": json.dumps(_cumulative(tithe_data)),
+        "combined": json.dumps(combined_data),
+        "combined_cumulative": json.dumps(_cumulative(combined_data)),
+    }

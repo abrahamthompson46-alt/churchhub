@@ -846,6 +846,46 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         test_row = next(row for row in board if row["church"] == "Test Church")
         self.assertTrue(any("Overdue remittance" in issue for issue in test_row["issues"]))
 
+    def test_district_treasurer_home_shows_tithe_and_subtree(self):
+        from permissions.org_scope import apply_org_scope
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        Church.objects.create(district=self.district, code="C2T", name="Second Treas Church")
+        user = User.objects.create_user(
+            username="dt_home",
+            password="pass12345",
+            role=UserRole.DISTRICT_TREASURY,
+            church=self.church,
+        )
+        apply_org_scope(
+            user,
+            role=UserRole.DISTRICT_TREASURY,
+            church=self.church,
+            district=self.district,
+        )
+        user.save()
+        client = Client()
+        client.login(username="dt_home", password="pass12345")
+        session = client.session
+        from accounts.mfa import SESSION_MFA_VERIFIED
+
+        session[SESSION_MFA_VERIFIED] = True
+        session.save()
+
+        response = client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_scope"].level, "SUBTREE")
+        self.assertEqual(response.context["dashboard_role"], "district_treasury")
+        ids = [w["id"] for w in (response.context.get("dashboard_kpi_widgets") or [])]
+        self.assertIn("mtd_tithe", ids)
+        self.assertIn("mtd_combined", ids)
+        self.assertTrue(response.context.get("show_finance_chart"))
+        self.assertEqual(response.context.get("finance_chart_series"), "tithe")
+        self.assertContains(response, 'data-finance-chart="combined"')
+        combined = client.get(reverse("dashboard:home") + "?finance_chart=combined")
+        self.assertEqual(combined.context.get("finance_chart_series"), "combined")
+
     def test_home_kpis_follow_open_working_month_not_clock(self):
         from datetime import date
 

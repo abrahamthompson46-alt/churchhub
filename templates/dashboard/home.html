@@ -11,9 +11,9 @@
             <div class="cc-hero__main">
                 <h1 class="cc-hero__title">Good day{% if user.first_name %}, {{ user.first_name }}{% endif %}</h1>
                 <p class="cc-hero__meta">
-                    <span class="cc-hero__badge">{% if church_focused and dashboard_scope.primary_church %}{{ dashboard_scope.primary_church.name }}{% elif is_control_center %}Mission Control{% else %}{{ role_label }}{% endif %}</span>
+                    <span class="cc-hero__badge">{% if is_control_center %}Mission Control{% elif church_focused and dashboard_scope.primary_church %}{{ dashboard_scope.primary_church.name }}{% else %}{{ role_label }}{% endif %}</span>
                     · {{ role_label }}
-                    {% if church_focused %}{% elif dashboard_scope.level == "SUBTREE" %} · {{ dashboard_scope.label }}{% elif active_church %} · {{ active_church.name }}{% elif user_church %} · {{ user_church.name }}{% elif executive_kpis %} · {{ executive_kpis.church_count }} churches{% endif %}
+                    {% if church_focused and dashboard_scope.primary_church %}{% if is_control_center %} · {{ dashboard_scope.primary_church.name }}{% endif %}{% elif dashboard_scope.level == "SUBTREE" %} · {{ dashboard_scope.label }}{% elif active_church %} · {{ active_church.name }}{% elif user_church %} · {{ user_church.name }}{% elif executive_kpis %} · {{ executive_kpis.church_count }} churches{% endif %}
                 </p>
                 {% if role_focus.headline %}
                 <p class="dashboard-role-focus cc-hero__focus mb-0">{{ role_focus.headline }}</p>

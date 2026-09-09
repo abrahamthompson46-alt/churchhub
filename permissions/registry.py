@@ -9,13 +9,16 @@ _ROLE_TREE = {
     "ZONE_DIRECTOR", "DISTRICT_PASTOR",
 }
 _ROLE_ALL_STAFF = _ROLE_TREE | {
-    "LOCAL_PASTOR", "SECRETARY", "TREASURY",
+    "LOCAL_PASTOR", "SECRETARY", "TREASURY", "DISTRICT_TREASURY",
 }
 _ROLE_LEADERSHIP = _ROLE_TREE | {"LOCAL_PASTOR"}
 _ROLE_HIERARCHY = set(_ROLE_TREE)
 _ROLE_TREASURY_OPS = {"SUPER_ADMIN", "GENERAL_OVERSEER", "CONFERENCE_ADMIN", "TREASURY"}
 _ROLE_POLICY = {"SUPER_ADMIN", "GENERAL_OVERSEER", "UNION_ADMIN", "CONFERENCE_ADMIN"}
 _ROLE_READ = _ROLE_ALL_STAFF | {"BOARD_MEMBER"}
+_ROLE_DEEP_FINANCE_READ = (_ROLE_ALL_STAFF | {"BOARD_MEMBER"}) - {"DISTRICT_PASTOR"}
+_ROLE_FINANCE_POST = _ROLE_ALL_STAFF - {"DISTRICT_PASTOR", "DISTRICT_TREASURY"}
+_ROLE_JOURNAL_APPROVE = _ROLE_LEADERSHIP - {"DISTRICT_PASTOR"}
 
 
 PERMISSION_REGISTRY = {
@@ -205,7 +208,6 @@ PERMISSION_REGISTRY = {
         "default_roles": _ROLE_TREASURY_OPS | {
             "UNION_ADMIN",
             "ZONE_DIRECTOR",
-            "DISTRICT_PASTOR",
             "LOCAL_PASTOR",
         },
         "implies": [
@@ -224,14 +226,14 @@ PERMISSION_REGISTRY = {
         "name": "Record Receipts",
         "category": "Finance",
         "description": "Record tithes, offerings, and other receipts.",
-        "default_roles": _ROLE_ALL_STAFF,
+        "default_roles": _ROLE_FINANCE_POST,
         "implies": ["view_transactions"],
     },
     "manage_expenses": {
         "name": "Record Expenses",
         "category": "Finance",
         "description": "Record church expenses.",
-        "default_roles": _ROLE_ALL_STAFF,
+        "default_roles": _ROLE_FINANCE_POST,
         "implies": ["view_transactions"],
     },
     "view_pending_approvals": {
@@ -245,7 +247,7 @@ PERMISSION_REGISTRY = {
         "name": "Approve Transactions",
         "category": "Finance",
         "description": "Approve or reject pending financial transactions.",
-        "default_roles": _ROLE_LEADERSHIP,
+        "default_roles": _ROLE_JOURNAL_APPROVE,
         "implies": [
             "view_transactions", "view_pending_approvals", "void_transactions",
             "reject_transactions", "manage_working_day", "lock_periods",
@@ -256,72 +258,72 @@ PERMISSION_REGISTRY = {
         "name": "Reject Transactions",
         "category": "Finance",
         "description": "Reject pending financial transactions.",
-        "default_roles": _ROLE_LEADERSHIP,
+        "default_roles": _ROLE_JOURNAL_APPROVE,
         "implies": ["view_pending_approvals"],
     },
     "void_transactions": {
         "name": "Void Transactions",
         "category": "Finance",
         "description": "Void approved financial transactions.",
-        "default_roles": _ROLE_LEADERSHIP,
+        "default_roles": _ROLE_JOURNAL_APPROVE,
         "implies": ["view_transactions"],
     },
     "view_reconciliation": {
         "name": "View Bank Reconciliation",
         "category": "Finance",
         "description": "View bank reconciliation worksheets.",
-        "default_roles": _ROLE_ALL_STAFF | {"BOARD_MEMBER"},
+        "default_roles": _ROLE_DEEP_FINANCE_READ,
     },
     "manage_reconciliation": {
         "name": "Manage Bank Reconciliation",
         "category": "Finance",
         "description": "Create and update bank reconciliations.",
-        "default_roles": _ROLE_TREASURY_OPS | {"LOCAL_PASTOR", "DISTRICT_PASTOR"},
+        "default_roles": _ROLE_TREASURY_OPS | {"LOCAL_PASTOR"},
         "implies": ["view_reconciliation"],
     },
     "finalize_reconciliation": {
         "name": "Finalize Bank Reconciliation",
         "category": "Finance",
         "description": "Finalize and lock a completed reconciliation.",
-        "default_roles": _ROLE_LEADERSHIP | {"TREASURY"},
+        "default_roles": _ROLE_JOURNAL_APPROVE | {"TREASURY"},
         "implies": ["manage_reconciliation"],
     },
     "view_audit_log": {
         "name": "View Finance Audit Log",
         "category": "Finance",
         "description": "Review financial audit trail events.",
-        "default_roles": _ROLE_LEADERSHIP | {"TREASURY", "BOARD_MEMBER"},
+        "default_roles": _ROLE_JOURNAL_APPROVE | {"TREASURY", "BOARD_MEMBER", "DISTRICT_TREASURY"},
     },
     "manage_working_day": {
         "name": "Manage Working Day",
         "category": "Finance",
         "description": "Open and close the church business day.",
-        "default_roles": _ROLE_LEADERSHIP,
+        "default_roles": _ROLE_JOURNAL_APPROVE,
     },
     "lock_periods": {
         "name": "Lock Financial Periods",
         "category": "Finance",
         "description": "Lock monthly financial periods.",
-        "default_roles": _ROLE_LEADERSHIP,
+        "default_roles": _ROLE_JOURNAL_APPROVE,
     },
     "unlock_periods": {
         "name": "Unlock Financial Periods",
         "category": "Finance",
         "description": "Unlock previously locked periods.",
-        "default_roles": _ROLE_POLICY | {"DISTRICT_PASTOR"},
+        "default_roles": _ROLE_POLICY,
     },
     "run_cutoff": {
         "name": "Run Monthly Cut-off",
         "category": "Finance",
         "description": "Generate monthly remittance cut-off summaries.",
-        "default_roles": _ROLE_ALL_STAFF,
+        "default_roles": _ROLE_FINANCE_POST,
         "implies": ["view_transactions"],
     },
     "export_transactions": {
         "name": "Export Transactions",
         "category": "Finance",
         "description": "Export transaction registers to CSV/Excel.",
-        "default_roles": _ROLE_LEADERSHIP | {"TREASURY"},
+        "default_roles": _ROLE_JOURNAL_APPROVE | {"TREASURY", "DISTRICT_TREASURY"},
         "implies": ["view_transactions"],
     },
 
@@ -330,13 +332,13 @@ PERMISSION_REGISTRY = {
         "name": "View Ledger",
         "category": "Ledger",
         "description": "Browse general ledger entries and category reports.",
-        "default_roles": _ROLE_ALL_STAFF | {"BOARD_MEMBER"},
+        "default_roles": _ROLE_DEEP_FINANCE_READ,
     },
     "manage_ledger_entries": {
         "name": "Post Ledger Entries",
         "category": "Ledger",
         "description": "Create and confirm category-driven GL journal entries.",
-        "default_roles": _ROLE_ALL_STAFF,
+        "default_roles": _ROLE_FINANCE_POST,
         "implies": ["view_ledger"],
     },
     "manage_gl_categories": {
@@ -357,14 +359,14 @@ PERMISSION_REGISTRY = {
         "name": "Export Ledger",
         "category": "Ledger",
         "description": "Export GL registers and category summaries.",
-        "default_roles": _ROLE_LEADERSHIP | {"TREASURY"},
+        "default_roles": _ROLE_JOURNAL_APPROVE | {"TREASURY", "DISTRICT_TREASURY"},
         "implies": ["view_ledger"],
     },
     "view_trial_balance": {
         "name": "View Trial Balance",
         "category": "Ledger",
         "description": "Access trial balance and account balances.",
-        "default_roles": _ROLE_ALL_STAFF | {"BOARD_MEMBER"},
+        "default_roles": _ROLE_DEEP_FINANCE_READ,
         "implies": ["view_ledger"],
     },
 
@@ -386,7 +388,7 @@ PERMISSION_REGISTRY = {
         "name": "Manage Settlements",
         "category": "Remittance",
         "description": "Create and edit remittance settlement batches.",
-        "default_roles": _ROLE_TREASURY_OPS | {"LOCAL_PASTOR", "DISTRICT_PASTOR"},
+        "default_roles": _ROLE_TREASURY_OPS | {"LOCAL_PASTOR"},
         "implies": ["view_remittance"],
     },
     "post_settlements": {
@@ -429,7 +431,7 @@ PERMISSION_REGISTRY = {
         "name": "View Payroll",
         "category": "Payroll",
         "description": "View payroll dashboard and run summaries.",
-        "default_roles": _ROLE_TREASURY_OPS | {"LOCAL_PASTOR", "DISTRICT_PASTOR", "BOARD_MEMBER"},
+        "default_roles": _ROLE_TREASURY_OPS | {"LOCAL_PASTOR", "DISTRICT_TREASURY", "BOARD_MEMBER"},
     },
     "manage_payroll": {
         "name": "Manage Payroll",
@@ -564,7 +566,7 @@ PERMISSION_REGISTRY = {
         "name": "View Giving",
         "category": "Giving",
         "description": "View member giving statements and summaries.",
-        "default_roles": _ROLE_ALL_STAFF | {"BOARD_MEMBER"},
+        "default_roles": _ROLE_DEEP_FINANCE_READ,
     },
     "manage_giving": {
         "name": "Manage Giving Statements",
@@ -583,7 +585,7 @@ PERMISSION_REGISTRY = {
         "name": "Export Giving",
         "category": "Giving",
         "description": "Export giving statements and donor summaries.",
-        "default_roles": _ROLE_LEADERSHIP | {"TREASURY"},
+        "default_roles": _ROLE_JOURNAL_APPROVE | {"TREASURY", "DISTRICT_TREASURY"},
         "implies": ["view_giving"],
     },
 
@@ -592,7 +594,7 @@ PERMISSION_REGISTRY = {
         "name": "View Contribution Campaigns",
         "category": "Giving",
         "description": "View contribution campaign progress and member participation.",
-        "default_roles": _ROLE_ALL_STAFF | {"BOARD_MEMBER"},
+        "default_roles": _ROLE_DEEP_FINANCE_READ,
     },
     "manage_contribution_campaigns": {
         "name": "Manage Contribution Campaigns",
@@ -706,14 +708,14 @@ PERMISSION_REGISTRY = {
         "name": "View Hierarchy Reports",
         "category": "Reports",
         "description": "Run district/zone/conference roll-up reports.",
-        "default_roles": _ROLE_HIERARCHY | {"BOARD_MEMBER"},
+        "default_roles": _ROLE_HIERARCHY | {"BOARD_MEMBER", "DISTRICT_TREASURY"},
         "implies": ["view_reports"],
     },
     "run_advanced_reports": {
         "name": "Run Advanced Reports",
         "category": "Reports",
         "description": "Access advanced / feature-gated analytics.",
-        "default_roles": _ROLE_LEADERSHIP | {"TREASURY"},
+        "default_roles": _ROLE_JOURNAL_APPROVE | {"TREASURY", "DISTRICT_TREASURY"},
         "implies": ["view_reports"],
     },
     "export_reports_csv": {
@@ -743,13 +745,13 @@ PERMISSION_REGISTRY = {
         "name": "View All Churches",
         "category": "Organization",
         "description": "Switch church context and view hierarchy-wide data.",
-        "default_roles": _ROLE_HIERARCHY,
+        "default_roles": _ROLE_HIERARCHY | {"DISTRICT_TREASURY"},
     },
     "switch_church_context": {
         "name": "Switch Church Context",
         "category": "Organization",
         "description": "Change the active church in the UI.",
-        "default_roles": _ROLE_HIERARCHY,
+        "default_roles": _ROLE_HIERARCHY | {"DISTRICT_TREASURY"},
         "implies": ["view_all_churches"],
     },
     "manage_organization": {

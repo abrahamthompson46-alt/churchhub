@@ -96,7 +96,8 @@ Categories include Members, Meetings, Transactions/Finance, Ledger, Remittance, 
 | `UNION_ADMIN` | Union subtree |
 | `CONFERENCE_ADMIN` | Conference subtree |
 | `ZONE_DIRECTOR` | Zone subtree |
-| `DISTRICT_PASTOR` | District subtree |
+| `DISTRICT_PASTOR` | District subtree (labeled District Administrator). Finance **summaries** only by default — no posting/approve/recon. |
+| `DISTRICT_TREASURY` | District subtree. Deeper finance **read** (ledger, giving, recon, exports) without default posting/approve. |
 | `LOCAL_PASTOR` | Church |
 | `SECRETARY` | Church ops |
 | `TREASURY` | Finance ops |

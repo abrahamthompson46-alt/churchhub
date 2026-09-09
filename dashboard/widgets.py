@@ -11,6 +11,7 @@ from permissions.checks import (
     can_manage_members,
     can_manage_receipts,
     can_run_cutoff,
+    can_view_dashboard_finance,
     can_view_members,
     can_view_pending_approvals,
 )
@@ -19,6 +20,7 @@ LAYOUT_PROFILES = {
     "admin": "executive",
     "overseer": "executive",
     "district_overseer": "district",
+    "district_treasury": "district_treasury",
     "treasury": "treasury",
     "finance": "treasury",
     "secretary": "secretary",
@@ -43,6 +45,14 @@ WIDGET_ORDER = {
         "mtd_combined",
         "remittance_payable",
         "pending_transfers",
+    ),
+    "district_treasury": (
+        "churches",
+        "action_items",
+        "mtd_net",
+        "mtd_tithe",
+        "mtd_combined",
+        "remittance_payable",
     ),
     "pastoral": (
         "pending_approvals",
@@ -78,6 +88,8 @@ def user_can_use_finance_kpis(user) -> bool:
     role = getattr(user, "role", "")
     if role in {UserRole.SECRETARY, UserRole.MEMBER}:
         return False
+    if role in {UserRole.DISTRICT_PASTOR, UserRole.DISTRICT_TREASURY}:
+        return can_view_dashboard_finance(user)
     return (
         can_manage_finances(user)
         or can_approve_transactions(user)

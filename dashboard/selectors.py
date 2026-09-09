@@ -171,10 +171,14 @@ def monthly_cutoff_for_church_month(church, month_start_date):
 
 
 def income_expense_trend_aggregates(lines_qs, since_date):
+    return trend_aggregates_by_account_types(lines_qs, since_date, ["INCOME", "EXPENSE"])
+
+
+def trend_aggregates_by_account_types(lines_qs, since_date, account_types):
     return (
         lines_qs.filter(
             transaction__date__gte=since_date,
-            account__account_type__in=["INCOME", "EXPENSE"],
+            account__account_type__in=list(account_types),
         )
         .annotate(month=TruncMonth("transaction__date"))
         .values("month", "account__account_type")

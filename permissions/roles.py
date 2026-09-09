@@ -12,6 +12,7 @@ class UserRole:
     CONFERENCE_ADMIN = "CONFERENCE_ADMIN"
     ZONE_DIRECTOR = "ZONE_DIRECTOR"
     DISTRICT_PASTOR = "DISTRICT_PASTOR"
+    DISTRICT_TREASURY = "DISTRICT_TREASURY"
     LOCAL_PASTOR = "LOCAL_PASTOR"
     SECRETARY = "SECRETARY"
     TREASURY = "TREASURY"
@@ -25,6 +26,7 @@ class UserRole:
         (CONFERENCE_ADMIN, "Conference Administrator"),
         (ZONE_DIRECTOR, "Zone Director"),
         (DISTRICT_PASTOR, "District Administrator"),
+        (DISTRICT_TREASURY, "District Treasurer"),
         (LOCAL_PASTOR, "Local Pastor"),
         (SECRETARY, "Secretary"),
         (TREASURY, "Treasury"),
@@ -39,6 +41,7 @@ class UserRole:
         CONFERENCE_ADMIN,
         ZONE_DIRECTOR,
         DISTRICT_PASTOR,
+        DISTRICT_TREASURY,
         LOCAL_PASTOR,
         SECRETARY,
         TREASURY,
@@ -54,6 +57,7 @@ class UserRole:
         CONFERENCE_ADMIN,
         ZONE_DIRECTOR,
         DISTRICT_PASTOR,
+        DISTRICT_TREASURY,
     }
 
     ASSIGNABLE_BY_ROLE = {
@@ -63,6 +67,7 @@ class UserRole:
             CONFERENCE_ADMIN,
             ZONE_DIRECTOR,
             DISTRICT_PASTOR,
+            DISTRICT_TREASURY,
             LOCAL_PASTOR,
             SECRETARY,
             TREASURY,
@@ -74,6 +79,7 @@ class UserRole:
             CONFERENCE_ADMIN,
             ZONE_DIRECTOR,
             DISTRICT_PASTOR,
+            DISTRICT_TREASURY,
             LOCAL_PASTOR,
             SECRETARY,
             TREASURY,
@@ -84,6 +90,7 @@ class UserRole:
             CONFERENCE_ADMIN,
             ZONE_DIRECTOR,
             DISTRICT_PASTOR,
+            DISTRICT_TREASURY,
             LOCAL_PASTOR,
             SECRETARY,
             TREASURY,
@@ -93,6 +100,7 @@ class UserRole:
         CONFERENCE_ADMIN: (
             ZONE_DIRECTOR,
             DISTRICT_PASTOR,
+            DISTRICT_TREASURY,
             LOCAL_PASTOR,
             SECRETARY,
             TREASURY,
@@ -101,6 +109,7 @@ class UserRole:
         ),
         ZONE_DIRECTOR: (
             DISTRICT_PASTOR,
+            DISTRICT_TREASURY,
             LOCAL_PASTOR,
             SECRETARY,
             TREASURY,
@@ -108,6 +117,7 @@ class UserRole:
             MEMBER,
         ),
         DISTRICT_PASTOR: (
+            DISTRICT_TREASURY,
             LOCAL_PASTOR,
             SECRETARY,
             TREASURY,
@@ -122,6 +132,7 @@ class UserRole:
         ),
         SECRETARY: (MEMBER,),
         TREASURY: (MEMBER,),
+        DISTRICT_TREASURY: (MEMBER,),
         BOARD_MEMBER: (MEMBER,),
         MEMBER: (),
     }

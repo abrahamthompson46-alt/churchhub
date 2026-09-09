@@ -77,7 +77,7 @@ Platform capabilities (`sitecontrol/rbac.py`): `view`, `manage_tenants`, `manage
 | **Organization subtree** | GC → Union → Conference → Zone → District → Church, filtered by `church_q_for_scope` (`permissions/org_scope.py`) |
 | **Platform** | `/platform/` lane; `User.is_platform_user`; capabilities + `managed_denominations` unless Owner/Django superuser |
 
-Default `scope_level` by role (`OrgScopeLevel.default_for_role`): SUPER_ADMIN and GENERAL_OVERSEER → DENOMINATION; UNION_ADMIN → UNION; CONFERENCE_ADMIN → CONFERENCE; ZONE_DIRECTOR → ZONE; DISTRICT_PASTOR → DISTRICT; LOCAL_PASTOR, SECRETARY, TREASURY, BOARD_MEMBER, MEMBER → CHURCH.
+Default `scope_level` by role (`OrgScopeLevel.default_for_role`): SUPER_ADMIN and GENERAL_OVERSEER → DENOMINATION; UNION_ADMIN → UNION; CONFERENCE_ADMIN → CONFERENCE; ZONE_DIRECTOR → ZONE; DISTRICT_PASTOR and DISTRICT_TREASURY → DISTRICT; LOCAL_PASTOR, SECRETARY, TREASURY, BOARD_MEMBER, MEMBER → CHURCH.
 
 ### INV-TEN-01 — Denomination wall
 
@@ -167,7 +167,8 @@ Scope for every cell: denomination wall + `get_manageable_churches` (or portal s
 | UNION_ADMIN | Yes | Yes (`manage_finances`) | Yes in union subtree | Archive; void (leadership) | Journals/minutes/announcements/welfare/assets/payroll/budgets: Yes. Recon **create/match**: **No** (not treasury_ops / local / district pastor) | Yes | Union subtree; unlock periods (policy) |
 | CONFERENCE_ADMIN | Yes | Yes | Yes | Archive; void | Yes including recon mutate (`_ROLE_TREASURY_OPS`) | Yes | Conference subtree |
 | ZONE_DIRECTOR | Yes | Yes | Yes | Archive; void | Journals etc. Yes. Recon create/match: **No** | Yes | Zone subtree |
-| DISTRICT_PASTOR | Yes | Yes | Yes | Archive; void | Yes including recon mutate | Yes | District subtree; unlock periods |
+| DISTRICT_PASTOR | Yes (directory, txns, remittance, finance reports; **not** GL/giving/recon worksheets by default) | Members/meetings; **MUST NOT** receipts/expenses/ledger post | Members/meetings they may manage | Archive; **not** void journals | Minutes/announcements/welfare as leadership. **MUST NOT** approve/void journals, recon match, unlock periods | **MUST NOT** | District subtree users/org; not matrix |
+| DISTRICT_TREASURY | Yes including ledger, giving, recon **view**, payroll **view**, exports | **MUST NOT** finance writes | **MUST NOT** | **MUST NOT** | **MUST NOT** | **MUST NOT** | Not users/org/matrix |
 | LOCAL_PASTOR | Yes | Yes | Own church | Archive; void | Yes including recon mutate | Yes | Own church users/working day/lock periods. Not matrix (`manage_permissions` is policy) |
 | SECRETARY | Yes finance **view**; receipts/expenses via those codes | Members, receipts, expenses, welfare cases, campaigns, meetings. **MUST NOT** remittance **payment** (no default `manage_finances`) | Members/meetings/announcements they may manage | Archive announcements; **not** void journals | **MUST NOT** approve/void journals, minutes (approve_minutes is leadership), welfare, assets, payroll, budgets, recon match | **MUST NOT** | Not `manage_users` / matrix / org tree |
 | TREASURY | Yes | Receipts/expenses/ledger/contributions/remittance payment/recon create | Giving/campaigns/assets (manage_assets) / payroll prepare | Not void | Recon **finalize** Yes. Journal approve/void: **No**. Asset approve/dispose: Yes. Payroll approve: **No** | **MUST NOT** | Not users/org/matrix |
@@ -182,19 +183,19 @@ BOARD_MEMBER **may** view in-scope journals and recon worksheets; **must not** P
 
 ### 2.2 Default finance permission map (actual codenames)
 
-| Permission | SA/GO | UA | CA | ZD | DP | LP | SEC | TRE | BM | MEM |
-|------------|-------|----|----|----|----|----|-----|-----|----|-----|
-| `view_transactions` | Y | Y | Y | Y | Y | Y | Y | Y | Y | N |
-| `manage_finances` | Y | Y | Y | Y | Y | Y | **N** | Y | **N** | N |
-| `manage_receipts` / `manage_expenses` | Y | Y | Y | Y | Y | Y | Y | Y | N | N |
-| District remittance **payment** (contract = `manage_finances`) | Y | Y | Y | Y | Y | Y | **N** | Y | **N** | N |
-| `view_reconciliation` | Y | Y | Y | Y | Y | Y | Y | Y | Y | N |
-| `manage_reconciliation` | Y | **N** | Y | **N** | Y | Y | **N** | Y | **N** | N |
-| `finalize_reconciliation` | Y | Y | Y | Y | Y | Y | **N** | Y | N | N |
-| `approve_transactions` / `void_transactions` | Y | Y | Y | Y | Y | Y | **N** | **N** | **N** | N |
-| `manage_working_day` / `lock_periods` | Y | Y | Y | Y | Y | Y | N | N | N | N |
-| `unlock_periods` | Y | Y | Y | N | Y | N | N | N | N | N |
-| `view_all_churches` | Y | Y | Y | Y | Y | N | N | N | N | N |
+| Permission | SA/GO | UA | CA | ZD | DP | DT | LP | SEC | TRE | BM | MEM |
+|------------|-------|----|----|----|----|----|----|-----|-----|----|-----|
+| `view_transactions` | Y | Y | Y | Y | Y | Y | Y | Y | Y | Y | N |
+| `manage_finances` | Y | Y | Y | Y | **N** | **N** | Y | **N** | Y | **N** | N |
+| `manage_receipts` / `manage_expenses` | Y | Y | Y | Y | **N** | **N** | Y | Y | Y | N | N |
+| District remittance **payment** (contract = `manage_finances`) | Y | Y | Y | Y | **N** | **N** | Y | **N** | Y | **N** | N |
+| `view_ledger` / `view_giving` / `view_reconciliation` | Y | Y | Y | Y | **N** | Y | Y | Y | Y | Y | N |
+| `manage_reconciliation` | Y | **N** | Y | **N** | **N** | **N** | Y | **N** | Y | **N** | N |
+| `finalize_reconciliation` | Y | Y | Y | Y | **N** | **N** | Y | **N** | Y | N | N |
+| `approve_transactions` / `void_transactions` | Y | Y | Y | Y | **N** | **N** | Y | **N** | **N** | **N** | N |
+| `manage_working_day` / `lock_periods` | Y | Y | Y | Y | **N** | **N** | Y | N | N | N | N |
+| `unlock_periods` | Y | Y | Y | N | **N** | **N** | N | N | N | N | N |
+| `view_all_churches` | Y | Y | Y | Y | Y | Y | N | N | N | N | N |
 
 `manage_finances.implies` includes `view_reconciliation` but **not** `manage_reconciliation`. SECRETARY therefore sees recon lists and MUST be denied recon POST.
 
@@ -433,7 +434,7 @@ Original and reversal dates MUST be in an unlocked period. If a working day is o
 
 ### INV-DATE-06 — Closed period
 
-`lock_periods` / `unlock_periods` are separate permissions. Unlock is narrower (`_ROLE_POLICY` + DISTRICT_PASTOR). Unlock MUST be audited.
+`lock_periods` / `unlock_periods` are separate permissions. Unlock is narrower (`_ROLE_POLICY` only — not district roles). Unlock MUST be audited.
 
 ---
 

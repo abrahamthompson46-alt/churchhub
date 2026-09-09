@@ -13,9 +13,12 @@ from permissions.checks import (
     can_create_announcements,
     can_manage_finances,
     can_manage_members,
+    can_manage_receipts,
     can_manage_permissions,
     can_manage_users,
     can_view_all_churches,
+    can_view_dashboard_finance,
+    can_view_giving,
     can_view_ledger,
     can_view_members,
     can_view_reports,
@@ -91,6 +94,54 @@ class PermissionCheckTests(ChurchHubTestMixin, TestCase):
         self.assertFalse(can_manage_users(user))
         self.assertTrue(can_view_members(user))
         self.assertTrue(can_create_announcements(user))
+
+    def test_district_admin_has_finance_visibility_without_posting(self):
+        from permissions.org_scope import apply_org_scope
+
+        user = User.objects.create_user(
+            username="perm_dist_admin",
+            password="pass12345",
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+        )
+        apply_org_scope(
+            user,
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+            district=self.district,
+        )
+        user.save()
+        self.assertTrue(can_view_dashboard_finance(user))
+        self.assertTrue(can_view_all_churches(user))
+        self.assertFalse(can_manage_finances(user))
+        self.assertFalse(can_manage_receipts(user))
+        self.assertFalse(can_approve_transactions(user))
+        self.assertFalse(can_view_ledger(user))
+        self.assertFalse(can_view_giving(user))
+
+    def test_district_treasurer_has_deeper_finance_read(self):
+        from permissions.org_scope import apply_org_scope
+
+        user = User.objects.create_user(
+            username="perm_dist_treas",
+            password="pass12345",
+            role=UserRole.DISTRICT_TREASURY,
+            church=self.church,
+        )
+        apply_org_scope(
+            user,
+            role=UserRole.DISTRICT_TREASURY,
+            church=self.church,
+            district=self.district,
+        )
+        user.save()
+        self.assertTrue(can_view_dashboard_finance(user))
+        self.assertTrue(can_view_all_churches(user))
+        self.assertTrue(can_view_ledger(user))
+        self.assertTrue(can_view_giving(user))
+        self.assertFalse(can_manage_finances(user))
+        self.assertFalse(can_manage_receipts(user))
+        self.assertFalse(can_approve_transactions(user))
 
     def test_manage_members_implies_view_members(self):
         user = User.objects.create_user(

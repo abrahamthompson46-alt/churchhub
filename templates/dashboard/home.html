@@ -224,14 +224,19 @@
     {% if show_finance_chart %}
     <section class="cc-panel cc-panel--chart mb-3">
         <div class="cc-panel__header">
-            <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Income{% if dashboard_scope.finance_scope_label %} · {{ dashboard_scope.finance_scope_label }}{% endif %}</h2>
+            <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Giving{% if dashboard_scope.finance_scope_label %} · {{ dashboard_scope.finance_scope_label }}{% endif %}</h2>
+            <div class="cc-seg" role="tablist" aria-label="Chart series">
+                <button type="button" class="cc-seg__btn{% if finance_chart_series == 'tithe' %} is-active{% endif %}" role="tab" data-finance-chart="tithe" aria-selected="{% if finance_chart_series == 'tithe' %}true{% else %}false{% endif %}">Tithe</button>
+                <button type="button" class="cc-seg__btn{% if finance_chart_series == 'combined' %} is-active{% endif %}" role="tab" data-finance-chart="combined" aria-selected="{% if finance_chart_series == 'combined' %}true{% else %}false{% endif %}">Combined</button>
+                <button type="button" class="cc-seg__btn{% if finance_chart_series == 'income' %} is-active{% endif %}" role="tab" data-finance-chart="income" aria-selected="{% if finance_chart_series == 'income' %}true{% else %}false{% endif %}">Income</button>
+            </div>
         </div>
         <div class="cc-panel__body cc-panel__body--chart">
             {% if chart_has_activity %}
-            <canvas id="trendChart" height="96" aria-label="Monthly income and cumulative total"></canvas>
-            <p class="small text-muted px-3 pb-2 mb-0">Bars: income by posting month. Line: cumulative income.</p>
+            <canvas id="trendChart" height="96" aria-label="Monthly giving and cumulative total"></canvas>
+            <p class="small text-muted px-3 pb-2 mb-0" id="trendChartCaption">Bars: amount by posting month. Line: cumulative.</p>
             {% else %}
-            <p class="text-muted text-center mb-0 py-3">No approved income in the last 12 posting months for this church.</p>
+            <p class="text-muted text-center mb-0 py-3">No approved giving in the last 12 posting months for this scope.</p>
             {% endif %}
         </div>
     </section>
@@ -642,26 +647,49 @@
 })();
 </script>
 {% endif %}
-{% if show_finance_chart and chart_has_activity %}
+{% if show_finance_chart %}
 <script>
-const ctx = document.getElementById('trendChart');
-if (ctx && typeof Chart !== 'undefined') {
-    new Chart(ctx, {
+(function () {
+    const ctx = document.getElementById('trendChart');
+    const seriesPack = {
+        tithe: { bar: {{ tithe_data|safe }}, line: {{ tithe_cumulative_data|safe }}, barLabel: 'Tithe', lineLabel: 'Cumulative tithe' },
+        combined: { bar: {{ combined_data|safe }}, line: {{ combined_cumulative_data|safe }}, barLabel: 'Combined', lineLabel: 'Cumulative combined' },
+        income: { bar: {{ income_data|safe }}, line: {{ income_cumulative_data|safe }}, barLabel: 'Income', lineLabel: 'Cumulative income' }
+    };
+    let series = '{{ finance_chart_series|default:"tithe" }}';
+    if (!seriesPack[series]) series = 'tithe';
+
+    function persist(next) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('finance_chart', next);
+        window.history.replaceState({}, '', url);
+    }
+
+    function syncButtons() {
+        document.querySelectorAll('[data-finance-chart]').forEach(function (btn) {
+            const on = btn.getAttribute('data-finance-chart') === series;
+            btn.classList.toggle('is-active', on);
+            btn.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+    }
+
+    const pack = seriesPack[series];
+    const chart = (ctx && typeof Chart !== 'undefined') ? new Chart(ctx, {
         data: {
             labels: {{ trend_labels|safe }},
             datasets: [
                 {
                     type: 'bar',
-                    label: 'Income',
-                    data: {{ income_data|safe }},
+                    label: pack.barLabel,
+                    data: pack.bar,
                     backgroundColor: '#5b7c99',
                     borderSkipped: false,
                     order: 2
                 },
                 {
                     type: 'line',
-                    label: 'Cumulative',
-                    data: {{ income_cumulative_data|safe }},
+                    label: pack.lineLabel,
+                    data: pack.line,
                     borderColor: '#1e3a5f',
                     backgroundColor: 'rgba(30, 58, 95, 0.12)',
                     fill: true,
@@ -684,7 +712,28 @@ if (ctx && typeof Chart !== 'undefined') {
             }
         }
     });
-}
+
+    function apply() {
+        const next = seriesPack[series];
+        if (chart) {
+            chart.data.datasets[0].data = next.bar;
+            chart.data.datasets[0].label = next.barLabel;
+            chart.data.datasets[1].data = next.line;
+            chart.data.datasets[1].label = next.lineLabel;
+            chart.update();
+        }
+        syncButtons();
+    }
+
+    document.querySelectorAll('[data-finance-chart]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            series = btn.getAttribute('data-finance-chart');
+            persist(series);
+            apply();
+        });
+    });
+    syncButtons();
+})();
 </script>
 {% endif %}
 {% if show_teller_console %}

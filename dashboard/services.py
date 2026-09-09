@@ -77,6 +77,8 @@ def get_dashboard_role(user):
         return "overseer"
     if user.role == UserRole.DISTRICT_PASTOR:
         return "district_overseer"
+    if user.role == UserRole.DISTRICT_TREASURY:
+        return "district_treasury"
     if user.role == UserRole.TREASURY:
         return "treasury"
     if user.role == UserRole.SECRETARY:
@@ -289,6 +291,10 @@ def get_role_focus(role):
         "district_overseer": {
             "headline": "District command center — churches, remittances, and pastoral oversight.",
             "focus": ["Church leaderboard", "Remittance compliance", "Action queue"],
+        },
+        "district_treasury": {
+            "headline": "District treasury — giving, remittance, and books for churches in your district.",
+            "focus": ["Tithe and combined", "Remittance posture", "Ledger and reports"],
         },
         "admin": {
             "headline": "Organization KPIs, compliance, and pending actions.",
@@ -1161,8 +1167,8 @@ def build_home_context(request):
     show_treasury_ops = show_finance or can_view_transactions(user) or can_manage_receipts(user)
     show_members = can_view_members(user) or can_manage_members(user)
     show_admin = can_view_all_churches(user) or user.is_superuser
-    show_hierarchy = role in ("admin", "overseer", "district_overseer") or show_admin
-    is_control_center = role in ("admin", "overseer", "district_overseer")
+    show_hierarchy = role in ("admin", "overseer", "district_overseer", "district_treasury") or show_admin
+    is_control_center = role in ("admin", "overseer", "district_overseer", "district_treasury")
 
     scope = resolve_dashboard_scope(request)
     scope_banner = scope_selection_banner(scope, user)
@@ -1178,6 +1184,7 @@ def build_home_context(request):
         "finance",
         "overseer",
         "district_overseer",
+        "district_treasury",
         "leadership",
     )
     show_member_kpis = show_members and role in ("secretary", "members", "member", "leadership")
@@ -1373,6 +1380,8 @@ def build_home_context(request):
     kpi_role = role
     if church_focused and role in ("district_overseer", "overseer", "admin"):
         kpi_role = "leadership"
+    elif church_focused and role == "district_treasury":
+        kpi_role = "treasury"
 
     context["dashboard_kpi_widgets"] = build_kpi_widgets(
         user=user,
@@ -1391,15 +1400,27 @@ def build_home_context(request):
         as_of_dt = datetime.combine(as_of, time.min)
         if timezone.is_aware(timezone.now()):
             as_of_dt = timezone.make_aware(as_of_dt, timezone.get_current_timezone())
-        labels, income, expense, cumulative = metrics.income_expense_trend_chart(
+        chart = metrics.income_expense_trend_chart(
             list(scope.finance_church_ids), now=as_of_dt, months=12
         )
-        context["trend_labels"] = labels
-        context["income_data"] = income
-        context["expense_data"] = expense
-        context["income_cumulative_data"] = cumulative
+        series = (request.GET.get("finance_chart") or "tithe").lower()
+        if series not in {"tithe", "combined", "income"}:
+            series = "tithe"
+        context["trend_labels"] = chart["labels"]
+        context["income_data"] = chart["income"]
+        context["expense_data"] = chart["expense"]
+        context["income_cumulative_data"] = chart["income_cumulative"]
+        context["tithe_data"] = chart["tithe"]
+        context["tithe_cumulative_data"] = chart["tithe_cumulative"]
+        context["combined_data"] = chart["combined"]
+        context["combined_cumulative_data"] = chart["combined_cumulative"]
+        context["finance_chart_series"] = series
         context["show_finance_chart"] = True
-        context["chart_has_activity"] = any(float(v) for v in json.loads(income))
+        context["chart_has_activity"] = any(
+            float(v)
+            for key in ("income", "tithe", "combined")
+            for v in json.loads(chart[key])
+        )
     else:
         context["show_finance_chart"] = False
         context["chart_has_activity"] = False

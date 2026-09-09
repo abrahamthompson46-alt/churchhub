@@ -239,10 +239,10 @@ def get_financial_summary(request):
     }
 
 
-def get_member_summary(request, church_ids=None):
+def get_member_summary(request, church_ids=None, compact=False):
     from dashboard.member_summary import build_member_dashboard
 
-    snapshot = build_member_dashboard(request, church_ids=church_ids)
+    snapshot = build_member_dashboard(request, church_ids=church_ids, compact=compact)
     if not snapshot:
         return {}
     active_church = get_active_church(request)
@@ -1300,7 +1300,7 @@ def build_home_context(request):
             context["cash_position"] = None
 
     if show_members:
-        context.update(get_member_summary(request, church_ids=list(scope.church_ids)))
+        context.update(get_member_summary(request, church_ids=list(scope.church_ids), compact=True))
         if scope.level == "SUBTREE" and scope.church_ids:
             context["pending_transfers"] = selectors.pending_transfers_for_church_ids(
                 list(scope.church_ids)
@@ -1391,16 +1391,15 @@ def build_home_context(request):
         as_of_dt = datetime.combine(as_of, time.min)
         if timezone.is_aware(timezone.now()):
             as_of_dt = timezone.make_aware(as_of_dt, timezone.get_current_timezone())
-        labels, income, expense = metrics.income_expense_trend_chart(
-            list(scope.finance_church_ids), now=as_of_dt
+        labels, income, expense, cumulative = metrics.income_expense_trend_chart(
+            list(scope.finance_church_ids), now=as_of_dt, months=12
         )
         context["trend_labels"] = labels
         context["income_data"] = income
         context["expense_data"] = expense
+        context["income_cumulative_data"] = cumulative
         context["show_finance_chart"] = True
-        context["chart_has_activity"] = any(
-            float(v) for v in (json.loads(income) + json.loads(expense))
-        )
+        context["chart_has_activity"] = any(float(v) for v in json.loads(income))
     else:
         context["show_finance_chart"] = False
         context["chart_has_activity"] = False

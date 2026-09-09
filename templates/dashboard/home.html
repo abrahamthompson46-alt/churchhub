@@ -230,19 +230,18 @@
     {% if show_finance_chart %}
     <section class="cc-panel cc-panel--chart mb-3">
         <div class="cc-panel__header">
-            <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Income vs expense{% if dashboard_scope.finance_scope_label %} · {{ dashboard_scope.finance_scope_label }}{% endif %}</h2>
+            <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Income{% if dashboard_scope.finance_scope_label %} · {{ dashboard_scope.finance_scope_label }}{% endif %}</h2>
         </div>
         <div class="cc-panel__body cc-panel__body--chart">
             {% if chart_has_activity %}
-            <canvas id="trendChart" height="72"></canvas>
+            <canvas id="trendChart" height="96" aria-label="Monthly income and cumulative total"></canvas>
+            <p class="small text-muted px-3 pb-2 mb-0">Bars: income by posting month. Line: cumulative income.</p>
             {% else %}
-            <p class="text-muted text-center mb-0 py-3">No approved income or expense in the last 6 posting months for this church.</p>
+            <p class="text-muted text-center mb-0 py-3">No approved income in the last 12 posting months for this church.</p>
             {% endif %}
         </div>
     </section>
     {% endif %}
-
-    {% include "dashboard/includes/membership_analysis.html" %}
 
     <div class="row g-3 cc-home-body cc-command-grid">
         <div class="{% if is_control_center %}col-xl-5{% else %}col-xl-4{% endif %} cc-command-grid__workbench">
@@ -474,90 +473,45 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if member_dashboard %}
-<script>
-(function () {
-    const trend = document.getElementById('memberTrendChart');
-    if (trend && typeof Chart !== 'undefined') {
-        new Chart(trend, {
-            data: {
-                labels: {{ member_dashboard.trend.labels_json|safe }},
-                datasets: [
-                    {
-                        type: 'bar',
-                        label: 'New members',
-                        data: {{ member_dashboard.trend.new_json|safe }},
-                        backgroundColor: '#5b7c99',
-                        borderSkipped: false,
-                        order: 2
-                    },
-                    {
-                        type: 'line',
-                        label: 'Cumulative net',
-                        data: {{ member_dashboard.trend.cumulative_net_json|safe }},
-                        borderColor: '#1e3a5f',
-                        backgroundColor: 'rgba(30, 58, 95, 0.10)',
-                        fill: true,
-                        tension: 0.15,
-                        pointRadius: 3,
-                        pointBackgroundColor: '#fff',
-                        pointBorderColor: '#1e3a5f',
-                        order: 1
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 10, font: { size: 10 } } } },
-                scales: {
-                    y: { beginAtZero: true, grid: { color: '#e8edf4' }, border: { display: false }, ticks: { font: { size: 10 } } },
-                    x: { grid: { color: '#f1f5f9' }, border: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0 } }
-                }
-            }
-        });
-    }
-    const statusEl = document.getElementById('memberStatusChart');
-    if (statusEl && typeof Chart !== 'undefined') {
-        new Chart(statusEl, {
-            type: 'doughnut',
-            data: {
-                labels: {{ member_dashboard.status_chart.labels_json|safe }},
-                datasets: [{
-                    data: {{ member_dashboard.status_chart.data_json|safe }},
-                    backgroundColor: ['#1e3a5f', '#5b7c99', '#94a3b8', '#cbd5e1', '#64748b', '#334155', '#0f172a'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }
-            }
-        });
-    }
-})();
-</script>
-{% endif %}
 {% if show_finance_chart and chart_has_activity %}
 <script>
 const ctx = document.getElementById('trendChart');
-if (ctx) {
+if (ctx && typeof Chart !== 'undefined') {
     new Chart(ctx, {
-        type: 'bar',
         data: {
             labels: {{ trend_labels|safe }},
             datasets: [
-                { label: 'Income', data: {{ income_data|safe }}, backgroundColor: '#047857', borderRadius: 4, borderSkipped: false },
-                { label: 'Expense', data: {{ expense_data|safe }}, backgroundColor: '#b91c1c', borderRadius: 4, borderSkipped: false }
+                {
+                    type: 'bar',
+                    label: 'Income',
+                    data: {{ income_data|safe }},
+                    backgroundColor: '#5b7c99',
+                    borderSkipped: false,
+                    order: 2
+                },
+                {
+                    type: 'line',
+                    label: 'Cumulative',
+                    data: {{ income_cumulative_data|safe }},
+                    borderColor: '#1e3a5f',
+                    backgroundColor: 'rgba(30, 58, 95, 0.12)',
+                    fill: true,
+                    tension: 0.15,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#1e3a5f',
+                    pointBorderWidth: 2,
+                    order: 1
+                }
             ]
         },
         options: {
             responsive: true,
-            plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 8, font: { size: 10 } } } },
             maintainAspectRatio: true,
+            plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 10, font: { size: 11 } } } },
             scales: {
                 y: { beginAtZero: true, grid: { color: '#e8edf4' }, border: { display: false }, ticks: { font: { size: 10 } } },
-                x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 10 } } }
+                x: { grid: { color: '#eef2f6' }, border: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0 } }
             }
         }
     });

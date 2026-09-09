@@ -271,7 +271,15 @@ def _member_summary(request, start, end, **hierarchy):
         "by_department": list(by_dept),
         "headers": headers,
         "rows": rows,
+        "member_dashboard": _member_dashboard_for_report(request, members),
     }
+
+
+def _member_dashboard_for_report(request, members_qs):
+    from dashboard.member_summary import build_member_dashboard
+
+    church_ids = list(members_qs.values_list("church_id", flat=True).distinct())
+    return build_member_dashboard(request, church_ids=church_ids)
 
 
 def _tithe_report(request, start, end, **hierarchy):

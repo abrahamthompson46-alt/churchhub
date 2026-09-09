@@ -172,6 +172,16 @@ class MemberDashboardTests(TestCase):
         self.assertEqual(len(news), 6)
         self.assertEqual(sum(news), 1)
 
+    def test_compact_omits_trend_queries_payload(self):
+        snap = build_member_dashboard(
+            self._request(self.secretary),
+            church_ids=[self.church.id],
+            compact=True,
+        )
+        self.assertTrue(snap["compact"])
+        self.assertNotIn("trend", snap)
+        self.assertEqual(snap["kpis"]["total"], 4)
+
     def test_treasury_without_member_permission(self):
         snap = build_member_dashboard(self._request(self.treasury), church_ids=[self.church.id])
         self.assertIsNone(snap)
@@ -199,7 +209,9 @@ class MemberDashboardTests(TestCase):
         response = client.get(reverse("dashboard:home"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Member Summary")
-        self.assertContains(response, "Membership trend")
+        self.assertContains(response, "Member report")
+        self.assertNotContains(response, "Membership trend")
+        self.assertNotContains(response, "Data quality")
         self.assertNotContains(response, "Statement of position")
         self.assertNotContains(response, "transactions ledger")
         self.assertNotContains(response, "System command center")

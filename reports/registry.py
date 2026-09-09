@@ -9,7 +9,7 @@ REPORT_CATALOG = {
     },
     "member_summary": {
         "label": "Member Summary",
-        "description": "Membership counts by status, gender, and department.",
+        "description": "Membership KPIs, demographics, trends, activity, and data quality.",
         "icon": "bi-people",
         "permission": "members",
     },

@@ -169,7 +169,14 @@ def get_member_role_extras(request):
 _CHART_CHURCH_LIMIT = 40
 
 
-def get_membership_analysis(church_ids, month_start):
+def get_membership_analysis(
+    church_ids,
+    month_start,
+    *,
+    view=None,
+    district_id=None,
+    conference_id=None,
+):
     """Active-member comparison by church, district, and conference (caller-scoped ids)."""
     import json
 
@@ -296,10 +303,18 @@ def get_membership_analysis(church_ids, month_start):
     if len(conference_rows) > 1:
         levels.append("conference")
 
+    default_level = "church"
+    if "district" in levels and len(church_rows) >= 6 and len(district_rows) > 1:
+        default_level = "district"
+    if view in levels:
+        default_level = view
+
     chart = {
         "total": total_members,
         "levels": levels,
-        "default_level": "church",
+        "default_level": default_level,
+        "selected_district": district_id or "",
+        "selected_conference": conference_id or "",
         "truncated": truncated,
         "churches": chart_points,
         "districts": [

@@ -16,7 +16,7 @@
     <form method="post" class="data-card mb-4">
 
         {% csrf_token %}
-        <div class="table-responsive">
+        <div class="table-responsive permission-matrix-scroll">
             <table class="table table-sm align-middle permission-matrix mb-0">
                 <thead>
                     <tr>
@@ -42,7 +42,6 @@
                             {% if row.conflicts_with %}
                             <span class="d-block small text-warning">Conflicts: {{ row.conflicts_with|join:", " }}</span>
                             {% endif %}
-                        </td>
                         </td>
                         {% for cell in row.cells %}
                         <td class="text-center">

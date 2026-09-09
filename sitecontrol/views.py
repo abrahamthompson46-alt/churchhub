@@ -8,7 +8,7 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import connection
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -570,9 +570,19 @@ def subscription_edit(request, pk=None):
 def subscription_record_payment(request, pk):
     sub = selectors.get_subscription_or_404(pk)
     _require_tenant_access(request, sub.church)
+    activation_request = None
+    activation_id = request.GET.get("activation") or request.POST.get("activation")
+    if activation_id:
+        activation_request = selectors.get_activation_request_or_404(activation_id)
+        _require_tenant_access(request, activation_request.church)
+        if activation_request.subscription_id not in (None, sub.pk):
+            raise Http404()
+    else:
+        activation_request = selectors.open_activation_request_for_subscription(sub)
     form = RecordSubscriptionPaymentForm(
         request.POST or None,
         subscription=sub,
+        activation_request=activation_request,
     )
     if request.method == "POST" and form.is_valid():
         record_subscription_payment(

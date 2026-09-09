@@ -5,8 +5,7 @@
         <div>
             <h2 class="cc-member-dash__title">Member Summary</h2>
             {% if member_dashboard.compact %}
-            <p class="cc-member-dash__meta">Key counts for this church. Open the report for trends and demographics.</p>
-            {% else %}
+            {% elif member_dashboard.period_label %}
             <p class="cc-member-dash__meta">{{ member_dashboard.period_label }}</p>
             {% endif %}
         </div>

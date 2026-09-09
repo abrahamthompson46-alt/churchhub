@@ -757,6 +757,75 @@ class ViewTests(ChurchHubTestMixin, TestCase):
         self.assertEqual(log.details["old_role"], UserRole.SECRETARY)
         self.assertEqual(log.details["new_role"], UserRole.TREASURY)
 
+    def test_user_detail_church_to_district_scope(self):
+        from permissions.org_scope import OrgScopeLevel
+
+        target = User.objects.create_user(
+            username="scopechange",
+            password="pass12345",
+            role=UserRole.SECRETARY,
+            church=self.church,
+        )
+        self._login("admin")
+        response = self.client.post(
+            reverse("accounts:user_detail", kwargs={"pk": target.pk}),
+            {
+                "action": "save",
+                "first_name": "",
+                "last_name": "",
+                "email": "scopechange@test.com",
+                "phone": "",
+                "role": UserRole.DISTRICT_PASTOR,
+                "scope_level": OrgScopeLevel.DISTRICT,
+                "scope_unit": str(self.district.pk),
+                "church": str(self.church.pk),
+                "member": "",
+            },
+        )
+        if response.status_code != 302:
+            form = response.context["form"] if response.context else None
+            self.fail(f"expected 302 got {response.status_code} errors={getattr(form, 'errors', None)}")
+        target.refresh_from_db()
+        self.assertEqual(target.role, UserRole.DISTRICT_PASTOR)
+        self.assertEqual(target.scope_level, OrgScopeLevel.DISTRICT)
+        self.assertEqual(target.scope_district_id, self.district.pk)
+        detail = self.client.get(reverse("accounts:user_detail", kwargs={"pk": target.pk}))
+        self.assertEqual(detail.status_code, 200)
+
+    def test_user_detail_district_scope_accepts_stale_church_unit(self):
+        from permissions.org_scope import OrgScopeLevel
+
+        target = User.objects.create_user(
+            username="stalescope",
+            password="pass12345",
+            role=UserRole.SECRETARY,
+            church=self.church,
+        )
+        self._login("admin")
+        response = self.client.post(
+            reverse("accounts:user_detail", kwargs={"pk": target.pk}),
+            {
+                "action": "save",
+                "first_name": "",
+                "last_name": "",
+                "email": "stalescope@test.com",
+                "phone": "",
+                "role": UserRole.DISTRICT_PASTOR,
+                "scope_level": OrgScopeLevel.DISTRICT,
+                "scope_unit": str(self.church.pk),
+                "church": "",
+                "member": "",
+            },
+        )
+        if response.status_code != 302:
+            form = response.context["form"] if response.context else None
+            self.fail(f"expected 302 got {response.status_code} errors={getattr(form, 'errors', None)}")
+        target.refresh_from_db()
+        self.assertEqual(target.scope_level, OrgScopeLevel.DISTRICT)
+        self.assertEqual(target.scope_district_id, self.district.pk)
+        detail = self.client.get(reverse("accounts:user_detail", kwargs={"pk": target.pk}))
+        self.assertEqual(detail.status_code, 200)
+
     def test_self_deactivate_blocked_in_view(self):
         self._login("admin")
         response = self.client.post(

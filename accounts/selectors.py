@@ -8,6 +8,7 @@ repositories.
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
@@ -178,46 +179,55 @@ def empty_churches():
     return Church.objects.none()
 
 
+def _first_by_pk(model, pk):
+    if pk in (None, ""):
+        return None
+    try:
+        return model.objects.filter(pk=pk).first()
+    except (DjangoValidationError, ValueError, TypeError):
+        return None
+
+
 def church_by_pk(pk):
     from organization.models import Church
 
-    return Church.objects.filter(pk=pk).first()
+    return _first_by_pk(Church, pk)
 
 
 def district_by_pk(pk):
     from organization.models import District
 
-    return District.objects.filter(pk=pk).first()
+    return _first_by_pk(District, pk)
 
 
 def zone_by_pk(pk):
     from organization.models import Zone
 
-    return Zone.objects.filter(pk=pk).first()
+    return _first_by_pk(Zone, pk)
 
 
 def conference_by_pk(pk):
     from organization.models import Conference
 
-    return Conference.objects.filter(pk=pk).first()
+    return _first_by_pk(Conference, pk)
 
 
 def union_by_pk(pk):
     from organization.models import Union
 
-    return Union.objects.filter(pk=pk).first()
+    return _first_by_pk(Union, pk)
 
 
 def general_conference_by_pk(pk):
     from organization.models import GeneralConference
 
-    return GeneralConference.objects.filter(pk=pk).first()
+    return _first_by_pk(GeneralConference, pk)
 
 
 def denomination_by_pk(pk):
     from sitecontrol.models import Denomination
 
-    return Denomination.objects.filter(pk=pk).first()
+    return _first_by_pk(Denomination, pk)
 
 
 def empty_members():

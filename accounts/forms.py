@@ -17,6 +17,15 @@ from sitecontrol.models import Denomination
 from .models import User
 
 
+class FlexibleChoiceField(forms.ChoiceField):
+    """Accept a posted id that is not yet in the rebuilt unit list (stale church vs district)."""
+
+    def valid_value(self, value):
+        if super().valid_value(value):
+            return True
+        return bool(value)
+
+
 class ProfileForm(forms.ModelForm):
     class Meta:
         model = User
@@ -250,7 +259,7 @@ class UserManageForm(forms.ModelForm):
         widget=forms.Select(attrs=select_attrs()),
         help_text="Optional link to a church member record.",
     )
-    scope_unit = forms.ChoiceField(
+    scope_unit = FlexibleChoiceField(
         choices=[],
         required=False,
         widget=forms.Select(attrs=select_attrs(**{"class": "scope-unit-select"})),
@@ -297,15 +306,27 @@ class UserManageForm(forms.ModelForm):
                     (current_role, UserRole.label(current_role))
                 ]
 
-        role = self.data.get("role") if self.is_bound else self.instance.role
+        role = (
+            self.data.get("role")
+            if self.is_bound
+            else (self.initial.get("role") or getattr(self.instance, "role", None))
+        )
         allowed = OrgScopeLevel.allowed_for_role(role or UserRole.MEMBER)
         self.fields["scope_level"].choices = [
             c for c in OrgScopeLevel.CHOICES if c[0] in allowed
         ]
 
-        level = self.data.get("scope_level") if self.is_bound else self.instance.scope_level
+        level = (
+            self.data.get("scope_level")
+            if self.is_bound
+            else (self.initial.get("scope_level") or getattr(self.instance, "scope_level", None))
+        )
         if level not in allowed:
             level = OrgScopeLevel.default_for_role(role or UserRole.MEMBER)
+        if not self.is_bound:
+            if self.initial.get("role"):
+                self.fields["role"].initial = self.initial["role"]
+            self.fields["scope_level"].initial = level
 
         if manager:
             units = manageable_scope_units(manager, level)
@@ -315,6 +336,9 @@ class UserManageForm(forms.ModelForm):
         self.fields["scope_unit"].choices = [("", "— Select —")] + [
             (str(obj.pk), str(obj)) for obj in units
         ]
+        posted_unit = self.data.get("scope_unit") if self.is_bound else None
+        if posted_unit and posted_unit not in {c[0] for c in self.fields["scope_unit"].choices}:
+            self.fields["scope_unit"].choices.append((posted_unit, posted_unit))
         if not self.is_bound:
             initial_unit = (
                 self.instance.church_id
@@ -350,6 +374,11 @@ class UserManageForm(forms.ModelForm):
         if UserRole.requires_church(role or UserRole.MEMBER):
             self.fields["church"].required = True
 
+    def add_error(self, field, error):
+        if field and field not in self.fields:
+            field = "scope_unit" if str(field).startswith("scope_") else None
+        return super().add_error(field, error)
+
     def clean_role(self):
         role = self.cleaned_data["role"]
         current = getattr(self.instance, "role", None)
@@ -373,7 +402,11 @@ class UserManageForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         role = cleaned.get("role") or self.instance.role
+        allowed = OrgScopeLevel.allowed_for_role(role)
         level = cleaned.get("scope_level") or OrgScopeLevel.default_for_role(role)
+        if level not in allowed:
+            self.add_error("scope_level", "This scope level is not valid for the selected role.")
+            level = OrgScopeLevel.default_for_role(role)
         unit_id = cleaned.get("scope_unit")
         church = cleaned.get("church")
 
@@ -388,24 +421,72 @@ class UserManageForm(forms.ModelForm):
             "general_conference": None,
             "denomination": cleaned.get("denomination"),
         }
-        if level == OrgScopeLevel.DISTRICT and unit_id:
-            kwargs["district"] = selectors.district_by_pk(unit_id)
-        elif level == OrgScopeLevel.ZONE and unit_id:
-            kwargs["zone"] = selectors.zone_by_pk(unit_id)
-        elif level == OrgScopeLevel.CONFERENCE and unit_id:
-            kwargs["conference"] = selectors.conference_by_pk(unit_id)
+        if level == OrgScopeLevel.DISTRICT:
+            kwargs["district"] = self._resolve_district(unit_id, church)
+            if not kwargs["district"]:
+                self.add_error("scope_unit", "Select the district.")
+        elif level == OrgScopeLevel.ZONE:
+            kwargs["zone"] = self._resolve_zone(unit_id, church)
+            if not kwargs["zone"]:
+                self.add_error("scope_unit", "Select the zone.")
+        elif level == OrgScopeLevel.CONFERENCE:
+            kwargs["conference"] = self._resolve_conference(unit_id, church)
+            if not kwargs["conference"]:
+                self.add_error("scope_unit", "Select the conference.")
         elif level == OrgScopeLevel.UNION and unit_id:
             kwargs["union"] = selectors.union_by_pk(unit_id)
+            if not kwargs["union"]:
+                self.add_error("scope_unit", "Select the union.")
         elif level == OrgScopeLevel.GENERAL_CONFERENCE and unit_id:
             kwargs["general_conference"] = selectors.general_conference_by_pk(unit_id)
         elif level == OrgScopeLevel.DENOMINATION and unit_id:
             kwargs["denomination"] = selectors.denomination_by_pk(unit_id)
-        elif level == OrgScopeLevel.CHURCH and church:
-            pass
+        elif level == OrgScopeLevel.CHURCH:
+            if unit_id and not church:
+                church = selectors.church_by_pk(unit_id)
+                cleaned["church"] = church
+                kwargs["church"] = church
+            if not church:
+                self.add_error("scope_unit", "Select the local church.")
 
-        # Stash for save()
+        cleaned["scope_level"] = level
         self._scope_apply_kwargs = kwargs
+        if not self.errors:
+            apply_org_scope(self.instance, **kwargs)
         return cleaned
+
+    def _resolve_district(self, unit_id, church):
+        district = selectors.district_by_pk(unit_id) if unit_id else None
+        if district:
+            return district
+        from_church = selectors.church_by_pk(unit_id) if unit_id else None
+        if from_church:
+            return getattr(from_church, "district", None)
+        return getattr(church, "district", None) if church else None
+
+    def _resolve_zone(self, unit_id, church):
+        zone = selectors.zone_by_pk(unit_id) if unit_id else None
+        if zone:
+            return zone
+        from_church = selectors.church_by_pk(unit_id) if unit_id else None
+        if from_church:
+            district = getattr(from_church, "district", None)
+            return getattr(district, "zone", None) if district else None
+        district = getattr(church, "district", None) if church else None
+        return getattr(district, "zone", None) if district else None
+
+    def _resolve_conference(self, unit_id, church):
+        conference = selectors.conference_by_pk(unit_id) if unit_id else None
+        if conference:
+            return conference
+        from_church = selectors.church_by_pk(unit_id) if unit_id else None
+        if from_church:
+            district = getattr(from_church, "district", None)
+            zone = getattr(district, "zone", None) if district else None
+            return getattr(zone, "conference", None) if zone else None
+        district = getattr(church, "district", None) if church else None
+        zone = getattr(district, "zone", None) if district else None
+        return getattr(zone, "conference", None) if zone else None
 
     def save(self, commit=True):
         user = super().save(commit=False)

@@ -11,9 +11,9 @@
             <div class="cc-hero__main">
                 <h1 class="cc-hero__title">Good day{% if user.first_name %}, {{ user.first_name }}{% endif %}</h1>
                 <p class="cc-hero__meta">
-                    <span class="cc-hero__badge">{% if is_control_center %}Mission Control{% else %}Operations{% endif %}</span>
+                    <span class="cc-hero__badge">{% if is_control_center %}Mission Control{% elif church_focused and dashboard_scope.primary_church %}{{ dashboard_scope.primary_church.name }}{% else %}{{ role_label }}{% endif %}</span>
                     · {{ role_label }}
-                    {% if church_focused and dashboard_scope.primary_church %} · {{ dashboard_scope.primary_church.name }}{% elif dashboard_scope.level == "SUBTREE" %} · {{ dashboard_scope.label }}{% elif active_church %} · {{ active_church.name }}{% elif user_church %} · {{ user_church.name }}{% elif executive_kpis %} · {{ executive_kpis.church_count }} churches{% endif %}
+                    {% if church_focused and dashboard_scope.primary_church %}{% if is_control_center %} · {{ dashboard_scope.primary_church.name }}{% endif %}{% elif dashboard_scope.level == "SUBTREE" %} · {{ dashboard_scope.label }}{% elif active_church %} · {{ active_church.name }}{% elif user_church %} · {{ user_church.name }}{% elif executive_kpis %} · {{ executive_kpis.church_count }} churches{% endif %}
                 </p>
                 {% if role_focus.headline %}
                 <p class="dashboard-role-focus cc-hero__focus mb-0">{{ role_focus.headline }}</p>
@@ -246,7 +246,9 @@
 
     <div class="row g-3 cc-home-body cc-command-grid">
         <div class="{% if is_control_center %}col-xl-5{% else %}col-xl-4{% endif %} cc-command-grid__workbench">
+            {% if not church_focused %}
             <p class="cc-kicker cc-kicker--section">Workbench</p>
+            {% endif %}
             {% if show_action_queue %}
             <section class="cc-panel{% if primary_work == 'queue' %} cc-panel--priority{% endif %} mb-4">
                 <div class="cc-panel__header">
@@ -336,7 +338,9 @@
         </div>
 
         <div class="{% if is_control_center %}col-xl-7{% else %}col-xl-8{% endif %} cc-command-grid__evidence">
+            {% if not church_focused %}
             <p class="cc-kicker cc-kicker--section">Evidence</p>
+            {% endif %}
             {% if show_leaderboard and church_leaderboard %}
             <section class="cc-panel mb-4">
                 <div class="cc-panel__header">
@@ -485,8 +489,39 @@
 
     const districtSel = document.getElementById('memberChartDistrict');
     const conferenceSel = document.getElementById('memberChartConference');
-    let level = data.default_level || 'church';
+    const params = new URLSearchParams(window.location.search);
+    let level = params.get('member_view') || data.default_level || 'church';
+    if ((data.levels || []).indexOf(level) === -1) {
+        level = data.default_level || 'church';
+    }
+    if (districtSel) {
+        districtSel.value = params.get('member_district') || data.selected_district || '';
+    }
+    if (conferenceSel) {
+        conferenceSel.value = params.get('member_conference') || data.selected_conference || '';
+    }
     let chart;
+
+    function persist() {
+        const next = new URLSearchParams(window.location.search);
+        next.set('member_view', level);
+        if (districtSel && districtSel.value) next.set('member_district', districtSel.value);
+        else next.delete('member_district');
+        if (conferenceSel && conferenceSel.value) next.set('member_conference', conferenceSel.value);
+        else next.delete('member_conference');
+        const href = window.location.pathname + '?' + next.toString();
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState({}, '', href);
+        }
+    }
+
+    function syncLevelButtons() {
+        document.querySelectorAll('[data-member-level]').forEach(function (other) {
+            const on = other.getAttribute('data-member-level') === level;
+            other.classList.toggle('is-active', on);
+            other.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+    }
 
     function palette(n) {
         const colors = ['#1e3a5f', '#5b7c99', '#3d5a73', '#7a93a8', '#2c4a6e', '#94a3b8'];
@@ -546,7 +581,30 @@
                 onClick: function (_evt, items) {
                     if (!items.length) return;
                     const row = rowsForLevel()[items[0].index];
-                    if (row && row.url) window.location.href = row.url;
+                    if (!row) return;
+                    if (level === 'church' && row.url) {
+                        const focused = new URL(row.url, window.location.origin);
+                        const next = new URLSearchParams(window.location.search);
+                        const churchId = focused.searchParams.get('church');
+                        if (churchId) next.set('church', churchId);
+                        window.location.href = window.location.pathname + '?' + next.toString();
+                        return;
+                    }
+                    if (level === 'district' && row.district_id) {
+                        if (districtSel) districtSel.value = row.district_id;
+                        level = 'church';
+                        persist();
+                        syncLevelButtons();
+                        apply();
+                        return;
+                    }
+                    if (level === 'conference' && row.conference_id) {
+                        if (conferenceSel) conferenceSel.value = row.conference_id;
+                        level = (data.levels || []).indexOf('district') !== -1 ? 'district' : 'church';
+                        persist();
+                        syncLevelButtons();
+                        apply();
+                    }
                 },
                 plugins: {
                     legend: { display: false },
@@ -579,16 +637,14 @@
     document.querySelectorAll('[data-member-level]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             level = btn.getAttribute('data-member-level');
-            document.querySelectorAll('[data-member-level]').forEach(function (other) {
-                const on = other === btn;
-                other.classList.toggle('is-active', on);
-                other.setAttribute('aria-selected', on ? 'true' : 'false');
-            });
+            persist();
+            syncLevelButtons();
             apply();
         });
     });
-    if (districtSel) districtSel.addEventListener('change', apply);
-    if (conferenceSel) conferenceSel.addEventListener('change', apply);
+    if (districtSel) districtSel.addEventListener('change', function () { persist(); apply(); });
+    if (conferenceSel) conferenceSel.addEventListener('change', function () { persist(); apply(); });
+    syncLevelButtons();
     apply();
 })();
 </script>

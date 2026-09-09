@@ -407,6 +407,18 @@ class PublicDemoTrialTests(SiteControlClientHarness, TestCase):
         self.assertContains(platform_detail, "500.00")
         self.assertContains(platform_detail, "Yearly")
 
+        pay_page = self.client.get(
+            reverse("sitecontrol:subscription_record_payment", args=[sub.pk])
+            + f"?activation={req.pk}"
+        )
+        self.assertEqual(pay_page.status_code, 200)
+        self.assertContains(pay_page, "TRX-10482")
+        from django.utils.timezone import localtime
+
+        self.assertContains(
+            pay_page, localtime(req.created_at).strftime("%Y-%m-%dT%H:%M")
+        )
+
         record_subscription_payment(
             sub,
             user=owner,

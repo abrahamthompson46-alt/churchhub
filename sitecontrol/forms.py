@@ -811,9 +811,14 @@ class RecordSubscriptionPaymentForm(forms.Form):
     )
     paid_at = forms.DateTimeField(
         required=False,
-        widget=forms.DateTimeInput(attrs=input_attrs(type="datetime-local")),
+        localize=False,
+        input_formats=["%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S"],
+        widget=forms.DateTimeInput(
+            attrs=input_attrs(type="datetime-local"),
+            format="%Y-%m-%dT%H:%M",
+        ),
         label="Paid at",
-        help_text="Defaults to now if left blank.",
+        help_text="Defaults to now if left blank. Prefills from a pending full-version request.",
     )
     reactivate = forms.BooleanField(
         required=False,
@@ -829,12 +834,23 @@ class RecordSubscriptionPaymentForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         subscription = kwargs.pop("subscription", None)
+        activation_request = kwargs.pop("activation_request", None)
         super().__init__(*args, **kwargs)
         self.fields["payment_method"].queryset = selectors.active_payment_methods_ordered()
         if subscription and subscription.payment_method_id:
             self.fields["payment_method"].initial = subscription.payment_method_id
         if subscription and subscription.payment_reference:
             self.fields["payment_reference"].initial = subscription.payment_reference
+        if activation_request:
+            if activation_request.payment_reference:
+                self.fields["payment_reference"].initial = activation_request.payment_reference
+            submitted = getattr(activation_request, "created_at", None)
+            if submitted:
+                from django.utils.timezone import localtime
+
+                self.fields["paid_at"].initial = localtime(submitted).replace(
+                    second=0, microsecond=0
+                )
 
 
 class TenantChurchForm(forms.ModelForm):

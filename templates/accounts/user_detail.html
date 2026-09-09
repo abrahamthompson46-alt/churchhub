@@ -60,7 +60,7 @@
             <div class="panel-header">Edit User</div>
             <div class="panel-body">
                 {% if can_manage_users %}
-                <form method="post" novalidate>
+                <form method="post" id="user-manage-form" novalidate>
                     {% csrf_token %}
                     <input type="hidden" name="action" value="save">
                     {% for field in form %}
@@ -103,4 +103,23 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var form = document.getElementById("user-manage-form");
+    if (!form) return;
+    var role = form.querySelector(".scope-role-select");
+    var level = form.querySelector(".scope-level-select");
+    function refresh() {
+        var params = new URLSearchParams();
+        if (role && role.value) params.set("role", role.value);
+        if (level && level.value) params.set("scope_level", level.value);
+        window.location = window.location.pathname + "?" + params.toString();
+    }
+    if (role) role.addEventListener("change", refresh);
+    if (level) level.addEventListener("change", refresh);
+})();
+</script>
 {% endblock %}

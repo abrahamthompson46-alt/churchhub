@@ -166,40 +166,68 @@ def get_member_role_extras(request):
     return extras
 
 
+_CHART_CHURCH_LIMIT = 40
+
+
 def get_membership_analysis(church_ids, month_start):
-    """Per-church and district membership with month-to-date join growth."""
+    """Active-member comparison by church, district, and conference (caller-scoped ids)."""
+    import json
+
     if not church_ids:
         return None
     churches = list(
         Church.objects.filter(pk__in=church_ids)
-        .select_related("district")
+        .select_related("district__zone__conference")
         .order_by("district__name", "name")
     )
     if not churches:
         return None
     growth = selectors.membership_growth_by_church(list(church_ids), month_start)
+    active_map = selectors.active_status_counts_by_church(list(church_ids))
     church_rows = []
     district_map = {}
+    conference_map = {}
+    church_points = []
     for church in churches:
         stats = growth.get(church.pk, {"current": 0, "new_mtd": 0})
-        current = int(stats.get("current") or 0)
         new_mtd = int(stats.get("new_mtd") or 0)
+        current = int(active_map.get(church.pk) or 0)
         prior = max(current - new_mtd, 0)
+        district = church.district
+        conference = getattr(getattr(district, "zone", None), "conference", None) if district else None
+        district_id = str(church.district_id) if church.district_id else ""
+        conference_id = str(conference.pk) if conference else ""
         row = {
             "church_id": church.pk,
             "church": church.name,
-            "district": church.district.name if church.district_id else "—",
+            "district": district.name if district else "—",
             "district_id": church.district_id,
+            "conference": conference.name if conference else "—",
+            "conference_id": conference.pk if conference else None,
             "members": current,
             "new_mtd": new_mtd,
             "delta_pct": metrics.pct_change(current, prior),
             "focus_url": f"{reverse('dashboard:home')}?church={church.id}",
         }
         church_rows.append(row)
+        church_points.append(
+            {
+                "label": church.name,
+                "value": current,
+                "url": row["focus_url"],
+                "district_id": district_id,
+                "district": row["district"],
+                "conference_id": conference_id,
+                "conference": row["conference"],
+                "sub": row["district"],
+            }
+        )
         bucket = district_map.setdefault(
             church.district_id or "none",
             {
                 "district": row["district"],
+                "district_id": district_id,
+                "conference_id": conference_id,
                 "members": 0,
                 "new_mtd": 0,
                 "church_count": 0,
@@ -208,20 +236,108 @@ def get_membership_analysis(church_ids, month_start):
         bucket["members"] += current
         bucket["new_mtd"] += new_mtd
         bucket["church_count"] += 1
+        conf_bucket = conference_map.setdefault(
+            conference.pk if conference else "none",
+            {
+                "conference": row["conference"],
+                "conference_id": conference_id,
+                "members": 0,
+                "new_mtd": 0,
+                "church_count": 0,
+                "district_count": set(),
+            },
+        )
+        conf_bucket["members"] += current
+        conf_bucket["new_mtd"] += new_mtd
+        conf_bucket["church_count"] += 1
+        if church.district_id:
+            conf_bucket["district_count"].add(church.district_id)
 
     district_rows = []
     for bucket in district_map.values():
         prior = max(bucket["members"] - bucket["new_mtd"], 0)
         bucket["delta_pct"] = metrics.pct_change(bucket["members"], prior)
         district_rows.append(bucket)
-    district_rows.sort(key=lambda r: r["district"])
+    district_rows.sort(key=lambda r: (-r["members"], r["district"]))
+
+    conference_rows = []
+    for bucket in conference_map.values():
+        prior = max(bucket["members"] - bucket["new_mtd"], 0)
+        bucket["delta_pct"] = metrics.pct_change(bucket["members"], prior)
+        bucket["district_count"] = len(bucket["district_count"])
+        conference_rows.append(bucket)
+    conference_rows.sort(key=lambda r: (-r["members"], r["conference"]))
+
+    church_points.sort(key=lambda r: (-r["value"], r["label"]))
+    truncated = 0
+    chart_points = church_points
+    if len(church_points) > _CHART_CHURCH_LIMIT:
+        head = church_points[: _CHART_CHURCH_LIMIT - 1]
+        rest = church_points[_CHART_CHURCH_LIMIT - 1 :]
+        truncated = len(rest)
+        chart_points = head + [
+            {
+                "label": f"Other ({truncated} churches)",
+                "value": sum(p["value"] for p in rest),
+                "url": "",
+                "district_id": "",
+                "district": "",
+                "conference_id": "",
+                "conference": "",
+                "sub": "",
+            }
+        ]
 
     total_members = sum(r["members"] for r in church_rows)
     total_new = sum(r["new_mtd"] for r in church_rows)
+    levels = ["church"]
+    if len(church_rows) > 1:
+        levels.append("district")
+    if len(conference_rows) > 1:
+        levels.append("conference")
+
+    chart = {
+        "total": total_members,
+        "levels": levels,
+        "default_level": "church",
+        "truncated": truncated,
+        "churches": chart_points,
+        "districts": [
+            {
+                "label": r["district"],
+                "value": r["members"],
+                "sub": f"{r['church_count']} church{'es' if r['church_count'] != 1 else ''}",
+                "district_id": r["district_id"],
+                "conference_id": r["conference_id"],
+            }
+            for r in district_rows
+        ],
+        "conferences": [
+            {
+                "label": r["conference"],
+                "value": r["members"],
+                "sub": f"{r['church_count']} churches · {r['district_count']} districts",
+                "conference_id": r["conference_id"],
+            }
+            for r in conference_rows
+        ],
+        "district_filters": [
+            {"id": r["district_id"], "label": r["district"]}
+            for r in district_rows
+            if r["district_id"]
+        ],
+        "conference_filters": [
+            {"id": r["conference_id"], "label": r["conference"]}
+            for r in conference_rows
+            if r["conference_id"]
+        ],
+    }
     return {
         "churches": church_rows,
         "districts": district_rows,
+        "conferences": conference_rows,
         "show_districts": len(district_rows) > 1 or (len(church_rows) > 1 and district_rows),
+        "show_conferences": len(conference_rows) > 1,
         "totals": {
             "members": total_members,
             "new_mtd": total_new,
@@ -229,6 +345,8 @@ def get_membership_analysis(church_ids, month_start):
             "church_count": len(church_rows),
         },
         "period_label": month_start.strftime("%B %Y"),
+        "chart": chart,
+        "chart_json": json.dumps(chart),
     }
 
 

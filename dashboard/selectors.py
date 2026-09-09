@@ -236,6 +236,25 @@ def active_member_count_for_churches(church_ids):
     return Member.objects.filter(church_id__in=church_ids, is_active=True).count()
 
 
+def active_status_counts_by_church(church_ids):
+    """Members with membership_status=ACTIVE, keyed by church id."""
+    from members.models import MembershipStatus
+
+    if not church_ids:
+        return {}
+    return {
+        row["church_id"]: int(row["count"] or 0)
+        for row in (
+            Member.objects.filter(
+                church_id__in=list(church_ids),
+                membership_status=MembershipStatus.ACTIVE,
+            )
+            .values("church_id")
+            .annotate(count=Count("id"))
+        )
+    }
+
+
 def member_counts_by_church(church_ids):
     return {
         row["church_id"]: row["count"]

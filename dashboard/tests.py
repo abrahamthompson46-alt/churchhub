@@ -760,6 +760,8 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertNotContains(response, "Tithe MTD")
         self.assertIsNotNone(response.context.get("membership_analysis"))
         self.assertContains(response, "Membership")
+        self.assertContains(response, "memberCompareChart")
+        self.assertContains(response, "Active members")
 
     def test_district_pastor_defaults_to_subtree_exception_board(self):
         from permissions.org_scope import apply_org_scope

@@ -1,0 +1,61 @@
+{% load humanize %}
+{% if membership_analysis and membership_analysis.chart %}
+<section class="cc-panel cc-panel--chart mb-3" id="membership-compare" aria-label="Active members by congregation">
+    <div class="cc-panel__header cc-member-chart__head">
+        <div>
+            <h2 class="cc-panel__title"><i class="bi bi-bar-chart-line"></i> Active members</h2>
+            <p class="cc-member-chart__meta mb-0">
+                {{ membership_analysis.totals.members|intcomma }} active
+                · {{ membership_analysis.totals.church_count }} congregation{{ membership_analysis.totals.church_count|pluralize }}
+                in your scope
+            </p>
+        </div>
+        <a href="{% url 'reports:run' 'member_summary' %}" class="dash-section__link">Member report →</a>
+    </div>
+    <div class="cc-member-chart__controls px-3 pt-2">
+        {% if membership_analysis.chart.levels|length > 1 %}
+        <div class="cc-seg" role="tablist" aria-label="Membership grouping">
+            <button type="button" class="cc-seg__btn is-active" data-member-level="church" role="tab" aria-selected="true">Churches</button>
+            {% if "district" in membership_analysis.chart.levels %}
+            <button type="button" class="cc-seg__btn" data-member-level="district" role="tab" aria-selected="false">Districts</button>
+            {% endif %}
+            {% if "conference" in membership_analysis.chart.levels %}
+            <button type="button" class="cc-seg__btn" data-member-level="conference" role="tab" aria-selected="false">Conferences</button>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if membership_analysis.chart.district_filters|length > 1 %}
+        <label class="cc-member-chart__filter">
+            <span class="visually-hidden">Filter by district</span>
+            <select id="memberChartDistrict" class="form-select form-select-sm" data-member-filter="district">
+                <option value="">All districts</option>
+                {% for row in membership_analysis.chart.district_filters %}
+                <option value="{{ row.id }}">{{ row.label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        {% endif %}
+        {% if membership_analysis.chart.conference_filters|length > 1 %}
+        <label class="cc-member-chart__filter">
+            <span class="visually-hidden">Filter by conference</span>
+            <select id="memberChartConference" class="form-select form-select-sm" data-member-filter="conference">
+                <option value="">All conferences</option>
+                {% for row in membership_analysis.chart.conference_filters %}
+                <option value="{{ row.id }}">{{ row.label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        {% endif %}
+    </div>
+    <div class="cc-panel__body cc-panel__body--chart">
+        <div class="cc-member-chart__plot">
+            <canvas id="memberCompareChart" aria-label="Active members by church, district, or conference"></canvas>
+        </div>
+        {% if membership_analysis.chart.truncated %}
+        <p class="small text-muted px-1 pt-2 mb-0">Showing the {{ membership_analysis.chart.churches|length }} largest groups. {{ membership_analysis.chart.truncated }} smaller churches are combined as Other.</p>
+        {% endif %}
+        <p class="small text-muted px-1 pt-2 mb-0">Counts use membership status Active. Only churches you are allowed to manage are included. Click a church bar to focus that congregation.</p>
+    </div>
+    {{ membership_analysis.chart|json_script:"membership-chart-data" }}
+</section>
+{% endif %}

@@ -150,6 +150,7 @@
     {% endif %}
 
     {% include "dashboard/includes/member_summary.html" %}
+    {% include "dashboard/includes/membership_chart.html" %}
 
     {% if member_role_extras %}
     {% include "dashboard/includes/member_extras.html" %}
@@ -473,6 +474,125 @@
 {% endblock %}
 
 {% block extra_js %}
+{% if membership_analysis and membership_analysis.chart %}
+<script>
+(function () {
+    const el = document.getElementById('memberCompareChart');
+    const raw = document.getElementById('membership-chart-data');
+    if (!el || !raw || typeof Chart === 'undefined') return;
+    let data;
+    try { data = JSON.parse(raw.textContent); } catch (e) { return; }
+
+    const districtSel = document.getElementById('memberChartDistrict');
+    const conferenceSel = document.getElementById('memberChartConference');
+    let level = data.default_level || 'church';
+    let chart;
+
+    function palette(n) {
+        const colors = ['#1e3a5f', '#5b7c99', '#3d5a73', '#7a93a8', '#2c4a6e', '#94a3b8'];
+        const out = [];
+        for (let i = 0; i < n; i += 1) out.push(colors[i % colors.length]);
+        return out;
+    }
+
+    function rowsForLevel() {
+        const district = districtSel ? districtSel.value : '';
+        const conference = conferenceSel ? conferenceSel.value : '';
+        if (level === 'district') {
+            return (data.districts || []).filter(function (row) {
+                return !conference || row.conference_id === conference;
+            });
+        }
+        if (level === 'conference') {
+            return data.conferences || [];
+        }
+        return (data.churches || []).filter(function (row) {
+            if (district && row.district_id !== district) return false;
+            if (conference && row.conference_id !== conference) return false;
+            return true;
+        });
+    }
+
+    function apply() {
+        const rows = rowsForLevel();
+        const labels = rows.map(function (r) { return r.label; });
+        const values = rows.map(function (r) { return r.value; });
+        const height = Math.max(160, 28 * Math.max(rows.length, 1) + 48);
+        const plot = el.parentElement;
+        if (plot) plot.style.height = height + 'px';
+        const payload = {
+            labels: labels,
+            datasets: [{
+                label: 'Active members',
+                data: values,
+                backgroundColor: palette(values.length),
+                borderSkipped: false,
+                borderRadius: 3,
+                maxBarThickness: 22
+            }]
+        };
+        if (chart) {
+            chart.data = payload;
+            chart.update();
+            return;
+        }
+        chart = new Chart(el, {
+            type: 'bar',
+            data: payload,
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                onClick: function (_evt, items) {
+                    if (!items.length) return;
+                    const row = rowsForLevel()[items[0].index];
+                    if (row && row.url) window.location.href = row.url;
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function (ctx) {
+                                const row = rowsForLevel()[ctx.dataIndex];
+                                return row && row.sub ? row.sub : '';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: { color: '#e8edf4' },
+                        border: { display: false },
+                        ticks: { precision: 0, font: { size: 10 } }
+                    },
+                    y: {
+                        grid: { display: false },
+                        border: { display: false },
+                        ticks: { font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    }
+
+    document.querySelectorAll('[data-member-level]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            level = btn.getAttribute('data-member-level');
+            document.querySelectorAll('[data-member-level]').forEach(function (other) {
+                const on = other === btn;
+                other.classList.toggle('is-active', on);
+                other.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            apply();
+        });
+    });
+    if (districtSel) districtSel.addEventListener('change', apply);
+    if (conferenceSel) conferenceSel.addEventListener('change', apply);
+    apply();
+})();
+</script>
+{% endif %}
 {% if show_finance_chart and chart_has_activity %}
 <script>
 const ctx = document.getElementById('trendChart');

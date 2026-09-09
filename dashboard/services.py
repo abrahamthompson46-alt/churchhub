@@ -1423,7 +1423,7 @@ def build_home_context(request):
     context["settlement_strip"] = home_panels.get_settlement_strip(
         request, list(scope.church_ids)
     ) if show_money_kpis else None
-    if show_members and role in ("secretary", "leadership", "members") and scope.church_ids:
+    if show_members and scope.church_ids:
         context["membership_analysis"] = home_panels.get_membership_analysis(
             list(scope.church_ids), as_of.replace(day=1)
         )

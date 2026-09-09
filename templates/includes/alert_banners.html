@@ -2,12 +2,21 @@
 {% if alerts %}
 <section class="alert-banner-stack mb-3" aria-label="Alerts">
     {% for alert in alerts %}
+    {% if alert.url %}
+    <a href="{{ alert.url }}" class="alert-banner alert-{{ alert.level|default:'info' }}">
+        <span>{{ alert.text }}</span>
+        <span class="alert-banner__link">View</span>
+    </a>
+    {% elif alert.url_name %}
+    <a href="{% url alert.url_name %}" class="alert-banner alert-{{ alert.level|default:'info' }}">
+        <span>{{ alert.text }}</span>
+        <span class="alert-banner__link">View</span>
+    </a>
+    {% else %}
     <div class="alert-banner alert-{{ alert.level|default:'info' }}">
         <span>{{ alert.text }}</span>
-        {% if alert.url_name %}
-        <a href="{% url alert.url_name %}" class="alert-banner__link">View</a>
-        {% endif %}
     </div>
+    {% endif %}
     {% endfor %}
     {% if alerts_extra_count %}
     <p class="alert-banner-more text-muted small mb-0">

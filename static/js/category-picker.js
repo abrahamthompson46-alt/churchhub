@@ -26,9 +26,40 @@
         return opt && opt.value ? opt.textContent : "";
     }
 
+    function constrainResults(el) {
+        if (!el) return;
+        el.style.position = "absolute";
+        el.style.left = "0";
+        el.style.right = "0";
+        el.style.top = "calc(100% + 4px)";
+        el.style.maxHeight = "12.5rem";
+        el.style.overflowY = "auto";
+        el.style.overflowX = "hidden";
+        el.style.zIndex = "2000";
+    }
+
+    function ensureSearchWrap(root) {
+        var existing = root.querySelector(".category-picker__search-wrap");
+        if (existing) {
+            constrainResults(existing.querySelector("[data-cp-results]"));
+            return existing;
+        }
+        var input = root.querySelector("[data-cp-input]");
+        var results = root.querySelector("[data-cp-results]");
+        if (!input || !results) return null;
+        var wrap = document.createElement("div");
+        wrap.className = "category-picker__search-wrap";
+        input.parentNode.insertBefore(wrap, input);
+        wrap.appendChild(input);
+        wrap.appendChild(results);
+        constrainResults(results);
+        return wrap;
+    }
+
     function ensureChrome(select) {
         var root = select.closest("[data-category-picker]");
         if (root) {
+            ensureSearchWrap(root);
             return root;
         }
         root = document.createElement("div");
@@ -52,8 +83,12 @@
         results.setAttribute("data-cp-results", "");
         results.setAttribute("role", "listbox");
 
-        root.appendChild(input);
-        root.appendChild(results);
+        var wrap = document.createElement("div");
+        wrap.className = "category-picker__search-wrap";
+        wrap.appendChild(input);
+        wrap.appendChild(results);
+        root.appendChild(wrap);
+        constrainResults(results);
         return root;
     }
 
@@ -82,6 +117,7 @@
                 })
                 .join("");
         }
+        constrainResults(state.results);
         state.results.classList.remove("d-none");
         state.open = true;
     }

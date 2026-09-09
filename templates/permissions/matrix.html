@@ -13,11 +13,26 @@
         </div>
     </div>
 
-    <form method="post" class="data-card mb-4">
+    <form method="post" class="data-card permission-matrix-card mb-4">
 
         {% csrf_token %}
-        <div class="table-responsive permission-matrix-scroll">
+        <div class="permission-matrix-sticky-head" data-matrix-sticky-head>
+            <div class="permission-matrix-sticky-head__track" data-matrix-sticky-track
+                 style="grid-template-columns: 220px repeat({{ roles|length }}, minmax(5.5rem, 1fr));">
+                <div class="permission-matrix-sticky-head__perm">Permission</div>
+                {% for role, label in roles %}
+                <div class="permission-matrix-sticky-head__role">{{ label }}</div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="table-responsive permission-matrix-scroll" data-matrix-scroll>
             <table class="table table-sm align-middle permission-matrix mb-0">
+                <colgroup>
+                    <col style="width: 220px">
+                    {% for role, label in roles %}
+                    <col>
+                    {% endfor %}
+                </colgroup>
                 <thead>
                     <tr>
                         <th class="matrix-sticky">Permission</th>

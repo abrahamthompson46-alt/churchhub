@@ -62,6 +62,9 @@ from permissions.checks import (
     can_view_dashboard_finance,
     can_view_enterprise_audit,
     can_view_enterprise_controls,
+    can_view_approval_cases,
+    can_manage_approval_policy,
+    can_manage_approval_delegations,
     can_view_finance_reports,
     can_view_giving,
     can_view_ledger,
@@ -206,6 +209,8 @@ def _finance_sections(user, active_church=None):
         treasury_items.append(_item("Record Expense", "transactions:record_expense", "bi-dash-circle"))
     if can_view_pending_approvals(user):
         treasury_items.append(_item("Pending Approvals", "transactions:pending_approvals", "bi-hourglass-split"))
+    if can_view_approval_cases(user):
+        treasury_items.append(_item("Approval cases", "approvals:case_list", "bi-diagram-3"))
     if can_view_transactions(user):
         treasury_items.append(_item("Transactions", "transactions:transaction_list", "bi-list-check"))
     if treasury_items:
@@ -423,6 +428,10 @@ def get_main_navigation(user, active_church=None):
         home_items.append(_item("Monthly Cut-off", "dashboard:cutoff", "bi-calendar-check"))
     if can_view_enterprise_controls(user):
         home_items.append(_item("Enterprise controls", "audit:controls_home", "bi-shield-check"))
+    if can_manage_approval_policy(user):
+        home_items.append(_item("Approval steps", "approvals:policy", "bi-list-ol"))
+    if can_manage_approval_delegations(user):
+        home_items.append(_item("Delegations", "approvals:delegations", "bi-person-check"))
     if can_manage_working_day(user):
         home_items.append(_item("Working day", "transactions:period_list", "bi-calendar2-week"))
     if len(home_items) == 1:
@@ -907,6 +916,9 @@ def _tab_allowed(user, url_name, active_church=None):
         "transactions:audit_log": lambda: can_view_audit_log(user),
         "audit:controls_home": lambda: can_view_enterprise_controls(user),
         "audit:event_list": lambda: can_view_enterprise_audit(user),
+        "approvals:case_list": lambda: can_view_approval_cases(user),
+        "approvals:policy": lambda: can_manage_approval_policy(user),
+        "approvals:delegations": lambda: can_manage_approval_delegations(user),
         "organization:hierarchy": lambda: can_view_all_churches(user),
         "organization:directory": lambda: can_view_all_churches(user),
         "organization:church_onboard": lambda: (

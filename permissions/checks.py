@@ -190,6 +190,9 @@ def can_view_dashboard_admin(user): return _p(user, "view_dashboard_admin")
 def can_view_enterprise_controls(user): return _p(user, "view_enterprise_controls")
 def can_view_enterprise_audit(user): return _p(user, "view_enterprise_audit")
 def can_export_enterprise_audit(user): return _p(user, "export_enterprise_audit")
+def can_view_approval_cases(user): return _p(user, "view_approval_cases")
+def can_manage_approval_policy(user): return _p(user, "manage_approval_policy")
+def can_manage_approval_delegations(user): return _p(user, "manage_approval_delegations")
 
 
 def role_required(*roles):

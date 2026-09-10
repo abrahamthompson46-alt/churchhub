@@ -566,9 +566,16 @@ class TransactionPostPermissionTests(TestCase):
         from permissions.services import create_override
 
         void_perm = Permission.objects.get(codename="void_transactions")
-        create_override(self.treasurer, void_perm, granted=True, reason="Void-only delegate")
+        User.objects.create_user(
+            username="perm_voider",
+            password="pass12345",
+            role="TREASURY",
+            church=self.church,
+        )
+        voider = User.objects.get(username="perm_voider")
+        create_override(voider, void_perm, granted=True, reason="Void-only delegate")
         txn = self._approved_receipt()
-        self._login_church("perm_treasury")
+        self._login_church("perm_voider")
         response = self.client.post(
             reverse("transactions:void_transaction", kwargs={"pk": txn.pk}),
             {"reason": "Correcting duplicate entry"},
@@ -576,6 +583,22 @@ class TransactionPostPermissionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         txn.refresh_from_db()
         self.assertTrue(txn.is_voided)
+
+    def test_maker_with_void_grant_cannot_void_own_via_post(self):
+        from permissions.models import Permission
+        from permissions.services import create_override
+
+        void_perm = Permission.objects.get(codename="void_transactions")
+        create_override(self.treasurer, void_perm, granted=True, reason="Void-only on own journal")
+        txn = self._approved_receipt()
+        self._login_church("perm_treasury")
+        response = self.client.post(
+            reverse("transactions:void_transaction", kwargs={"pk": txn.pk}),
+            {"reason": "Should be blocked by SoD"},
+        )
+        self.assertEqual(response.status_code, 302)
+        txn.refresh_from_db()
+        self.assertFalse(txn.is_voided)
 
     def test_treasurer_cannot_open_working_day_via_post(self):
         close_working_day(self.church, self.pastor)

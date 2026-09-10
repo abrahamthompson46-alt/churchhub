@@ -144,6 +144,7 @@ INSTALLED_APPS = [
     "assets.apps.AssetsConfig",
     "portal.apps.PortalConfig",
     "audit.apps.AuditConfig",
+    "approvals.apps.ApprovalsConfig",
     "sitecontrol.apps.SitecontrolConfig",
 ]
 

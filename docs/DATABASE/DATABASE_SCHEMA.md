@@ -217,6 +217,18 @@ Tenant: **global** catalog (not church-scoped). Authorization scope is applied a
 
 ---
 
+### 4.6c `approvals` (5 models)
+
+| Model | PK | Key relations / constraints | Tenant |
+|-------|-----|-----------------------------|--------|
+| `ApprovalPolicy` | UUID | OneToOne church; `required_steps` default 1 | church |
+| `ApprovalCase` | UUID | OneToOne transaction; FK church, denomination; unique step numbers on `ApprovalStep` | church |
+| `ApprovalStep` | UUID | FK case; unique `(case, step_number)` | via case |
+| `ApprovalDelegation` | UUID | FKs grantor, grantee, church | church |
+| `ApprovalEscalation` | UUID | FK case | via case |
+
+---
+
 ### 4.7 `ledger` (1 model)
 
 | Model | PK | Relations / constraints |

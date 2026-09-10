@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Journal approval steps — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Controls" page_title="Journal approval steps" page_description="Default remains one checker. This does not change receipt auto-approve on Working day." %}
+    <form method="post" class="data-card p-3" style="max-width:28rem">
+        {% csrf_token %}
+        <label class="form-label">Required checker steps for {{ church.name }}</label>
+        {{ form.required_steps }}
+        <button class="btn btn-primary btn-sm mt-3" type="submit">Save</button>
+        <a class="btn btn-outline-secondary btn-sm mt-3" href="{% url 'approvals:case_list' %}">Cancel</a>
+    </form>
+</div>
+{% endblock %}

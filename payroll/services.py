@@ -824,6 +824,8 @@ def reverse_payroll_run(payroll_run, user, reason=""):
     """
     Reverse a POSTED or PAID payroll run via equal-and-opposite GL journals.
     Does not delete history; marks the run VOID after reversal.
+    Journal void SoD applies: the journal maker cannot reverse their own posting
+    except institutional superadmin.
     """
     from transactions.services import void_transaction
 

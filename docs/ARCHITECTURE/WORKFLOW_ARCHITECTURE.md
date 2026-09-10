@@ -347,7 +347,7 @@ Celery is configured project-wide; tests run eager. Do not assume every report i
 
 | Domain | Current maker-checker | Planned breadth (AGENTS.md) |
 |--------|----------------------|-----------------------------|
-| Transactions | Yes | Yes |
+| Transactions | Yes (`approvals` façade + existing services; default one checker) | Yes |
 | Payroll | Dual approval (pastor + treasury) | Yes |
 | Assets | Submit / approve / reject | Yes |
 | Minutes | Submit / approve / reject | Yes |

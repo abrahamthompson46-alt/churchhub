@@ -186,7 +186,7 @@ Fields include year, org FKs by level, `account`, `amount`, `notes`.
 
 ### 4.9 Maker-checker
 
-Financial approval is maker-checker oriented: approve/reject/void gated by permissions (`can_approve_transactions`, etc.). Creators should not self-approve where services enforce that pattern — verify in `transactions/services.py` when changing approval flows.
+Financial approval is maker-checker oriented: HTTP approve/reject/void go through `approvals.services`, which wrap `approve_transaction` / `reject_transaction` / `void_transaction`. Creators cannot approve, reject, or void their own journal unless `is_superadmin`. Default church `ApprovalPolicy` is one checker. Receipt auto-approve via `TreasuryApprovalPolicy` is unchanged. Multi-step policies record intermediate `ApprovalStep` rows without posting; the last step calls `approve_transaction`. Request-correction and escalation leave `PENDING`.
 
 ### 4.10 Ledger app
 

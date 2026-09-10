@@ -74,6 +74,30 @@ class AutoApproveRegressionTests(TestCase):
         with self.assertRaises(ValueError):
             approve_transaction(txn, self.treasurer)
 
+    def test_maker_cannot_reject_own_transaction(self):
+        from transactions.services import reject_transaction
+
+        txn = record_receipt(
+            church=self.church,
+            created_by=self.treasurer,
+            tithe_amount=Decimal("25.00"),
+        )
+        with self.assertRaises(ValueError):
+            reject_transaction(txn, self.treasurer)
+
+    def test_maker_cannot_void_own_transaction(self):
+        from transactions.services import void_transaction
+
+        txn = record_receipt(
+            church=self.church,
+            created_by=self.treasurer,
+            tithe_amount=Decimal("25.00"),
+        )
+        approve_transaction(txn, self.pastor)
+        txn.refresh_from_db()
+        with self.assertRaises(ValueError):
+            void_transaction(txn, self.treasurer)
+
     def test_approve_module_journal_skips_self_checker(self):
         txn = record_receipt(
             church=self.church,

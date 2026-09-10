@@ -57,7 +57,6 @@ from transactions import selectors
 from transactions.services import (
     PeriodLockedError,
     WorkingDayClosedError,
-    approve_transaction as svc_approve,
     close_working_day,
     create_bank_reconciliation,
     finalize_bank_reconciliation,
@@ -73,12 +72,11 @@ from transactions.services import (
     record_expense_by_category,
     record_receipt,
     record_receipt_by_category,
-    reject_transaction as svc_reject,
     resolve_transaction_date,
     unlock_financial_period,
     update_reconciliation_matches,
-    void_transaction,
 )
+from approvals.services import record_void
 
 
 def _finance_required(view_func):
@@ -135,23 +133,36 @@ def pending_approvals(request):
     transactions_qs = selectors.pending_transactions_qs(request)
     paginator = Paginator(transactions_qs, 50)
     transactions = paginator.get_page(request.GET.get("page"))
+    from approvals.models import ApprovalDelegation
+
+    today = timezone.localdate()
+    can_decide_approvals = can_approve_transactions(request.user) or ApprovalDelegation.objects.filter(
+        grantee=request.user,
+        is_revoked=False,
+        valid_from__lte=today,
+        valid_until__gte=today,
+    ).exists()
     return render(request, "transactions/pending.html", {
         "transactions": transactions,
         "page_obj": transactions,
         "can_approve": can_approve_transactions(request.user),
+        "can_decide_approvals": can_decide_approvals,
     })
 
 
 @login_required
 @require_POST
 def approve_transaction_view(request, pk):
-    if not can_approve_transactions(request.user):
-        raise PermissionDenied
+    from approvals.services import actor_may_decide, record_approval
+
     transaction = selectors.transaction_for_request(request, pk)
+    if not actor_may_decide(request.user, transaction):
+        raise PermissionDenied
     try:
-        svc_approve(transaction, request.user)
-        flash_success(request, f"{transaction.reference} approved.")
-        if transaction.created_by_id and transaction.created_by_id != request.user.id:
+        outcome = record_approval(transaction, request.user)
+        flash_success(request, outcome.message)
+        transaction = outcome.transaction
+        if outcome.posted and transaction.created_by_id and transaction.created_by_id != request.user.id:
             from dashboard.services import notify_user
             notify_user(
                 transaction.created_by,
@@ -168,11 +179,13 @@ def approve_transaction_view(request, pk):
 @login_required
 @require_POST
 def reject_transaction_view(request, pk):
-    if not can_approve_transactions(request.user):
-        raise PermissionDenied
+    from approvals.services import actor_may_decide, record_rejection
+
     transaction = selectors.transaction_for_request(request, pk)
+    if not actor_may_decide(request.user, transaction):
+        raise PermissionDenied
     try:
-        svc_reject(transaction, request.user)
+        record_rejection(transaction, request.user)
         flash_success(request, f"{transaction.reference} rejected.")
         if transaction.created_by_id and transaction.created_by_id != request.user.id:
             from dashboard.services import notify_user
@@ -192,8 +205,8 @@ def reject_transaction_view(request, pk):
 @login_required
 @require_POST
 def bulk_approve(request):
-    if not can_approve_transactions(request.user):
-        raise PermissionDenied
+    from approvals.services import actor_may_decide, record_approval
+
     ids = request.POST.getlist("transaction_ids")
     qs = selectors.pending_transactions_by_ids_qs(request, ids)
     count = 0
@@ -201,11 +214,17 @@ def bulk_approve(request):
     notified = set()
     for txn in qs:
         try:
-            svc_approve(txn, request.user)
+            if not actor_may_decide(request.user, txn):
+                skipped += 1
+                continue
+            outcome = record_approval(txn, request.user)
+            if not outcome.posted:
+                skipped += 1
+                continue
             count += 1
             if txn.created_by_id and txn.created_by_id != request.user.id:
                 notified.add(txn.created_by_id)
-        except ValueError:
+        except (ValueError, PermissionDenied):
             skipped += 1
     if notified:
         from accounts.models import User
@@ -648,7 +667,7 @@ def void_transaction_view(request, pk):
     form = VoidTransactionForm(request.POST)
     reason = form.data.get("reason", "") if form.is_valid() else request.POST.get("reason", "")
     try:
-        void_transaction(transaction, request.user, reason=reason)
+        record_void(transaction, request.user, reason=reason)
         flash_success(
             request,
             f"{transaction.reference} reversed. It is excluded from books and reports.",

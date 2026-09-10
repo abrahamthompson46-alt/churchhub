@@ -908,6 +908,25 @@ PERMISSION_REGISTRY = {
         "default_roles": _ROLE_JOURNAL_APPROVE | {"TREASURY", "DISTRICT_TREASURY"},
         "implies": ["view_enterprise_audit"],
     },
+    "view_approval_cases": {
+        "name": "View Approval Cases",
+        "category": "Controls",
+        "description": "See maker-checker cases in managed churches. Does not grant posting.",
+        "default_roles": _ROLE_ALL_STAFF | {"BOARD_MEMBER"},
+        "implies": ["view_pending_approvals"],
+    },
+    "manage_approval_policy": {
+        "name": "Manage Journal Approval Policy",
+        "category": "Controls",
+        "description": "Set required checker steps. Does not change receipt auto-approve.",
+        "default_roles": _ROLE_POLICY,
+    },
+    "manage_approval_delegations": {
+        "name": "Manage Approval Delegations",
+        "category": "Controls",
+        "description": "Grant time-bounded journal approval delegation within church scope.",
+        "default_roles": _ROLE_JOURNAL_APPROVE,
+    },
 }
 
 

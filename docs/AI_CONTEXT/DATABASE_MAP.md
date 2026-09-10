@@ -210,6 +210,22 @@ Constraint: debit account ≠ credit account. Unique `(church, code)`.
 
 ---
 
+## 9c. App: `approvals`
+
+**File:** `approvals/models.py`
+
+| Model | Key fields / relationships |
+|-------|----------------------------|
+| `ApprovalPolicy` | OneToOne `church`; `required_steps` default 1; does **not** replace `TreasuryApprovalPolicy` |
+| `ApprovalCase` | UUID; FKs church, denomination, OneToOne `transaction`; maker; status OPEN/APPROVED/REJECTED/CORRECTION_REQUESTED/ESCALATED; snapshot `required_steps` / `current_step` |
+| `ApprovalStep` | FK case; `step_number`; PENDING/COMPLETED; action; actor; notes |
+| `ApprovalDelegation` | grantor/grantee/church; dates; optional `max_amount`; `permission_codename`; `is_revoked` |
+| `ApprovalEscalation` | FK case; requested_by; reason. Never auto-approves the journal |
+
+**Writer:** `approvals.services`. Final checker step calls existing `approve_transaction()`. Intermediate steps do not post. Request-correction leaves `Transaction.approval_status=PENDING`.
+
+---
+
 ## 10. Apps with no (or empty) models
 
 | App | Schema reality |

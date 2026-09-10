@@ -118,6 +118,16 @@ Additive codes in `PERMISSION_REGISTRY` (no posting/approve from these grants):
 
 District Administrator (`DISTRICT_PASTOR`) is summary-only. District Treasurer may open detailed events **within** `get_manageable_churches` (district + denomination wall). Existing `FinancialAuditLog` / `transactions:audit_log` is unchanged.
 
+### 4.2 Maker-checker (Phase 2 — Current)
+
+Additive `approvals` app wraps `approve_transaction` / `reject_transaction` / `void_transaction`. Default `ApprovalPolicy.required_steps=1` matches today’s one-checker queue. `TreasuryApprovalPolicy` receipt auto-approve is unchanged. Maker cannot approve, reject, or void their own journal except institutional `is_superadmin`. Intermediate steps do not post; the final step calls `approve_transaction`. Escalation never auto-approves. Request-correction leaves `Transaction.approval_status=PENDING`. Delegation requires the grantor’s `approve_transactions`, church scope, validity dates, and optional `max_amount`. District Admin cannot decide or manage policy; District Treasurer does not gain posting via this app.
+
+| Codename | Default roles (summary) |
+|----------|-------------------------|
+| `view_approval_cases` | Staff + board (same breadth as pending queue visibility) |
+| `manage_approval_policy` | `_ROLE_POLICY` (not District Admin / District Treasurer) |
+| `manage_approval_delegations` | Journal-approve set (not District Admin) |
+
 ### Planned (AGENTS.md)
 
 Product labels such as Church Clerk / District Pastor map to these codes. Do **not** invent new role codes without migration + registry + matrix updates.
@@ -239,7 +249,7 @@ sequenceDiagram
 - `/platform/` → `can_manage_platform` + optional IP allowlist  
 - `/admin/` → `can_access_django_admin`  
 - Platform users redirected away from institution prefixes  
-- Institution prefixes include `/dashboard/`, `/members/`, `/organization/`, `/transactions/`, `/permissions/`, `/announcements/`, `/reports/`, `/meetings/`, `/budgets/`, `/giving/`, `/contributions/`, `/controls/`, `/ledger/`, `/remittance/`, `/payroll/`, `/assets/`, `/portal/` (as coded)
+- Institution prefixes include `/dashboard/`, `/members/`, `/organization/`, `/transactions/`, `/permissions/`, `/announcements/`, `/reports/`, `/meetings/`, `/budgets/`, `/giving/`, `/contributions/`, `/controls/`, `/approvals/`, `/ledger/`, `/remittance/`, `/payroll/`, `/assets/`, `/portal/` (as coded)
 
 ---
 

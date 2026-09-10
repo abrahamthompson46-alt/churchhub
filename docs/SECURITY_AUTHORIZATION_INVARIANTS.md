@@ -199,6 +199,9 @@ BOARD_MEMBER **may** view in-scope journals and recon worksheets; **must not** P
 | `view_enterprise_controls` | Y | Y | Y | Y | Y | Y | Y | **N** | Y | Y | N |
 | `view_enterprise_audit` | Y | Y | Y | Y | **N** | Y | Y | **N** | Y | Y | N |
 | `export_enterprise_audit` | Y | Y | Y | Y | **N** | Y | Y | **N** | Y | **N** | N |
+| `view_approval_cases` | Y | Y | Y | Y | Y | Y | Y | Y | Y | Y | N |
+| `manage_approval_policy` | Y | Y | Y | **N** | **N** | **N** | **N** | **N** | **N** | **N** | N |
+| `manage_approval_delegations` | Y | Y | Y | Y | **N** | **N** | Y | **N** | **N** | **N** | N |
 
 `manage_finances.implies` includes `view_reconciliation` but **not** `manage_reconciliation`. SECRETARY therefore sees recon lists and MUST be denied recon POST.
 

@@ -83,7 +83,8 @@ From `church_system/settings.py` `INSTALLED_APPS`:
 | `payroll` | Employees, payroll runs, statutory rules → posts journals |
 | `assets` | Fixed assets, depreciation, maintenance |
 | `audit` | Enterprise `AuditEvent` dual-write + `/controls/` summary/search (not a second GL) |
-| `approvals` | Maker-checker cases/steps/delegations wrapping `transactions` approve/reject/void |
+| `approvals` | HTTP pending-queue maker-checker (cases/steps/delegations wrapping journal approve/reject/void). Multi-step policy does not cover programmatic payroll/settlement/asset posters |
+| `intelligence` | Deterministic `RiskPolicy` / `RiskAlert` (no ML). HIGH pending alerts may attach an `ApprovalCase`; they never approve/reject or block receipt auto-approve |
 | `portal` | Member-linked self-service views |
 | `sitecontrol` | Platform SaaS: denominations, subscriptions, applications, owner marketing, settings |
 
@@ -116,6 +117,7 @@ Defined in `church_system/urls.py`:
 | `/assets/` | `assets` |
 | `/controls/` | `audit` (enterprise controls / audit events) |
 | `/approvals/` | `approvals` (cases, step policy, delegations) |
+| `/intelligence/` | `intelligence` (risk alerts / policy) |
 | `/portal/` | `portal` |
 | `/platform/` | `sitecontrol` (platform operators) |
 | `/` | Public landing (`church_system.views.public_home`); signed-in users are sent to dashboard, portal, or `/platform/` |

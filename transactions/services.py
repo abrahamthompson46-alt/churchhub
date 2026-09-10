@@ -3,6 +3,7 @@ Financial services — balanced double-entry posting and audit trail.
 """
 
 from datetime import date
+import logging
 
 from decimal import Decimal
 
@@ -40,14 +41,25 @@ class WorkingDayClosedError(ValueError):
     pass
 
 
+logger = logging.getLogger(__name__)
+
+
 def _log_audit(church, action, user, transaction=None, details=None):
-    return repo.create_audit_log(
+    result = repo.create_audit_log(
         church=church,
         action=action,
         user=user,
         transaction=transaction,
         details=details,
     )
+    if transaction is not None and action in {"CREATE", "APPROVE", "VOID"}:
+        try:
+            from intelligence.services import evaluate_transaction
+
+            evaluate_transaction(transaction)
+        except Exception:
+            logger.exception("Intelligence evaluation failed after %s", action)
+    return result
 
 
 def _quantize_currency(amount):

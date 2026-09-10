@@ -11,6 +11,7 @@ from permissions.checks import (
     can_export_enterprise_audit,
     can_view_enterprise_audit,
     can_view_enterprise_controls,
+    can_view_risk_alerts,
     permission_required,
 )
 from reports.exporters import export_table_csv
@@ -29,6 +30,7 @@ def controls_home(request):
             "summary": summary,
             "can_detail": can_detail,
             "can_export": can_export_enterprise_audit(request.user),
+            "can_risk": can_view_risk_alerts(request.user),
         },
     )
 

@@ -200,7 +200,9 @@ stateDiagram-v2
 
 Void creates opposite-line APPROVED reversal linked by `reversal_of`; marks original `is_voided`; may call `void_welfare_for_transaction`.
 
-**Module integration (Current):** Settlement, payroll post/pay, and asset capitalization create PENDING journals with `created_by` set to the module maker (batch creator, payroll preparer, asset submitter). Posting completes only when `approve_module_journal` finds a checker distinct from `created_by` (typically the officer posting after module-level SoD). Depreciation and disposal journals remain PENDING until approved in the transactions queue.
+**HTTP pending queue (Phase 2 Current):** `/transactions/pending/` approve/reject/void and `/approvals/` wrap the same journal services. Default `ApprovalPolicy.required_steps=1`. Multi-step policy, correction, and escalation live on `ApprovalCase` / `ApprovalStep`; they do not add `Transaction.APPROVAL_STATUS` values. Escalation never auto-approves. `TreasuryApprovalPolicy` receipt auto-approve is unchanged.
+
+**Module integration (Current):** Settlement, payroll post/pay, and asset capitalization create PENDING journals with `created_by` set to the module maker (batch creator, payroll preparer, asset submitter). Posting completes only when `approve_module_journal` finds a checker distinct from `created_by` (typically the officer posting after module-level SoD), or when those services call `approve_transaction()` directly. Those programmatic paths are **not** full multi-step `ApprovalPolicy` coverage. Depreciation and disposal journals remain PENDING until approved in the transactions queue.
 
 ---
 

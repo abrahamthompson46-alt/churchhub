@@ -218,8 +218,8 @@ flowchart TD
 
 | Domain | Entry points |
 |--------|--------------|
-| Transactions | Creator cannot approve own (except superadmin path); **receipt auto-approve** under church/user limit is a documented SoD exception with `auto_approved` audit detail |
-| Payroll | `approved_by` + `treasury_approved_by` before post |
+| Transactions | Creator cannot approve, reject, or void own (except superadmin path); **receipt auto-approve** under church/user limit is a documented SoD exception with `auto_approved` audit detail |
+| Payroll | `approved_by` + `treasury_approved_by` before post; reverse requires a checker other than the journal poster (except superadmin) |
 | Assets | Submit → approve/reject + SoD helpers |
 | Meeting minutes | Submit → approve/reject |
 | Announcements | Approve/reject (pending excludes creator) |

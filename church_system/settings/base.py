@@ -145,6 +145,7 @@ INSTALLED_APPS = [
     "portal.apps.PortalConfig",
     "audit.apps.AuditConfig",
     "approvals.apps.ApprovalsConfig",
+    "intelligence.apps.IntelligenceConfig",
     "sitecontrol.apps.SitecontrolConfig",
 ]
 

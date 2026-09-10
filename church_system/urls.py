@@ -76,6 +76,7 @@ urlpatterns = [
     path("assets/", include(("assets.urls", "assets"), namespace="assets")),
     path("controls/", include(("audit.urls", "audit"), namespace="audit")),
     path("approvals/", include(("approvals.urls", "approvals"), namespace="approvals")),
+    path("intelligence/", include(("intelligence.urls", "intelligence"), namespace="intelligence")),
     path("portal/", include(("portal.urls", "portal"), namespace="portal")),
     path("platform/", include(("sitecontrol.urls", "sitecontrol"), namespace="sitecontrol")),
     # Always auth-gate private media (DEBUG and production). Public branding is

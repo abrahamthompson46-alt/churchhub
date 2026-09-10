@@ -45,6 +45,7 @@ INSTITUTION_PREFIXES = (
     "/contributions/",
     "/controls/",
     "/approvals/",
+    "/intelligence/",
     "/ledger/",
     "/remittance/",
     "/payroll/",

@@ -911,21 +911,56 @@ PERMISSION_REGISTRY = {
     "view_approval_cases": {
         "name": "View Approval Cases",
         "category": "Controls",
-        "description": "See maker-checker cases in managed churches. Does not grant posting.",
+        "description": (
+            "See HTTP pending-queue maker-checker cases in managed churches. "
+            "Does not grant posting, receipt management, or journal approval."
+        ),
         "default_roles": _ROLE_ALL_STAFF | {"BOARD_MEMBER"},
         "implies": ["view_pending_approvals"],
     },
     "manage_approval_policy": {
         "name": "Manage Journal Approval Policy",
         "category": "Controls",
-        "description": "Set required checker steps. Does not change receipt auto-approve.",
+        "description": (
+            "Set required HTTP checker steps (default one). Does not change "
+            "TreasuryApprovalPolicy, receipt auto-approve, posting, or journal approval."
+        ),
         "default_roles": _ROLE_POLICY,
     },
     "manage_approval_delegations": {
         "name": "Manage Approval Delegations",
         "category": "Controls",
-        "description": "Grant time-bounded journal approval delegation within church scope.",
+        "description": (
+            "Grant time-bounded journal approval delegation within church scope. "
+            "Does not imply approve_transactions, posting, or receipt management."
+        ),
         "default_roles": _ROLE_JOURNAL_APPROVE,
+    },
+    "view_risk_alerts": {
+        "name": "View Risk Alerts",
+        "category": "Controls",
+        "description": (
+            "See deterministic financial risk alerts in managed churches. "
+            "Does not grant posting, receipt management, or journal approval."
+        ),
+        "default_roles": _ROLE_ENTERPRISE_AUDIT,
+    },
+    "review_risk_alerts": {
+        "name": "Review Risk Alerts",
+        "category": "Controls",
+        "description": (
+            "Confirm or dismiss risk alerts. Does not approve, reject, or post journals."
+        ),
+        "default_roles": _ROLE_JOURNAL_APPROVE | {"TREASURY"},
+    },
+    "manage_risk_policy": {
+        "name": "Manage Risk Policy",
+        "category": "Controls",
+        "description": (
+            "Edit detection thresholds. Does not change TreasuryApprovalPolicy or "
+            "block receipt auto-approve."
+        ),
+        "default_roles": _ROLE_POLICY,
     },
 }
 

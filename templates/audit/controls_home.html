@@ -20,6 +20,7 @@
     {% if can_detail %}
     <p class="mb-3">
         <a href="{% url 'audit:event_list' %}" class="btn btn-primary btn-sm">Open audit events</a>
+        {% if can_risk %}<a href="{% url 'intelligence:alert_list' %}" class="btn btn-outline-primary btn-sm">Risk alerts</a>{% endif %}
     </p>
     {% else %}
     <p class="text-muted">Your role can see these counts only. Detailed audit events and financial-risk drill-down are limited to District Treasurer and other deep-finance read roles.</p>

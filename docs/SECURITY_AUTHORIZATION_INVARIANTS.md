@@ -202,6 +202,9 @@ BOARD_MEMBER **may** view in-scope journals and recon worksheets; **must not** P
 | `view_approval_cases` | Y | Y | Y | Y | Y | Y | Y | Y | Y | Y | N |
 | `manage_approval_policy` | Y | Y | Y | **N** | **N** | **N** | **N** | **N** | **N** | **N** | N |
 | `manage_approval_delegations` | Y | Y | Y | Y | **N** | **N** | Y | **N** | **N** | **N** | N |
+| `view_risk_alerts` | Y | Y | Y | Y | **N** | Y | Y | **N** | Y | Y | N |
+| `review_risk_alerts` | Y | Y | Y | Y | **N** | **N** | Y | **N** | Y | **N** | N |
+| `manage_risk_policy` | Y | Y | Y | Y | **N** | **N** | **N** | **N** | **N** | **N** | N |
 
 `manage_finances.implies` includes `view_reconciliation` but **not** `manage_reconciliation`. SECRETARY therefore sees recon lists and MUST be denied recon POST.
 
@@ -392,11 +395,17 @@ No in-place edit of APPROVED/locked lines. Correction = void/reversal. Unbalance
 
 ### INV-SOD-01 — Journals
 
-`approve_transaction`: `created_by_id == user.id` MUST raise unless `is_superadmin` (documented break-glass). Enforced in `transactions/services.py`. MUST remain server-side in the service, not only the view.
+`approve_transaction`, `reject_transaction`, and `void_transaction`: `created_by_id == user.id` MUST raise unless `is_superadmin` (documented break-glass). Enforced in `transactions/services.py`. MUST remain server-side in the service, not only the view.
 
 Receipt auto-approve (`receipt_should_auto_approve`) is the **only** documented SoD exception: capped income receipts, audited with `auto_approved` / `sod_exception`. MUST NOT apply to expenses, transfers, remittance, ledger, assets, payroll, or welfare disbursement.
 
 `approve_module_journal` MUST NOT approve when no distinct checker exists; callers MUST NOT treat the register as posted while the journal is PENDING.
+
+Phase 2 multi-step `ApprovalPolicy` MUST be documented as HTTP pending-queue coverage only. Programmatic `approve_transaction()` callers (payroll, settlements, assets) MUST NOT be described as having full multi-step policy coverage.
+
+Phase 2 permission codes (`view_approval_cases`, `manage_approval_policy`, `manage_approval_delegations`) MUST remain additive: they MUST NOT imply `manage_receipts`, posting, or `approve_transactions`.
+
+Phase 3 `view_risk_alerts` / `review_risk_alerts` / `manage_risk_policy` MUST remain additive and MUST NOT imply posting, `manage_receipts`, or `approve_transactions`. `block_auto_approve_on_high` MUST default False and MUST NOT be read by `receipt_should_auto_approve`. HIGH alerts MUST NOT auto-approve or auto-reject journals.
 
 ### INV-SOD-02 — Welfare
 
@@ -408,7 +417,9 @@ Existing helpers (`exclude_self_submitted`, `assert_segregation_of_duties` on as
 
 ### INV-SOD-04 — Void
 
-Void is a privileged reversal, not a second approval of the original. The voiding user MAY be the original creator if they hold `void_transactions` (leadership). Contract does not require creator ≠ voider unless product later tightens it. Concurrent double-void MUST be impossible (`select_for_update` / unique `reversal_of`).
+Void is a privileged reversal, not a second approval of the original. **Current (Phase 2):** the journal maker MUST NOT void their own journal unless `is_superadmin`. Concurrent double-void MUST be impossible (`select_for_update` / unique `reversal_of`).
+
+Payroll reverse uses `void_transaction` on the posted PAYROLL/payment journals. The poster MUST NOT reverse their own run unless `is_superadmin`; a second authorized checker is required. This is intentional SoD, not a regression.
 
 ---
 

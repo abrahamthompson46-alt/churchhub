@@ -221,11 +221,18 @@ Tenant: **global** catalog (not church-scoped). Authorization scope is applied a
 
 | Model | PK | Key relations / constraints | Tenant |
 |-------|-----|-----------------------------|--------|
-| `ApprovalPolicy` | UUID | OneToOne church; `required_steps` default 1 | church |
+| `ApprovalPolicy` | UUID | OneToOne church; `required_steps` default 1 (HTTP pending queue only; does not replace `TreasuryApprovalPolicy`) | church |
 | `ApprovalCase` | UUID | OneToOne transaction; FK church, denomination; unique step numbers on `ApprovalStep` | church |
 | `ApprovalStep` | UUID | FK case; unique `(case, step_number)` | via case |
 | `ApprovalDelegation` | UUID | FKs grantor, grantee, church | church |
 | `ApprovalEscalation` | UUID | FK case | via case |
+
+### 4.6d `intelligence` (2 models)
+
+| Model | PK | Key relations / constraints | Tenant |
+|-------|-----|-----------------------------|--------|
+| `RiskPolicy` | UUID | OneToOne church; `block_auto_approve_on_high` default False | church |
+| `RiskAlert` | UUID | FK church, optional transaction/case; unique `(church, rule_code, fingerprint)` | church |
 
 ---
 

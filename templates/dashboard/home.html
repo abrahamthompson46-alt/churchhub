@@ -231,10 +231,10 @@
             </div>
         </div>
         <div class="cc-member-chart__controls px-3 pt-2">
-            <div class="cc-seg" role="tablist" aria-label="Giving series">
-                <button type="button" class="cc-seg__btn{% if finance_chart_series == 'tithe' %} is-active{% endif %}" role="tab" data-finance-chart="tithe" aria-selected="{% if finance_chart_series == 'tithe' %}true{% else %}false{% endif %}">Tithe</button>
-                <button type="button" class="cc-seg__btn{% if finance_chart_series == 'combined' %} is-active{% endif %}" role="tab" data-finance-chart="combined" aria-selected="{% if finance_chart_series == 'combined' %}true{% else %}false{% endif %}">Combined</button>
-                <button type="button" class="cc-seg__btn{% if finance_chart_series == 'income' %} is-active{% endif %}" role="tab" data-finance-chart="income" aria-selected="{% if finance_chart_series == 'income' %}true{% else %}false{% endif %}">Income</button>
+            <div class="cc-finance-seg" role="tablist" aria-label="Giving series">
+                <button type="button" class="cc-finance-seg__btn cc-finance-seg__btn--tithe{% if finance_chart_series == 'tithe' %} is-active{% endif %}" role="tab" data-finance-chart="tithe" aria-selected="{% if finance_chart_series == 'tithe' %}true{% else %}false{% endif %}">Tithe</button>
+                <button type="button" class="cc-finance-seg__btn cc-finance-seg__btn--combined{% if finance_chart_series == 'combined' %} is-active{% endif %}" role="tab" data-finance-chart="combined" aria-selected="{% if finance_chart_series == 'combined' %}true{% else %}false{% endif %}">Combined</button>
+                <button type="button" class="cc-finance-seg__btn cc-finance-seg__btn--income{% if finance_chart_series == 'income' %} is-active{% endif %}" role="tab" data-finance-chart="income" aria-selected="{% if finance_chart_series == 'income' %}true{% else %}false{% endif %}">Income</button>
             </div>
         </div>
         <div class="cc-panel__body cc-panel__body--chart">

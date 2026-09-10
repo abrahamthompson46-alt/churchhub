@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Audit event — {{ institution_display_name|default:"ChurchHub" }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Controls" page_title=event.action page_description=event.object_label %}
+
+    <p><a href="{% url 'audit:event_list' %}" class="dash-section__link">← All events</a></p>
+    <div class="data-card p-3">
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Occurred</dt><dd class="col-sm-9">{{ event.occurred_at }}</dd>
+            <dt class="col-sm-3">Business date</dt><dd class="col-sm-9">{{ event.business_date|default:"—" }}</dd>
+            <dt class="col-sm-3">Domain</dt><dd class="col-sm-9">{{ event.domain }}</dd>
+            <dt class="col-sm-3">Outcome</dt><dd class="col-sm-9">{{ event.outcome }}</dd>
+            <dt class="col-sm-3">Church</dt><dd class="col-sm-9">{{ event.church.name|default:"—" }}</dd>
+            <dt class="col-sm-3">Actor</dt><dd class="col-sm-9">{{ event.actor|default:"System" }} ({{ event.actor_role|default:"—" }})</dd>
+            <dt class="col-sm-3">Object</dt><dd class="col-sm-9">{{ event.object_type }} {{ event.object_id }}</dd>
+            <dt class="col-sm-3">Request</dt><dd class="col-sm-9">{{ event.ip_address|default:"—" }} {% if event.request_id %}<code>{{ event.request_id }}</code>{% endif %}</dd>
+            <dt class="col-sm-3">Integrity</dt><dd class="col-sm-9"><code class="small">{{ event.event_hash }}</code></dd>
+            <dt class="col-sm-3">After</dt><dd class="col-sm-9"><pre class="small mb-0">{{ event.after }}</pre></dd>
+        </dl>
+    </div>
+</div>
+{% endblock %}

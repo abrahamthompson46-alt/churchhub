@@ -198,6 +198,18 @@ Constraint: debit account ≠ credit account. Unique `(church, code)`.
 
 ---
 
+## 9b. App: `audit`
+
+**File:** `audit/models.py`
+
+| Model | Key fields / relationships |
+|-------|----------------------------|
+| `AuditEvent` | UUID PK; `occurred_at`; optional `business_date`; `domain` / `action` / `outcome`; optional FKs `actor`, `church`, `denomination` (SET_NULL); object type/id/label; JSON `before`/`after`; request meta; `source`/`source_id` dual-write pointer; `prev_hash`/`event_hash` per-church chain. Immutable `save`/`delete`. |
+
+**Writer:** `audit.services.emit_event`. Finance dual-write from `transactions.repositories.create_audit_log` → `emit_from_financial_audit` (failures are logged; `FinancialAuditLog` still persists). Not a second general ledger.
+
+---
+
 ## 10. Apps with no (or empty) models
 
 | App | Schema reality |

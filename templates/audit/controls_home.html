@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Enterprise controls — {{ institution_display_name|default:"ChurchHub" }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Controls" page_title="Enterprise controls" page_description="Audit activity in churches you may manage. Finance posting and approvals are unchanged." %}
+
+    <section class="cc-kpi-grid mb-3" aria-label="Audit summary">
+        <div class="cc-kpi-card">
+            <span class="cc-kpi-card__label">Events ({{ summary.days }} days)</span>
+            <span class="cc-kpi-card__value">{{ summary.total }}</span>
+        </div>
+        <div class="cc-kpi-card">
+            <span class="cc-kpi-card__label">Churches in scope</span>
+            <span class="cc-kpi-card__value">{{ summary.church_count }}</span>
+        </div>
+    </section>
+
+    {% if can_detail %}
+    <p class="mb-3">
+        <a href="{% url 'audit:event_list' %}" class="btn btn-primary btn-sm">Open audit events</a>
+    </p>
+    {% else %}
+    <p class="text-muted">Your role can see these counts only. Detailed audit events and financial-risk drill-down are limited to District Treasurer and other deep-finance read roles.</p>
+    {% endif %}
+
+    {% if summary.by_action %}
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr><th>Action</th><th class="text-end">Count</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in summary.by_action %}
+                    <tr>
+                        <td>{{ row.action }}</td>
+                        <td class="text-end">{{ row.total }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

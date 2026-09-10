@@ -209,6 +209,14 @@ Tenant: **global** catalog (not church-scoped). Authorization scope is applied a
 
 ---
 
+### 4.6b `audit` (1 model)
+
+| Model | PK | Key relations / constraints | Tenant |
+|-------|-----|-----------------------------|--------|
+| `AuditEvent` | UUID | Optional FKs actor, church, denomination (SET_NULL); indexes church+occurred_at, domain+action+occurred_at, object_type+object_id; hash chain `prev_hash`/`event_hash`; immutable in `save`/`delete` | church + denomination wall |
+
+---
+
 ### 4.7 `ledger` (1 model)
 
 | Model | PK | Relations / constraints |

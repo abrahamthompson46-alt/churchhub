@@ -143,6 +143,7 @@ INSTALLED_APPS = [
     "payroll.apps.PayrollConfig",
     "assets.apps.AssetsConfig",
     "portal.apps.PortalConfig",
+    "audit.apps.AuditConfig",
     "sitecontrol.apps.SitecontrolConfig",
 ]
 
@@ -165,6 +166,8 @@ MIDDLEWARE = [
 
     "accounts.middleware.MfaEnforcementMiddleware",
     "permissions.middleware.RoleEnforcementMiddleware",
+
+    "audit.middleware.AuditRequestMiddleware",
 
     "sitecontrol.denomination_middleware.DenominationContextMiddleware",
     "sitecontrol.middleware.UserScopeMiddleware",

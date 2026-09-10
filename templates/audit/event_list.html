@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Enterprise audit events — {{ institution_display_name|default:"ChurchHub" }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Controls" page_title="Audit events" page_description="Immutable enterprise events dual-written from financial audit. Scoped to churches you may manage." %}
+
+    <form method="get" class="filter-bar d-flex flex-wrap gap-2 align-items-end mb-3">
+        <label class="small">Domain
+            <input type="text" name="domain" value="{{ filter_domain }}" class="form-control form-control-sm" placeholder="finance">
+        </label>
+        <label class="small">Action
+            <input type="text" name="action" value="{{ filter_action }}" class="form-control form-control-sm" placeholder="journal.approve">
+        </label>
+        <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+        {% if can_export %}
+        <button type="submit" name="export" value="csv" class="btn btn-sm btn-outline-secondary">Export CSV</button>
+        {% endif %}
+        <a href="{% url 'audit:controls_home' %}" class="btn btn-sm btn-outline-secondary">Summary</a>
+    </form>
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>When</th>
+                        <th>Action</th>
+                        <th>Church</th>
+                        <th>Actor</th>
+                        <th>Object</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in events %}
+                    <tr>
+                        <td class="text-muted small">{{ event.occurred_at|date:"Y-m-d H:i" }}</td>
+                        <td><a href="{% url 'audit:event_detail' event.pk %}">{{ event.action }}</a></td>
+                        <td>{{ event.church.name|default:"—" }}</td>
+                        <td>{{ event.actor|default:"System" }}</td>
+                        <td class="small"><code>{{ event.object_label|default:event.object_id }}</code></td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">{% include "includes/empty_state.html" with icon="bi-shield" message="No enterprise audit events in your scope." %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page_obj.has_other_pages %}
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <span class="text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

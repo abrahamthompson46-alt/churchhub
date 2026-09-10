@@ -187,6 +187,9 @@ def can_manage_institution_branding(user):
 def can_view_dashboard(user): return _p(user, "view_dashboard")
 def can_view_dashboard_finance(user): return _p(user, "view_dashboard_finance")
 def can_view_dashboard_admin(user): return _p(user, "view_dashboard_admin")
+def can_view_enterprise_controls(user): return _p(user, "view_enterprise_controls")
+def can_view_enterprise_audit(user): return _p(user, "view_enterprise_audit")
+def can_export_enterprise_audit(user): return _p(user, "export_enterprise_audit")
 
 
 def role_required(*roles):

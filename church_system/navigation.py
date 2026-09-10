@@ -60,6 +60,8 @@ from permissions.checks import (
     can_view_contribution_reports,
     can_view_church_history,
     can_view_dashboard_finance,
+    can_view_enterprise_audit,
+    can_view_enterprise_controls,
     can_view_finance_reports,
     can_view_giving,
     can_view_ledger,
@@ -419,6 +421,8 @@ def get_main_navigation(user, active_church=None):
     home_items = [_item("Overview", "dashboard:home", "bi-speedometer2")]
     if can_run_cutoff(user) or can_view_dashboard_finance(user):
         home_items.append(_item("Monthly Cut-off", "dashboard:cutoff", "bi-calendar-check"))
+    if can_view_enterprise_controls(user):
+        home_items.append(_item("Enterprise controls", "audit:controls_home", "bi-shield-check"))
     if can_manage_working_day(user):
         home_items.append(_item("Working day", "transactions:period_list", "bi-calendar2-week"))
     if len(home_items) == 1:
@@ -901,6 +905,8 @@ def _tab_allowed(user, url_name, active_church=None):
         "transactions:financial_dashboard": lambda: can_view_finance_reports(user),
         "giving:index": lambda: can_view_giving(user) or can_manage_giving(user),
         "transactions:audit_log": lambda: can_view_audit_log(user),
+        "audit:controls_home": lambda: can_view_enterprise_controls(user),
+        "audit:event_list": lambda: can_view_enterprise_audit(user),
         "organization:hierarchy": lambda: can_view_all_churches(user),
         "organization:directory": lambda: can_view_all_churches(user),
         "organization:church_onboard": lambda: (

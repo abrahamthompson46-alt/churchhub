@@ -19,6 +19,8 @@ _ROLE_READ = _ROLE_ALL_STAFF | {"BOARD_MEMBER"}
 _ROLE_DEEP_FINANCE_READ = (_ROLE_ALL_STAFF | {"BOARD_MEMBER"}) - {"DISTRICT_PASTOR"}
 _ROLE_FINANCE_POST = _ROLE_ALL_STAFF - {"DISTRICT_PASTOR", "DISTRICT_TREASURY"}
 _ROLE_JOURNAL_APPROVE = _ROLE_LEADERSHIP - {"DISTRICT_PASTOR"}
+_ROLE_ENTERPRISE_AUDIT = _ROLE_DEEP_FINANCE_READ - {"SECRETARY"}
+_ROLE_ENTERPRISE_CONTROLS = _ROLE_ENTERPRISE_AUDIT | {"DISTRICT_PASTOR"}
 
 
 PERMISSION_REGISTRY = {
@@ -884,6 +886,27 @@ PERMISSION_REGISTRY = {
         "category": "Dashboard",
         "description": "See leadership/admin command-center widgets.",
         "default_roles": _ROLE_LEADERSHIP,
+    },
+
+    # ── Enterprise controls (Phase 1 audit; later risk/approvals) ─
+    "view_enterprise_controls": {
+        "name": "View Enterprise Controls Summary",
+        "category": "Controls",
+        "description": "See high-level enterprise control counts. Does not grant posting or journal approval.",
+        "default_roles": _ROLE_ENTERPRISE_CONTROLS,
+    },
+    "view_enterprise_audit": {
+        "name": "View Enterprise Audit Events",
+        "category": "Controls",
+        "description": "Search and open detailed enterprise audit events in managed churches.",
+        "default_roles": _ROLE_ENTERPRISE_AUDIT,
+    },
+    "export_enterprise_audit": {
+        "name": "Export Enterprise Audit Events",
+        "category": "Controls",
+        "description": "Download scoped enterprise audit events as CSV.",
+        "default_roles": _ROLE_JOURNAL_APPROVE | {"TREASURY", "DISTRICT_TREASURY"},
+        "implies": ["view_enterprise_audit"],
     },
 }
 

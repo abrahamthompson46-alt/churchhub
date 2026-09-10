@@ -82,6 +82,7 @@ From `church_system/settings.py` `INSTALLED_APPS`:
 | `remittance` | Remittance policies, settlement batches, welfare |
 | `payroll` | Employees, payroll runs, statutory rules → posts journals |
 | `assets` | Fixed assets, depreciation, maintenance |
+| `audit` | Enterprise `AuditEvent` dual-write + `/controls/` summary/search (not a second GL) |
 | `portal` | Member-linked self-service views |
 | `sitecontrol` | Platform SaaS: denominations, subscriptions, applications, owner marketing, settings |
 
@@ -112,6 +113,7 @@ Defined in `church_system/urls.py`:
 | `/remittance/` | `remittance` |
 | `/payroll/` | `payroll` |
 | `/assets/` | `assets` |
+| `/controls/` | `audit` (enterprise controls / audit events) |
 | `/portal/` | `portal` |
 | `/platform/` | `sitecontrol` (platform operators) |
 | `/` | Public landing (`church_system.views.public_home`); signed-in users are sent to dashboard, portal, or `/platform/` |

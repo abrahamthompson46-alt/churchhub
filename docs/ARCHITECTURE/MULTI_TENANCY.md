@@ -150,7 +150,7 @@ flowchart TD
   PU -->|no| OK
 ```
 
-Institution prefixes include `/dashboard/`, `/members/`, `/organization/`, `/transactions/`, `/permissions/`, `/announcements/`, `/reports/`, `/meetings/`, `/budgets/`, `/giving/`, `/ledger/`, `/remittance/`, `/payroll/`, `/assets/`.
+Institution prefixes include `/dashboard/`, `/members/`, `/organization/`, `/transactions/`, `/permissions/`, `/announcements/`, `/reports/`, `/meetings/`, `/budgets/`, `/giving/`, `/contributions/`, `/controls/`, `/ledger/`, `/remittance/`, `/payroll/`, `/assets/`, `/portal/`.
 
 Platform IP allowlisting uses `SiteSettings` via `ip_allowed_for_platform`.
 

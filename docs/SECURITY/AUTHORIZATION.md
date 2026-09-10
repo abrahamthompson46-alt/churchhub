@@ -106,6 +106,18 @@ Categories include Members, Meetings, Transactions/Finance, Ledger, Remittance, 
 
 Also: `HIERARCHY`, `TREE_ADMIN_ROLES`, `ASSIGNABLE_BY_ROLE`, `requires_church` helpers.
 
+### 4.1 Enterprise controls (Phase 1 — Current)
+
+Additive codes in `PERMISSION_REGISTRY` (no posting/approve from these grants):
+
+| Codename | Default roles (summary) | UI |
+|----------|-------------------------|----|
+| `view_enterprise_controls` | Deep-finance readers **plus** `DISTRICT_PASTOR` | `/controls/` counts/tiles only |
+| `view_enterprise_audit` | Deep-finance readers **minus** `SECRETARY` and **minus** `DISTRICT_PASTOR` (includes `DISTRICT_TREASURY`, `TREASURY`, leadership except District Admin, `BOARD_MEMBER`) | `/controls/events/` list/detail |
+| `export_enterprise_audit` | Journal-approve set plus `TREASURY` and `DISTRICT_TREASURY`; implies `view_enterprise_audit` | CSV export of scoped events |
+
+District Administrator (`DISTRICT_PASTOR`) is summary-only. District Treasurer may open detailed events **within** `get_manageable_churches` (district + denomination wall). Existing `FinancialAuditLog` / `transactions:audit_log` is unchanged.
+
 ### Planned (AGENTS.md)
 
 Product labels such as Church Clerk / District Pastor map to these codes. Do **not** invent new role codes without migration + registry + matrix updates.
@@ -227,7 +239,7 @@ sequenceDiagram
 - `/platform/` → `can_manage_platform` + optional IP allowlist  
 - `/admin/` → `can_access_django_admin`  
 - Platform users redirected away from institution prefixes  
-- Institution prefixes include `/dashboard/`, `/members/`, `/organization/`, `/transactions/`, `/permissions/`, `/announcements/`, `/reports/`, `/meetings/`, `/budgets/`, `/giving/`, `/ledger/`, `/remittance/`, `/payroll/`, `/assets/`, `/portal/` (as coded)
+- Institution prefixes include `/dashboard/`, `/members/`, `/organization/`, `/transactions/`, `/permissions/`, `/announcements/`, `/reports/`, `/meetings/`, `/budgets/`, `/giving/`, `/contributions/`, `/controls/`, `/ledger/`, `/remittance/`, `/payroll/`, `/assets/`, `/portal/` (as coded)
 
 ---
 

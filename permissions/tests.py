@@ -241,6 +241,9 @@ class MatrixTests(ChurchHubTestMixin, TestCase):
         self.assertIn("view_ledger", PERMISSION_REGISTRY)
         self.assertIn("manage_receipts", PERMISSION_REGISTRY)
         self.assertIn("dispose_assets", PERMISSION_REGISTRY)
+        self.assertIn("view_enterprise_controls", PERMISSION_REGISTRY)
+        self.assertIn("view_enterprise_audit", PERMISSION_REGISTRY)
+        self.assertIn("export_enterprise_audit", PERMISSION_REGISTRY)
         # Legacy broad gates still imply new granular codes
         implied = PERMISSION_REGISTRY["manage_finances"].get("implies", [])
         self.assertIn("view_ledger", implied)

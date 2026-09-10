@@ -3063,6 +3063,20 @@ form.data-card.permission-matrix-card {
     color: var(--ch-table-head-text);
     box-shadow: 0 1px 0 rgba(15, 23, 42, 0.12);
 }
+.permission-matrix .matrix-section-head th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--ch-table-head-bg);
+    color: var(--ch-table-head-text);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    white-space: nowrap;
+    vertical-align: bottom;
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.12);
+}
 .permission-matrix .matrix-sticky {
     position: sticky;
     left: 0;
@@ -3070,11 +3084,13 @@ form.data-card.permission-matrix-card {
     z-index: 2;
     min-width: 220px;
 }
-.permission-matrix thead th.matrix-sticky {
-    z-index: 4;
+.permission-matrix thead th.matrix-sticky,
+.permission-matrix .matrix-section-head th.matrix-sticky {
+    z-index: 6;
     left: 0;
     top: 0;
     background: var(--ch-table-head-bg);
+    color: var(--ch-table-head-text);
 }
 .permission-matrix .matrix-role-col { min-width: 90px; font-size: 0.75rem; }
 .permission-matrix .matrix-category-row td {
@@ -5655,6 +5671,16 @@ a.alert-banner:hover {
     position: relative;
 }
 .cc-member-chart__plot canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.cc-finance-chart__plot {
+    min-height: 16rem;
+    height: 16rem;
+    position: relative;
+}
+.cc-finance-chart__plot canvas {
     width: 100% !important;
     height: 100% !important;
 }

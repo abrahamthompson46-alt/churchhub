@@ -493,6 +493,7 @@ class PermissionViewTests(ChurchHubTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "permission-matrix-scroll")
         self.assertContains(response, "permission-matrix-card")
+        self.assertContains(response, "matrix-section-head")
         self.assertNotContains(response, "permission-matrix-sticky-head")
         self.assertContains(response, "<thead>")
 

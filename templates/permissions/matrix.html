@@ -34,8 +34,11 @@
                 </thead>
                 <tbody>
                     {% for section in matrix_rows %}
-                    <tr class="matrix-category-row">
-                        <td colspan="{{ roles|length|add:1 }}"><strong>{{ section.category }}</strong></td>
+                    <tr class="matrix-section-head">
+                        <th scope="col" class="matrix-sticky">{{ section.category }}</th>
+                        {% for role, label in roles %}
+                        <th scope="col" class="text-center matrix-role-col">{{ label }}</th>
+                        {% endfor %}
                     </tr>
                     {% for row in section.rows %}
                     <tr>

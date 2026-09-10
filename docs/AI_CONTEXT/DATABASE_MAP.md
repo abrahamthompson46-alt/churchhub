@@ -222,7 +222,20 @@ Constraint: debit account ≠ credit account. Unique `(church, code)`.
 | `ApprovalDelegation` | grantor/grantee/church; dates; optional `max_amount`; `permission_codename`; `is_revoked` |
 | `ApprovalEscalation` | FK case; requested_by; reason. Never auto-approves the journal |
 
-**Writer:** `approvals.services`. Final checker step calls existing `approve_transaction()`. Intermediate steps do not post. Request-correction leaves `Transaction.approval_status=PENDING`.
+**Writer:** `approvals.services` for the HTTP pending-journal queue. Final HTTP checker step calls existing `approve_transaction()`. Intermediate steps do not post. Request-correction leaves `Transaction.approval_status=PENDING`. Escalation never auto-approves. Default `required_steps=1`. Does not change `Transaction.APPROVAL_STATUS` values. Programmatic module posters (payroll, settlements, assets) are outside this multi-step coverage.
+
+---
+
+## 9d. App: `intelligence`
+
+**File:** `intelligence/models.py`
+
+| Model | Key fields / relationships |
+|-------|----------------------------|
+| `RiskPolicy` | OneToOne `church`; `block_auto_approve_on_high` default **False** (unused by receipt auto-approve); rule thresholds |
+| `RiskAlert` | UUID; church; optional transaction / approval_case; `rule_code`; severity LOW/MEDIUM/HIGH; status OPEN/CONFIRMED/DISMISSED; unique `(church, rule_code, fingerprint)`; `observed` + `threshold` JSON |
+
+**Writer:** `intelligence.services.evaluate_transaction`. Never posts, approves, or rejects journals. HIGH + PENDING may call `approvals.ensure_case`.
 
 ---
 

@@ -120,13 +120,29 @@ District Administrator (`DISTRICT_PASTOR`) is summary-only. District Treasurer m
 
 ### 4.2 Maker-checker (Phase 2 — Current)
 
-Additive `approvals` app wraps `approve_transaction` / `reject_transaction` / `void_transaction`. Default `ApprovalPolicy.required_steps=1` matches today’s one-checker queue. `TreasuryApprovalPolicy` receipt auto-approve is unchanged. Maker cannot approve, reject, or void their own journal except institutional `is_superadmin`. Intermediate steps do not post; the final step calls `approve_transaction`. Escalation never auto-approves. Request-correction leaves `Transaction.approval_status=PENDING`. Delegation requires the grantor’s `approve_transactions`, church scope, validity dates, and optional `max_amount`. District Admin cannot decide or manage policy; District Treasurer does not gain posting via this app.
+Additive `approvals` app wraps HTTP `approve_transaction` / `reject_transaction` / `void_transaction` on the **pending-journal queue** (`/transactions/pending/` and `/approvals/`). Default `ApprovalPolicy.required_steps=1` matches today’s one-checker queue. `TreasuryApprovalPolicy` receipt auto-approve is unchanged. Escalation never auto-approves. Request-correction leaves `Transaction.approval_status=PENDING`. `Transaction.APPROVAL_STATUS` values remain `PENDING`, `APPROVED`, `REJECTED`, `REVERSED` only.
 
-| Codename | Default roles (summary) |
-|----------|-------------------------|
-| `view_approval_cases` | Staff + board (same breadth as pending queue visibility) |
-| `manage_approval_policy` | `_ROLE_POLICY` (not District Admin / District Treasurer) |
-| `manage_approval_delegations` | Journal-approve set (not District Admin) |
+**Coverage (Current):** Multi-step `ApprovalPolicy` applies when a case is opened through that HTTP façade. Programmatic module-journal paths (payroll post/pay, remittance settlements, assets capitalization/depreciation, and other callers of `approve_transaction()` / `approve_module_journal()`) are **not** full multi-step policy coverage. Those paths still post through the existing journal services and module SoD.
+
+Maker cannot approve, reject, or void their own journal except institutional `is_superadmin`. Intermediate HTTP steps do not post; the final HTTP step calls `approve_transaction`. Delegation requires the grantor’s `approve_transactions`, church scope, validity dates, and optional `max_amount`. District Admin cannot decide or manage policy; District Treasurer does not gain posting via this app.
+
+Phase 2 codes are additive. They do **not** imply `manage_receipts`, `manage_expenses`, `manage_finances`, `approve_transactions`, or `void_transactions`. Delegation still requires a valid `approve_transactions` grant (or an in-scope, in-date, under-cap delegation) to decide a journal.
+
+| Codename | Default roles (summary) | Does not grant |
+|----------|-------------------------|----------------|
+| `view_approval_cases` | Staff + board (same breadth as pending queue visibility) | Posting, receipt management, or journal approve |
+| `manage_approval_policy` | `_ROLE_POLICY` (not District Admin / District Treasurer) | Posting, receipt management, or journal approve |
+| `manage_approval_delegations` | Journal-approve set (not District Admin) | Posting or receipt management; does not itself imply `approve_transactions` |
+
+### 4.3 Financial intelligence (Phase 3 — Current)
+
+Additive `intelligence` app. Deterministic rules only (no ML). Evaluation runs after journal CREATE/APPROVE/VOID via `transactions.services._log_audit` and never changes `TreasuryApprovalPolicy` or `receipt_should_auto_approve`. `RiskPolicy.block_auto_approve_on_high` defaults to **False** and is not used to block receipt auto-approve. HIGH alerts on PENDING journals may attach an `ApprovalCase`; they never approve, reject, or auto-escalate. Confirm/dismiss does not post. District Admin is not granted view/review/policy. District Treasurer may view scoped alerts only.
+
+| Codename | Default roles (summary) | Does not grant |
+|----------|-------------------------|----------------|
+| `view_risk_alerts` | `_ROLE_ENTERPRISE_AUDIT` (not District Admin / SECRETARY) | Posting, receipts, or journal approve |
+| `review_risk_alerts` | Journal-approve set plus `TREASURY` (not District Treasurer / District Admin) | Posting or journal approve |
+| `manage_risk_policy` | `_ROLE_POLICY` | Posting or receipt auto-approve changes |
 
 ### Planned (AGENTS.md)
 

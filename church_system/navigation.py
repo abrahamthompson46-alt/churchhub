@@ -65,6 +65,8 @@ from permissions.checks import (
     can_view_approval_cases,
     can_manage_approval_policy,
     can_manage_approval_delegations,
+    can_view_risk_alerts,
+    can_manage_risk_policy,
     can_view_finance_reports,
     can_view_giving,
     can_view_ledger,
@@ -428,6 +430,10 @@ def get_main_navigation(user, active_church=None):
         home_items.append(_item("Monthly Cut-off", "dashboard:cutoff", "bi-calendar-check"))
     if can_view_enterprise_controls(user):
         home_items.append(_item("Enterprise controls", "audit:controls_home", "bi-shield-check"))
+    if can_view_risk_alerts(user):
+        home_items.append(_item("Risk alerts", "intelligence:alert_list", "bi-exclamation-triangle"))
+    if can_manage_risk_policy(user):
+        home_items.append(_item("Risk policy", "intelligence:policy", "bi-sliders"))
     if can_manage_approval_policy(user):
         home_items.append(_item("Approval steps", "approvals:policy", "bi-list-ol"))
     if can_manage_approval_delegations(user):
@@ -916,6 +922,8 @@ def _tab_allowed(user, url_name, active_church=None):
         "transactions:audit_log": lambda: can_view_audit_log(user),
         "audit:controls_home": lambda: can_view_enterprise_controls(user),
         "audit:event_list": lambda: can_view_enterprise_audit(user),
+        "intelligence:alert_list": lambda: can_view_risk_alerts(user),
+        "intelligence:policy": lambda: can_manage_risk_policy(user),
         "approvals:case_list": lambda: can_view_approval_cases(user),
         "approvals:policy": lambda: can_manage_approval_policy(user),
         "approvals:delegations": lambda: can_manage_approval_delegations(user),

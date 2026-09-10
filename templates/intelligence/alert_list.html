@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Risk alerts — {{ institution_display_name|default:"ChurchHub" }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Controls" page_title="Risk alerts" page_description="Deterministic financial anomalies in churches you may manage. Alerts never approve or reject journals." %}
+    <p class="mb-3">
+        {% if can_manage_policy %}<a class="btn btn-sm btn-outline-primary" href="{% url 'intelligence:policy' %}">Risk policy</a>{% endif %}
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'audit:controls_home' %}">Enterprise controls</a>
+    </p>
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>When</th>
+                        <th>Rule</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                        <th>Church</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in alerts %}
+                    <tr>
+                        <td><a href="{% url 'intelligence:alert_detail' alert.pk %}">{{ alert.detected_at }}</a></td>
+                        <td>{{ alert.rule_code }}</td>
+                        <td>{{ alert.severity }}</td>
+                        <td>{{ alert.status }}</td>
+                        <td>{{ alert.church.name }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="text-muted">No risk alerts in churches you may manage.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

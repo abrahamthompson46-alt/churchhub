@@ -247,6 +247,26 @@ class MatrixTests(ChurchHubTestMixin, TestCase):
         self.assertIn("view_approval_cases", PERMISSION_REGISTRY)
         self.assertIn("manage_approval_policy", PERMISSION_REGISTRY)
         self.assertIn("manage_approval_delegations", PERMISSION_REGISTRY)
+        self.assertIn("view_risk_alerts", PERMISSION_REGISTRY)
+        self.assertIn("review_risk_alerts", PERMISSION_REGISTRY)
+        self.assertIn("manage_risk_policy", PERMISSION_REGISTRY)
+        forbidden = {
+            "approve_transactions",
+            "void_transactions",
+            "manage_receipts",
+            "manage_expenses",
+            "manage_finances",
+        }
+        for codename in (
+            "view_approval_cases",
+            "manage_approval_policy",
+            "manage_approval_delegations",
+            "view_risk_alerts",
+            "review_risk_alerts",
+            "manage_risk_policy",
+        ):
+            implied_codes = set(PERMISSION_REGISTRY[codename].get("implies", []))
+            self.assertTrue(forbidden.isdisjoint(implied_codes))
         # Legacy broad gates still imply new granular codes
         implied = PERMISSION_REGISTRY["manage_finances"].get("implies", [])
         self.assertIn("view_ledger", implied)
@@ -473,6 +493,7 @@ class PermissionViewTests(ChurchHubTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "permission-matrix-scroll")
         self.assertContains(response, "permission-matrix-card")
+        self.assertContains(response, "matrix-section-head")
         self.assertNotContains(response, "permission-matrix-sticky-head")
         self.assertContains(response, "<thead>")
 

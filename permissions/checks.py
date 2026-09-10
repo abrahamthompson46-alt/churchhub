@@ -193,6 +193,9 @@ def can_export_enterprise_audit(user): return _p(user, "export_enterprise_audit"
 def can_view_approval_cases(user): return _p(user, "view_approval_cases")
 def can_manage_approval_policy(user): return _p(user, "manage_approval_policy")
 def can_manage_approval_delegations(user): return _p(user, "manage_approval_delegations")
+def can_view_risk_alerts(user): return _p(user, "view_risk_alerts")
+def can_review_risk_alerts(user): return _p(user, "review_risk_alerts")
+def can_manage_risk_policy(user): return _p(user, "manage_risk_policy")
 
 
 def role_required(*roles):

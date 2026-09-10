@@ -928,6 +928,8 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertTrue(response.context.get("show_finance_chart"))
         self.assertEqual(response.context.get("finance_chart_series"), "tithe")
         self.assertContains(response, 'data-finance-chart="combined"')
+        self.assertContains(response, "finance-chart-data")
+        self.assertContains(response, "cc-finance-chart__plot")
         combined = client.get(reverse("dashboard:home") + "?finance_chart=combined")
         self.assertEqual(combined.context.get("finance_chart_series"), "combined")
 

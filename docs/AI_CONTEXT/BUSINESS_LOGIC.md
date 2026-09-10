@@ -186,13 +186,21 @@ Fields include year, org FKs by level, `account`, `amount`, `notes`.
 
 ### 4.9 Maker-checker
 
-Financial approval is maker-checker oriented: HTTP approve/reject/void go through `approvals.services`, which wrap `approve_transaction` / `reject_transaction` / `void_transaction`. Creators cannot approve, reject, or void their own journal unless `is_superadmin`. Default church `ApprovalPolicy` is one checker. Receipt auto-approve via `TreasuryApprovalPolicy` is unchanged. Multi-step policies record intermediate `ApprovalStep` rows without posting; the last step calls `approve_transaction`. Request-correction and escalation leave `PENDING`.
+Financial approval is maker-checker oriented: HTTP approve/reject/void on the pending-journal queue go through `approvals.services`, which wrap `approve_transaction` / `reject_transaction` / `void_transaction`. Creators cannot approve, reject, or void their own journal unless `is_superadmin`. Default church `ApprovalPolicy` is one checker and does not replace `TreasuryApprovalPolicy`. Receipt auto-approve is unchanged. Escalation never auto-approves. `Transaction.APPROVAL_STATUS` is unchanged (`PENDING` / `APPROVED` / `REJECTED` / `REVERSED`).
 
-### 4.10 Ledger app
+Multi-step `ApprovalPolicy` coverage is **HTTP pending-queue only**. Payroll, settlements, assets, and other programmatic callers of `approve_transaction()` do not run the multi-step case/step machine. Intermediate HTTP steps record `ApprovalStep` rows without posting; the last HTTP step calls `approve_transaction`. Request-correction leaves the journal `PENDING`.
+
+Payroll reverse (`reverse_payroll_run`) voids the posted PAYROLL (and payment) journals through `void_transaction`. The user who posted that journal cannot reverse it unless `is_superadmin`. A second authorized checker is required. That is intentional SoD, not a regression.
+
+### 4.10 Financial intelligence (Phase 3)
+
+`intelligence` runs deterministic rules after journal CREATE/APPROVE/VOID. Alerts are church-scoped, explainable (`observed` + `threshold`), and idempotent. `RiskPolicy.block_auto_approve_on_high` defaults to False and is **not** consulted by `receipt_should_auto_approve`. HIGH alerts on PENDING journals may attach an `ApprovalCase`; they never approve or reject. District Admin does not view alerts or manage risk policy. District Treasurer may view scoped alerts only.
+
+### 4.11 Ledger app
 
 `ledger.LedgerCategory` is a **posting template** (church, DR/CR accounts, remittance flags). The general ledger is still `Transaction` / `TransactionLine`. Do not treat `ledger` as a second books-of-record store.
 
-### 4.11 Giving app
+### 4.12 Giving app
 
 No giving tables. Statements are derived from approved transaction lines via `giving/services.py`.
 

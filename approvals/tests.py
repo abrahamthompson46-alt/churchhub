@@ -27,6 +27,7 @@ from audit.models import AuditEvent
 from organization.models import Church, Conference, District, Zone
 from permissions.checks import (
     can_approve_transactions,
+    can_manage_approval_delegations,
     can_manage_approval_policy,
     can_manage_receipts,
     can_view_approval_cases,
@@ -140,6 +141,19 @@ class MakerCheckerPhase2Tests(TestCase):
         session["current_church_id"] = str(self.church.pk)
         session.save()
         return client
+
+    def test_phase2_defaults_preserve_existing_journal_contract(self):
+        policy = get_or_create_policy(self.church)
+        self.assertEqual(policy.required_steps, 1)
+        self.assertEqual(
+            [choice[0] for choice in Transaction.APPROVAL_STATUS],
+            ["PENDING", "APPROVED", "REJECTED", "REVERSED"],
+        )
+        get_or_create_treasury_approval_policy(self.church)
+        txn = self._pending()
+        case = ensure_case(txn)
+        self.assertEqual(case.required_steps, 1)
+        self.assertEqual(txn.approval_status, "PENDING")
 
     def test_default_one_step_posts_via_existing_approve(self):
         txn = self._pending()
@@ -286,9 +300,12 @@ class MakerCheckerPhase2Tests(TestCase):
         self.assertTrue(can_view_approval_cases(self.district_admin))
         self.assertFalse(can_approve_transactions(self.district_admin))
         self.assertFalse(can_manage_approval_policy(self.district_admin))
+        self.assertFalse(can_manage_approval_delegations(self.district_admin))
         self.assertFalse(actor_may_decide(self.district_admin, txn))
         self.assertFalse(can_manage_receipts(self.district_treasurer))
         self.assertFalse(can_approve_transactions(self.district_treasurer))
+        self.assertFalse(can_manage_approval_policy(self.district_treasurer))
+        self.assertFalse(can_manage_approval_delegations(self.district_treasurer))
         self.assertFalse(actor_may_decide(self.district_treasurer, txn))
         with self.assertRaises(PermissionDenied):
             save_required_steps(self.church, self.district_admin, 2)

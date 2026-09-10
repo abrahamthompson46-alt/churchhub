@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Risk policy — {{ institution_display_name|default:"ChurchHub" }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Controls" page_title="Risk policy" page_description="Thresholds for deterministic detection. Receipt auto-approve is unchanged." %}
+    <form method="post" class="data-card p-3">{% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn btn-primary" type="submit">Save</button>
+        <a class="btn btn-outline-secondary" href="{% url 'intelligence:alert_list' %}">Alerts</a>
+    </form>
+</div>
+{% endblock %}

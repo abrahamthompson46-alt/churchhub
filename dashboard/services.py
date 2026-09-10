@@ -1475,6 +1475,16 @@ def build_home_context(request):
         context["combined_data"] = chart["combined"]
         context["combined_cumulative_data"] = chart["combined_cumulative"]
         context["finance_chart_series"] = series
+        context["finance_chart_payload"] = {
+            "series": series,
+            "labels": json.loads(chart["labels"]),
+            "income": json.loads(chart["income"]),
+            "income_cumulative": json.loads(chart["income_cumulative"]),
+            "tithe": json.loads(chart["tithe"]),
+            "tithe_cumulative": json.loads(chart["tithe_cumulative"]),
+            "combined": json.loads(chart["combined"]),
+            "combined_cumulative": json.loads(chart["combined_cumulative"]),
+        }
         context["show_finance_chart"] = True
         context["chart_has_activity"] = any(
             float(v)
@@ -1484,6 +1494,16 @@ def build_home_context(request):
     else:
         context["show_finance_chart"] = False
         context["chart_has_activity"] = False
+        context["finance_chart_payload"] = {
+            "series": "tithe",
+            "labels": [],
+            "income": [],
+            "income_cumulative": [],
+            "tithe": [],
+            "tithe_cumulative": [],
+            "combined": [],
+            "combined_cumulative": [],
+        }
 
     if scope.level == "CHURCH" and scope.primary_church:
         context["has_active_church"] = True

@@ -106,7 +106,7 @@ flowchart TD
 | `lock_financial_period` | Close books for month |
 | `generate_monthly_cutoff` | Aggregate remit payables for a month |
 
-**Downstream posters into this workflow:** payroll (`PAYROLL` type), assets (capital/depreciation), remittance settlements, ledger guided entry.
+**Downstream posters into this workflow:** payroll (`PAYROLL` type), assets (capital/depreciation), remittance settlements, ledger guided entry. Those modules still call `approve_transaction()` / `approve_module_journal()` directly. Phase 2 multi-step `ApprovalPolicy` is **not** claimed for those programmatic paths; it covers the HTTP pending-journal queue (`approvals.services` wrapping existing journal services). Default policy remains one checker. Escalation never auto-approves. Receipt auto-approve stays on `TreasuryApprovalPolicy`.
 
 ### Planned
 
@@ -115,6 +115,8 @@ Universal fund accounting entity, hard budget limits everywhere, multi-currency.
 ### Recommended
 
 Keep `transactions` as the single books-of-record; never create a parallel GL in `ledger` or elsewhere.
+
+Phase 3 intelligence (`RiskAlert`) is detection only. HIGH pending alerts may queue an `ApprovalCase` and must never auto-approve, auto-reject, or block `TreasuryApprovalPolicy` receipt auto-approve.
 
 ---
 
@@ -192,8 +194,11 @@ stateDiagram-v2
 |------|-------------|
 | `post_payroll_run` | Creates `transactions.Transaction` type `PAYROLL` |
 | `pay_payroll_run` | Creates payment transaction; links payment fields |
+| `reverse_payroll_run` | Voids the posted PAYROLL/payment journals via `void_transaction` |
 
 Idempotency keys supported on post/pay paths.
+
+**Reverse SoD (Current, intentional):** Journal void SoD applies. The user who posted the PAYROLL journal (`created_by`) cannot reverse that same journal unless institutional `is_superadmin`. A second user with void authority must reverse. This is not a regression.
 
 ---
 

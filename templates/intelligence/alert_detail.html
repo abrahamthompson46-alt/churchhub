@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Risk alert — {{ institution_display_name|default:"ChurchHub" }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Controls" page_title=alert.title page_description=alert.explanation %}
+    <p class="mb-3"><a href="{% url 'intelligence:alert_list' %}">Back to alerts</a></p>
+    <div class="data-card p-3 mb-3">
+        <p><strong>Rule:</strong> {{ alert.rule_code }} · <strong>Severity:</strong> {{ alert.severity }} · <strong>Status:</strong> {{ alert.status }}</p>
+        <p><strong>Church:</strong> {{ alert.church.name }}</p>
+        {% if alert.transaction %}
+        <p><strong>Journal:</strong> {{ alert.transaction.reference }} ({{ alert.transaction.approval_status }})</p>
+        {% endif %}
+        <p><strong>Observed:</strong> {{ alert.observed }}</p>
+        <p><strong>Threshold:</strong> {{ alert.threshold }}</p>
+    </div>
+    {% if can_review and alert.status == "OPEN" %}
+    <form method="post" action="{% url 'intelligence:alert_confirm' alert.pk %}" class="d-inline">{% csrf_token %}
+        {{ note_form.note }}
+        <button class="btn btn-sm btn-primary" type="submit">Confirm (does not post)</button>
+    </form>
+    <form method="post" action="{% url 'intelligence:alert_dismiss' alert.pk %}" class="d-inline ms-2">{% csrf_token %}
+        <button class="btn btn-sm btn-outline-secondary" type="submit">Dismiss</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

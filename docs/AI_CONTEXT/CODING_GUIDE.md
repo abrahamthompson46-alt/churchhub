@@ -67,7 +67,7 @@ Present in most apps:
 - `api/` packages
 - `services/` package directories (use flat `services.py` or a named sibling like `welfare_services.py`)
 
-**Current exception:** `transactions`, `members`, `remittance`, `payroll`, `assets`, `organization`, `reports`, `dashboard`, `permissions`, `accounts`, `sitecontrol`, `meetings`, `announcements`, `ledger`, `giving`, `budgets`, `audit`, and `approvals` each have `selectors.py` / `repositories.py` as architecture slices. Those modules are complete for this pattern (views/forms/services route through selectors/repos; ModelForm CRUD uses `commit=False` + repositories). Ledger remains posting templates/categories + CoA UI only — `transactions` owns Accounts/journals. Giving is a read-only reporting/statement layer (empty repositories). Budgets is the planning UI/workflow layer over `transactions.Budget` (no local Budget model). `audit` is an append-only dual-write search layer, not a second GL. Do not invent parallel patterns in other apps without an explicit architectural task.
+**Current exception:** `transactions`, `members`, `remittance`, `payroll`, `assets`, `organization`, `reports`, `dashboard`, `permissions`, `accounts`, `sitecontrol`, `meetings`, `announcements`, `ledger`, `giving`, `budgets`, `audit`, `approvals`, and `intelligence` each have `selectors.py` / `repositories.py` as architecture slices. Those modules are complete for this pattern (views/forms/services route through selectors/repos; ModelForm CRUD uses `commit=False` + repositories). Ledger remains posting templates/categories + CoA UI only — `transactions` owns Accounts/journals. Giving is a read-only reporting/statement layer (empty repositories). Budgets is the planning UI/workflow layer over `transactions.Budget` (no local Budget model). `audit` is an append-only dual-write search layer, not a second GL. `intelligence` is deterministic risk detection, not a second GL. Do not invent parallel patterns in other apps without an explicit architectural task.
 
 ---
 
@@ -172,7 +172,7 @@ from permissions.scoping import get_manageable_churches, user_may_manage_target
 ### Examples of correct call sites
 
 - Members: `members.services.create_member`, `request_transfer`, `complete_transfer`
-- Finance: `transactions.services.record_receipt`, `approve_transaction`, `void_transaction`
+- Finance: `transactions.services.record_receipt`, `approve_transaction`, `void_transaction`. HTTP pending-queue wrapping lives in `approvals.services`; payroll/settlement/asset posters still call `approve_transaction()` directly (not multi-step `ApprovalPolicy`).
 - Accounts: `accounts.services.create_invitation`, `update_user_role`
 
 Views should call services; they should not re-implement balance checks, transfer rules, or remittance math.

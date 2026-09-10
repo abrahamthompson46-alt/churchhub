@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Approval cases — {{ institution_display_name|default:"ChurchHub" }}{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Controls" page_title="Approval cases" page_description="Maker-checker cases wrap existing journal approval. Receipt auto-approve is unchanged." %}
+    <p class="mb-3">
+        {% if can_manage_policy %}<a class="btn btn-sm btn-outline-primary" href="{% url 'approvals:policy' %}">Step policy</a>{% endif %}
+        {% if can_delegate %}<a class="btn btn-sm btn-outline-primary" href="{% url 'approvals:delegations' %}">Delegations</a>{% endif %}
+        <a class="btn btn-sm btn-primary" href="{% url 'transactions:pending_approvals' %}">Pending journals</a>
+    </p>
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Journal</th>
+                        <th>Church</th>
+                        <th>Status</th>
+                        <th>Step</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for case in cases %}
+                    <tr>
+                        <td><a href="{% url 'approvals:case_detail' case.pk %}">{{ case.transaction.reference }}</a></td>
+                        <td>{{ case.church.name }}</td>
+                        <td>{{ case.status }}</td>
+                        <td>{{ case.current_step }} / {{ case.required_steps }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-muted">No approval cases in churches you may manage.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

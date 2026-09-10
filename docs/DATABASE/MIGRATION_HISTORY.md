@@ -36,7 +36,9 @@
 | **meetings** (2) | `0001_initial` → `0002_meeting_workflow` |
 | **dashboard** (2) | `0001_initial` → `0002_alter_notification_options_…` |
 | **reports** (2) | `0001_initial` → `0002_reports_enterprise` |
-| **permissions** (1) | `0001_initial` only |
+| **permissions** (6) | `0001_initial` → `0002_rc1_consistency` / `0002_alter_rolepermission_role` → `0003_merge_rc1_and_alter_role` → `0004_district_treasury_role` → `0005_enterprise_controls_perms` → `0006_maker_checker_perms` |
+| **audit** (1) | `0001_initial` (`AuditEvent`) |
+| **approvals** (1) | `0001_initial` (policy, case, step, delegation, escalation) |
 
 ---
 

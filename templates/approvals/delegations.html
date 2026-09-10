@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Approval delegations — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Controls" page_title="Approval delegations" page_description="Delegations cannot exceed the grantor’s approve permission, church scope, dates, or amount cap." %}
+    <form method="post" action="{% url 'approvals:delegation_create' %}" class="data-card p-3 mb-3">
+        {% csrf_token %}
+        <div class="row g-2">
+            <div class="col-md-4"><label class="small">Grantee</label>{{ form.grantee }}</div>
+            <div class="col-md-2"><label class="small">From</label>{{ form.valid_from }}</div>
+            <div class="col-md-2"><label class="small">Until</label>{{ form.valid_until }}</div>
+            <div class="col-md-2"><label class="small">Max amount</label>{{ form.max_amount }}</div>
+            <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary btn-sm" type="submit">Grant</button></div>
+        </div>
+    </form>
+    <div class="data-card">
+        <table class="table table-sm mb-0">
+            <thead><tr><th>Grantor</th><th>Grantee</th><th>Church</th><th>Dates</th><th>Cap</th><th></th></tr></thead>
+            <tbody>
+                {% for row in delegations %}
+                <tr>
+                    <td>{{ row.grantor }}</td>
+                    <td>{{ row.grantee }}</td>
+                    <td>{{ row.church.name }}</td>
+                    <td>{{ row.valid_from }} – {{ row.valid_until }}</td>
+                    <td>{% if row.max_amount %}{{ row.max_amount }}{% else %}—{% endif %}{% if row.is_revoked %} (revoked){% endif %}</td>
+                    <td>
+                        {% if not row.is_revoked %}
+                        <form method="post" action="{% url 'approvals:delegation_revoke' row.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger" type="submit">Revoke</button></form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-muted">No delegations in scope.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

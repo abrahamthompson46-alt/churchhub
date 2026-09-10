@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}{{ case.transaction.reference }} — approvals{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Controls" page_title=case.transaction.reference page_description="Journal status is unchanged until the final approval step." %}
+    <p><a href="{% url 'approvals:case_list' %}">← Cases</a> · <a href="{% url 'transactions:transaction_detail' case.transaction_id %}">Journal</a></p>
+    <div class="data-card p-3 mb-3">
+        <p class="mb-1">Case status: <strong>{{ case.status }}</strong></p>
+        <p class="mb-1">Steps: {{ case.current_step }} / {{ case.required_steps }}</p>
+        <p class="mb-0">Journal approval status: <strong>{{ case.transaction.approval_status }}</strong></p>
+        {% if case.correction_note %}<p class="mt-2 mb-0">Correction: {{ case.correction_note }}</p>{% endif %}
+    </div>
+    {% if can_decide and case.transaction.approval_status == "PENDING" %}
+    <div class="d-flex flex-wrap gap-2">
+        <form method="post" action="{% url 'transactions:approve_transaction' case.transaction_id %}">{% csrf_token %}<button class="btn btn-sm btn-success" type="submit">Approve step</button></form>
+        <form method="post" action="{% url 'transactions:reject_transaction' case.transaction_id %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger" type="submit">Reject</button></form>
+        <form method="post" action="{% url 'approvals:correct' case.transaction_id %}" class="d-flex gap-2">{% csrf_token %}{{ note_form.note }}<button class="btn btn-sm btn-outline-secondary" type="submit">Request correction</button></form>
+        <form method="post" action="{% url 'approvals:escalate' case.transaction_id %}" class="d-flex gap-2">{% csrf_token %}<textarea name="note" class="form-control" rows="2" required placeholder="Escalation reason"></textarea><button class="btn btn-sm btn-outline-warning" type="submit">Escalate</button></form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

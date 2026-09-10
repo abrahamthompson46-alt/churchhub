@@ -43,6 +43,8 @@ INSTITUTION_PREFIXES = (
     "/budgets/",
     "/giving/",
     "/contributions/",
+    "/controls/",
+    "/approvals/",
     "/ledger/",
     "/remittance/",
     "/payroll/",

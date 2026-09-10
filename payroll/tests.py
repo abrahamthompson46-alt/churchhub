@@ -191,7 +191,7 @@ class PayrollTests(TestCase):
         approve_payroll_run(run, self.pastor)
         treasury_approve_payroll_run(run, self.treasury)
         post_payroll_run(run, self.treasury)
-        reverse_payroll_run(run, self.treasury, reason="Correction")
+        reverse_payroll_run(run, self.pastor, reason="Correction")
         run.refresh_from_db()
         self.assertEqual(run.status, "VOID")
         self.assertTrue(run.transaction.is_voided)

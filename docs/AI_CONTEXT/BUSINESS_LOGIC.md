@@ -186,7 +186,7 @@ Fields include year, org FKs by level, `account`, `amount`, `notes`.
 
 ### 4.9 Maker-checker
 
-Financial approval is maker-checker oriented: approve/reject/void gated by permissions (`can_approve_transactions`, etc.). Creators should not self-approve where services enforce that pattern — verify in `transactions/services.py` when changing approval flows.
+Financial approval is maker-checker oriented: HTTP approve/reject/void go through `approvals.services`, which wrap `approve_transaction` / `reject_transaction` / `void_transaction`. Creators cannot approve, reject, or void their own journal unless `is_superadmin`. Default church `ApprovalPolicy` is one checker. Receipt auto-approve via `TreasuryApprovalPolicy` is unchanged. Multi-step policies record intermediate `ApprovalStep` rows without posting; the last step calls `approve_transaction`. Request-correction and escalation leave `PENDING`.
 
 ### 4.10 Ledger app
 
@@ -357,9 +357,9 @@ Always scope report queries to the user’s manageable churches / denomination.
 
 ## 14. Audit expectations (implemented vs aspirational)
 
-**Present (domain-specific):** FinancialAuditLog, MemberAuditLog, OrganizationAuditLog, PermissionAuditLog, PlatformAuditLog, AssetAuditLog / AssetPolicyAuditLog, RemittancePolicyAuditLog, AnnouncementAuditLog, ReportAccessAuditLog, UserActivityLog, PayrollRunAuditLog, etc.
+**Present (domain-specific plus enterprise dual-write):** FinancialAuditLog, MemberAuditLog, OrganizationAuditLog, PermissionAuditLog, PlatformAuditLog, AssetAuditLog / AssetPolicyAuditLog, RemittancePolicyAuditLog, AnnouncementAuditLog, ReportAccessAuditLog, UserActivityLog, PayrollRunAuditLog, **`audit.AuditEvent`** (Phase 1 search layer dual-written from financial audit; `/controls/` summary for `view_enterprise_controls`, event drill-down for `view_enterprise_audit`). District Administrator is summary-only; District Treasurer may open scoped event detail. These permissions do not grant posting or journal approval.
 
-**Aspirational (`AGENTS.md`):** universal soft-delete + single audit pattern for every module. Do not assume every model has full old/new JSON audit or soft-delete columns.
+**Aspirational (`AGENTS.md`):** universal soft-delete + single audit pattern for every module. Do not assume every model has full old/new JSON audit or soft-delete columns. Domain tables remain; do not treat `AuditEvent` as a replacement GL.
 
 ---
 

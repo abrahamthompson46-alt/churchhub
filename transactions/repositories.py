@@ -7,6 +7,7 @@ Selectors own read querysets. Do not put authorization or workflow rules here.
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -22,15 +23,26 @@ from .models import (
     WorkingDay,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def create_audit_log(*, church, action, user, transaction=None, details=None):
-    return FinancialAuditLog.objects.create(
+    log = FinancialAuditLog.objects.create(
         church=church,
         transaction=transaction,
         action=action,
         performed_by=user,
         details=details or {},
     )
+    try:
+        from audit.services import emit_from_financial_audit
+
+        emit_from_financial_audit(log)
+    except Exception:
+        logger.exception(
+            "Enterprise audit dual-write failed for FinancialAuditLog %s", log.pk
+        )
+    return log
 
 
 def get_account_by_name(church, name):

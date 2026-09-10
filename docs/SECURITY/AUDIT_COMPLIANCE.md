@@ -14,7 +14,7 @@
 
 ## 1. Audit logging architecture (Current)
 
-ChurchHub uses **domain-specific audit tables**, not a single universal audit event store.
+ChurchHub uses **domain-specific audit tables**, plus an additive enterprise `AuditEvent` search layer. Domain logs remain the books-of-record companion stores; `AuditEvent` is **not** a second general ledger.
 
 ```mermaid
 flowchart TB
@@ -28,6 +28,9 @@ flowchart TB
     FAL[FinancialAuditLog]
     PAYA[PayrollRunAuditLog]
     REMA[RemittancePolicyAuditLog]
+  end
+  subgraph Enterprise
+    AEV[AuditEvent dual-write]
   end
   subgraph Ops
     MAL[MemberAuditLog]
@@ -44,6 +47,7 @@ flowchart TB
   Actions --> Finance
   Actions --> Ops
   Actions --> Platform
+  FAL --> AEV
 ```
 
 | Model | App | Typical actions |
@@ -51,6 +55,7 @@ flowchart TB
 | `UserActivityLog` | accounts | LOGIN, LOGOUT, PASSWORD_CHANGE, ROLE_CHANGE, CHURCH_ASSIGN, USER_*, INVITE_*, PROFILE_UPDATE, EMAIL_CHANGE, SCOPE_CHANGE |
 | `PermissionAuditLog` | permissions | MATRIX_UPDATE, MATRIX_RESET, OVERRIDE_CREATE/UPDATE/DELETE |
 | `FinancialAuditLog` | transactions | CREATE, UPDATE, APPROVE, REJECT, VOID, REMIT, BUDGET_* |
+| `AuditEvent` | audit | Dual-write from `FinancialAuditLog` (`journal.*`); scoped search at `/controls/` |
 | `MemberAuditLog` | members | CREATE, UPDATE, STATUS, TRANSFER_*, EXPORT, DEACTIVATE, ACTIVATE |
 | `OrganizationAuditLog` | organization | CREATE, UPDATE, DEACTIVATE, ACTIVATE, TRANSFER |
 | `AnnouncementAuditLog` | announcements | CREATE, UPDATE, APPROVE, REJECT, ARCHIVE, PIN, UNPIN, EXPORT |
@@ -61,7 +66,7 @@ flowchart TB
 | `ReportAccessAuditLog` | reports | RUN, EXPORT |
 | `PlatformAuditLog` | sitecontrol | Tenant/operator/settings/denomination/impersonation/breakglass, … |
 
-**Immutability:** Only `PlatformAuditLog` enforces immutability in `save()`/`delete()` (updates/deletes raise). Other audit models rely on process/admin discipline (`ReadOnlyAuditModelAdmin` in `admin_custom` for several).
+**Immutability:** `PlatformAuditLog` and `audit.AuditEvent` enforce immutability in `save()`/`delete()` (updates/deletes raise). Other audit models rely on process/admin discipline (`ReadOnlyAuditModelAdmin` in `admin_custom` for several). Dual-write failures must not block `FinancialAuditLog` creation.
 
 ### Application logging
 
@@ -72,7 +77,7 @@ flowchart TB
 ## 2. Financial audit trail (Current)
 
 **Model:** `transactions.FinancialAuditLog`  
-**Writer:** `transactions` services (`_log_audit`) and companion posters that create journals
+**Writer:** `transactions` services (`_log_audit`) via `create_audit_log`, which still inserts `FinancialAuditLog` and then dual-writes `audit.AuditEvent` when possible.
 
 ```mermaid
 flowchart LR

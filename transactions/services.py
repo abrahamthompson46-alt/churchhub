@@ -934,8 +934,7 @@ def approve_transaction(transaction, user):
         return locked
     if locked.locked:
         raise ValueError("Transaction is already locked.")
-    if locked.created_by_id == user.id and not is_superadmin(user):
-        raise ValueError("Creator cannot approve their own transaction.")
+    _assert_not_self_maker(locked, user, "approve")
 
     assert_period_open(locked.church, locked.date)
     validate_transaction_balance(locked)
@@ -995,10 +994,18 @@ def _mark_cutoff_transferred_for_remittance(transaction):
         )
 
 
+def _assert_not_self_maker(transaction, user, verb):
+    """SoD: maker cannot approve, reject, or void their own journal except institutional superadmin."""
+    maker_id = getattr(transaction, "created_by_id", None)
+    if maker_id and user and maker_id == user.id and not is_superadmin(user):
+        raise ValueError(f"Creator cannot {verb} their own transaction.")
+
+
 @db_transaction.atomic
 def reject_transaction(transaction, user, reason=""):
     if transaction.locked:
         raise ValueError("Transaction is already locked.")
+    _assert_not_self_maker(transaction, user, "reject")
 
     transaction.approval_status = "REJECTED"
     transaction.locked = True
@@ -1036,6 +1043,7 @@ def void_transaction(transaction, user, reason=""):
     )
     if locked.is_voided or locked.approval_status == "REVERSED":
         raise ValueError("Transaction is already reversed.")
+    _assert_not_self_maker(locked, user, "void")
     if locked.approval_status != "APPROVED":
         raise ValueError("Only approved transactions can be reversed.")
     if locked.reversal_of_id:

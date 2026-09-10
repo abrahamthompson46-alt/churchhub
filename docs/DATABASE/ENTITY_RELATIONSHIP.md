@@ -445,7 +445,7 @@ Do **not** assume these tables exist:
 | Procurement / PO | Absent |
 | Petty cash | Absent |
 | Soft-delete columns | Absent |
-| Unified AuditEvent | Multiple domain audit tables |
+| Single audit store replacing domain logs | Domain tables remain; `audit.AuditEvent` is an additive dual-write search layer |
 
 ---
 

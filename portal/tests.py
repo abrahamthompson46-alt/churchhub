@@ -14,6 +14,8 @@ from portal.services import (
     authenticate_portal_credentials,
     build_confirm_token,
     canonical_dob_password,
+    provision_portal_user,
+    PortalAuthError,
 )
 
 User = get_user_model()
@@ -54,6 +56,9 @@ class PortalTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Member sign in")
         self.assertContains(response, "Email")
+        self.assertContains(response, "Request a sign-in email")
+        self.assertNotContains(response, "YYYY-MM-DD")
+        self.assertNotContains(response, "date of birth")
 
     def test_staff_login_links_to_portal(self):
         response = self.client.get(reverse("login"))
@@ -289,15 +294,47 @@ class PortalAuthFlowTests(TestCase):
             self.assertGreater(len(list(field.choices)), 1, name)
             self.assertGreater(len(list(field.widget.choices)), 1, name)
 
-    def test_authenticate_email_and_dob_provisions_user(self):
-        user = authenticate_portal_credentials(
-            "kwame.asante@example.com",
-            canonical_dob_password(self.dob),
+    def test_dob_does_not_provision_or_authenticate(self):
+        with self.assertRaises(PortalAuthError):
+            authenticate_portal_credentials(
+                "kwame.asante@example.com",
+                canonical_dob_password(self.dob),
+            )
+        self.assertFalse(
+            User.objects.filter(email__iexact="kwame.asante@example.com").exists()
         )
+
+    def test_access_email_provisions_user_without_dob_password(self):
+        from django.core import mail
+
+        response = self.client.post(
+            reverse("portal:password_reset"),
+            {"email": "kwame.asante@example.com"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("portal:password_reset_done"))
+        user = User.objects.get(email__iexact="kwame.asante@example.com")
         self.assertEqual(user.role, UserRole.MEMBER)
         self.assertEqual(user.member_id, self.member.pk)
-        self.assertEqual(user.username, "kwame.asante@example.com")
-        self.assertTrue(user.must_change_password)
+        self.assertFalse(user.has_usable_password())
+        self.assertTrue(mail.outbox)
+        with self.assertRaises(PortalAuthError):
+            authenticate_portal_credentials(
+                "kwame.asante@example.com",
+                canonical_dob_password(self.dob),
+            )
+
+    def test_unknown_access_email_does_not_enumerate(self):
+        from django.core import mail
+
+        response = self.client.post(
+            reverse("portal:password_reset"),
+            {"email": "nobody@example.com"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("portal:password_reset_done"))
+        self.assertFalse(mail.outbox)
+        self.assertFalse(User.objects.filter(email__iexact="nobody@example.com").exists())
 
     @override_settings(
         DEBUG=True,
@@ -305,11 +342,15 @@ class PortalAuthFlowTests(TestCase):
         SECURE_SSL_REDIRECT=False,
     )
     def test_first_login_requires_email_confirmation(self):
+        user = provision_portal_user(self.member)
+        user.set_password("SecurePass1")
+        user.must_change_password = False
+        user.save(update_fields=["password", "must_change_password"])
         response = self.client.post(
             reverse("portal:login"),
             {
                 "username": "kwame.asante@example.com",
-                "password": "1988-03-14",
+                "password": "SecurePass1",
             },
         )
         self.assertEqual(response.status_code, 302)
@@ -318,24 +359,24 @@ class PortalAuthFlowTests(TestCase):
 
         from urllib.parse import quote
 
-        user = User.objects.get(email__iexact="kwame.asante@example.com")
         token = build_confirm_token(user)
         confirm = self.client.get(
             reverse("portal:confirm_device") + "?token=" + quote(token, safe="")
         )
         self.assertEqual(confirm.status_code, 302)
-        self.assertEqual(confirm.url, reverse("portal:password_change"))
+        self.assertEqual(confirm.url, reverse("portal:home"))
 
-        # Session should now be authenticated
         home = self.client.get(reverse("portal:home"))
-        self.assertEqual(home.status_code, 302)
-        self.assertEqual(home.url, reverse("portal:password_change"))
+        self.assertEqual(home.status_code, 200)
 
     @override_settings(DEBUG=True, SECURE_SSL_REDIRECT=False)
     def test_password_change_after_confirm(self):
         from urllib.parse import quote
 
-        user = authenticate_portal_credentials("kwame.asante@example.com", "1988-03-14")
+        user = provision_portal_user(self.member)
+        user.set_password("SecurePass1")
+        user.must_change_password = False
+        user.save(update_fields=["password", "must_change_password"])
         token = build_confirm_token(user)
         self.client.get(
             reverse("portal:confirm_device") + "?token=" + quote(token, safe="")
@@ -343,13 +384,15 @@ class PortalAuthFlowTests(TestCase):
         response = self.client.post(
             reverse("portal:password_change"),
             {
-                "old_password": "1988-03-14",
-                "new_password1": "SecurePass1",
-                "new_password2": "SecurePass1",
+                "old_password": "SecurePass1",
+                "new_password1": "SecurePass2",
+                "new_password2": "SecurePass2",
             },
         )
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("portal:home"))
         user.refresh_from_db()
         self.assertFalse(user.must_change_password)
-        self.assertTrue(user.check_password("SecurePass1"))
+        self.assertTrue(user.check_password("SecurePass2"))
+        with self.assertRaises(PortalAuthError):
+            authenticate_portal_credentials("kwame.asante@example.com", "1988-03-14")

@@ -1,4 +1,4 @@
-"""Member portal authentication — email + date-of-birth credentials."""
+"""Member portal authentication — email + chosen password; first access via email link."""
 
 from __future__ import annotations
 
@@ -74,7 +74,7 @@ def parse_dob_password(raw: str) -> Optional[date]:
 
 
 def canonical_dob_password(dob: date) -> str:
-    """Canonical first-login password derived from date of birth (ISO)."""
+    """ISO date string historically used as a first-login secret (no longer accepted)."""
     return dob.isoformat()
 
 
@@ -131,10 +131,6 @@ def provision_portal_user(member: Member) -> User:
     email = normalize_email(member.email)
     if not email:
         raise PortalAuthError("Your member record has no email address.")
-    if not member.date_of_birth:
-        raise PortalAuthError(
-            "Your member record has no date of birth. Contact your church office."
-        )
 
     existing = _linked_user(member)
     if existing is not None:
@@ -179,11 +175,10 @@ def provision_portal_user(member: Member) -> User:
             "This email is already used by another account. Contact your church office."
         )
 
-    password = canonical_dob_password(member.date_of_birth)
     user = User.objects.create_user(
         username=email,
         email=email,
-        password=password,
+        password=None,
         role=UserRole.MEMBER,
         church=member.church,
         member=member,
@@ -191,17 +186,40 @@ def provision_portal_user(member: Member) -> User:
         last_name=member.last_name or "",
         must_change_password=True,
     )
+    user.set_unusable_password()
+    user.save(update_fields=["password"])
     log_activity(user, "PORTAL_ACCOUNT_PROVISIONED")
     return user
 
 
+def portal_user_for_access_email(email: str):
+    """
+    Return a MEMBER user for a set-password email, or None.
+
+    Unknown, inactive, and duplicate emails all return None so the public
+    reset page cannot enumerate member records.
+    """
+    try:
+        member = find_member_by_email(email)
+    except PortalAuthError:
+        logger.info("portal_access_request reason=duplicate_or_invalid")
+        return None
+    if member is None:
+        logger.info("portal_access_request reason=unknown_or_inactive")
+        return None
+    try:
+        return provision_portal_user(member)
+    except PortalAuthError:
+        logger.info("portal_access_request reason=provision_failed")
+        return None
+
+
 def authenticate_portal_credentials(email: str, password: str) -> User:
     """
-    Verify portal credentials.
+    Verify a chosen portal password.
 
-    Accepts an existing MEMBER password. Date of birth is accepted only for
-    first-time sign-in while ``must_change_password`` is still required.
-    After a member sets a real password, DOB login is permanently disabled.
+    Date of birth is never a login secret. First-time members request a
+    one-time set-password email at ``/portal/password/reset/``.
     """
     email = normalize_email(email)
     password = (password or "").strip()
@@ -213,35 +231,30 @@ def authenticate_portal_credentials(email: str, password: str) -> User:
         logger.info("portal_auth_denied reason=unknown_or_inactive")
         raise PortalAuthError(PORTAL_INVALID_CREDENTIALS)
 
+    if member_matches_dob(member, password):
+        logger.info("portal_auth_denied reason=dob_login_retired")
+        raise PortalAuthError(PORTAL_INVALID_CREDENTIALS)
+
     user = _linked_user(member) or find_portal_user_for_email(email)
+    if user is None or not user.has_usable_password():
+        logger.info("portal_auth_denied reason=no_usable_password")
+        raise PortalAuthError(PORTAL_INVALID_CREDENTIALS)
 
-    if user is not None and user.check_password(password):
-        if user.member_id and user.member_id != member.pk:
-            logger.info("portal_auth_denied reason=account_link_mismatch")
-            raise PortalAuthError(PORTAL_INVALID_CREDENTIALS)
-        if not user.member_id:
-            user.member = member
-            user.church = member.church
-            user.save(update_fields=["member", "church"])
-        return user
-
-    if user is not None and not user.must_change_password:
+    if not user.check_password(password):
         logger.info("portal_auth_denied reason=password_mismatch")
         raise PortalAuthError(PORTAL_INVALID_CREDENTIALS)
 
-    if not member_matches_dob(member, password):
-        logger.info("portal_auth_denied reason=dob_or_password_mismatch")
+    if password_is_still_dob(user):
+        logger.info("portal_auth_denied reason=legacy_dob_hash")
         raise PortalAuthError(PORTAL_INVALID_CREDENTIALS)
 
-    user = provision_portal_user(member) if user is None else user
-    if user.check_password(password) or user.check_password(
-        canonical_dob_password(member.date_of_birth)
-    ):
-        return user
-
-    user.set_password(canonical_dob_password(member.date_of_birth))
-    user.must_change_password = True
-    user.save(update_fields=["password", "must_change_password"])
+    if user.member_id and user.member_id != member.pk:
+        logger.info("portal_auth_denied reason=account_link_mismatch")
+        raise PortalAuthError(PORTAL_INVALID_CREDENTIALS)
+    if not user.member_id:
+        user.member = member
+        user.church = member.church
+        user.save(update_fields=["member", "church"])
     return user
 
 

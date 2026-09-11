@@ -48,11 +48,20 @@ class PortalCredentialHardeningTests(TestCase):
             gender="Male",
         )
 
-    def test_dob_rejected_after_password_change(self):
-        user = authenticate_portal_credentials(
-            "sam.member@example.com",
-            canonical_dob_password(self.dob),
+    def test_dob_never_authenticates(self):
+        with self.assertRaises(PortalAuthError):
+            authenticate_portal_credentials(
+                "sam.member@example.com",
+                canonical_dob_password(self.dob),
+            )
+        self.assertFalse(
+            User.objects.filter(email__iexact="sam.member@example.com").exists()
         )
+
+    def test_dob_rejected_after_password_change(self):
+        from portal.services import provision_portal_user
+
+        user = provision_portal_user(self.member)
         user.set_password("RealPortalPass1!")
         user.must_change_password = False
         user.save(update_fields=["password", "must_change_password"])
@@ -62,12 +71,18 @@ class PortalCredentialHardeningTests(TestCase):
                 "sam.member@example.com",
                 canonical_dob_password(self.dob),
             )
+        authenticated = authenticate_portal_credentials(
+            "sam.member@example.com",
+            "RealPortalPass1!",
+        )
+        self.assertEqual(authenticated.pk, user.pk)
 
     def test_confirm_token_is_single_use(self):
-        user = authenticate_portal_credentials(
-            "sam.member@example.com",
-            canonical_dob_password(self.dob),
-        )
+        from portal.services import provision_portal_user
+
+        user = provision_portal_user(self.member)
+        user.set_password("RealPortalPass1!")
+        user.save(update_fields=["password"])
         token = build_confirm_token(user)
         resolve_confirm_token(token)
         with self.assertRaises(PortalAuthError):

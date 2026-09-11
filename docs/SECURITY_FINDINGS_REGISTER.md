@@ -33,7 +33,7 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 | CH-SEC-012 | MEDIUM | CONFIRMED | FIXED (Phase 3) | Concurrent void can double-reverse | No | Staff |
 | CH-SEC-013 | MEDIUM | CONFIRMED | FIXED (Phase 3) | Incomplete idempotency keys reusable | No | Staff |
 | CH-SEC-014 | MEDIUM | CONFIRMED | FIXED | UserActivityLog deletable in admin | No | Break-glass |
-| CH-SEC-015 | MEDIUM | CONFIRMED | OPEN | Email+DOB first-login credential | No | Public portal |
+| CH-SEC-015 | MEDIUM | CONFIRMED | FIXED | Email+DOB first-login credential | No | Public portal |
 | CH-SEC-016 | MEDIUM | CONFIRMED | FIXED | Some financial CSVs unaudited | No | Staff |
 | CH-SEC-017 | LOW | CONFIRMED | FIXED | GET logout CSRF | No | Victim session |
 | CH-SEC-018 | LOW | CONFIRMED | FIXED | GET church switch | No | Staff |
@@ -291,6 +291,8 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 **Remediation:** One-time invite/OTP instead of DOB; if DOB must remain, rate-limit and generic errors.  
 **Test:** After password change, DOB login fails; untrusted device without confirm token cannot session-login.  
 **Auth:** Public portal. **Confidence:** High for credential design; Medium for unaided takeover.
+
+**Remediation (2026-09-11):** **FIXED.** Portal login accepts only a chosen password. Date of birth never authenticates, including leftover DOB hashes. First access uses `/portal/password/reset/` to provision a MEMBER user with an unusable password and email a one-time set-password link. Device confirmation is unchanged. Tests: `PortalAuthFlowTests`, `PortalCredentialHardeningTests`.
 
 ---
 

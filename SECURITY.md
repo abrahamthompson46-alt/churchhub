@@ -559,27 +559,31 @@ Log execution.
 
 Backups must be:
 
-Encrypted (optional age — `CHURCHHUB_BACKUP_ENCRYPT` + `CHURCHHUB_BACKUP_AGE_RECIPIENT`)
+Encrypted (age — required for production **app** offsite unless `CHURCHHUB_BACKUP_ALLOW_PLAINTEXT`)
 
 Access-controlled (directory mode `0700`, files `0600`; not world-readable)
 
 Verified (`manage.py backup_database --verify` + sibling `.sha256`)
 
-Stored securely (local `CHURCHHUB_BACKUP_DIR`; optional rclone offsite — opt-in only)
+Stored securely (local `CHURCHHUB_BACKUP_DIR` plus rclone **or** provider `managed` snapshots)
 
-Regularly tested (`manage.py restore_database` on **staging**, never casually on production)
+Regularly tested (`manage.py restore_drill` on a throwaway database; `restore_database` only with confirm gates)
 
 ## Backup & restore commands (Current)
 
 ```bash
 python manage.py backup_database --verify
+python manage.py restore_drill \
+  --input /var/backups/churchhub/churchhub_YYYYMMDD_HHMMSS.sql.gz \
+  --operator "name" \
+  --database-url "$CHURCHHUB_BACKUP_DRILL_DATABASE_URL"
 python manage.py restore_database \
   --input /var/backups/churchhub/churchhub_YYYYMMDD_HHMMSS.sql.gz \
   --confirm DESTROY_LOCAL_DATA
 # Production target also requires: --i-understand-production --no-input
 ```
 
-Offsite upload never runs unless `CHURCHHUB_BACKUP_POST_HOOK` / rclone remote is configured.
+Production VPS: set `CHURCHHUB_BACKUP_OFFSITE=app` (rclone) or `managed` (provider snapshots). Media is archived next to the dump unless `--skip-media`.
 See `deploy/backup/README.md` and `docs/WAVE1_BACKUP_RECOVERY_PLAN.md`.
 
 ---

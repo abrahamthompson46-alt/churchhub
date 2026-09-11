@@ -171,7 +171,13 @@ Full list: `.env.example`
 | Daily 02:15 | Purge old notifications | same |
 | Hourly | Health probe task | same |
 
-Manual backup: `python manage.py backup_database`
+Manual backup: `python manage.py backup_database --verify`
+
+Restore drill (throwaway DB only):
+
+```bash
+python manage.py restore_drill --input backups/churchhub_YYYYMMDD_HHMMSS.sql.gz --operator "ops" --database-url "$CHURCHHUB_BACKUP_DRILL_DATABASE_URL"
+```
 
 ---
 

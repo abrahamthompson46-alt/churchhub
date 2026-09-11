@@ -129,7 +129,7 @@ ChurchHub has strong multi-tenant RBAC, MFA for privileged roles, maker-checker 
 | PII | Members, employees, users store names, contacts, identifiers in PostgreSQL |
 | Sensitive fields | MFA secrets Fernet-encrypted at rest; passwords hashed |
 | Export permissions | Present in registry; enforcement incomplete on some report export formats |
-| Backup / restore | `backup_database` + Beat schedule + ops scripts; restore drill operator-owned |
+| Backup / restore | `backup_database` (DB+media) + Beat + rclone/`managed` offsite; `restore_drill` on throwaway DB |
 | Media | Production must not rely on DEBUG media serving |
 
 ---

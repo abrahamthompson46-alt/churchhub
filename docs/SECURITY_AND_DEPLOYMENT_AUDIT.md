@@ -218,8 +218,8 @@ Severity legend:
 | Fail2Ban jails | **Absent** |
 | UFW / iptables / nftables | **Absent** |
 | Host crontab (aside from Celery Beat) | **Absent** (Beat is preferred) |
-| Offsite backup replication | **Absent** (local `backups/` only; gitignored) |
-| Documented restore drill evidence | Operator-owned (KL-OPS-03) |
+| Offsite backup replication | **Current:** rclone post-hook or `CHURCHHUB_BACKUP_OFFSITE=managed` (fail-closed on production VPS) |
+| Documented restore drill evidence | **Current:** `manage.py restore_drill` writes `backups/restore_drills/*.json` |
 
 ---
 
@@ -243,15 +243,15 @@ Severity legend:
 | **Impact** | Direct DB/cache compromise |
 | **Fix** | UFW default deny; allow 22 (or jump host), 80, 443 only; keep Postgres/Redis on localhost |
 
-### Finding I-03 — Backups are local-only; restore unproven in repo
+### Finding I-03 — Backups must leave the app disk (code fail-closed)
 
 | Field | Detail |
 |-------|--------|
 | **Severity** | **High** |
-| **Evidence** | `backup_database` writes `backups/churchhub_*.sql.gz`; retention deletes old local files; no offsite sync script |
-| **Risk** | VPS disk failure / ransomware destroys DB **and** backups together |
-| **Impact** | Catastrophic data loss |
-| **Fix** | Copy dumps to offsite object storage daily; encrypt at rest; run and record a restore drill quarterly |
+| **Evidence** | `backup_database` writes DB + media archives; production VPS requires rclone `app` offsite or `managed` provider snapshots; `restore_drill` refuses live `DATABASE_URL` |
+| **Risk** | Residual: operator must still set rclone remote or confirm provider snapshots, and keep the age private key offline |
+| **Impact** | Catastrophic data loss if env is left on `managed` without real provider backups |
+| **Fix** | **Shipped in code (2026-09-11).** Operators configure `.env` per `deploy/backup/README.md` and run one drill. |
 
 ### Finding I-04 — Backup command loads DB password into process env
 
@@ -390,7 +390,7 @@ Severity legend:
 | D-02 | High | Deploy | Unauthenticated `/media/` via Nginx |
 | I-01 | High | Infra | No Fail2Ban |
 | I-02 | High | Infra | No firewall policy as code |
-| I-03 | High | Infra | Local-only backups / unproven restore |
+| I-03 | High | Infra | Offsite/managed backups + restore_drill (code shipped; operator config remains) |
 | D-01 | High | Deploy | TLS block still commented in Nginx template |
 | A-01 | Medium | App | MFA verify not rate-limited |
 | A-02 | Medium | App | MFA key tied to SECRET_KEY |

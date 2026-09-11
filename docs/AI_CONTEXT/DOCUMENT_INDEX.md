@@ -109,6 +109,7 @@ These are the 14 August 2026 audit pack. They do **not** replace `SECURITY/*.md`
 | [DEVELOPMENT_RULES.md](../DEVELOPMENT/DEVELOPMENT_RULES.md) | Dev process rules |
 | [SETUP_GUIDE.md](../DEVELOPMENT/SETUP_GUIDE.md) | Local setup |
 | [DEPLOYMENT_NOTES.md](../DEVELOPMENT/DEPLOYMENT_NOTES.md) | Deploy notes (e.g. Render) |
+| [WAVE1_BACKUP_RECOVERY_PLAN.md](../WAVE1_BACKUP_RECOVERY_PLAN.md) | Backup/restore/drill Current |
 | [TESTING_GUIDE.md](../DEVELOPMENT/TESTING_GUIDE.md) | How tests are run |
 
 ### Module specifications — `docs/MODULE_SPECIFICATIONS/`

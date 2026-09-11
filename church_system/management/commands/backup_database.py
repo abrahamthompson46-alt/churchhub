@@ -13,7 +13,10 @@ from django.core.management.base import BaseCommand, CommandError
 
 from church_system.backup_ops import (
     age_recipient,
+    archive_media_root,
+    encrypt_path_with_age,
     encryption_requested,
+    enforce_backup_policy,
     ensure_secure_dir,
     pg_dump_command,
     pg_env_from_settings,
@@ -28,9 +31,9 @@ from church_system.backup_ops import (
 
 class Command(BaseCommand):
     help = (
-        "Create a PostgreSQL dump (pg_dump) for disaster recovery. "
-        "Streams pg_dump → gzip (never loads the full dump into memory). "
-        "Optional age encryption via --encrypt / CHURCHHUB_BACKUP_ENCRYPT."
+        "Create a PostgreSQL dump and MEDIA_ROOT archive for disaster recovery. "
+        "Streams pg_dump → gzip. Optional age encryption. "
+        "Production VPS requires app offsite (rclone) or managed provider snapshots."
     )
 
     def add_arguments(self, parser):
@@ -61,6 +64,11 @@ class Command(BaseCommand):
             action="store_true",
             help="Encrypt with age (requires CHURCHHUB_BACKUP_AGE_RECIPIENT).",
         )
+        parser.add_argument(
+            "--skip-media",
+            action="store_true",
+            help="Do not archive MEDIA_ROOT (database dump only).",
+        )
 
     def handle(self, *args, **options):
         engine = settings.DATABASES["default"]["ENGINE"]
@@ -80,6 +88,17 @@ class Command(BaseCommand):
             raise CommandError(
                 "Encryption requested but CHURCHHUB_BACKUP_AGE_RECIPIENT is unset."
             )
+
+        production_like = (not settings.DEBUG) or (
+            getattr(settings, "DJANGO_ENV", "") in {"production", "staging"}
+        )
+        on_pa = bool(getattr(settings, "ON_PYTHONANYWHERE", False))
+        mode = enforce_backup_policy(
+            production_like=production_like,
+            on_pythonanywhere=on_pa,
+            encrypt=encrypt,
+        )
+        self.stdout.write(f"Backup offsite mode: {mode}")
 
         plain_name = f"churchhub_{stamp}.sql.gz"
         if encrypt:
@@ -127,9 +146,36 @@ class Command(BaseCommand):
                 digest = write_sha256(outfile)
                 self.stdout.write(f"Verified gzip; checksum: {digest}")
 
+        artifacts = [outfile]
+        if not options.get("skip_media"):
+            media_plain = output_dir / f"churchhub_{stamp}_media.tar.gz"
+            media_root = Path(settings.MEDIA_ROOT)
+            count = archive_media_root(media_root, media_plain)
+            if encrypt:
+                media_out = output_dir / f"{media_plain.name}.age"
+                try:
+                    encrypt_path_with_age(media_plain, media_out, recipient)
+                finally:
+                    media_plain.unlink(missing_ok=True)
+            else:
+                media_out = media_plain
+            secure_file(media_out)
+            if not media_out.is_file() or media_out.stat().st_size <= 0:
+                raise CommandError(f"Media archive missing or empty: {media_out}")
+            if options.get("verify"):
+                digest = write_sha256(media_out)
+                self.stdout.write(f"Media archive ({count} files); checksum: {digest}")
+            else:
+                self.stdout.write(f"Media archive ({count} files): {media_out}")
+            artifacts.append(media_out)
+
         self.stdout.write(self.style.SUCCESS(f"Backup complete: {outfile}"))
 
-        run_post_hook(outfile)
+        run_post_hook(*artifacts)
+        for extra in list(artifacts):
+            sha = Path(str(extra) + ".sha256")
+            if sha.is_file():
+                run_post_hook(sha)
 
         retention = resolve_retention(options.get("retention"))
         if retention > 0:
@@ -206,6 +252,10 @@ class Command(BaseCommand):
             "churchhub_*.sql.gz.age",
             "churchhub_*.sql.gz.sha256",
             "churchhub_*.sql.gz.age.sha256",
+            "churchhub_*_media.tar.gz",
+            "churchhub_*_media.tar.gz.age",
+            "churchhub_*_media.tar.gz.sha256",
+            "churchhub_*_media.tar.gz.age.sha256",
         )
         seen: set[Path] = set()
         for pattern in patterns:

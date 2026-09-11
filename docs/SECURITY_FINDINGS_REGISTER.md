@@ -34,7 +34,7 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 | CH-SEC-013 | MEDIUM | CONFIRMED | FIXED (Phase 3) | Incomplete idempotency keys reusable | No | Staff |
 | CH-SEC-014 | MEDIUM | CONFIRMED | FIXED | UserActivityLog deletable in admin | No | Break-glass |
 | CH-SEC-015 | MEDIUM | CONFIRMED | OPEN | Email+DOB first-login credential | No | Public portal |
-| CH-SEC-016 | MEDIUM | CONFIRMED | OPEN | Some financial CSVs unaudited | No | Staff |
+| CH-SEC-016 | MEDIUM | CONFIRMED | FIXED | Some financial CSVs unaudited | No | Staff |
 | CH-SEC-017 | LOW | CONFIRMED | FIXED | GET logout CSRF | No | Victim session |
 | CH-SEC-018 | LOW | CONFIRMED | FIXED | GET church switch | No | Staff |
 | CH-SEC-019 | LOW | CONFIRMED | OPEN | Identifier lockout DoS | N/A | No |
@@ -42,9 +42,9 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 | CH-SEC-021 | LOW | CONFIRMED | OPEN | Compose publishes DB/Redis + default passwords | Dev | N/A |
 | CH-SEC-022 | LOW | CONFIRMED | OPEN | Django HSTS 1h vs Nginx 1y | N/A | N/A |
 | CH-SEC-L1 | HIGH | LIKELY | FIXED (Phase 4) | Unanchored SUPER_ADMIN is global | Yes | If user exists |
-| CH-SEC-L2 | MEDIUM | LIKELY | OPEN | Upload validation is MIME/extension only | Maybe | Yes |
+| CH-SEC-L2 | MEDIUM | LIKELY | FIXED | Upload validation is MIME/extension only | Maybe | Yes |
 | CH-SEC-L3 | MEDIUM | LIKELY | FIXED (Phase 3) | Settlement/district remittance races | No | Staff |
-| CH-SEC-L4 | LOW | LIKELY | OPEN | Password-reset paths skip trusted-device revoke | No | Yes |
+| CH-SEC-L4 | LOW | LIKELY | FIXED | Password-reset paths skip trusted-device revoke | No | Yes |
 | CH-SEC-P1 | LOW | POTENTIAL | FIXED | Health token compared without `compare_digest` | N/A | No |
 | CH-SEC-P2 | INFO | POTENTIAL | OPEN | Nginx template hostnames vs `mychurch.zreta.com` | N/A | N/A |
 
@@ -300,6 +300,8 @@ Asset register/activity CSV and contribution member-total export lack `audit_exp
 **Remediation:** Write export audit like reports.  
 **Auth:** Yes. **Cross-tenant:** No. **Confidence:** High.
 
+**Remediation (2026-09-11):** **FIXED.** `assets:asset_export_csv`, `assets:activity_log_export`, and contribution campaign member-total CSV/Excel call `audit_export`. Activity CSV also requires `export_assets`.
+
 ---
 
 ## CH-SEC-017 — LOW — CONFIRMED
@@ -357,11 +359,15 @@ Failed logins lock by submitted identifier (`sitecontrol/middleware.py` 260–33
 **CH-SEC-L1 HIGH:** `get_manageable_churches` returns all churches when superadmin has no church/denomination (`permissions/scoping.py` 16–31). `User.clean()` would block; `save()` skips it.  
 
 **Remediation (Phase 4):** **FIXED.** Unanchored institution `is_superadmin` / break-glass `is_superuser` → empty manageable churches; unanchored superadmin users → self-only. `User.save()` rejects new unanchored SUPER_ADMIN / DENOMINATION-scope rows (legacy rows via `QuerySet.update` still fail closed at read time). Tests: `permissions/tests_phase4_tenancy.py`. Residual: inventory/quarantine historical unanchored SUPER_ADMIN rows in ops.  
-**CH-SEC-L2 MEDIUM:** `validate_upload` does not check magic bytes (`church_system/uploads.py` 100–138).  
+**CH-SEC-L2 MEDIUM:** `validate_upload` does not check magic bytes (`church_system/uploads.py` 100–138).
+
+**Remediation (2026-09-11):** **FIXED.** JPEG/PNG/GIF/WebP/PDF/Office and text uploads are checked against file prefixes. Tests: `church_system/tests_uploads.py`.  
 **CH-SEC-L3 MEDIUM:** Settlement posting and district remittance duplicate checks are query-based without row locks.  
 
 **Remediation (Phase 3):** **FIXED.** Settlement draft/post use `select_for_update`; partial unique `uniq_settlement_active_period_obligation` on `(from_unit_type, from_unit_id, offering_type, period_start, period_end)` for DRAFT|POSTED after quarantine (`0005`); `record_district_remittance` locks `MonthlyCutoff`. Tests: Phase3SettlementUniquenessTests.  
 **CH-SEC-L4 LOW:** Staff profile password change and portal set-password do not always revoke trusted devices.
+
+**Remediation (2026-09-11):** **FIXED.** `StaffPasswordChangeForm` / `StaffSetPasswordForm` and `PortalSetPasswordForm` call `revoke_all_trusted_devices`. Tests: `TrustedDeviceRevokeTests`.
 
 ---
 

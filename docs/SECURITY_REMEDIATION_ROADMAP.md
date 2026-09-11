@@ -131,9 +131,9 @@ Do these first. They are the reason the verdict is **READY WITH CRITICAL REMEDIA
 | P2-5 | CH-SEC-013 | Lock incomplete idempotency keys; reject in-flight reuse | Parallel receipt POSTs with same key create one txn |
 | P2-6 | CH-SEC-014 | Disable delete on `UserActivityLog` admin; raise on model `delete()` | Admin delete denied |
 | P2-7 | CH-SEC-015 | Replace DOB-as-password with invite/OTP; keep device confirm | After set-password, DOB login fails |
-| P2-8 | CH-SEC-016 | Call `audit_export` on asset/contribution CSV | Export appears in activity/audit log |
+| P2-8 | CH-SEC-016 | Call `audit_export` on asset/contribution CSV | **Done (2026-09-11):** asset register/activity + campaign totals audited |
 | P2-9 | CH-SEC-L1 | Require church or denomination on SUPER_ADMIN at save (not only `clean()`) | Unanchored superadmin cannot be persisted |
-| P2-10 | CH-SEC-L2 | Magic-byte / content sniff on uploads | `.jpg` that is HTML/SVG is rejected |
+| P2-10 | CH-SEC-L2 | Magic-byte / content sniff on uploads | **Done (2026-09-11):** JPEG/PNG/GIF/WebP/PDF/Office + txt/csv prefix checks |
 | P2-11 | CH-SEC-L3 | Row lock or unique constraint on settlement / district remittance | Concurrent posts create one journal |
 
 ---
@@ -148,7 +148,7 @@ Do these first. They are the reason the verdict is **READY WITH CRITICAL REMEDIA
 | P3-4 | CH-SEC-020 | Pin `Django==5.1.15` or actually upgrade and test 6.x |
 | P3-5 | CH-SEC-021 | Never publish Postgres/Redis host ports in a production overlay; rotate compose default passwords if ever used live |
 | P3-6 | CH-SEC-022 | Align Django `SECURE_HSTS_SECONDS` with Nginx `max-age=31536000` |
-| P3-7 | CH-SEC-L4 | Revoke trusted devices on every password-change / reset path |
+| P3-7 | CH-SEC-L4 | **Done (2026-09-11):** Revoke trusted devices on staff/portal password-change and reset confirm |
 | P3-8 | CH-SEC-P1 | Compare health tokens with `hmac.compare_digest` |
 | P3-9 | CH-SEC-P2 | Confirm live Nginx `server_name` is `mychurch.zreta.com` (repo template may differ) |
 | P3-10 | deps | Add read-only `pip-audit` (and npm audit if JS is added) to CI |

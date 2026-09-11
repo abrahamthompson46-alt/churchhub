@@ -415,6 +415,28 @@ class AssetViewTests(TestCase):
         export_response = client.get(reverse("assets:asset_export_csv"))
         self.assertEqual(export_response.status_code, 403)
 
+    def test_asset_csv_exports_are_audited(self):
+        from reports.models import ReportAccessAuditLog
+
+        client = self._login(self.treasury)
+        register = client.get(reverse("assets:asset_export_csv"))
+        self.assertEqual(register.status_code, 200)
+        self.assertEqual(
+            ReportAccessAuditLog.objects.filter(report_key="asset_register").count(),
+            1,
+        )
+        activity = client.get(reverse("assets:activity_log_export"))
+        self.assertEqual(activity.status_code, 200)
+        self.assertEqual(
+            ReportAccessAuditLog.objects.filter(report_key="asset_activity").count(),
+            1,
+        )
+
+    def test_board_cannot_export_activity_log(self):
+        client = self._login(self.board)
+        response = client.get(reverse("assets:activity_log_export"))
+        self.assertEqual(response.status_code, 403)
+
     def test_index_accessible_to_treasury(self):
         client = self._login(self.treasury)
         response = client.get(reverse("assets:index"))

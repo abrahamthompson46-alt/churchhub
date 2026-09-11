@@ -205,6 +205,9 @@ class PortalSetPasswordForm(SetPasswordForm):
         user.must_change_password = False
         if commit:
             user.save()
+            from accounts.mfa import revoke_all_trusted_devices
+
+            revoke_all_trusted_devices(user)
         return user
 
 

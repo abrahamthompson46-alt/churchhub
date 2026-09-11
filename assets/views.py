@@ -242,6 +242,16 @@ def asset_export_csv(request):
         raise PermissionDenied
     church = require_church(request)
     csv_data = asset_register_csv(church)
+    from reports.services import audit_export
+
+    audit_export(
+        user=request.user,
+        report_key="asset_register",
+        export_format="csv",
+        row_count=csv_data.count("\n"),
+        church=church,
+        params={"church_code": church.code},
+    )
     response = HttpResponse(csv_data, content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="asset-register-{church.code}.csv"'
     return response
@@ -411,14 +421,19 @@ def activity_log(request):
         "page_obj": page_obj,
         "action_filter": action,
         "action_choices": action_choices,
+        "can_export_assets": can_export_assets(request.user),
     })
 
 
 @_assets_read_access
 def activity_log_export(request):
+    if not can_export_assets(request.user):
+        raise PermissionDenied
     church = require_church(request)
     import csv
     from io import StringIO
+
+    from reports.services import audit_export
 
     action = request.GET.get("action", "").strip()
     entries = church_activity_logs(church, action=action, limit=5000)
@@ -434,6 +449,14 @@ def activity_log_export(request):
             row["user"].username if row["user"] else "",
             row["notes"],
         ])
+    audit_export(
+        user=request.user,
+        report_key="asset_activity",
+        export_format="csv",
+        row_count=len(entries),
+        church=church,
+        params={"action": action, "count": len(entries)},
+    )
     response = HttpResponse(buffer.getvalue(), content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="asset-activity-{church.code}.csv"'
     return response

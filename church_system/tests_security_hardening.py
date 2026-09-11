@@ -82,6 +82,67 @@ class PortalCredentialHardeningTests(TestCase):
         self.assertEqual(str(unknown.exception), "Email or password is incorrect.")
 
 
+class TrustedDeviceRevokeTests(TestCase):
+    def test_portal_set_password_revokes_trusted_devices(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from accounts.models import TrustedDevice
+        from portal.forms import PortalSetPasswordForm
+
+        user = User.objects.create_user(
+            username="revoke_portal",
+            password="oldPass12345",
+            email="revoke.portal@example.com",
+        )
+        TrustedDevice.objects.create(
+            user=user,
+            token_hash="c" * 64,
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+        form = PortalSetPasswordForm(
+            user,
+            data={
+                "new_password1": "ChurchHubPass1!",
+                "new_password2": "ChurchHubPass1!",
+            },
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        self.assertEqual(TrustedDevice.objects.filter(user=user).count(), 0)
+
+    def test_staff_password_change_revokes_trusted_devices(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from accounts.models import TrustedDevice
+        from accounts.password_reset import StaffPasswordChangeForm
+
+        user = User.objects.create_user(
+            username="revoke_staff",
+            password="oldPass12345",
+            email="revoke.staff@example.com",
+        )
+        TrustedDevice.objects.create(
+            user=user,
+            token_hash="d" * 64,
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+        form = StaffPasswordChangeForm(
+            user,
+            data={
+                "old_password": "oldPass12345",
+                "new_password1": "ChurchHubPass1!",
+                "new_password2": "ChurchHubPass1!",
+            },
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        self.assertEqual(TrustedDevice.objects.filter(user=user).count(), 0)
+
+
 @override_settings(HEALTH_CHECK_TOKEN="test-health-secret")
 class HealthEndpointAuthTests(TestCase):
     def test_health_requires_token_when_configured(self):

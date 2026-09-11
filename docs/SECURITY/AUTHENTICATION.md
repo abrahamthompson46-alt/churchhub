@@ -53,6 +53,7 @@ flowchart TD
 | Portal login throttling | Stricter cap (**3** failed attempts per 15 minutes per IP/email on `/portal/login/`); honeypot field rejects bots |
 | Email link base URL | Set **`CHURCHHUB_PUBLIC_URL`** to your live HTTPS **site root** only (example: `https://churchhub.pythonanywhere.com`) — **not** a path like `/dashboard/`. If unset or left at `localhost`, confirmation links in email will not work on phones or other devices. After changing it, redeploy and request a **new** confirmation email. Production also falls back to `DJANGO_CSRF_TRUSTED_ORIGINS` when the public URL is still localhost. Confirm links use `/portal/confirm/?token=…` so email clients handle signed tokens reliably. |
 | After login | Forced password change when `must_change_password`; change at `/portal/password/change/`; reset at `/portal/password/reset/` |
+| Trusted devices | Password change and password-reset confirm revoke all trusted devices for that user. |
 | Public errors | Unknown email, duplicate email, and wrong password all show **Email or password is incorrect.** Reason codes are logged without the email. |
 | Sign-out / church switch | POST + CSRF (`dashboard:logout`, `dashboard:switch_church`). GET is rejected (405). |
 

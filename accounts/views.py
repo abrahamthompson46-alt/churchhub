@@ -2,7 +2,6 @@
 
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import PermissionDenied, ValidationError as DjangoValidationError
 from django.core.paginator import Paginator
 from django.shortcuts import redirect, render
@@ -18,6 +17,7 @@ from church_system.flash import (
 
 from accounts import repositories as repo
 from accounts import selectors
+from accounts.password_reset import StaffPasswordChangeForm
 from accounts.forms import (
     AcceptInvitationForm,
     InstitutionBrandingForm,
@@ -54,7 +54,7 @@ from sitecontrol.services import can_add_user_to_church
 @login_required
 def profile(request):
     profile_form = ProfileForm(instance=request.user)
-    password_form = PasswordChangeForm(request.user)
+    password_form = StaffPasswordChangeForm(request.user)
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -71,7 +71,7 @@ def profile(request):
                 return redirect("accounts:profile")
             flash_validation_errors(request, profile_form, title="Profile could not be saved")
         elif action == "password":
-            password_form = PasswordChangeForm(request.user, request.POST)
+            password_form = StaffPasswordChangeForm(request.user, request.POST)
             if password_form.is_valid():
                 user = password_form.save(commit=False)
                 repo.save_user(user)

@@ -136,6 +136,29 @@ class ContributionCampaignTests(TestCase):
         self.assertIn("Contribution Campaigns", labels)
         self.assertIn("New Campaign", labels)
 
+    def test_campaign_member_totals_export_is_audited(self):
+        from accounts.mfa import SESSION_MFA_VERIFIED, enable_mfa_for_user, generate_totp_secret
+        from reports.models import ReportAccessAuditLog
+
+        enable_mfa_for_user(self.treasurer, generate_totp_secret(), [])
+        self.treasurer.refresh_from_db()
+        self.client.login(username="treasury_cc", password="pass12345")
+        session = self.client.session
+        session["current_church_id"] = str(self.church.pk)
+        session[SESSION_MFA_VERIFIED] = True
+        session.save()
+        response = self.client.get(
+            reverse("contributions:campaign_detail", args=[self.campaign.pk]),
+            {"export": "csv"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            ReportAccessAuditLog.objects.filter(
+                report_key="contribution_campaign_totals"
+            ).count(),
+            1,
+        )
+
 
 class ContributionPhase2Tests(ContributionCampaignTests):
     def test_bulk_entry_records_multiple(self):

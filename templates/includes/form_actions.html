@@ -9,5 +9,5 @@ Usage: {% include "includes/form_actions.html" with submit_label="Save" cancel_u
     {% if cancel_url %}
     <a href="{{ cancel_url }}" class="btn btn-outline-secondary btn-sm">{{ cancel_label|default:"Cancel" }}</a>
     {% endif %}
-    {% if extra_actions %}{{ extra_actions|safe }}{% endif %}
+    {% if extra_actions %}{{ extra_actions }}{% endif %}
 </div>

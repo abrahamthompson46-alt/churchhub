@@ -22,7 +22,7 @@ User = get_user_model()
 
 
 class MemberPortalLoginForm(AuthenticationForm):
-    """Email as username; password is DOB (first login) or a chosen password."""
+    """Email as username; password is the member's chosen password (DOB only while first-login is required)."""
 
     username = forms.EmailField(
         label="Email",
@@ -42,10 +42,10 @@ class MemberPortalLoginForm(AuthenticationForm):
             attrs={
                 "class": "form-control ps-5",
                 "autocomplete": "current-password",
-                "placeholder": "Date of birth or your password",
+                "placeholder": "Password",
             }
         ),
-        help_text="First sign-in: use your date of birth as YYYY-MM-DD (example: 1990-05-21).",
+        help_text="Use the password you chose for the portal.",
     )
     website = forms.CharField(
         required=False,
@@ -61,7 +61,7 @@ class MemberPortalLoginForm(AuthenticationForm):
 
     error_messages = {
         **AuthenticationForm.error_messages,
-        "invalid_login": "Email and password do not match our member records.",
+        "invalid_login": "Email or password is incorrect.",
     }
 
     def clean(self):

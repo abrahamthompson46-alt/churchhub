@@ -316,6 +316,10 @@ def build_member_dashboard(request, *, church_ids=None, compact=False):
         "activity": activity,
         "links": links,
         "trend": {
+            "labels": labels,
+            "new": new_series,
+            "left": left_series,
+            "cumulative_net": net_series,
             "labels_json": json.dumps(labels),
             "new_json": json.dumps(new_series),
             "left_json": json.dumps(left_series),
@@ -323,6 +327,8 @@ def build_member_dashboard(request, *, church_ids=None, compact=False):
             "has_activity": any(new_series) or any(left_series),
         },
         "status_chart": {
+            "labels": [r["label"] for r in status_rows if r["count"]],
+            "data": [r["count"] for r in status_rows if r["count"]],
             "labels_json": json.dumps([r["label"] for r in status_rows if r["count"]]),
             "data_json": json.dumps([r["count"] for r in status_rows if r["count"]]),
             "has_activity": any(r["count"] for r in status_rows),

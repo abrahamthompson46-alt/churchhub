@@ -28,7 +28,9 @@
 
                 <div class="navbar-utilities">
                     {% if can_switch_church and available_churches %}
-                    <form method="get" action="{% url 'dashboard:home' %}" class="brand-church-switch d-none d-lg-block">
+                    <form method="post" action="{% url 'dashboard:switch_church' %}" class="brand-church-switch d-none d-lg-block">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.path }}">
                         <select name="church" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Switch church context">
                             <option value="" {% if not active_church %}selected{% endif %}>All churches</option>
                             {% for c in available_churches %}
@@ -60,7 +62,14 @@
                             </li>
                             {% for item in account_navigation %}
                             <li>
-                                {% if item.url_name == 'admin:index' %}
+                                {% if item.url_name == 'dashboard:logout' %}
+                                <form method="post" action="{% url 'dashboard:logout' %}" class="logout-form logout-form--menu">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="bi {{ item.icon }}"></i>{{ item.label }}
+                                    </button>
+                                </form>
+                                {% elif item.url_name == 'admin:index' %}
                                 <a class="dropdown-item{% if current_view == item.url_name %} active{% endif %}" href="/admin/">
                                     <i class="bi {{ item.icon }}"></i>{{ item.label }}
                                 </a>
@@ -95,7 +104,9 @@
 
             <div class="collapse navbar-collapse" id="mainNav">
                 {% if can_switch_church and available_churches %}
-                <form method="get" action="{% url 'dashboard:home' %}" class="brand-church-switch d-lg-none w-100 mb-2">
+                <form method="post" action="{% url 'dashboard:switch_church' %}" class="brand-church-switch d-lg-none w-100 mb-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.path }}">
                     <select name="church" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Switch church context">
                         <option value="" {% if not active_church %}selected{% endif %}>All churches</option>
                         {% for c in available_churches %}

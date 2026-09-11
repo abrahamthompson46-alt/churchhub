@@ -1,5 +1,7 @@
 """Church-scoping utilities for multi-tenant data isolation."""
 
+import uuid
+
 from django.core.exceptions import PermissionDenied
 
 from permissions.checks import can_view_all_churches
@@ -19,6 +21,10 @@ def get_user_church(user):
 def _church_from_id(church_id, manageable):
     if not church_id:
         return None
+    try:
+        uuid.UUID(str(church_id))
+    except (ValueError, TypeError, AttributeError):
+        return None
     return manageable.filter(pk=church_id).first()
 
 
@@ -28,12 +34,16 @@ def get_active_church(request):
     Hierarchy users may switch via session within their manageable churches.
     Tree admins with more than one church and no explicit GET/session church
     stay unfocused (None) so the toolbar "All churches" matches dashboard SUBTREE.
+    Query ``church=all`` or a non-UUID value is ignored (not a session write).
     """
     if not request.user.is_authenticated:
         return None
 
     manageable = get_manageable_churches(request.user)
-    church_id = request.GET.get("church")
+    raw = request.GET.get("church")
+    church_id = None
+    if raw is not None and str(raw).strip() and str(raw).strip().lower() != "all":
+        church_id = str(raw).strip()
     session = getattr(request, "session", None)
     had_explicit = bool(church_id)
     if not church_id and session is not None:

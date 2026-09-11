@@ -73,6 +73,14 @@ class PortalCredentialHardeningTests(TestCase):
         with self.assertRaises(PortalAuthError):
             resolve_confirm_token(token)
 
+    def test_public_login_errors_do_not_enumerate_emails(self):
+        with self.assertRaises(PortalAuthError) as unknown:
+            authenticate_portal_credentials("nobody@example.com", "1991-07-04")
+        with self.assertRaises(PortalAuthError) as known:
+            authenticate_portal_credentials("sam.member@example.com", "not-the-password")
+        self.assertEqual(str(unknown.exception), str(known.exception))
+        self.assertEqual(str(unknown.exception), "Email or password is incorrect.")
+
 
 @override_settings(HEALTH_CHECK_TOKEN="test-health-secret")
 class HealthEndpointAuthTests(TestCase):

@@ -238,6 +238,12 @@ body.platform-body {
     padding-inline: 0.65rem;
 }
 
+.platform-sidebar-footer .logout-form,
+.platform-topbar-actions .logout-form {
+    display: inline-flex;
+    margin: 0;
+}
+
 .platform-topbar-logout-label {
     display: none;
 }

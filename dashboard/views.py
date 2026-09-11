@@ -24,10 +24,10 @@ from transactions.services import generate_monthly_cutoff
 
 def _apply_church_switch(request, church_param):
     """
-    Set or clear session church from a query/form value.
+    Set or clear session church from a form value.
 
     Empty string or 'all' clears current_church_id. A valid UUID among
-    manageable churches sets it.
+    manageable churches sets it. GET query strings are not used.
     """
     if church_param is None:
         return
@@ -89,11 +89,6 @@ def teller_console_api(request):
 
 @login_required
 def home(request):
-    if "church" in request.GET:
-        _apply_church_switch(request, request.GET.get("church"))
-        # Redirect so get_active_church never sees church=all / empty as a UUID
-        return redirect("dashboard:home")
-
     context = build_home_context(request)
     return render(request, "dashboard/home.html", context)
 
@@ -117,10 +112,11 @@ def pin_quick_action(request):
 
 
 @login_required
+@require_POST
 def switch_church(request):
-    if "church" in request.GET:
-        _apply_church_switch(request, request.GET.get("church"))
-    return redirect("dashboard:home")
+    _apply_church_switch(request, request.POST.get("church"))
+    target = safe_internal_redirect(request.POST.get("next") or "", None)
+    return redirect(target or "dashboard:home")
 
 
 @login_required
@@ -189,6 +185,7 @@ def notification_count(request):
 
 
 @login_required
+@require_POST
 def custom_logout(request):
     from church_system.denomination_scope import get_active_denomination
 

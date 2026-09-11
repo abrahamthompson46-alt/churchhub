@@ -677,6 +677,24 @@ body.app-body.auth-page {
     color: var(--ch-primary);
 }
 
+.logout-form {
+    display: inline;
+    margin: 0;
+}
+
+.logout-form--menu {
+    display: block;
+    width: 100%;
+}
+
+.logout-form--menu .dropdown-item {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+}
+
 @media (max-width: 991px) {
     .ch-navbar .navbar-collapse {
         background: var(--ch-dark-elevated);

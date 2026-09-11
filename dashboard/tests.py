@@ -484,20 +484,35 @@ class ViewTests(DashboardTestMixin, TestCase):
         session = self.client.session
         session["current_church_id"] = str(self.church.id)
         session.save()
-        response = self.client.get(reverse("dashboard:switch_church") + "?church=")
+        response = self.client.post(reverse("dashboard:switch_church"), {"church": ""})
         self.assertEqual(response.status_code, 302)
         self.assertNotIn("current_church_id", self.client.session)
 
-    def test_home_clears_church_with_all(self):
+    def test_home_get_does_not_switch_church(self):
         self._login("treasury")
         session = self.client.session
         session["current_church_id"] = str(self.church.id)
         session.save()
         response = self.client.get(reverse("dashboard:home") + "?church=all", follow=True)
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn("current_church_id", self.client.session)
+        self.assertEqual(self.client.session.get("current_church_id"), str(self.church.id))
 
-    def test_open_redirect_blocked_on_notification_follow(self):
+    def test_switch_church_rejects_get(self):
+        self._login("treasury")
+        response = self.client.get(reverse("dashboard:switch_church") + "?church=")
+        self.assertEqual(response.status_code, 405)
+
+    def test_logout_rejects_get(self):
+        self._login("treasury")
+        response = self.client.get(reverse("dashboard:logout"))
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(self.client.session.get("_auth_user_id"))
+
+    def test_logout_post_clears_session(self):
+        self._login("treasury")
+        response = self.client.post(reverse("dashboard:logout"))
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
         n = notify_user(
             self.treasury,
             "Phish",

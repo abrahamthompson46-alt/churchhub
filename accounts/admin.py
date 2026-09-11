@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
+from admin_custom.audit_admin import ReadOnlyAuditModelAdmin
 from .models import TrustedDevice, User, UserActivityLog, UserInvitation
 
 
@@ -61,17 +62,11 @@ class CustomUserAdmin(UserAdmin):
 
 
 @admin.register(UserActivityLog)
-class UserActivityLogAdmin(admin.ModelAdmin):
+class UserActivityLogAdmin(ReadOnlyAuditModelAdmin):
     list_display = ("user", "action", "performed_by", "ip_address", "created_at")
     list_filter = ("action", "created_at")
     search_fields = ("user__username",)
     readonly_fields = ("user", "action", "performed_by", "ip_address", "details", "created_at")
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
 
 
 @admin.register(UserInvitation)

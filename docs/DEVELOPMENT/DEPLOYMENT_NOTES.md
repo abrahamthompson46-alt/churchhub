@@ -283,13 +283,14 @@ sudo bash deploy/firewall/ufw-churchhub.sh --check-exposure
 | Mechanism | Notes |
 |-----------|-------|
 | Render / provider Postgres backups | Enable in dashboard |
-| `manage.py backup_database --verify` | Streaming pg_dump→gzip; optional age encrypt; `0600` files |
+| `manage.py backup_database --verify` | Streaming pg_dump→gzip; media tar; optional age encrypt; `0600` files |
 | `manage.py restore_database` | Requires `--confirm DESTROY_LOCAL_DATA` (+ production flag) |
+| `manage.py restore_drill` | Restores into a throwaway DB only; writes `backups/restore_drills/*.json` |
 | `scripts/backup.sh` | Wrapper; honors `CHURCHHUB_BACKUP_DIR` |
 | Celery Beat `backup_database_task` | Daily ~03:00 when Beat + Postgres |
 | systemd `churchhub-backup.timer` | Daily 03:15 oneshot (optional; see below) |
-| Offsite | `deploy/backup/rclone-sync.sh` — **opt-in** via env |
-| Media | Disk snapshot or S3 versioning |
+| Offsite | `app` = rclone post-hook (required on production VPS unless `managed`) |
+| Media | Archived as `churchhub_*_media.tar.gz` with the dump |
 
 ### Install backup timer (VPS)
 

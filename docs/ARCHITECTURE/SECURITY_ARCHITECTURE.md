@@ -197,12 +197,12 @@ Payroll sensitive fields use encryption helpers (`tin_encrypted`, etc.).
 | SQL injection | Prefer ORM; avoid string-built SQL |
 | XSS | Template auto-escape; sanitize where HTML allowed |
 | Clickjacking | `X_FRAME_OPTIONS=DENY` |
-| File uploads | Shared `church_system.uploads` validators (size + extension + MIME allowlists) on announcements, meetings, welfare, member photos, branding; nginx `client_max_body_size 25m`; Django `DATA_UPLOAD_MAX_MEMORY_SIZE` / `FILE_UPLOAD_MAX_MEMORY_SIZE` aligned. No virus-scan integration yet. |
+| File uploads | Shared `church_system.uploads` validators (size + extension + MIME allowlists + magic-byte prefixes for JPEG/PNG/GIF/WebP/PDF/Office and binary/HTML rejection for txt/csv) on announcements, meetings, welfare, member photos, branding; nginx `client_max_body_size 25m`; Django `DATA_UPLOAD_MAX_MEMORY_SIZE` / `FILE_UPLOAD_MAX_MEMORY_SIZE` aligned. No virus-scan integration yet. |
 | Mass assignment | Forms / explicit service parameters |
 
 ### Planned
 
-Virus scan integration; optional magic-byte sniffing beyond extension/MIME.
+Virus scan integration.
 
 ---
 

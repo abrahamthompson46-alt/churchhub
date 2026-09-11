@@ -28,7 +28,7 @@ def campaigns_for_church(church, *, status=None):
 
 
 def get_campaign_or_404(request, pk):
-    qs = filter_by_church(ContributionCampaign.objects.all(), request, church_field="church")
+    qs = filter_by_church(ContributionCampaign.objects.all(), request, field="church")
     return get_object_or_404(qs.select_related("offering_category", "church"), pk=pk)
 
 

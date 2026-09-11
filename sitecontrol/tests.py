@@ -46,7 +46,7 @@ class PlatformAccessTests(SiteControlClientHarness, TestCase):
 
     def test_platform_user_can_logout_from_control_room(self):
         self.client.login(username="platform", password="pass12345")
-        response = self.client.get(reverse("dashboard:logout"), follow=False)
+        response = self.client.post(reverse("dashboard:logout"), follow=False)
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "logged_out.html")
         self.assertFalse(response.wsgi_request.user.is_authenticated)

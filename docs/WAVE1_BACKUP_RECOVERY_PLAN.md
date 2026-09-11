@@ -16,11 +16,13 @@
 | `church_system/tasks.py` | Beat task honors `CHURCHHUB_BACKUP_*` + `--verify` |
 | `church_system/tests_backup_restore.py` | Env + safety tests |
 | `deploy/systemd/churchhub-backup.service` / `.timer` | Daily oneshot |
-| `deploy/backup/rclone-sync.sh` + `README.md` | Opt-in offsite |
+| `deploy/backup/rclone-sync.sh` + `README.md` | App offsite (rclone); fail-closed on production VPS |
 | `scripts/backup.sh` | Env-aware + `--verify` |
-| Docs | `SECURITY.md`, `DEPLOYMENT_GUIDE.md`, runbook, DEPLOYMENT_NOTES, `.env.example` |
+| `church_system/management/commands/restore_drill.py` | Throwaway-DB restore + JSON drill log |
 
-**Encryption:** age (optional). **Upload:** never without `CHURCHHUB_BACKUP_RCLONE_REMOTE` / post-hook.
+**Status:** IMPLEMENTED — including media archives and production offsite fail-closed (2026-09-11).
+
+**Encryption:** age required for production **app** offsite (unless `CHURCHHUB_BACKUP_ALLOW_PLAINTEXT`). **Upload:** production VPS defaults to app offsite; `managed` for provider snapshots.
 
 ---
 

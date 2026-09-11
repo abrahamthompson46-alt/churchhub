@@ -39,7 +39,7 @@
             {% endif %}
             <a href="{% url 'portal:thanksgiving_testimony' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-stars me-1"></i>Thanksgiving</a>
             <a href="{% url 'portal:profile' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-person me-1"></i>Profile</a>
-            <a href="{% url 'dashboard:logout' %}" class="btn btn-primary btn-sm">Sign out</a>
+            {% include "includes/logout_button.html" with extra_class="" button_class="btn btn-primary btn-sm" label="Sign out" %}
         </div>
     </header>
 

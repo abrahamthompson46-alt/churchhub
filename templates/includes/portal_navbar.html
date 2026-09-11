@@ -19,7 +19,7 @@
                     <a href="{% url 'portal:thanksgiving_testimony' %}" class="tool-btn" title="Thanksgiving"><i class="bi bi-stars"></i></a>
                     <a href="{% url 'portal:home' %}" class="tool-btn" title="Portal home"><i class="bi bi-house"></i></a>
                     <a href="{% url 'portal:profile' %}" class="tool-btn" title="My profile"><i class="bi bi-person"></i></a>
-                    <a href="{% url 'dashboard:logout' %}" class="btn btn-sm btn-outline-light">Sign out</a>
+                    {% include "includes/logout_button.html" with extra_class="" button_class="btn btn-sm btn-outline-light" label="Sign out" icon="" %}
                 </div>
             </div>
         </div>

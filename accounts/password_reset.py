@@ -1,6 +1,6 @@
 """Staff password reset with branded HTML and platform SMTP."""
 
-from django.contrib.auth.forms import PasswordResetForm
+from django.contrib.auth.forms import PasswordChangeForm, PasswordResetForm, SetPasswordForm
 from django.contrib.auth.views import PasswordResetView
 from django.contrib.sites.shortcuts import get_current_site
 from django.template.loader import render_to_string
@@ -104,3 +104,23 @@ class StaffPasswordResetView(PasswordResetView):
     email_template_name = "registration/password_reset_email.html"
     html_email_template_name = "emails/staff_password_reset.html"
     subject_template_name = "registration/password_reset_subject.txt"
+
+
+class StaffPasswordChangeForm(PasswordChangeForm):
+    def save(self, commit=True):
+        user = super().save(commit=commit)
+        if commit:
+            from accounts.mfa import revoke_all_trusted_devices
+
+            revoke_all_trusted_devices(user)
+        return user
+
+
+class StaffSetPasswordForm(SetPasswordForm):
+    def save(self, commit=True):
+        user = super().save(commit=commit)
+        if commit:
+            from accounts.mfa import revoke_all_trusted_devices
+
+            revoke_all_trusted_devices(user)
+        return user

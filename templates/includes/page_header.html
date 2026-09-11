@@ -21,7 +21,7 @@
         {% if page_description %}<p class="page-lead">{{ page_description }}</p>{% endif %}
     </div>
     {% if page_actions %}
-    <div class="page-header-actions">{{ page_actions|safe }}</div>
+    <div class="page-header-actions">{{ page_actions }}</div>
     {% elif action_url and action_label %}
     <div class="page-header-actions">
         <a href="{{ action_url }}" class="btn btn-primary btn-sm">

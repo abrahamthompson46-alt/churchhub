@@ -57,6 +57,15 @@ class ActiveChurchScopeTests(TestCase):
         request.session = {}
         self.assertIsNone(get_active_church(request))
 
+    def test_get_church_all_does_not_raise_or_clear_session(self):
+        factory = RequestFactory()
+        request = factory.get("/dashboard/", {"church": "all"})
+        request.user = self.super
+        request.session = {"current_church_id": str(self.church_a.id)}
+        church = get_active_church(request)
+        self.assertEqual(church, self.church_a)
+        self.assertEqual(request.session["current_church_id"], str(self.church_a.id))
+
     def test_super_admin_sees_inactive_church_in_manageable_scope(self):
         from permissions.scoping import get_manageable_churches
 

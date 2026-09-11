@@ -20,7 +20,13 @@ if [[ "${1:-}" == "--dry-run" ]]; then
 fi
 
 REMOTE="${CHURCHHUB_BACKUP_RCLONE_REMOTE:-${RCLONE_REMOTE:-}}"
+MODE="${CHURCHHUB_BACKUP_OFFSITE:-}"
+REQUIRE="$(echo "${CHURCHHUB_BACKUP_REQUIRE_OFFSITE:-false}" | tr '[:upper:]' '[:lower:]')"
 if [[ -z "$REMOTE" ]]; then
+  if [[ "$MODE" == "app" || "$REQUIRE" == "true" || "$REQUIRE" == "1" || "$REQUIRE" == "yes" ]]; then
+    echo "ERROR: offsite required but CHURCHHUB_BACKUP_RCLONE_REMOTE is unset." >&2
+    exit 1
+  fi
   echo "Offsite sync skipped: CHURCHHUB_BACKUP_RCLONE_REMOTE unset."
   exit 0
 fi
@@ -42,6 +48,9 @@ ARGS+=(--checksum -v)
 if [[ -n "$FILE" && -f "$FILE" ]]; then
   echo "rclone ${ARGS[*]} $FILE $REMOTE"
   rclone "${ARGS[@]}" "$FILE" "$REMOTE"
+  if [[ -f "${FILE}.sha256" ]]; then
+    rclone "${ARGS[@]}" "${FILE}.sha256" "$REMOTE"
+  fi
 else
   echo "rclone ${ARGS[*]} $LOCAL_DIR $REMOTE"
   rclone "${ARGS[@]}" "$LOCAL_DIR" "$REMOTE"

@@ -195,6 +195,16 @@ def campaign_detail(request, pk):
             for row in member_totals
         ]
         slug = f"campaign-{campaign.code.lower()}"
+        from reports.services import audit_export
+
+        audit_export(
+            user=request.user,
+            report_key="contribution_campaign_totals",
+            export_format=export_fmt,
+            row_count=len(rows),
+            church=church,
+            params={"campaign": str(campaign.pk), "code": campaign.code},
+        )
         if export_fmt == "csv":
             return export_table_csv(headers, rows, f"{slug}.csv")
         return export_table_excel(headers, rows, f"{slug}.xlsx", campaign.name[:31])

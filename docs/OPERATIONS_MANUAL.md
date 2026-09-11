@@ -56,7 +56,7 @@ Access: `/platform/` after MFA (when required).
 | Automated DB backup | Daily (Beat) | `backup_database_task` |
 | Manual backup | Before major change | `python manage.py backup_database` |
 | Provider snapshot | Per host policy | Render/Postgres console |
-| Restore drill | Before pilot + quarterly | Restore to staging; verify login + one txn |
+| Restore drill | Before pilot + quarterly | `manage.py restore_drill` into throwaway DB; keep JSON log |
 
 **Restore is destructive** — practice on staging only until runbook signed.
 

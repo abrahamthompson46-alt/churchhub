@@ -45,9 +45,10 @@
                 </form>
                 {% endif %}
 
-                <p class="text-center small mt-3 mb-0">
-                    <a href="{% url 'logout' %}">Cancel and sign out</a>
-                </p>
+                <form method="post" action="{% url 'logout' %}" class="logout-form text-center mt-3 mb-0">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-link btn-sm text-decoration-none p-0">Cancel and sign out</button>
+                </form>
             </div>
         </div>
     </section>

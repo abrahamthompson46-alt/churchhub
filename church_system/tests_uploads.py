@@ -13,8 +13,18 @@ from church_system.uploads import (
 
 class UploadValidationTests(SimpleTestCase):
     def test_accepts_jpeg_image(self):
-        f = SimpleUploadedFile("photo.jpg", b"fake-jpeg", content_type="image/jpeg")
+        jpeg = b"\xff\xd8\xff\xe0\x00\x10JFIF" + b"\x00" * 8
+        f = SimpleUploadedFile("photo.jpg", jpeg, content_type="image/jpeg")
         validate_upload(f, kind="image")
+
+    def test_rejects_html_named_as_jpeg(self):
+        f = SimpleUploadedFile(
+            "photo.jpg",
+            b"<html><body>not an image</body></html>",
+            content_type="image/jpeg",
+        )
+        with self.assertRaises(ValidationError):
+            validate_upload(f, kind="image")
 
     def test_rejects_oversized_image(self):
         f = SimpleUploadedFile(

@@ -100,7 +100,9 @@
 
     {% if scope_switcher %}
     <section class="cc-scope-bar" role="region" aria-label="Church context">
-        <form method="get" action="{% url 'dashboard:home' %}" class="cc-scope-bar__form">
+        <form method="post" action="{% url 'dashboard:switch_church' %}" class="cc-scope-bar__form">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{% url 'dashboard:home' %}">
             <label class="cc-scope-bar__label" for="dash-church-scope">Congregation</label>
             <select id="dash-church-scope" name="church" class="form-select form-select-sm cc-scope-bar__select" onchange="this.form.submit()">
                 <option value="all"{% if not scope_switcher.focused_id %} selected{% endif %}>All churches</option>

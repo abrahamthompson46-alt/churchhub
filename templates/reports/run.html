@@ -118,18 +118,27 @@
 </script>
 {% endif %}
 {% if report_key == "member_summary" and data.member_dashboard and data.member_dashboard.trend %}
+{{ data.member_dashboard.trend.labels|json_script:"member-trend-labels" }}
+{{ data.member_dashboard.trend.new|json_script:"member-trend-new" }}
+{{ data.member_dashboard.trend.cumulative_net|json_script:"member-trend-net" }}
+{{ data.member_dashboard.status_chart.labels|json_script:"member-status-labels" }}
+{{ data.member_dashboard.status_chart.data|json_script:"member-status-data" }}
 <script>
 (function () {
+    function readJson(id) {
+        const el = document.getElementById(id);
+        return el ? JSON.parse(el.textContent) : [];
+    }
     const trend = document.getElementById('memberTrendChart');
     if (trend && typeof Chart !== 'undefined') {
         new Chart(trend, {
             data: {
-                labels: {{ data.member_dashboard.trend.labels_json|safe }},
+                labels: readJson('member-trend-labels'),
                 datasets: [
                     {
                         type: 'bar',
                         label: 'New members',
-                        data: {{ data.member_dashboard.trend.new_json|safe }},
+                        data: readJson('member-trend-new'),
                         backgroundColor: '#5b7c99',
                         borderSkipped: false,
                         order: 2
@@ -137,7 +146,7 @@
                     {
                         type: 'line',
                         label: 'Cumulative net',
-                        data: {{ data.member_dashboard.trend.cumulative_net_json|safe }},
+                        data: readJson('member-trend-net'),
                         borderColor: '#1e3a5f',
                         backgroundColor: 'rgba(30, 58, 95, 0.10)',
                         fill: true,
@@ -164,9 +173,9 @@
         new Chart(statusEl, {
             type: 'doughnut',
             data: {
-                labels: {{ data.member_dashboard.status_chart.labels_json|safe }},
+                labels: readJson('member-status-labels'),
                 datasets: [{
-                    data: {{ data.member_dashboard.status_chart.data_json|safe }},
+                    data: readJson('member-status-data'),
                     backgroundColor: ['#1e3a5f', '#5b7c99', '#94a3b8', '#cbd5e1', '#64748b', '#334155', '#0f172a'],
                     borderWidth: 0
                 }]

@@ -28,24 +28,24 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 | CH-SEC-007 | HIGH | CONFIRMED | FIXED (Phase 1) | Remittance/bank-rec use read-oriented wrapper | No | Staff |
 | CH-SEC-008 | MEDIUM | CONFIRMED | FIXED | Announcement detail IDOR for approvers | Yes | Staff |
 | CH-SEC-009 | MEDIUM | CONFIRMED | FIXED (Phase 4) | Platform dashboard stats not denomination-scoped | Yes | Platform |
-| CH-SEC-010 | MEDIUM | CONFIRMED | OPEN | Portal login account enumeration | N/A | No |
+| CH-SEC-010 | MEDIUM | CONFIRMED | FIXED | Portal login account enumeration | N/A | No |
 | CH-SEC-011 | MEDIUM | CONFIRMED | FIXED (Phase 3) | Welfare same-user approval | No | Staff |
 | CH-SEC-012 | MEDIUM | CONFIRMED | FIXED (Phase 3) | Concurrent void can double-reverse | No | Staff |
 | CH-SEC-013 | MEDIUM | CONFIRMED | FIXED (Phase 3) | Incomplete idempotency keys reusable | No | Staff |
-| CH-SEC-014 | MEDIUM | CONFIRMED | OPEN | UserActivityLog deletable in admin | No | Break-glass |
+| CH-SEC-014 | MEDIUM | CONFIRMED | FIXED | UserActivityLog deletable in admin | No | Break-glass |
 | CH-SEC-015 | MEDIUM | CONFIRMED | OPEN | Email+DOB first-login credential | No | Public portal |
-| CH-SEC-016 | MEDIUM | CONFIRMED | OPEN | Some financial CSVs unaudited | No | Staff |
-| CH-SEC-017 | LOW | CONFIRMED | OPEN | GET logout CSRF | No | Victim session |
-| CH-SEC-018 | LOW | CONFIRMED | OPEN | GET church switch | No | Staff |
+| CH-SEC-016 | MEDIUM | CONFIRMED | FIXED | Some financial CSVs unaudited | No | Staff |
+| CH-SEC-017 | LOW | CONFIRMED | FIXED | GET logout CSRF | No | Victim session |
+| CH-SEC-018 | LOW | CONFIRMED | FIXED | GET church switch | No | Staff |
 | CH-SEC-019 | LOW | CONFIRMED | OPEN | Identifier lockout DoS | N/A | No |
 | CH-SEC-020 | LOW | CONFIRMED | OPEN | Django pin drift 6.0 vs 5.1.15 | N/A | N/A |
 | CH-SEC-021 | LOW | CONFIRMED | OPEN | Compose publishes DB/Redis + default passwords | Dev | N/A |
 | CH-SEC-022 | LOW | CONFIRMED | OPEN | Django HSTS 1h vs Nginx 1y | N/A | N/A |
 | CH-SEC-L1 | HIGH | LIKELY | FIXED (Phase 4) | Unanchored SUPER_ADMIN is global | Yes | If user exists |
-| CH-SEC-L2 | MEDIUM | LIKELY | OPEN | Upload validation is MIME/extension only | Maybe | Yes |
+| CH-SEC-L2 | MEDIUM | LIKELY | FIXED | Upload validation is MIME/extension only | Maybe | Yes |
 | CH-SEC-L3 | MEDIUM | LIKELY | FIXED (Phase 3) | Settlement/district remittance races | No | Staff |
-| CH-SEC-L4 | LOW | LIKELY | OPEN | Password-reset paths skip trusted-device revoke | No | Yes |
-| CH-SEC-P1 | LOW | POTENTIAL | OPEN | Health token compared without `compare_digest` | N/A | No |
+| CH-SEC-L4 | LOW | LIKELY | FIXED | Password-reset paths skip trusted-device revoke | No | Yes |
+| CH-SEC-P1 | LOW | POTENTIAL | FIXED | Health token compared without `compare_digest` | N/A | No |
 | CH-SEC-P2 | INFO | POTENTIAL | OPEN | Nginx template hostnames vs `mychurch.zreta.com` | N/A | N/A |
 
 ---
@@ -238,7 +238,7 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 **Portal login returns distinct errors** for unknown email, duplicate email, DOB mismatch, and post-password state (`portal/services.py` 211–245; template shows non-field errors).  
 **Remediation:** Generic “email or password incorrect”; log internally.  
 **Test:** Unknown vs known email produce identical public error text.  
-**Auth:** No. **Cross-tenant:** N/A. **Confidence:** High.
+**Remediation (2026-09-11):** **FIXED.** `authenticate_portal_credentials` returns one public string (`PORTAL_INVALID_CREDENTIALS`). Internal `logger.info` uses reason codes only (no email). Tests: `PortalCredentialHardeningTests.test_public_login_errors_do_not_enumerate_emails`.
 
 ---
 
@@ -280,7 +280,7 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 **`UserActivityLogAdmin` disables add/change but not delete** (`accounts/admin.py` 63–75). Model has no immutable `delete`. Contrast `PlatformAuditLog`. Break-glass `/admin/` users can erase staff activity history.  
 **Remediation:** `has_delete_permission = False`; override `delete()` to raise.  
 **Test:** Admin delete of activity log is denied.  
-**Auth:** Break-glass. **Cross-tenant:** No. **Confidence:** High.
+**Remediation (2026-09-11):** **FIXED.** `UserActivityLogAdmin` subclasses `ReadOnlyAuditModelAdmin` (`has_delete_permission` False).
 
 ---
 
@@ -300,13 +300,15 @@ Asset register/activity CSV and contribution member-total export lack `audit_exp
 **Remediation:** Write export audit like reports.  
 **Auth:** Yes. **Cross-tenant:** No. **Confidence:** High.
 
+**Remediation (2026-09-11):** **FIXED.** `assets:asset_export_csv`, `assets:activity_log_export`, and contribution campaign member-total CSV/Excel call `audit_export`. Activity CSV also requires `export_assets`.
+
 ---
 
 ## CH-SEC-017 — LOW — CONFIRMED
 
 `dashboard.views.custom_logout` (191–200) has no `@require_POST`; portal navbar uses GET (`templates/includes/portal_navbar.html` 22). Third-party page can force logout.  
 **Remediation:** POST + CSRF.  
-**Auth:** Victim session. **Confidence:** High.
+**Remediation (2026-09-11):** **FIXED.** `custom_logout` is `@require_POST`; Sign out controls are CSRF forms in navbar, portal, platform, and MFA.
 
 ---
 
@@ -315,6 +317,8 @@ Asset register/activity CSV and contribution member-total export lack `audit_exp
 `dashboard:switch_church` mutates session on GET (`dashboard/views.py` ~119–123).  
 **Remediation:** POST + CSRF.  
 **Confidence:** High.
+
+**Remediation (2026-09-11):** **FIXED.** `switch_church` is POST-only; dashboard home GET no longer mutates church session. Tests: `test_switch_church_rejects_get`, `test_home_get_does_not_switch_church`.
 
 ---
 
@@ -355,17 +359,21 @@ Failed logins lock by submitted identifier (`sitecontrol/middleware.py` 260–33
 **CH-SEC-L1 HIGH:** `get_manageable_churches` returns all churches when superadmin has no church/denomination (`permissions/scoping.py` 16–31). `User.clean()` would block; `save()` skips it.  
 
 **Remediation (Phase 4):** **FIXED.** Unanchored institution `is_superadmin` / break-glass `is_superuser` → empty manageable churches; unanchored superadmin users → self-only. `User.save()` rejects new unanchored SUPER_ADMIN / DENOMINATION-scope rows (legacy rows via `QuerySet.update` still fail closed at read time). Tests: `permissions/tests_phase4_tenancy.py`. Residual: inventory/quarantine historical unanchored SUPER_ADMIN rows in ops.  
-**CH-SEC-L2 MEDIUM:** `validate_upload` does not check magic bytes (`church_system/uploads.py` 100–138).  
+**CH-SEC-L2 MEDIUM:** `validate_upload` does not check magic bytes (`church_system/uploads.py` 100–138).
+
+**Remediation (2026-09-11):** **FIXED.** JPEG/PNG/GIF/WebP/PDF/Office and text uploads are checked against file prefixes. Tests: `church_system/tests_uploads.py`.  
 **CH-SEC-L3 MEDIUM:** Settlement posting and district remittance duplicate checks are query-based without row locks.  
 
 **Remediation (Phase 3):** **FIXED.** Settlement draft/post use `select_for_update`; partial unique `uniq_settlement_active_period_obligation` on `(from_unit_type, from_unit_id, offering_type, period_start, period_end)` for DRAFT|POSTED after quarantine (`0005`); `record_district_remittance` locks `MonthlyCutoff`. Tests: Phase3SettlementUniquenessTests.  
 **CH-SEC-L4 LOW:** Staff profile password change and portal set-password do not always revoke trusted devices.
 
+**Remediation (2026-09-11):** **FIXED.** `StaffPasswordChangeForm` / `StaffSetPasswordForm` and `PortalSetPasswordForm` call `revoke_all_trusted_devices`. Tests: `TrustedDeviceRevokeTests`.
+
 ---
 
 ## POTENTIAL
 
-**CH-SEC-P1:** Health token equality vs `hmac.compare_digest`.  
+**CH-SEC-P1:** **FIXED.** `health_check_authorized` compares HMAC-SHA256 digests with `hmac.compare_digest`.  
 **CH-SEC-P2:** Repo Nginx `server_name` is `zreta.com`; live app is `mychurch.zreta.com` — verify live vhost.  
-**CH-SEC-P3:** `|safe` in page header/table action slots — keep server-generated only.  
+**CH-SEC-P3:** `|safe` removed from page header/table/form action slots. Remaining `|safe`: hex-validated `institution_branding_css` only. Member summary charts use `json_script`.  
 **CH-SEC-P4:** `CHURCHHUB_BACKUP_POST_HOOK` executes a configured binary (`backup_ops.py`).

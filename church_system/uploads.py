@@ -1,4 +1,4 @@
-"""Shared upload validation — size, extension, and content-type allowlists.
+"""Shared upload validation — size, extension, content-type, and magic bytes.
 
 Use for every user-facing FileField / ImageField clean path.
 System-generated files (e.g. report export jobs) should not use these.
@@ -136,6 +136,78 @@ def validate_upload(uploaded, *, kind: str = "image") -> None:
             raise ValidationError(
                 f"File content type “{content_type}” is not allowed for {label}."
             )
+
+    _assert_magic_bytes(uploaded, ext)
+
+
+def _read_prefix(uploaded, size: int = 16) -> bytes:
+    read = getattr(uploaded, "read", None)
+    if not callable(read):
+        return b""
+    try:
+        data = read(size) or b""
+    except (OSError, ValueError):
+        return b""
+    seek = getattr(uploaded, "seek", None)
+    if callable(seek):
+        try:
+            seek(0)
+        except (OSError, ValueError):
+            pass
+    return bytes(data)[:size]
+
+
+def _looks_like_zip(header: bytes) -> bool:
+    return header.startswith(b"PK\x03\x04") or header.startswith(b"PK\x05\x06")
+
+
+def _looks_like_ole(header: bytes) -> bool:
+    return header.startswith(b"\xd0\xcf\x11\xe0")
+
+
+def _assert_magic_bytes(uploaded, ext: str) -> None:
+    header = _read_prefix(uploaded)
+    if ext in {".jpg", ".jpeg"}:
+        if not header.startswith(b"\xff\xd8\xff"):
+            raise ValidationError("That file is not a valid JPEG image.")
+        return
+    if ext == ".png":
+        if not header.startswith(b"\x89PNG\r\n\x1a\n"):
+            raise ValidationError("That file is not a valid PNG image.")
+        return
+    if ext == ".gif":
+        if not header.startswith(b"GIF87a") and not header.startswith(b"GIF89a"):
+            raise ValidationError("That file is not a valid GIF image.")
+        return
+    if ext == ".webp":
+        if not (header.startswith(b"RIFF") and b"WEBP" in header[:16]):
+            raise ValidationError("That file is not a valid WebP image.")
+        return
+    if ext == ".pdf":
+        if not header.startswith(b"%PDF"):
+            raise ValidationError("That file is not a valid PDF.")
+        return
+    if ext in {".docx", ".xlsx"}:
+        if not _looks_like_zip(header):
+            raise ValidationError("That Office file is not a valid document.")
+        return
+    if ext in {".doc", ".xls"}:
+        if not (_looks_like_ole(header) or _looks_like_zip(header)):
+            raise ValidationError("That Office file is not a valid document.")
+        return
+    if ext in {".txt", ".csv"}:
+        if (
+            header.startswith(b"MZ")
+            or header.startswith(b"%PDF")
+            or header.startswith(b"\x89PNG")
+            or header.startswith(b"\xff\xd8\xff")
+            or _looks_like_zip(header)
+        ):
+            raise ValidationError("That text file contains binary content and was rejected.")
+        stripped = header.lstrip()
+        if stripped.startswith(b"<") or stripped.startswith(b"<!"):
+            raise ValidationError("HTML is not allowed as a text upload.")
+        return
 
 
 def image_upload_validator(uploaded):

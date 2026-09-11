@@ -34,6 +34,7 @@ User = get_user_model()
 PORTAL_CONFIRM_SALT = "churchhub.portal.device-confirm"
 PORTAL_CONFIRM_MAX_AGE = 60 * 60  # 1 hour — shorter window limits link replay
 PORTAL_CONFIRM_CACHE_PREFIX = "portal_confirm:"
+PORTAL_INVALID_CREDENTIALS = "Email or password is incorrect."
 PORTAL_DOB_PASSWORD_FORMATS = (
     "%Y-%m-%d",
     "%Y/%m/%d",
@@ -98,9 +99,8 @@ def find_member_by_email(email: str) -> Optional[Member]:
     if not matches:
         return None
     if len(matches) > 1:
-        raise PortalAuthError(
-            "More than one member record uses this email. Contact your church office."
-        )
+        logger.info("portal_auth_denied reason=duplicate_email")
+        raise PortalAuthError(PORTAL_INVALID_CREDENTIALS)
     return matches[0]
 
 
@@ -210,13 +210,15 @@ def authenticate_portal_credentials(email: str, password: str) -> User:
 
     member = find_member_by_email(email)
     if member is None:
-        raise PortalAuthError("No active member was found for that email.")
+        logger.info("portal_auth_denied reason=unknown_or_inactive")
+        raise PortalAuthError(PORTAL_INVALID_CREDENTIALS)
 
     user = _linked_user(member) or find_portal_user_for_email(email)
 
     if user is not None and user.check_password(password):
         if user.member_id and user.member_id != member.pk:
-            raise PortalAuthError("Account link mismatch. Contact your church office.")
+            logger.info("portal_auth_denied reason=account_link_mismatch")
+            raise PortalAuthError(PORTAL_INVALID_CREDENTIALS)
         if not user.member_id:
             user.member = member
             user.church = member.church
@@ -224,15 +226,12 @@ def authenticate_portal_credentials(email: str, password: str) -> User:
         return user
 
     if user is not None and not user.must_change_password:
-        raise PortalAuthError(
-            "Use the password you set for the portal, or reset it from the sign-in page."
-        )
+        logger.info("portal_auth_denied reason=password_mismatch")
+        raise PortalAuthError(PORTAL_INVALID_CREDENTIALS)
 
     if not member_matches_dob(member, password):
-        raise PortalAuthError(
-            "Email and date of birth do not match our records. "
-            "For first sign-in use your member email and date of birth as YYYY-MM-DD."
-        )
+        logger.info("portal_auth_denied reason=dob_or_password_mismatch")
+        raise PortalAuthError(PORTAL_INVALID_CREDENTIALS)
 
     user = provision_portal_user(member) if user is None else user
     if user.check_password(password) or user.check_password(

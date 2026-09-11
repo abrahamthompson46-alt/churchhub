@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hmac
+
 from django.conf import settings
 
 
@@ -16,4 +18,7 @@ def health_check_authorized(request) -> bool:
     if not expected:
         return True
     supplied = (request.headers.get("X-Health-Token") or request.GET.get("token") or "").strip()
-    return supplied == expected
+    return hmac.compare_digest(
+        hmac.new(b"churchhub-health", supplied.encode("utf-8"), "sha256").digest(),
+        hmac.new(b"churchhub-health", expected.encode("utf-8"), "sha256").digest(),
+    )

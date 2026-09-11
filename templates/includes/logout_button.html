@@ -1,0 +1,8 @@
+<form method="post" action="{% url 'dashboard:logout' %}" class="logout-form {{ extra_class }}">
+    {% csrf_token %}
+    <button type="submit" class="{{ button_class }}" {% if title %}title="{{ title }}"{% endif %} {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}>
+        {% if icon %}<i class="bi {{ icon }}" aria-hidden="true"></i>{% endif %}
+        {% if label %}<span class="{{ label_class }}">{{ label }}</span>{% endif %}
+        {% if slot %}{{ slot }}{% endif %}
+    </button>
+</form>

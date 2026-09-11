@@ -23,7 +23,7 @@ ChurchHub treats security as an **operating model**: least privilege, tenant iso
 | Control | Detail |
 |---------|--------|
 | Staff login | Django sessions · `/accounts/login/` |
-| Portal login | Member email + DOB first password (`YYYY-MM-DD`) then forced change |
+| Portal login | Member email + chosen password; first access via one-time set-password email |
 | Password storage | Django password hashers (never plaintext) |
 | CSRF | Required on browser POSTs |
 | Rate limiting | Login throttling middleware; stricter portal caps |

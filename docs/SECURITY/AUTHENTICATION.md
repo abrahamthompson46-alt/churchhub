@@ -34,7 +34,7 @@ flowchart TD
 | Item | Detail |
 |------|--------|
 | Primary login | `/accounts/login/` → `church_system.auth.ChurchHubLoginView` |
-| Portal login | `/portal/login/` → `portal.views.portal_login` (member email + DOB/password) |
+| Portal login | `/portal/login/` → `portal.views.portal_login` (member email + chosen password) |
 | Backend | Default `ModelBackend` for staff; portal verifies against `members.Member` then establishes a session |
 | Settings | `LOGIN_URL=/accounts/login/`; `LOGIN_REDIRECT_URL=/dashboard/` (overridden by view) |
 | Root | `""` → `public_home` (landing). Signed-in users redirect to `/dashboard/`, `/portal/`, or `/platform/`. Unauthenticated visitors are not sent to login automatically. |
@@ -45,10 +45,11 @@ flowchart TD
 | Step | Behavior |
 |------|----------|
 | Username | Member **email** (must match an active `members.Member.email`) |
-| First password | Member **date of birth** as `YYYY-MM-DD` — **only while** `must_change_password` is true (first sign-in) |
-| After password set | DOB login is **permanently disabled**; use chosen password or reset flow |
-| Match rule | Email and DOB must both match the member directory before a portal session is issued |
-| Provisioning | First successful match creates/links a `User` (`role=MEMBER`, `must_change_password=True`) |
+| First access | Request a one-time email at `/portal/password/reset/`. That provisions a MEMBER user with an unusable password and sends a set-password link. Unknown emails get the same public “check your inbox” page. |
+| Password | Chosen password only. **Date of birth is never a login secret**, including for first sign-in and for leftover DOB hashes. |
+| After password set | Sign in at `/portal/login/`; untrusted browsers still need device confirmation |
+| Match rule | Email must match the member directory; password must match the Django hash and must not be the member’s date of birth |
+| Provisioning | Access-email (or clerk-created MEMBER user) creates/links `User` (`role=MEMBER`). Login does **not** create accounts. |
 | New device / first login | Confirmation email link (`/portal/confirm/?token=…`) before session; **single-use**, **1 hour** TTL; trusted-device cookie afterward |
 | Portal login throttling | Stricter cap (**3** failed attempts per 15 minutes per IP/email on `/portal/login/`); honeypot field rejects bots |
 | Email link base URL | Set **`CHURCHHUB_PUBLIC_URL`** to your live HTTPS **site root** only (example: `https://churchhub.pythonanywhere.com`) — **not** a path like `/dashboard/`. If unset or left at `localhost`, confirmation links in email will not work on phones or other devices. After changing it, redeploy and request a **new** confirmation email. Production also falls back to `DJANGO_CSRF_TRUSTED_ORIGINS` when the public URL is still localhost. Confirm links use `/portal/confirm/?token=…` so email clients handle signed tokens reliably. |
@@ -88,7 +89,7 @@ Portal login additionally sends users with `member_id` to the portal.
 | `managed_denominations` | M2M — operator denomination access |
 | `mfa_enabled` | Enrolled MFA flag (enforced only when site MFA policy requires the user’s audience) |
 | `member` | Optional OneToOne to `members.Member` |
-| `must_change_password` | Portal users must set a non-DOB password after first confirmed sign-in |
+| `must_change_password` | May still force an in-session password change after staff-set credentials |
 
 Password hashing: Django’s password framework only — never plaintext.
 
@@ -353,7 +354,7 @@ SiteSettings also: session timeout, login attempts/lockout, password min length 
 | Lockout | Cache rate-limit | Account lock + admin unlock | Persist lock events; unlock UI |
 | Sessions | Idle via SiteSettings | Absolute + logout-all + devices | Absolute timeout + logout-all |
 | MFA | TOTP + email OTP + recovery; trusted device 30d | SMS OTP | Expand optional roles |
-| Portal | Email + DOB bootstrap, device confirm, forced password change, portal reset | Richer member auth / optional portal MFA | Keep lane separation; enforce unique member email + DOB |
+| Portal | Email + set-password email, device confirm, portal reset | Richer member auth / optional portal MFA | Keep lane separation; unique member email |
 
 ---
 

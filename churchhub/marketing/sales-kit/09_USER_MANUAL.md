@@ -14,7 +14,7 @@
 5. You land on **Mission Control** (dashboard)
 
 **Members:** use the **Member Portal** login (`/portal/login/`) — not staff login.  
-First-time portal password is often date of birth as `YYYY-MM-DD`, then you must set a new password.
+First time: request a sign-in email from that page, choose a password from the link, then sign in. Your date of birth is not a password.
 
 ---
 

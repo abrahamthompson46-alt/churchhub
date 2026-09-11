@@ -312,7 +312,7 @@ class Member(SoftDeleteModel):
     date_of_birth = models.DateField(
         null=True,
         blank=True,
-        help_text="Required when an email is set (used for member portal first sign-in).",
+        help_text="Required when an email is set.",
     )
     date_joined = models.DateField(null=True, blank=True)
     membership_status = models.CharField(
@@ -409,8 +409,7 @@ class Member(SoftDeleteModel):
         self.email = email
         if email and not self.date_of_birth:
             errors["date_of_birth"] = (
-                "Date of birth is required when an email is set "
-                "(needed for member portal first sign-in)."
+                "Date of birth is required when an email is set."
             )
         if email:
             qs = Member.objects.filter(email__iexact=email)

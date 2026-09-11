@@ -166,8 +166,7 @@ class MemberForm(forms.ModelForm):
         if email and not dob:
             self.add_error(
                 "date_of_birth",
-                "Date of birth is required when an email is set "
-                "(needed for member portal first sign-in).",
+                "Date of birth is required when an email is set.",
             )
         if not self.church:
             return cleaned

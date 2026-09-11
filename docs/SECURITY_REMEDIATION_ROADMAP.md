@@ -130,7 +130,7 @@ Do these first. They are the reason the verdict is **READY WITH CRITICAL REMEDIA
 | P2-4 | CH-SEC-012 | `select_for_update` on original txn; unique on `reversal_of` | Concurrent voids → one reversal |
 | P2-5 | CH-SEC-013 | Lock incomplete idempotency keys; reject in-flight reuse | Parallel receipt POSTs with same key create one txn |
 | P2-6 | CH-SEC-014 | Disable delete on `UserActivityLog` admin; raise on model `delete()` | Admin delete denied |
-| P2-7 | CH-SEC-015 | Replace DOB-as-password with invite/OTP; keep device confirm | After set-password, DOB login fails |
+| P2-7 | CH-SEC-015 | Replace DOB-as-password with invite/OTP; keep device confirm | **Done (2026-09-11):** set-password email; DOB never authenticates |
 | P2-8 | CH-SEC-016 | Call `audit_export` on asset/contribution CSV | **Done (2026-09-11):** asset register/activity + campaign totals audited |
 | P2-9 | CH-SEC-L1 | Require church or denomination on SUPER_ADMIN at save (not only `clean()`) | Unanchored superadmin cannot be persisted |
 | P2-10 | CH-SEC-L2 | Magic-byte / content sniff on uploads | **Done (2026-09-11):** JPEG/PNG/GIF/WebP/PDF/Office + txt/csv prefix checks |

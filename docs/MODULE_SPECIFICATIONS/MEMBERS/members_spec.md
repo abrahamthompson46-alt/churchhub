@@ -56,7 +56,7 @@ Own **local church membership**: directory, member CRUD, families/departments, p
 | `Department` | UUID; FK church; unique `(church, name)` |
 | `Family` | UUID; FK church; optional head Member; unique `(church, name)` |
 | `Occupation` | BigAuto PK; FK church; unique `(church, name)` |
-| `Member` | UUID; church + optional dept/family/occupation; demographics; baptism fields; phone/membership_number partial uniques; **unique non-blank email** (case-insensitive, active records); email implies required DOB (portal); `is_active` synced from status |
+| `Member` | UUID; church + optional dept/family/occupation; demographics; baptism fields; phone/membership_number partial uniques; **unique non-blank email** (case-insensitive, active records); email implies required DOB (directory completeness, not a portal password); `is_active` synced from status |
 | `MemberTransfer` | from/to church; status; reason/notes; requested/processed by |
 | `Record` / `RecordImage` | Pastoral records + M2M images |
 | `History` / `HistoryImage` | History events + images |
@@ -263,7 +263,7 @@ flowchart LR
 - Search returns limited fields for picker — still PII; keep permissioned.  
 - Department delete allowed only when no members, active leadership, or budget lines reference the row; writes `MemberAuditLog` `DEPARTMENT_DELETE`. Spiritual-gift unassign writes `GIFT_UNASSIGN` audit before delete.
 - No member hard-delete view; status/`is_active` used instead.
-- **Portal eligibility:** unique non-blank email + date of birth required together. Clerks should capture both accurately so members can self-serve at `/portal/login/` without staff creating user accounts.
+- **Portal eligibility:** unique non-blank email. Clerks should capture email (and DOB for directory completeness) so members can request a set-password email at `/portal/password/reset/` without staff creating user accounts.
 
 ---
 

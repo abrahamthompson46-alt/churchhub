@@ -8,10 +8,13 @@ from django.urls import reverse
 
 from members.models import Member
 from organization.models import Church, Conference, District, Zone
-from portal.services import canonical_dob_password
+from accounts.models import UserRole
+from django.contrib.auth import get_user_model
 from sitecontrol.models import SiteSettings
 from sitecontrol.services import clear_settings_cache
 from sitecontrol.test_support import SiteControlClientHarness
+
+User = get_user_model()
 
 
 @override_settings(
@@ -47,6 +50,15 @@ class LoginRateLimitMiddlewareTests(SiteControlClientHarness, TestCase):
             email=self.portal_email,
             date_of_birth=self.portal_dob,
             gender="Male",
+        )
+        self.portal_password = "PortalPass1!"
+        self.portal_user = User.objects.create_user(
+            username=self.portal_email,
+            email=self.portal_email,
+            password=self.portal_password,
+            role=UserRole.MEMBER,
+            church=self.church,
+            member=self.member,
         )
         self.client = Client()
 
@@ -90,7 +102,7 @@ class LoginRateLimitMiddlewareTests(SiteControlClientHarness, TestCase):
             url,
             {
                 "username": self.portal_email,
-                "password": canonical_dob_password(self.portal_dob),
+                "password": self.portal_password,
             },
         )
         self.assertIsNone(cache.get("login_fail:127.0.0.1"))

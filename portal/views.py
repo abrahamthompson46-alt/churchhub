@@ -65,7 +65,7 @@ def _portal_post_login_redirect(request):
 
 @require_http_methods(["GET", "POST"])
 def portal_login(request):
-    """Email + DOB/password login with device confirmation for new browsers."""
+    """Email + password login with device confirmation for new browsers."""
     if request.user.is_authenticated and user_can_use_member_portal(request.user):
         return _portal_post_login_redirect(request)
 

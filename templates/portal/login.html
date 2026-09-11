@@ -15,7 +15,7 @@
             <p class="auth-platform-eyebrow mb-2">Member Portal</p>
             <h2 class="auth-split-title">{{ institution_display_name|default:site_name }}</h2>
             <p class="auth-split-tagline">
-                Sign in with the email on your member record and your portal password.
+                Sign in with the email on your member record and the password you chose.
             </p>
             <ul class="auth-feature-list">
                 <li><i class="bi bi-person-badge"></i> Membership profile</li>
@@ -43,7 +43,7 @@
             <div class="card-body p-4 p-md-5">
                 <h1 class="auth-form-title text-center">Member sign in</h1>
                 <p class="text-muted small mb-4 text-center">
-                    Email from your member record. After you sign in, a confirmation link may be sent to that inbox.
+                    First time? Request a sign-in email. New browsers may also need a confirmation link.
                 </p>
 
                 {% if form.non_field_errors %}
@@ -83,7 +83,7 @@
                     <button type="submit" class="btn btn-primary w-100 py-2 mt-2">Enter Portal</button>
                 </form>
                 <p class="text-center mt-3 mb-0 small">
-                    <a href="{% url 'portal:password_reset' %}" class="text-muted text-decoration-none">Forgot password?</a>
+                    <a href="{% url 'portal:password_reset' %}" class="text-muted text-decoration-none">First time or forgot password? Request a sign-in email</a>
                 </p>
                 <p class="auth-secondary-links text-center mt-3 mb-0 small">
                     <a href="{% url 'login' %}" class="text-decoration-none">Staff sign in</a>

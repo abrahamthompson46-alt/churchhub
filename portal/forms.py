@@ -9,20 +9,23 @@ from django.utils.http import urlsafe_base64_encode
 
 from decimal import Decimal
 
+from decimal import Decimal
+
 from remittance.models import WelfareAssistanceCase
-from permissions.roles import UserRole
 
 from .services import (
     PortalAuthError,
     authenticate_portal_credentials,
+    member_matches_dob,
     normalize_email,
+    portal_user_for_access_email,
 )
 
 User = get_user_model()
 
 
 class MemberPortalLoginForm(AuthenticationForm):
-    """Email as username; password is the member's chosen password (DOB only while first-login is required)."""
+    """Email as username; password is the member's chosen portal password."""
 
     username = forms.EmailField(
         label="Email",
@@ -45,7 +48,7 @@ class MemberPortalLoginForm(AuthenticationForm):
                 "placeholder": "Password",
             }
         ),
-        help_text="Use the password you chose for the portal.",
+        help_text="Use the password you chose after following the email we sent you.",
     )
     website = forms.CharField(
         required=False,
@@ -85,6 +88,15 @@ class PortalPasswordChangeForm(PasswordChangeForm):
         for name in ("old_password", "new_password1", "new_password2"):
             self.fields[name].widget.attrs.setdefault("class", "form-control")
 
+    def clean_new_password1(self):
+        password = self.cleaned_data.get("new_password1")
+        member = getattr(self.user, "member", None)
+        if password and member and member_matches_dob(member, password):
+            raise forms.ValidationError(
+                "Choose a password that is not your date of birth."
+            )
+        return password
+
     def save(self, commit=True):
         user = super().save(commit=False)
         user.must_change_password = False
@@ -100,13 +112,10 @@ class PortalPasswordResetForm(PasswordResetForm):
     """Only MEMBER accounts with a linked member email may reset via the portal."""
 
     def get_users(self, email):
-        email = normalize_email(email)
-        active_users = User.objects.filter(
-            is_active=True,
-            is_platform_user=False,
-            role=UserRole.MEMBER,
-        ).filter(email__iexact=email)
-        return (u for u in active_users if u.has_usable_password())
+        user = portal_user_for_access_email(email)
+        if user is None:
+            return ()
+        return (user,)
 
     def save(
         self,
@@ -157,7 +166,7 @@ class PortalPasswordResetForm(PasswordResetForm):
             context.update(
                 get_email_branding_context(
                     request,
-                    preheader="Reset your member portal password",
+                    preheader="Set or reset your member portal password",
                 )
             )
             subject = render_to_string(
@@ -199,6 +208,15 @@ class PortalSetPasswordForm(SetPasswordForm):
         super().__init__(*args, **kwargs)
         for name in ("new_password1", "new_password2"):
             self.fields[name].widget.attrs.setdefault("class", "form-control")
+
+    def clean_new_password1(self):
+        password = self.cleaned_data.get("new_password1")
+        member = getattr(self.user, "member", None)
+        if password and member and member_matches_dob(member, password):
+            raise forms.ValidationError(
+                "Choose a password that is not your date of birth."
+            )
+        return password
 
     def save(self, commit=True):
         user = super().save(commit=False)

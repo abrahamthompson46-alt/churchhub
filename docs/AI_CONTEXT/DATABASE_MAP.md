@@ -257,7 +257,7 @@ Constraint: debit account ≠ credit account. Unique `(church, code)`.
 
 | Model | Purpose |
 |-------|---------|
-| `Notification` | User/church notifications for dashboard |
+| `Notification` | In-app inbox (category, severity, event_key coalesce, occurrence_count) |
 
 ---
 
@@ -370,7 +370,7 @@ Distinct from `sitecontrol.PlatformAnnouncement`.
 | `PlatformAnnouncement` | Platform-wide announcements |
 | `TenantApplication` | Public/apply workflow; status PENDING/APPROVED/REJECTED/WITHDRAWN; types EXISTING_DISTRICT/NEW_HIERARCHY; `contact_phone_normalized` for demo identity lock |
 | `SubscriptionActivationRequest` | Full-version request; payment_reference_normalized unique among non-rejected; requested_plan FK + billing interval/amount/plan_name snapshot; optional receipt; unique pending per church |
-| `Denomination` | SaaS tenant boundary; branding; feature flags; `allow_institution_branding`; defaults |
+| `Denomination` | SaaS tenant boundary; branding; feature flags; `allow_institution_branding`; money decimal places; notification retention; defaults |
 | `MarketingSettings` | Singleton public inquiry, privacy consent, retention, website and sales-notification settings |
 | `MarketingCampaign` | UUID campaign; status/period and UTM attribution metadata |
 | `MarketingLead` | UUID platform sales inquiry; optional denomination/campaign; consent snapshot, assignment, lifecycle, notification delivery and anonymization metadata |

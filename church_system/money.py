@@ -1,7 +1,7 @@
 """
 Canonical money helpers — always use Decimal, never float, for currency.
 
-Policy: two decimal places, ROUND_HALF_UP (common for church treasury / GHS).
+Policy: ROUND_HALF_UP. Default is two decimal places; institutions may choose 0–4 for UI.
 """
 
 from __future__ import annotations
@@ -11,9 +11,30 @@ from typing import Any
 
 MONEY_QUANT = Decimal("0.01")
 ZERO_MONEY = Decimal("0.00")
+MIN_MONEY_PLACES = 0
+MAX_MONEY_PLACES = 4
+DEFAULT_MONEY_PLACES = 2
 
 
-def quantize_money(amount: Any) -> Decimal:
+def clamp_money_places(places: Any) -> int:
+    """Bound display/posting decimal places to a safe 0–4 range."""
+    try:
+        value = int(places)
+    except (TypeError, ValueError):
+        value = DEFAULT_MONEY_PLACES
+    return max(MIN_MONEY_PLACES, min(MAX_MONEY_PLACES, value))
+
+
+def money_decimal_places(*, church=None, denomination=None) -> int:
+    """Institution decimal places from the denomination SaaS tenant (default 2)."""
+    if denomination is None and church is not None:
+        denomination = getattr(church, "denomination", None)
+    if denomination is not None:
+        return clamp_money_places(getattr(denomination, "money_decimal_places", DEFAULT_MONEY_PLACES))
+    return DEFAULT_MONEY_PLACES
+
+
+def quantize_money(amount: Any, *, places: int | None = None) -> Decimal:
     """
     Normalize any numeric-like value to a Decimal money amount (2 dp).
 
@@ -29,7 +50,9 @@ def quantize_money(amount: Any) -> Decimal:
             value = Decimal(str(amount))
         except (InvalidOperation, ValueError, TypeError) as exc:
             raise ValueError(f"Invalid money amount: {amount!r}") from exc
-    return value.quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    dp = clamp_money_places(places) if places is not None else DEFAULT_MONEY_PLACES
+    quant = Decimal("1").scaleb(-dp)
+    return value.quantize(quant, rounding=ROUND_HALF_UP)
 
 
 def money_export_value(val: Any) -> Any:

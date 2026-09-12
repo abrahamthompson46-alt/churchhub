@@ -163,9 +163,10 @@ Services include `assert_working_day_allows_posting`, `assert_period_open`, open
 
 `MonthlyCutoff` per `(church, month)`:
 
-- Aggregates approved non-voided remittance payable lines into `total_tithe`, `total_combined`
-- `total_payable` = tithe + combined
-- `transferred` flag when remittance transfer marked
+- Snapshot of remittance payable MTD (`total_tithe`, `total_combined`); `total_payable` = tithe + combined
+- The remittance desk (`dashboard:cutoff`) **displays live GL** for the **working-day month** (same figure as the dashboard remittance-payable KPI). A stored snapshot is archival and is not used as the headline when it is stale.
+- `transferred` is set on remittance **approval** only when outstanding payable + district clearing is zero. A transferred flag with remaining GL is treated as incomplete; another district remittance may be recorded.
+- Duplicate bank remittance is blocked while a **PENDING** remittance journal exists for that cutoff — not merely because a prior approved remittance exists.
 
 Coexists with remittance `SettlementBatch` — see §5 (dual remittance concepts).
 

@@ -140,15 +140,26 @@ def save_financial_period(period, *, update_fields=None):
 
 
 def mark_monthly_cutoff_transferred(*, cutoff_id=None, church=None, month=None, transfer_date=None):
+    return set_monthly_cutoff_transfer_state(
+        cutoff_id=cutoff_id,
+        church=church,
+        month=month,
+        transferred=True,
+        transfer_date=transfer_date,
+    )
+
+
+def set_monthly_cutoff_transfer_state(
+    *,
+    cutoff_id=None,
+    church=None,
+    month=None,
+    transferred=True,
+    transfer_date=None,
+):
+    updates = {"transferred": transferred, "transfer_date": transfer_date if transferred else None}
     if cutoff_id:
-        return MonthlyCutoff.objects.filter(pk=cutoff_id, transferred=False).update(
-            transferred=True,
-            transfer_date=transfer_date,
-        )
+        return MonthlyCutoff.objects.filter(pk=cutoff_id).update(**updates)
     if church is not None and month is not None:
-        return MonthlyCutoff.objects.filter(
-            church=church,
-            month=month,
-            transferred=False,
-        ).update(transferred=True, transfer_date=transfer_date)
+        return MonthlyCutoff.objects.filter(church=church, month=month).update(**updates)
     return 0

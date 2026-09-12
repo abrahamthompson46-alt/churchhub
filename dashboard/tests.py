@@ -66,6 +66,32 @@ class ServiceTests(DashboardTestMixin, TestCase):
         self.assertIsNotNone(n)
         self.assertEqual(Notification.objects.filter(user=user).count(), 1)
 
+    def test_notify_user_coalesces_unread_event_key(self):
+        user = User.objects.create_user(
+            username="u_coalesce", password="pass12345", role=UserRole.MEMBER, church=self.church
+        )
+        first = notify_user(
+            user,
+            "Payable",
+            "1005 due",
+            category="FINANCE",
+            severity="WARNING",
+            event_key="remittance.outstanding.c1",
+        )
+        second = notify_user(
+            user,
+            "Payable",
+            "1100 due",
+            category="FINANCE",
+            severity="WARNING",
+            event_key="remittance.outstanding.c1",
+        )
+        self.assertEqual(first.pk, second.pk)
+        self.assertEqual(Notification.objects.filter(user=user).count(), 1)
+        second.refresh_from_db()
+        self.assertEqual(second.occurrence_count, 2)
+        self.assertEqual(second.message, "1100 due")
+
     def test_dashboard_role_treasury(self):
         user = User.objects.create_user(
             username="t1", password="pass12345", role=UserRole.TREASURY, church=self.church
@@ -471,6 +497,43 @@ class ViewTests(DashboardTestMixin, TestCase):
         session.save()
         response = self.client.get(reverse("dashboard:cutoff"))
         self.assertEqual(response.status_code, 200)
+
+    def test_cutoff_shows_live_payable_when_snapshot_is_stale(self):
+        from django.utils import timezone as tz
+
+        pastor = User.objects.create_user(
+            username="cutoff_pastor",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=self.church,
+        )
+        open_working_day(self.church, tz.localdate(), pastor)
+        txn = record_receipt(
+            church=self.church,
+            created_by=self.treasury,
+            tithe_amount=Decimal("1005.00"),
+        )
+        approve_transaction(txn, pastor)
+        month_start = tz.localdate().replace(day=1)
+        MonthlyCutoff.objects.update_or_create(
+            church=self.church,
+            month=month_start,
+            defaults={
+                "total_tithe": Decimal("0.00"),
+                "total_combined": Decimal("0.00"),
+                "transferred": True,
+            },
+        )
+        self._login("treasury")
+        session = self.client.session
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        response = self.client.get(reverse("dashboard:cutoff"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["monthly_total"], Decimal("1005.00"))
+        self.assertGreater(response.context["remaining"], Decimal("0.00"))
+        self.assertContains(response, "Marked remitted")
+        self.assertContains(response, "Record district remittance")
 
     def test_cutoff_get_does_not_create_monthly_cutoff(self):
         self._login("treasury")

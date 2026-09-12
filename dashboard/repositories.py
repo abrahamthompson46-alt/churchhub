@@ -14,8 +14,46 @@ from django.utils import timezone
 from .models import Notification
 
 
-def create_notification(*, user, title, message, category="INFO", action_url=""):
+def create_notification(
+    *,
+    user,
+    title,
+    message,
+    category="INFO",
+    action_url="",
+    severity="INFO",
+    event_key="",
+):
     from church_system.perf_cache import invalidate_unread_notifications
+
+    key = (event_key or "").strip()[:120]
+    if key:
+        existing = (
+            Notification.objects.filter(user=user, event_key=key, read=False)
+            .order_by("-last_event_at", "-pk")
+            .first()
+        )
+        if existing:
+            existing.title = title
+            existing.message = message
+            existing.category = category
+            existing.severity = severity
+            existing.action_url = action_url
+            existing.occurrence_count = (existing.occurrence_count or 1) + 1
+            existing.last_event_at = timezone.now()
+            existing.save(
+                update_fields=[
+                    "title",
+                    "message",
+                    "category",
+                    "severity",
+                    "action_url",
+                    "occurrence_count",
+                    "last_event_at",
+                ]
+            )
+            invalidate_unread_notifications(user.pk)
+            return existing
 
     note = Notification.objects.create(
         user=user,
@@ -23,6 +61,8 @@ def create_notification(*, user, title, message, category="INFO", action_url="")
         message=message,
         category=category,
         action_url=action_url,
+        severity=severity,
+        event_key=key,
     )
     invalidate_unread_notifications(user.pk)
     return note

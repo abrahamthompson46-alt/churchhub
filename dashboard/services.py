@@ -41,24 +41,46 @@ REMIT_PAYABLE_TYPES = selectors.REMIT_PAYABLE_TYPES
 INCOME_REMIT_TYPES = selectors.INCOME_REMIT_TYPES
 
 
-def notify_user(user, title, message, category="INFO", action_url=""):
-    """Create an in-app notification for a user."""
+def notify_user(
+    user,
+    title,
+    message,
+    category="INFO",
+    action_url="",
+    *,
+    severity="INFO",
+    event_key="",
+):
+    """Create or coalesce an in-app notification for a user."""
     if not user or not user.is_active:
         return None
     from dashboard.models import Notification
 
     if category not in Notification.VALID_CATEGORIES:
         category = "INFO"
+    if severity not in Notification.VALID_SEVERITIES:
+        severity = "INFO"
     return repo.create_notification(
         user=user,
         title=title,
         message=message,
         category=category,
         action_url=action_url,
+        severity=severity,
+        event_key=event_key,
     )
 
 
-def notify_users(users, title, message, category="INFO", action_url=""):
+def notify_users(
+    users,
+    title,
+    message,
+    category="INFO",
+    action_url="",
+    *,
+    severity="INFO",
+    event_key="",
+):
     """Fan-out helper; skips inactive / missing users."""
     created = []
     seen = set()
@@ -66,10 +88,99 @@ def notify_users(users, title, message, category="INFO", action_url=""):
         if not user or getattr(user, "pk", None) in seen:
             continue
         seen.add(user.pk)
-        note = notify_user(user, title, message, category=category, action_url=action_url)
+        note = notify_user(
+            user,
+            title,
+            message,
+            category=category,
+            action_url=action_url,
+            severity=severity,
+            event_key=event_key,
+        )
         if note:
             created.append(note)
     return created
+
+
+def get_remittance_desk(church, user=None):
+    """
+    Live remittance desk for a church month (working-day as-of).
+
+    Headline payable matches dashboard KPIs. Amount due is outstanding
+    payable + district clearing (what Record District Remittance pays).
+    """
+    from uuid import uuid4
+
+    from remittance.services import outstanding_district_remittance_parts
+    from transactions.models import FinancialAuditLog, MonthlyCutoff
+
+    as_of = _church_finance_as_of(church)
+    month_start = as_of.replace(day=1)
+    live_tithe, live_combined, live_total = _compute_remittance_payable_mtd(
+        church, month_start
+    )
+    outstanding = outstanding_district_remittance_parts(church)
+    snapshot = selectors.monthly_cutoff_for_church_month(church, month_start)
+    pending_payment = False
+    transferred = False
+    if snapshot and snapshot.pk:
+        transferred = bool(snapshot.transferred)
+        pending_payment = (
+            FinancialAuditLog.objects.filter(
+                church=church,
+                action="REMIT",
+                details__cutoff_id=str(snapshot.pk),
+                transaction__approval_status="PENDING",
+                transaction__is_voided=False,
+            )
+            .exclude(transaction__isnull=True)
+            .exists()
+        )
+
+    remaining = outstanding["total"]
+    if remaining <= 0 and transferred:
+        status = "complete"
+    elif remaining > 0 and transferred:
+        status = "incomplete"
+    elif pending_payment:
+        status = "pending_approval"
+    elif remaining > 0:
+        status = "outstanding"
+    else:
+        status = "clear"
+
+    can_record = bool(
+        user
+        and remaining > 0
+        and not pending_payment
+        and can_manage_finances(user)
+    )
+    display = snapshot or MonthlyCutoff(
+        church=church,
+        month=month_start,
+        total_tithe=live_tithe,
+        total_combined=live_combined,
+        transferred=False,
+    )
+    return {
+        "as_of": as_of,
+        "month_start": month_start,
+        "period_label": month_start.strftime("%B %Y"),
+        "live_tithe": live_tithe,
+        "live_combined": live_combined,
+        "live_total": live_total,
+        "outstanding": outstanding,
+        "remaining": remaining,
+        "snapshot": snapshot,
+        "cutoff": display,
+        "cutoff_persisted": bool(snapshot and snapshot.pk),
+        "transferred": transferred,
+        "pending_payment": pending_payment,
+        "status": status,
+        "can_recompute": True,
+        "can_remit": can_record,
+        "idempotency_key": f"remit-{church.pk}-{month_start.strftime('%Y-%m')}-{uuid4().hex[:12]}",
+    }
 
 
 def get_dashboard_role(user):

@@ -428,3 +428,31 @@ def update_institution_branding(form, *, actor, ip_address=None):
             },
         )
     return denomination
+
+
+def update_institution_system_settings(form, *, actor, ip_address=None):
+    """Persist denomination operational settings (decimals, notification retention)."""
+    from church_system.denomination_scope import get_user_denomination
+    from permissions.checks import can_manage_system_settings
+
+    if not can_manage_system_settings(actor):
+        raise PermissionError("You are not allowed to update system settings.")
+
+    denomination = get_user_denomination(actor)
+    if denomination is None or form.instance.pk != denomination.pk:
+        raise PermissionError("System settings are limited to your own institution.")
+
+    changed_fields = sorted(form.changed_data)
+    denomination = form.save()
+    if changed_fields:
+        log_activity(
+            actor,
+            "SYSTEM_SETTINGS_UPDATE",
+            performed_by=actor,
+            ip_address=ip_address,
+            details={
+                "denomination_id": str(denomination.pk),
+                "changed_fields": changed_fields,
+            },
+        )
+    return denomination

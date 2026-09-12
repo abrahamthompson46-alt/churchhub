@@ -21,6 +21,7 @@ from accounts.password_reset import StaffPasswordChangeForm
 from accounts.forms import (
     AcceptInvitationForm,
     InstitutionBrandingForm,
+    InstitutionSystemSettingsForm,
     ProfileForm,
     UserInviteForm,
     UserManageForm,
@@ -29,6 +30,7 @@ from accounts.models import UserActivityLog
 from accounts.permissions import (
     can_manage_institution_branding,
     can_manage_permissions,
+    can_manage_system_settings,
     can_manage_users,
     can_view_activity_logs,
     get_manageable_churches,
@@ -46,6 +48,7 @@ from accounts.services import (
     revoke_invitation,
     send_invitation_email,
     update_institution_branding,
+    update_institution_system_settings,
     update_user_profile,
 )
 from sitecontrol.services import can_add_user_to_church
@@ -521,6 +524,47 @@ def institution_branding(request):
             "form": form,
             "denomination": denomination,
             "preview_branding": preview_branding,
+        },
+    )
+
+
+@login_required
+def system_settings(request):
+    if not can_manage_system_settings(request.user):
+        raise PermissionDenied(
+            "System settings are available to institution Super Admins only."
+        )
+
+    from church_system.denomination_scope import get_user_denomination
+
+    denomination = get_user_denomination(request.user)
+    if denomination is None:
+        raise PermissionDenied("No institution context is available.")
+
+    form = InstitutionSystemSettingsForm(request.POST or None, instance=denomination)
+    if request.method == "POST" and form.is_valid():
+        try:
+            update_institution_system_settings(
+                form,
+                actor=request.user,
+                ip_address=get_client_ip(request),
+            )
+        except PermissionError as exc:
+            flash_error(request, str(exc), title="Settings not saved")
+        else:
+            flash_success(
+                request,
+                "System settings saved. Money display and inbox retention apply on the next page load.",
+                title="Settings saved",
+            )
+            return redirect("accounts:system_settings")
+
+    return render(
+        request,
+        "accounts/system_settings.html",
+        {
+            "form": form,
+            "denomination": denomination,
         },
     )
 

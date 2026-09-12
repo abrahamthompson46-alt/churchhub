@@ -139,7 +139,7 @@ Tenant: **global** catalog (not church-scoped). Authorization scope is applied a
 | `PlatformAuditLog` | UUID | Immutable; many action codes; FK user, denomination; indexes on created_at/action |
 | `PlatformAnnouncement` | UUID | Platform-wide; FK created_by |
 | `TenantApplication` | UUID | status PENDING/APPROVED/REJECTED/WITHDRAWN; type EXISTING_DISTRICT/NEW_HIERARCHY; `contact_phone_normalized`; FKs district, denomination PROTECT, reviewed_by, created_church, invitation |
-| `Denomination` | UUID | `code` Slug unique; SaaS wall; FK default_plan; index `(is_active, code)` |
+| `Denomination` | UUID | `code` Slug unique; SaaS wall; FK default_plan; index `(is_active, code)`; operational: `money_decimal_places` (0–4, default 2), `notification_retention_read_days` / `_unread_days` |
 
 ---
 
@@ -329,7 +329,7 @@ Enums: MeetingStatus SCHEDULED/HELD/CANCELLED; MeetingType BOARD/CHURCH_BOARD/DE
 |-------|-----|------------|
 | `ReportExportJob` | UUID | status PENDING/RUNNING/COMPLETE/FAILED; FK user |
 | `ReportAccessAuditLog` | UUID | RUN/EXPORT; FK user, church nullable |
-| `Notification` | BigAuto | category INFO/FINANCE/MEMBER/SYSTEM; FK user |
+| `Notification` | BigAuto | category INFO/FINANCE/MEMBER/MEETING/SYSTEM; severity INFO/SUCCESS/WARNING/CRITICAL; optional `event_key` coalesce; FK user |
 
 ---
 

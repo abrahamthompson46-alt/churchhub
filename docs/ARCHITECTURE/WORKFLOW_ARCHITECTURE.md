@@ -137,7 +137,8 @@ flowchart LR
 
 | Concept | Model | Notes |
 |---------|-------|-------|
-| Cutoff | `transactions.MonthlyCutoff` | Per church/month tithe+combined payable totals |
+| Cutoff | `transactions.MonthlyCutoff` | Snapshot of MTD remit payables. Desk UI uses **live GL** for the working-day month (matches KPI). `transferred` only when outstanding payable+clearing is zero. |
+| Settlement | `remittance.SettlementBatch` | Hierarchy unit-to-unit settlement lifecycle |
 | Settlement | `remittance.SettlementBatch` | Hierarchy unit-to-unit settlement lifecycle |
 
 **Architectural gap:** Two remittance-related lifecycles. Agents must inspect both before changing remittance behavior.

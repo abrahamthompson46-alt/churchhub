@@ -183,6 +183,16 @@ def can_manage_institution_branding(user):
     return bool(denomination and denomination.allow_institution_branding)
 
 
+def can_manage_system_settings(user):
+    """Institution Super Admins may edit denomination operational settings (decimals, inbox retention)."""
+    from church_system.denomination_scope import get_user_denomination
+    from permissions.superadmin import is_superadmin
+
+    if not is_superadmin(user):
+        return False
+    return get_user_denomination(user) is not None
+
+
 # ── Dashboard ─────────────────────────────────────────────────────
 def can_view_dashboard(user): return _p(user, "view_dashboard")
 def can_view_dashboard_finance(user): return _p(user, "view_dashboard_finance")

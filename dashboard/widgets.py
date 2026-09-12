@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from calendar import monthrange
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from permissions.roles import UserRole
@@ -64,6 +66,7 @@ WIDGET_ORDER = {
         "income_mtd",
         "mtd_net",
         "expense_mtd",
+        "mtd_tithe",
         "mtd_combined",
         "remittance_payable",
     ),
@@ -149,10 +152,14 @@ def _count_widget(widget_id, label, value, hint, url_name, card_class="", report
     }
 
 
-def _receipts_url(user) -> str:
-    if can_manage_receipts(user):
-        return "transactions:record_receipt"
-    return "transactions:transaction_list"
+def _mtd_receipt_records_query(finance_bundle) -> str:
+    """Month-to-date receipt journal, not the record-receipt form."""
+    start = finance_bundle.get("month_start_date") if finance_bundle else None
+    if not isinstance(start, date):
+        return "?type=RECEIPT"
+    last = monthrange(start.year, start.month)[1]
+    end = date(start.year, start.month, last)
+    return f"?type=RECEIPT&date_from={start.isoformat()}&date_to={end.isoformat()}"
 
 
 def _zero_receipt_cta(value) -> str:
@@ -249,7 +256,7 @@ def build_kpi_widgets(
         def _delta(key):
             return finance_bundle.get(f"{key}_delta_pct")
 
-        receipts_url = _receipts_url(user)
+        receipts_query = _mtd_receipt_records_query(finance_bundle)
         hover_hint = f"{hint_scope} · {period}" if hint_scope else period
         figures_report = "financial_summary"
         figures_query = "?period=monthly"
@@ -271,8 +278,9 @@ def build_kpi_widgets(
             "Combined MTD",
             finance_bundle["mtd_combined"],
             hover_hint,
-            receipts_url,
+            "transactions:transaction_list",
             card_class="cc-kpi-card--accent",
+            url_query=receipts_query,
             delta_pct=_delta("mtd_combined"),
             compare_label=compare,
             empty_cta=_zero_receipt_cta(finance_bundle["mtd_combined"]),
@@ -282,8 +290,9 @@ def build_kpi_widgets(
             "Tithe MTD",
             finance_bundle["mtd_tithe"],
             hover_hint,
-            receipts_url,
+            "transactions:transaction_list",
             card_class="cc-kpi-card--primary",
+            url_query=receipts_query,
             delta_pct=_delta("mtd_tithe"),
             compare_label=compare,
             empty_cta=_zero_receipt_cta(finance_bundle["mtd_tithe"]),
@@ -295,8 +304,9 @@ def build_kpi_widgets(
                 "Income MTD",
                 finance_bundle["mtd_income"],
                 hover_hint,
-                receipts_url,
+                "transactions:transaction_list",
                 card_class="cc-kpi-card--success",
+                url_query=receipts_query,
                 delta_pct=_delta("mtd_income"),
                 compare_label=compare,
                 empty_cta=_zero_receipt_cta(finance_bundle["mtd_income"]),

@@ -154,15 +154,11 @@ def remittance_payable_mtd_amounts(church, month_start_date):
 
 
 def sum_remittance_payable_mtd_for_churches(churches, month_start_date):
-    """Per-church cut-off or GL compute, summed — matches the cut-off page."""
+    """Live remittance-payable GL for the month (not a stale MonthlyCutoff snapshot)."""
     total = Decimal("0")
     for church in churches:
-        existing = monthly_cutoff_for_church_month(church, month_start_date)
-        if existing:
-            total += existing.total_payable
-        else:
-            _, _, amount = remittance_payable_mtd_amounts(church, month_start_date)
-            total += amount
+        _, _, amount = remittance_payable_mtd_amounts(church, month_start_date)
+        total += amount
     return total
 
 

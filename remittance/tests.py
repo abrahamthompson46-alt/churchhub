@@ -398,3 +398,49 @@ class RemittancePolicyTests(TestCase):
         )
         self.assertEqual(remit.transaction_type, "TRANSFER")
 
+    def test_policy_create_redirects_to_index(self):
+        from accounts.mfa import SESSION_MFA_VERIFIED
+        from django.test import Client
+        from django.urls import reverse
+        from permissions.org_scope import OrgScopeLevel, apply_org_scope
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        conference = self.church.district.zone.conference
+        admin = User.objects.create_user(
+            username="policy_admin",
+            password="pass12345",
+            role=UserRole.CONFERENCE_ADMIN,
+            church=self.church,
+        )
+        apply_org_scope(
+            admin,
+            role=UserRole.CONFERENCE_ADMIN,
+            scope_level=OrgScopeLevel.CONFERENCE,
+            conference=conference,
+            church=self.church,
+        )
+        admin.save()
+        client = Client()
+        self.assertTrue(client.login(username="policy_admin", password="pass12345"))
+        session = client.session
+        session["current_church_id"] = str(self.church.id)
+        session[SESSION_MFA_VERIFIED] = True
+        session.save()
+        response = client.post(
+            reverse("remittance:policy_create"),
+            {
+                "offering_type": "TITHE",
+                "application_scope": "GROSS_COLLECTION",
+                "unit_type": "CHURCH",
+                "unit_id": str(self.church.pk),
+                "retain_percent": "0",
+                "remit_percent": "100",
+                "effective_from": timezone.localdate().isoformat(),
+                "is_active": "on",
+                "notes": "Save should not 500",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.startswith(reverse("remittance:index")))
+

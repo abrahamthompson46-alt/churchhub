@@ -142,6 +142,21 @@ class ServiceTests(DashboardTestMixin, TestCase):
         self.assertEqual(kpis["mtd_tithe"], summary["tithe_total"])
         self.assertEqual(kpis["mtd_combined"], summary["combined_total"])
 
+        stale = MonthlyCutoff.objects.create(
+            church=self.church,
+            month=timezone.localdate().replace(day=1),
+            total_tithe=Decimal("0"),
+            total_combined=Decimal("0"),
+        )
+        self.assertEqual(stale.total_payable, Decimal("0"))
+        kpis_after_stale = get_executive_kpis(
+            request,
+            treasury,
+            church_ids=[self.church.id],
+            active_church=self.church,
+        )
+        self.assertEqual(kpis_after_stale["mtd_remittance_payable"], Decimal("125.00"))
+
     def test_quick_actions_capped_and_no_duplicate_org(self):
         admin = User.objects.create_user(
             username="dashadmin",
@@ -813,6 +828,14 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertTrue(response.context.get("show_finance_charts"))
         ids = [w["id"] for w in widgets]
         self.assertIn("income_mtd", ids)
+        self.assertIn("mtd_tithe", ids)
+        self.assertIn("mtd_combined", ids)
+        self.assertContains(response, "Tithe MTD")
+        by_id = {w["id"]: w for w in widgets}
+        self.assertEqual(by_id["income_mtd"]["url_name"], "transactions:transaction_list")
+        self.assertEqual(by_id["mtd_combined"]["url_name"], "transactions:transaction_list")
+        self.assertIn("type=RECEIPT", by_id["income_mtd"]["url_query"])
+        self.assertNotEqual(by_id["income_mtd"]["url_name"], "transactions:record_receipt")
 
     def test_secretary_home_omits_finance_kpis(self):
         from permissions.services import ensure_permission_matrix
@@ -1006,6 +1029,12 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertContains(response, "/reports/financial_summary/?period=monthly")
         self.assertEqual(by_id["mtd_tithe"]["value"], Decimal("80.00"))
         self.assertEqual(by_id["mtd_combined"]["value"], Decimal("20.00"))
+        self.assertEqual(by_id["mtd_tithe"]["url_name"], "transactions:transaction_list")
+        self.assertEqual(by_id["mtd_combined"]["url_name"], "transactions:transaction_list")
+        self.assertEqual(by_id["income_mtd"]["url_name"], "transactions:transaction_list")
+        self.assertIn("type=RECEIPT", by_id["mtd_tithe"]["url_query"])
+        self.assertIn("date_from=2026-01-01", by_id["mtd_tithe"]["url_query"])
+        self.assertIn("date_to=2026-01-31", by_id["mtd_tithe"]["url_query"])
         self.assertEqual(response.context.get("finance_as_of"), posting)
         self.assertIn("January", by_id["mtd_tithe"]["hint"])
         self.assertTrue(response.context.get("chart_has_activity"))

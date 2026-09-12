@@ -1,8 +1,11 @@
 """Remittance policy and welfare views."""
 
+from urllib.parse import urlencode
+
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from church_system.church_scope import get_active_church, require_church
@@ -78,6 +81,16 @@ def _policy_required(view_func):
             raise PermissionDenied
         return view_func(request, *args, **kwargs)
     return _wrapped
+
+
+def _policy_index_url(data) -> str:
+    query = urlencode(
+        {
+            "unit_type": data.get("unit_type") or "",
+            "unit_id": str(data.get("unit_id") or ""),
+        }
+    )
+    return f"{reverse('remittance:index')}?{query}"
 
 
 def _can_mutate_settlements(user):
@@ -181,10 +194,7 @@ def policy_create(request):
         try:
             save_remittance_policy(request.POST, request.user, church=church)
             flash_success(request, "Remittance policy saved.")
-            return redirect(
-                "remittance:index"
-                f"?unit_type={form.cleaned_data['unit_type']}&unit_id={form.cleaned_data['unit_id']}"
-            )
+            return redirect(_policy_index_url(form.cleaned_data))
         except RemittancePolicyError as exc:
             flash_exception(request, exc)
     return render(request, "remittance/policy_form.html", {
@@ -207,8 +217,12 @@ def policy_edit(request, pk):
             save_remittance_policy(request.POST, request.user, policy=policy, church=church)
             flash_success(request, "Remittance policy updated.")
             return redirect(
-                "remittance:index"
-                f"?unit_type={policy.unit_type}&unit_id={policy.unit_id}"
+                _policy_index_url(
+                    {
+                        "unit_type": policy.unit_type,
+                        "unit_id": policy.unit_id,
+                    }
+                )
             )
         except RemittancePolicyError as exc:
             flash_exception(request, exc)

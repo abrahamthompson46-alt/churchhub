@@ -111,6 +111,7 @@ def build_executive_finance_bundle(
     member_count = aggregate_member_count(church_ids)
     result = {
         "period_label": period_label,
+        "month_start_date": month_start_date,
         "finance_scope": finance_scope,
         "finance_scope_label": finance_scope_label,
         "church_count": len(church_ids),

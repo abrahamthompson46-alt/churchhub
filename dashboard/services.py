@@ -132,7 +132,7 @@ def _sum_account_type(lines_qs, acc_type):
 
 
 def _compute_remittance_payable_mtd(church, month_start_date):
-    """Sum remittance payable GL lines for a church/month without creating MonthlyCutoff."""
+    """Live remittance payable GL for a church/month (cut-off snapshots are display-only)."""
     return selectors.remittance_payable_mtd_amounts(church, month_start_date)
 
 
@@ -711,7 +711,7 @@ def get_executive_kpis(
 
     Churches / members / action items stay hierarchy-wide.
     Finance MTD figures follow the toolbar church when one is selected; otherwise they roll up the full scope.
-    Remittance payable uses the same per-church cut-off logic as the cut-off page.
+    Remittance payable uses live remittance-payable GL for the posting month.
     """
     if manageable is None:
         manageable = get_manageable_churches(user)

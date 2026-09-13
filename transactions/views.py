@@ -501,7 +501,10 @@ def record_remittance_view(request):
     """GET: remittance payment form. POST: record district remittance (also used from cut-off)."""
     church = require_church(request)
     month_str = request.POST.get("month") if request.method == "POST" else request.GET.get("month")
-    month_date = parse_date(month_str) if month_str else timezone.now().date()
+    from dashboard.services import _church_finance_as_of, notify_user
+
+    parsed = parse_date(month_str) if month_str else None
+    month_date = parsed or _church_finance_as_of(church)
     cutoff = generate_monthly_cutoff(church, month_date)
     from remittance.services import outstanding_district_remittance_parts
 
@@ -512,7 +515,7 @@ def record_remittance_view(request):
         "month_date": month_date,
         "amount": amount,
         "outstanding": outstanding,
-        "idempotency_key": f"remit-{church.pk}-{month_date.strftime('%Y-%m')}",
+        "idempotency_key": f"remit-{church.pk}-{month_date.strftime('%Y-%m')}-{uuid.uuid4().hex[:12]}",
     }
 
     if request.method != "POST":
@@ -549,6 +552,15 @@ def record_remittance_view(request):
     flash_success(
         request,
         f"District remittance of {amount} recorded and pending approval.",
+    )
+    notify_user(
+        request.user,
+        "District remittance recorded",
+        f"{amount} is pending approval for {month_date.strftime('%B %Y')}.",
+        category="FINANCE",
+        action_url=reverse("transactions:pending_approvals"),
+        severity="SUCCESS",
+        event_key=f"remittance.recorded.{church.pk}.{remit.pk}",
     )
     return redirect("dashboard:cutoff")
 

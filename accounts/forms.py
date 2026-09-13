@@ -543,3 +543,36 @@ class InstitutionBrandingForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+class InstitutionSystemSettingsForm(forms.ModelForm):
+    """Institution Super Admin operational behaviour for this denomination."""
+
+    class Meta:
+        model = Denomination
+        fields = (
+            "money_decimal_places",
+            "notification_retention_read_days",
+            "notification_retention_unread_days",
+        )
+        widgets = {
+            "money_decimal_places": forms.NumberInput(attrs=input_attrs()),
+            "notification_retention_read_days": forms.NumberInput(attrs=input_attrs()),
+            "notification_retention_unread_days": forms.NumberInput(attrs=input_attrs()),
+        }
+        help_texts = {
+            "money_decimal_places": "Decimal places shown for money (0–4). Default 2. Does not rewrite historical journals.",
+            "notification_retention_read_days": "Days to keep read inbox items before the purge job may delete them.",
+            "notification_retention_unread_days": "Days to keep unread inbox items before the purge job may delete them.",
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        read_days = cleaned.get("notification_retention_read_days") or 90
+        unread_days = cleaned.get("notification_retention_unread_days") or 180
+        if unread_days < read_days:
+            self.add_error(
+                "notification_retention_unread_days",
+                "Unread retention must be at least as long as read retention.",
+            )
+        return cleaned

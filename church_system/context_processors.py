@@ -155,6 +155,7 @@ def platform_context(request):
 def denomination_context(request):
     from church_system.currency import currency_symbol, normalize_currency_code
     from church_system.denomination_scope import get_active_denomination
+    from church_system.money import money_decimal_places
     from sitecontrol.branding_services import branding_css_block, resolve_institution_branding
     from sitecontrol.denomination_services import get_terminology_context, hierarchy_chain_description
     from sitecontrol.services import get_site_settings
@@ -193,6 +194,7 @@ def denomination_context(request):
         "hierarchy_chain": hierarchy_chain_description(denomination),
         "currency_code": currency_code,
         "currency_symbol": currency_symbol(currency_code),
+        "money_decimal_places": money_decimal_places(denomination=denomination),
     }
     if request.user.is_authenticated and getattr(request.user, "is_platform_user", False):
         from sitecontrol.platform_access import get_operator_denominations

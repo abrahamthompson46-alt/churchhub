@@ -31,6 +31,8 @@ def get_notification_inbox(user, *, limit=5):
             "title": note.title,
             "message": note.message,
             "category": note.category,
+            "severity": getattr(note, "severity", "INFO"),
+            "occurrence_count": getattr(note, "occurrence_count", 1),
             "read": note.read,
             "created_at": note.created_at,
             "action_url": note.action_url or "",

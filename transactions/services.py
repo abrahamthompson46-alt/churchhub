@@ -819,23 +819,24 @@ def record_district_remittance(
         if cutoff is None:
             raise ValueError("Monthly cutoff could not be locked for remittance.")
         if cutoff.transferred:
-            raise ValueError(
-                f"District remittance for {month_date.strftime('%B %Y')} has already been transferred."
-            )
+            outstanding = outstanding_district_remittance_parts(church)
+            if outstanding["total"] <= 0:
+                raise ValueError(
+                    f"District remittance for {month_date.strftime('%B %Y')} has already been transferred."
+                )
         pending_remit = FinancialAuditLog.objects.filter(
             church=church,
             action="REMIT",
             details__cutoff_id=str(cutoff.pk),
+            transaction__approval_status="PENDING",
         ).select_related("transaction").exclude(
             transaction__isnull=True,
-        ).exclude(
-            transaction__approval_status="REJECTED",
         ).exclude(
             transaction__is_voided=True,
         )
         if pending_remit.exists():
             raise ValueError(
-                f"A remittance for {month_date.strftime('%B %Y')} is already recorded or pending approval."
+                f"A remittance for {month_date.strftime('%B %Y')} is already pending approval."
             )
 
     outstanding = outstanding_district_remittance_parts(church)
@@ -986,23 +987,30 @@ def approve_transaction(transaction, user):
 
 
 def _mark_cutoff_transferred_for_remittance(transaction):
-    """Mark monthly cut-off complete when a district remittance txn is approved."""
+    """Mark monthly cut-off complete only when district payable/clearing is cleared."""
+    from remittance.services import outstanding_district_remittance_parts
+
     audit = selectors.remittance_audit_for_transaction(transaction)
     if not audit:
         return
+    remaining = outstanding_district_remittance_parts(transaction.church)["total"]
+    transferred = remaining <= 0
     cutoff_id = (audit.details or {}).get("cutoff_id")
+    month = (audit.details or {}).get("month")
+    transfer_date = timezone.now().date() if transferred else None
     if cutoff_id:
-        repo.mark_monthly_cutoff_transferred(
+        repo.set_monthly_cutoff_transfer_state(
             cutoff_id=cutoff_id,
-            transfer_date=timezone.now().date(),
+            transferred=transferred,
+            transfer_date=transfer_date,
         )
         return
-    month = (audit.details or {}).get("month")
     if month:
-        repo.mark_monthly_cutoff_transferred(
+        repo.set_monthly_cutoff_transfer_state(
             church=transaction.church,
             month=month,
-            transfer_date=timezone.now().date(),
+            transferred=transferred,
+            transfer_date=transfer_date,
         )
 
 

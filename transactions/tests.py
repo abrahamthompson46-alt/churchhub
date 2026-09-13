@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from organization.models import Church, Conference, District, Zone
-from transactions.models import Account, BankReconciliation, FinancialAuditLog, FinancialPeriod, Transaction
+from transactions.models import Account, BankReconciliation, FinancialAuditLog, FinancialPeriod, MonthlyCutoff, Transaction
 from transactions.services import (
     approve_transaction,
     close_working_day,
@@ -788,6 +788,25 @@ class SecurityAndIntegrityTests(FinancialServicesTests):
                 amount=cutoff.total_payable,
                 month_date=month,
             )
+
+    def test_remittance_allowed_when_cutoff_marked_transferred_but_balance_remains(self):
+        txn = record_receipt(
+            church=self.church,
+            created_by=self.treasurer,
+            tithe_amount=Decimal("80.00"),
+        )
+        approve_transaction(txn, self.pastor)
+        month = timezone.now().date()
+        cutoff = generate_monthly_cutoff(self.church, month)
+        MonthlyCutoff.objects.filter(pk=cutoff.pk).update(transferred=True)
+        remit = record_district_remittance(
+            church=self.church,
+            created_by=self.pastor,
+            amount=Decimal("80.00"),
+            month_date=month,
+        )
+        validate_transaction_balance(remit)
+        self.assertEqual(remit.approval_status, "PENDING")
 
     def test_transaction_line_rejects_cross_church_account(self):
         from organization.models import Conference, District, Zone

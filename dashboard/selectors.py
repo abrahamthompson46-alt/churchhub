@@ -40,12 +40,14 @@ def manageable_church_by_pk(user, pk):
     return get_manageable_churches(user).filter(pk=pk).first()
 
 
-def notifications_for_user(user, *, unread_only=False, category=""):
-    qs = Notification.objects.filter(user=user).order_by("-created_at")
+def notifications_for_user(user, *, unread_only=False, category="", severity=""):
+    qs = Notification.objects.filter(user=user).order_by("-last_event_at", "-created_at")
     if unread_only:
         qs = qs.filter(read=False)
     if category:
         qs = qs.filter(category=category)
+    if severity:
+        qs = qs.filter(severity=severity)
     return qs
 
 
@@ -728,7 +730,7 @@ def recent_financial_activity(church_ids, *, limit=8):
 
 def recent_notifications_for_user(user, *, limit=5):
     return list(
-        Notification.objects.filter(user=user).order_by("-created_at")[:limit]
+        Notification.objects.filter(user=user).order_by("-last_event_at", "-created_at")[:limit]
     )
 
 

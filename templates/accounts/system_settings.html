@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}System settings — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with page_subtitle="Administration" page_title="System settings" page_description="Operational behaviour for this institution. These settings do not change other denominations." %}
+
+    <p class="text-muted mb-4">
+        Editing <strong>{{ denomination.display_name|default:denomination.name }}</strong>.
+        Platform operators keep separate control-room settings (SMTP, MFA, maintenance).
+    </p>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="panel">
+                <div class="panel-header">Money &amp; inbox</div>
+                <div class="panel-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+                        <div class="row g-3">
+                            {% for field in form %}
+                            <div class="col-12">
+                                <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                                {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary">Save settings</button>
+                            {% if can_manage_institution_branding %}
+                            <a href="{% url 'accounts:institution_branding' %}" class="btn btn-outline-secondary">Branding</a>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="panel">
+                <div class="panel-header">What this controls</div>
+                <div class="panel-body">
+                    <ul class="mb-0 ps-3">
+                        <li class="mb-2"><strong>Decimal places</strong> — how money is shown on dashboards, remittance desk, and reports. Journals stay rounded with standard money helpers.</li>
+                        <li><strong>Inbox retention</strong> — defaults for <code>purge_old_notifications</code>. Unread items are kept longer than read items.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

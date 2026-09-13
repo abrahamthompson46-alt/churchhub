@@ -3,22 +3,21 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import redirect, render
-from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from accounts.permissions import can_approve_transactions, can_manage_finances
+from accounts.permissions import can_manage_finances
 from announcements.services import pending_for_user
 from church_system.church_scope import get_active_church
 from church_system.flash import flash_exception, flash_success, flash_warning
 from dashboard import repositories as repo
 from dashboard import selectors
 from dashboard.services import (
-    _compute_remittance_payable_mtd,
+    _church_finance_as_of,
     build_home_context,
     get_quick_actions,
+    get_remittance_desk,
 )
 from dashboard.utils import safe_internal_redirect
-from transactions.models import MonthlyCutoff
 from transactions.services import generate_monthly_cutoff
 
 
@@ -123,8 +122,12 @@ def switch_church(request):
 def notification_list(request):
     unread_only = request.GET.get("unread") == "1"
     category = (request.GET.get("category") or "").strip().upper()
+    severity = (request.GET.get("severity") or "").strip().upper()
     qs = selectors.notifications_for_user(
-        request.user, unread_only=unread_only, category=category
+        request.user,
+        unread_only=unread_only,
+        category=category,
+        severity=severity,
     )
     unread = selectors.unread_notification_count(request.user)
     paginator = Paginator(qs, 25)
@@ -137,7 +140,9 @@ def notification_list(request):
         "unread_count": unread,
         "unread_only": unread_only,
         "category": category,
+        "severity": severity,
         "categories": Notification.CATEGORY_CHOICES,
+        "severities": Notification.SEVERITY_CHOICES,
     })
 
 
@@ -207,64 +212,45 @@ def cutoff(request):
         if not church:
             flash_warning(
                 request,
-                "Choose a church from the toolbar to view cut-off totals.",
+                "Choose a church from the toolbar to view remittance payable.",
                 title="Church required",
             )
             return render(request, "dashboard/cutoff.html", {
                 "monthly_total": 0,
+                "remaining": 0,
                 "can_recompute": False,
+                "can_remit": False,
             })
 
-        now = timezone.now()
-        month_start = now.date().replace(day=1)
+        as_of = _church_finance_as_of(church)
 
-        if request.method == "POST" and (
-            request.POST.get("recompute") == "1" or request.GET.get("recompute") == "1"
-        ):
-            cutoff_obj = generate_monthly_cutoff(church, now.date())
+        if request.method == "POST" and request.POST.get("recompute") == "1":
+            generate_monthly_cutoff(church, as_of)
             flash_success(
                 request,
-                "Monthly cut-off totals recomputed from remittance payable accounts.",
-                title="Cut-off updated",
+                "Saved a cut-off snapshot from live remittance payable accounts for this working-day month.",
+                title="Snapshot saved",
             )
             return redirect("dashboard:cutoff")
 
-        # GET — display only; never create/mutate MonthlyCutoff
-        cutoff_obj = selectors.monthly_cutoff_for_church_month(church, month_start)
-        if cutoff_obj:
-            monthly_total = cutoff_obj.total_payable
-            total_tithe = cutoff_obj.total_tithe
-            total_combined = cutoff_obj.total_combined
-        else:
-            total_tithe, total_combined, monthly_total = _compute_remittance_payable_mtd(
-                church, month_start
-            )
-            # Lightweight display object without saving
-            cutoff_obj = MonthlyCutoff(
-                church=church,
-                month=month_start,
-                total_tithe=total_tithe,
-                total_combined=total_combined,
-                transferred=False,
-            )
-
+        desk = get_remittance_desk(church, request.user)
         return render(request, "dashboard/cutoff.html", {
-            "monthly_total": monthly_total,
-            "cutoff": cutoff_obj,
-            "cutoff_persisted": cutoff_obj.pk is not None,
-            "can_recompute": True,
-            "can_remit": (
-                can_manage_finances(request.user)
-                and can_approve_transactions(request.user)
-                and not cutoff_obj.transferred
-                and cutoff_obj.pk is not None
-            ),
+            "monthly_total": desk["live_total"],
+            "remaining": desk["remaining"],
+            "cutoff": desk["cutoff"],
+            "cutoff_persisted": desk["cutoff_persisted"],
+            "can_recompute": desk["can_recompute"],
+            "can_remit": desk["can_remit"],
+            "desk": desk,
+            "idempotency_key": desk["idempotency_key"],
         })
     except Exception as exc:
-        flash_exception(request, exc, title="Cut-off unavailable")
+        flash_exception(request, exc, title="Remittance desk unavailable")
         return render(request, "dashboard/cutoff.html", {
             "monthly_total": 0,
+            "remaining": 0,
             "can_recompute": False,
+            "can_remit": False,
         })
 
 

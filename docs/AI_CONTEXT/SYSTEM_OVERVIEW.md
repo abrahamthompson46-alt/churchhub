@@ -136,7 +136,7 @@ Login: `/accounts/login/` (`ChurchHubLoginView`). The site root is a public land
 - Helpers: `church_system/denomination_scope.py`
 - Middleware: `DenominationContextMiddleware`
 
-Denomination isolates branding, seeds, feature flags, and org trees for different church bodies on the same deployment.
+Denomination isolates branding, operational settings (money decimals, inbox retention), seeds, feature flags, and org trees for different church bodies on the same deployment. Institution Super Admins edit `/accounts/settings/system/` for their denomination only — not platform `SiteSettings`.
 
 ### 6.2 Operational tenant — Church
 

@@ -83,7 +83,7 @@ Views no longer call remittance model managers / `filter_by_church` directly; jo
 1. Retain% + remit% = 100 (model `clean`).  
 2. `post_offering_credit_lines` splits gross per church collection policy into retention + remit payable accounts.  
 3. Settlement draft computes remit payable / received-from-below; `post_settlement_batch` posts church-level balanced TRANSFER journals via PENDING + `approve_module_journal` (maker-checker) and marks POSTED. District+ batches with an amount raise `RemittancePolicyError` and stay **DRAFT** until higher-unit GL posting exists (never POSTED without a journal).  
-     3. **Cross-path (Current):** settlement reclassifies payable → district clearing; bank remittance may follow for the same month and debits clearing first, then payable. Double cash payout blocked by `cutoff.transferred` / REMIT audit — not by settlement alone.  
+     3. **Cross-path (Current):** settlement reclassifies payable → district clearing; bank remittance may follow for the same month and debits clearing first, then payable. Double cash payout is blocked while a **PENDING** remittance journal exists for the cutoff, or when `transferred` is true **and** outstanding payable+clearing is zero. A stale `transferred` flag with remaining GL does not block a remainder payment.  
 4. Welfare disbursement requires sufficient WELFARE_FUND balance; posts via unlocked journal lines then `approve_module_journal` (case row locked with `select_for_update`); links `disbursement_transaction`; rejects duplicate disbursements with audit.  
 5. Voiding a transaction can call `void_welfare_for_transaction`.  
 6. Feature gate: `remittance` (and welfare UI checks `welfare_module_enabled`).

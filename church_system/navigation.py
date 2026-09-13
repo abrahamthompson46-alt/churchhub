@@ -27,6 +27,7 @@ from permissions.checks import (
     can_manage_giving,
     can_manage_gl_categories,
     can_manage_institution_branding,
+    can_manage_system_settings,
     can_manage_leadership,
     can_manage_ledger_entries,
     can_manage_meetings,
@@ -565,10 +566,13 @@ def get_main_navigation(user, active_church=None):
     if ucc_items:
         settings_sections.append(_section("Users & access", ucc_items, "users"))
 
+    institution_items = []
+    if can_manage_system_settings(user):
+        institution_items.append(_item("System settings", "accounts:system_settings", "bi-sliders"))
     if can_manage_institution_branding(user):
-        settings_sections.append(_section("Institution", [
-            _item("Institution branding", "accounts:institution_branding", "bi-palette"),
-        ], "institution"))
+        institution_items.append(_item("Institution branding", "accounts:institution_branding", "bi-palette"))
+    if institution_items:
+        settings_sections.append(_section("Institution", institution_items, "institution"))
 
     if can_manage_working_day(user):
         settings_sections.append(_section("Treasury & calendar", [

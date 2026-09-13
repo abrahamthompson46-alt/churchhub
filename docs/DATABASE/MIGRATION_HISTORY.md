@@ -176,6 +176,9 @@ timeline
 | Announcement `status` added while booleans retained | `announcements.0003` | Dual state representation |
 | Conference gains denomination FK + backfill | `organization.0003` | SaaS isolation |
 | User gains scope_level + scope FKs | `accounts.0011` | Hierarchy admin model |
+| Denomination operational settings | `sitecontrol.0026` | Money decimals + inbox retention |
+| Notification severity / event_key | `dashboard.0005` | Coalesced enterprise inbox |
+| Drop one-time last_event_at default | `dashboard.0006` | Field matches `auto_now_add=True` only |
 
 ---
 

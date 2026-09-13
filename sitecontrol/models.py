@@ -1031,6 +1031,21 @@ class Denomination(models.Model):
         default=True,
         help_text="Allow institution Super Admins to update logo and brand colors.",
     )
+    money_decimal_places = models.PositiveSmallIntegerField(
+        default=2,
+        validators=[MinValueValidator(0), MaxValueValidator(4)],
+        help_text="How many decimal places to show for money on dashboards and reports (0–4). Ledgers still post with standard rounding.",
+    )
+    notification_retention_read_days = models.PositiveSmallIntegerField(
+        default=90,
+        validators=[MinValueValidator(7), MaxValueValidator(730)],
+        help_text="Purge read in-app notifications older than this many days.",
+    )
+    notification_retention_unread_days = models.PositiveSmallIntegerField(
+        default=180,
+        validators=[MinValueValidator(14), MaxValueValidator(1095)],
+        help_text="Purge unread in-app notifications older than this many days.",
+    )
     registration_intro = models.TextField(blank=True)
     default_plan = models.ForeignKey(
         "SubscriptionPlan",

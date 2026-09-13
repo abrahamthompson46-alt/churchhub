@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="page-container page-shell">
-    {% include "includes/page_header.html" with page_subtitle="Dashboard" page_title="Notifications" %}
+    {% include "includes/page_header.html" with page_subtitle="Inbox" page_title="Notifications" page_description="In-app alerts for finance, membership, meetings, and system events. Duplicate unread events are grouped." %}
 
     <div class="filter-bar filter-bar--sticky d-flex flex-wrap align-items-end gap-2">
         <form method="get" class="filter-form flex-grow-1">
@@ -14,6 +14,15 @@
                     <option value="">All</option>
                     {% for code, label in categories %}
                     <option value="{{ code }}" {% if category == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-field">
+                <label class="form-label" for="id_severity">Severity</label>
+                <select name="severity" id="id_severity" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for code, label in severities %}
+                    <option value="{{ code }}" {% if severity == code %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -43,11 +52,21 @@
                     <div class="flex-grow-1 min-w-0">
                         <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                             <span class="text-muted small text-uppercase">{{ n.get_category_display }}</span>
+                            {% if n.severity == "CRITICAL" %}
+                            <span class="badge bg-danger">Critical</span>
+                            {% elif n.severity == "WARNING" %}
+                            <span class="badge bg-warning text-dark">Warning</span>
+                            {% elif n.severity == "SUCCESS" %}
+                            <span class="badge bg-success">Success</span>
+                            {% endif %}
                             {% if not n.read %}<span class="badge bg-primary">New</span>{% endif %}
+                            {% if n.occurrence_count > 1 %}
+                            <span class="badge bg-secondary">×{{ n.occurrence_count }}</span>
+                            {% endif %}
                         </div>
                         <strong class="d-block">{{ n.title }}</strong>
                         <p class="text-muted small mb-1 mt-1">{{ n.message }}</p>
-                        <time class="text-muted small" datetime="{{ n.created_at|date:'c' }}">{{ n.created_at|date:"M j, Y H:i" }}</time>
+                        <time class="text-muted small" datetime="{{ n.last_event_at|date:'c' }}">{{ n.last_event_at|date:"M j, Y H:i" }}</time>
                     </div>
                     <div class="d-flex flex-column align-items-stretch gap-1 flex-shrink-0">
                         {% if n.action_url %}
@@ -82,11 +101,11 @@
     <nav aria-label="Notifications pagination">
         <ul class="pagination pagination-sm justify-content-center mb-0">
             {% if page_obj.has_previous %}
-            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if unread_only %}&amp;unread=1{% endif %}{% if category %}&amp;category={{ category }}{% endif %}">Previous</a></li>
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if unread_only %}&amp;unread=1{% endif %}{% if category %}&amp;category={{ category }}{% endif %}{% if severity %}&amp;severity={{ severity }}{% endif %}">Previous</a></li>
             {% endif %}
             <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
             {% if page_obj.has_next %}
-            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if unread_only %}&amp;unread=1{% endif %}{% if category %}&amp;category={{ category }}{% endif %}">Next</a></li>
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if unread_only %}&amp;unread=1{% endif %}{% if category %}&amp;category={{ category }}{% endif %}{% if severity %}&amp;severity={{ severity }}{% endif %}">Next</a></li>
             {% endif %}
         </ul>
     </nav>

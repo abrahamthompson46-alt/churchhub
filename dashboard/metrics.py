@@ -132,7 +132,7 @@ def build_executive_finance_bundle(
 
 
 def income_expense_trend_chart(finance_church_ids, now=None, months=12):
-    """Monthly income, tithe, and combined series for the home finance chart."""
+    """Monthly income, expense, tithe, and combined series for the home finance chart."""
     import json
 
     now = now or timezone.now()
@@ -142,6 +142,7 @@ def income_expense_trend_chart(finance_church_ids, now=None, months=12):
         "income": empty_json,
         "expense": empty_json,
         "income_cumulative": empty_json,
+        "expense_cumulative": empty_json,
         "tithe": empty_json,
         "tithe_cumulative": empty_json,
         "combined": empty_json,
@@ -209,6 +210,7 @@ def income_expense_trend_chart(finance_church_ids, now=None, months=12):
         "income": json.dumps(income_data),
         "expense": json.dumps(expense_data),
         "income_cumulative": json.dumps(_cumulative(income_data)),
+        "expense_cumulative": json.dumps(_cumulative(expense_data)),
         "tithe": json.dumps(tithe_data),
         "tithe_cumulative": json.dumps(_cumulative(tithe_data)),
         "combined": json.dumps(combined_data),

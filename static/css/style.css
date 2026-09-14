@@ -5712,34 +5712,42 @@ a.alert-banner:hover {
 
 .cc-finance-seg__btn {
     appearance: none;
-    border: 1px solid transparent;
+    border: 0;
     border-radius: 0.7rem;
-    min-width: 6.25rem;
-    padding: 0.45rem 1.05rem;
+    min-width: 5.75rem;
+    padding: 0.48rem 1.05rem;
     font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     line-height: 1.2;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    box-shadow: none;
+    transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 .cc-finance-seg__btn--tithe {
     color: #92400e;
-    background: #fff7ed;
-    border-color: #fdba74;
+    background: #ffedd5;
 }
 
 .cc-finance-seg__btn--combined {
     color: #0f766e;
-    background: #f0fdfa;
-    border-color: #5eead4;
+    background: #ccfbf1;
 }
 
 .cc-finance-seg__btn--income {
     color: #166534;
-    background: #f0fdf4;
-    border-color: #86efac;
+    background: #dcfce7;
+}
+
+.cc-finance-seg__btn--expense {
+    color: #9f1239;
+    background: #ffe4e6;
+}
+
+.cc-finance-seg__btn--compare {
+    color: #1e3a5f;
+    background: #e0e7ff;
 }
 
 .cc-finance-seg__btn:hover {
@@ -5749,23 +5757,32 @@ a.alert-banner:hover {
 
 .cc-finance-seg__btn--tithe.is-active {
     color: #fff;
-    background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
-    border-color: #b45309;
-    box-shadow: 0 4px 12px rgba(180, 83, 9, 0.28);
+    background: #d97706;
+    box-shadow: 0 4px 12px rgba(180, 83, 9, 0.22);
 }
 
 .cc-finance-seg__btn--combined.is-active {
     color: #fff;
-    background: linear-gradient(180deg, #14b8a6 0%, #0f766e 100%);
-    border-color: #0f766e;
-    box-shadow: 0 4px 12px rgba(15, 118, 110, 0.28);
+    background: #0f766e;
+    box-shadow: 0 4px 12px rgba(15, 118, 110, 0.22);
 }
 
 .cc-finance-seg__btn--income.is-active {
     color: #fff;
-    background: linear-gradient(180deg, #22c55e 0%, #15803d 100%);
-    border-color: #166534;
-    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.28);
+    background: #15803d;
+    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.22);
+}
+
+.cc-finance-seg__btn--expense.is-active {
+    color: #fff;
+    background: #e11d48;
+    box-shadow: 0 4px 12px rgba(190, 18, 60, 0.22);
+}
+
+.cc-finance-seg__btn--compare.is-active {
+    color: #fff;
+    background: #1e3a5f;
+    box-shadow: 0 4px 12px rgba(30, 58, 95, 0.22);
 }
 
 .cc-finance-seg__btn:focus-visible {

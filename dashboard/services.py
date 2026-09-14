@@ -1575,12 +1575,13 @@ def build_home_context(request):
             list(scope.finance_church_ids), now=as_of_dt, months=12
         )
         series = (request.GET.get("finance_chart") or "tithe").lower()
-        if series not in {"tithe", "combined", "income"}:
+        if series not in {"tithe", "combined", "income", "expense", "compare"}:
             series = "tithe"
         context["trend_labels"] = chart["labels"]
         context["income_data"] = chart["income"]
         context["expense_data"] = chart["expense"]
         context["income_cumulative_data"] = chart["income_cumulative"]
+        context["expense_cumulative_data"] = chart["expense_cumulative"]
         context["tithe_data"] = chart["tithe"]
         context["tithe_cumulative_data"] = chart["tithe_cumulative"]
         context["combined_data"] = chart["combined"]
@@ -1591,6 +1592,8 @@ def build_home_context(request):
             "labels": json.loads(chart["labels"]),
             "income": json.loads(chart["income"]),
             "income_cumulative": json.loads(chart["income_cumulative"]),
+            "expense": json.loads(chart["expense"]),
+            "expense_cumulative": json.loads(chart["expense_cumulative"]),
             "tithe": json.loads(chart["tithe"]),
             "tithe_cumulative": json.loads(chart["tithe_cumulative"]),
             "combined": json.loads(chart["combined"]),
@@ -1599,7 +1602,7 @@ def build_home_context(request):
         context["show_finance_chart"] = True
         context["chart_has_activity"] = any(
             float(v)
-            for key in ("income", "tithe", "combined")
+            for key in ("income", "expense", "tithe", "combined")
             for v in json.loads(chart[key])
         )
     else:
@@ -1610,6 +1613,8 @@ def build_home_context(request):
             "labels": [],
             "income": [],
             "income_cumulative": [],
+            "expense": [],
+            "expense_cumulative": [],
             "tithe": [],
             "tithe_cumulative": [],
             "combined": [],

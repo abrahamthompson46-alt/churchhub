@@ -164,6 +164,25 @@ def _welfare_attachment(user, path: str) -> bool:
     return False
 
 
+def _birthday_flyer(user, path: str) -> bool:
+    from announcements.models import BirthdayWishDispatch
+    from permissions.checks import can_view_announcements, can_view_members
+    from permissions.roles import UserRole
+
+    if getattr(user, "role", None) == UserRole.MEMBER:
+        return False
+    if not (can_view_members(user) and can_view_announcements(user)):
+        return False
+    row = (
+        BirthdayWishDispatch.objects.filter(flyer=path)
+        .select_related("church")
+        .first()
+    )
+    if row is None:
+        return False
+    return _church_in_scope(user, row.church)
+
+
 def _announcement_image(user, path: str) -> bool:
     from announcements.models import AnnouncementImage
     from announcements.services import (
@@ -254,6 +273,7 @@ _PREFIX_HANDLERS = (
     ("meetings/attachments/", _meeting_attachment),
     ("welfare/cases/", _welfare_attachment),
     ("exports/reports/", _export_file),
+    ("announcements/birthdays/", _birthday_flyer),
     ("announcements/", _announcement_image),
     ("records/", _record_image),
     ("history/", _history_image),

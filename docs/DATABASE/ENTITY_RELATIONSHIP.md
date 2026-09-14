@@ -406,6 +406,8 @@ erDiagram
   Announcement ||--o{ AnnouncementView : views
   User ||--o{ AnnouncementView : viewer
   Announcement ||--o{ AnnouncementAuditLog : audit
+  Church ||--o{ BirthdayWishDispatch : flyers
+  Member ||--o{ BirthdayWishDispatch : featured
   User ||--o{ ReportExportJob : jobs
   User ||--o{ ReportAccessAuditLog : access
   Church ||--o{ ReportAccessAuditLog : optional

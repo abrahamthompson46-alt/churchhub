@@ -7,6 +7,18 @@ app_name = "announcements"
 urlpatterns = [
     path("", views.announcement_list, name="announcement_list"),
     path("upcoming/", views.upcoming_calendar, name="upcoming_calendar"),
+    path("birthdays/", views.birthday_desk, name="birthday_desk"),
+    path("birthdays/prepare/", views.birthday_prepare, name="birthday_prepare"),
+    path(
+        "birthdays/<uuid:pk>/download/",
+        views.birthday_download,
+        name="birthday_download",
+    ),
+    path(
+        "birthdays/<uuid:pk>/posted/",
+        views.birthday_mark_posted,
+        name="birthday_mark_posted",
+    ),
     path("create/", views.create_announcement_view, name="create_announcement"),
     path("mine/", views.my_announcements, name="my_announcements"),
     path("pending/", views.pending_approvals, name="pending_approvals"),

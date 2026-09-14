@@ -27,6 +27,7 @@ from permissions.checks import (
     can_run_cutoff,
     can_transfer_members,
     can_view_all_churches,
+    can_view_announcements,
     can_view_budgets,
     can_view_dashboard_finance,
     can_manage_budgets,
@@ -1310,6 +1311,10 @@ def get_this_week_pulse(request):
         "counts": counts,
         "visitors": visitors,
         "birthdays": birthdays,
+        "birthday_desk_url": reverse("announcements:birthday_desk")
+        if can_view_announcements(user) and can_view_members(user)
+        and getattr(user, "role", "") != UserRole.MEMBER
+        else "",
         "transfers": transfers,
         "meetings": meetings,
         "has_items": has_items,

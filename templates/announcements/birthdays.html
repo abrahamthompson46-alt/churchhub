@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Birthday flyers — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Church Life" page_title="Birthday flyers" page_description="Prepare a square flyer and caption, then post them in your church WhatsApp group. Age is never shown." %}
+
+    <p class="text-muted small mb-3">
+        Active church: <strong>{{ church.name }}</strong>.
+        WhatsApp cannot be posted into automatically — download the image, copy the caption, and send both in the group.
+    </p>
+
+    <ul class="nav nav-pills birthday-desk-windows mb-4">
+        <li class="nav-item">
+            <a class="nav-link{% if window == 'today' %} active{% endif %}" href="?window=today">Today</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link{% if window == 'week' %} active{% endif %}" href="?window=week">This week</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link{% if window == 'month' %} active{% endif %}" href="?window=month">This month</a>
+        </li>
+    </ul>
+
+    {% if rows %}
+    <div class="birthday-desk-grid">
+        {% for row in rows %}
+        <article class="birthday-desk-card panel">
+            <div class="birthday-desk-card__hero">
+                {% if row.member.profile_picture %}
+                <img src="{{ row.member.profile_picture.url }}" alt="" class="birthday-desk-card__photo">
+                {% else %}
+                <div class="birthday-desk-card__initials" aria-hidden="true">
+                    {{ row.member.first_name|first|upper }}{{ row.member.last_name|first|upper }}
+                </div>
+                {% endif %}
+                <div>
+                    <h2 class="h5 mb-1">{{ row.member.full_name }}</h2>
+                    <p class="text-muted small mb-0">{{ row.occurrence_date|date:"l, F j" }}</p>
+                    {% if row.dispatch %}
+                    <span class="chip chip--muted">{{ row.dispatch.get_status_display }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <label class="form-label small text-muted mb-1" for="caption-{{ row.member.pk }}">WhatsApp caption</label>
+            <textarea id="caption-{{ row.member.pk }}" class="form-control form-control-sm birthday-desk-caption" rows="6" readonly>{{ row.caption }}</textarea>
+            <div class="birthday-desk-card__actions">
+                <form method="post" action="{% url 'announcements:birthday_prepare' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="member_id" value="{{ row.member.pk }}">
+                    <input type="hidden" name="occurrence_date" value="{{ row.occurrence_date|date:'Y-m-d' }}">
+                    <input type="hidden" name="window" value="{{ window }}">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        {% if row.dispatch %}Regenerate flyer{% else %}Prepare flyer{% endif %}
+                    </button>
+                </form>
+                {% if row.dispatch and row.dispatch.flyer %}
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'announcements:birthday_download' row.dispatch.pk %}">Download PNG</a>
+                <form method="post" action="{% url 'announcements:birthday_mark_posted' row.dispatch.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="window" value="{{ window }}">
+                    <button type="submit" class="btn btn-outline-secondary btn-sm"{% if row.dispatch.status == 'POSTED' %} disabled{% endif %}>Mark posted</button>
+                </form>
+                {% endif %}
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    {% include "includes/empty_state.html" with icon="bi-gift" message="No active members with a birthday in this window." %}
+    {% endif %}
+</div>
+{% endblock %}

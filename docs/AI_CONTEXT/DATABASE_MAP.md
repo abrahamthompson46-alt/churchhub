@@ -340,6 +340,7 @@ Constraint: debit account ≠ credit account. Unique `(church, code)`.
 | `AnnouncementImage` | Images |
 | `AnnouncementView` | View tracking |
 | `AnnouncementAuditLog` | Audit |
+| `BirthdayWishDispatch` | Church + member birthday flyer (PREPARED/DOWNLOADED/POSTED); media `announcements/birthdays/` |
 
 Distinct from `sitecontrol.PlatformAnnouncement`.
 

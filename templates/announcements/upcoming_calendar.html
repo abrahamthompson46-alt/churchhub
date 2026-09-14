@@ -30,6 +30,13 @@
             <div class="col-md-auto">
                 <button type="submit" class="btn btn-primary btn-sm">Apply</button>
             </div>
+            {% if birthday_desk_url %}
+            <div class="col-md-auto ms-md-auto">
+                <a href="{{ birthday_desk_url }}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-gift me-1"></i>Birthday flyers
+                </a>
+            </div>
+            {% endif %}
         </form>
     </div>
 
@@ -91,8 +98,6 @@
                         {% endif %}
                         {% if item.kind != 'birthday' %}
                         <p class="calendar-item__time text-muted small mb-0">{{ item.date|date:"g:i A" }}</p>
-                        {% elif item.turning_age %}
-                        <p class="calendar-item__time text-muted small mb-0">Turning {{ item.turning_age }}</p>
                         {% endif %}
                     </div>
                     {% if item.kind == 'birthday' and item.member.profile_picture %}

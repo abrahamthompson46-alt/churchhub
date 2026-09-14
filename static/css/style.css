@@ -6016,3 +6016,39 @@ a.alert-banner:hover {
 }
 
 /* Public landing styles live in static/css/landing.css (linked from public/home.html). */
+
+.birthday-desk-windows { gap: 0.35rem; }
+.birthday-desk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    gap: 1rem;
+}
+.birthday-desk-card__hero {
+    display: flex;
+    gap: 0.85rem;
+    align-items: center;
+    margin-bottom: 0.85rem;
+}
+.birthday-desk-card__photo,
+.birthday-desk-card__initials {
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 999px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+.birthday-desk-card__initials {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fdf2f8;
+    color: #be185d;
+    font-weight: 700;
+}
+.birthday-desk-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+.birthday-desk-caption { font-size: 0.85rem; }

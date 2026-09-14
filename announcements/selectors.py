@@ -257,6 +257,16 @@ def active_members_with_dob_for_request(request):
     )
 
 
+def active_members_with_dob_for_church(church):
+    if not church:
+        return Member.objects.none()
+    return Member.objects.filter(
+        church=church,
+        is_active=True,
+        date_of_birth__isnull=False,
+    ).select_related("department", "church")
+
+
 def scheduled_meetings_for_church_in_window(
     church, *, start, end, limit=50, portal_visible_only=False
 ):

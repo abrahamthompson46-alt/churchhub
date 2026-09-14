@@ -312,14 +312,15 @@ Enums: MeetingStatus SCHEDULED/HELD/CANCELLED; MeetingType BOARD/CHURCH_BOARD/DE
 
 ---
 
-### 4.12 `announcements` (4 models)
+### 4.12 `announcements` (5 models)
 
 | Model | PK | Key points | Tenant |
 |-------|-----|------------|--------|
 | `Announcement` | BigAuto | visibility general/church; status PENDING/APPROVED/REJECTED/ARCHIVED; FK church nullable; named indexes | church (nullable if general) |
 | `AnnouncementImage` | BigAuto | FK announcement | via ann |
 | `AnnouncementView` | BigAuto | unique `(announcement, user)` | via ann |
-| `AnnouncementAuditLog` | UUID | CREATE/UPDATE/APPROVE/REJECT/ARCHIVE/PIN/UNPIN/EXPORT | church |
+| `AnnouncementAuditLog` | UUID | CREATE/UPDATE/APPROVE/REJECT/ARCHIVE/PIN/UNPIN/EXPORT/BIRTHDAY_PREP/GET/POST | church |
+| `BirthdayWishDispatch` | UUID | unique `(church, member, occurrence_date)`; flyer PNG; statuses PREPARED/DOWNLOADED/POSTED | church |
 
 ---
 

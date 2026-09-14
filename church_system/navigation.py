@@ -83,6 +83,7 @@ from permissions.checks import (
     can_view_reports,
     can_view_transactions,
     can_view_welfare,
+    UserRole,
 )
 from permissions.superadmin import is_superadmin
 from sitecontrol.services import church_has_feature
@@ -469,6 +470,10 @@ def get_main_navigation(user, active_church=None):
             calendar_items.append(
                 _item("Upcoming", "announcements:upcoming_calendar", "bi-calendar-heart")
             )
+            if can_view_members(user) and getattr(user, "role", None) != UserRole.MEMBER:
+                calendar_items.append(
+                    _item("Birthday flyers", "announcements:birthday_desk", "bi-gift")
+                )
         if can_approve_announcements(user):
             calendar_items.append(
                 _item("Pending Announcements", "announcements:pending_approvals", "bi-hourglass-split")
@@ -708,6 +713,7 @@ MODULE_TABS = {
     ],
     "communications": [
         _item("Upcoming", "announcements:upcoming_calendar", "bi-calendar-heart"),
+        _item("Birthday flyers", "announcements:birthday_desk", "bi-gift"),
         _item("Announcements", "announcements:announcement_list", "bi-megaphone"),
         _item("New", "announcements:create_announcement", "bi-pencil-square"),
         _item("My Posts", "announcements:my_announcements", "bi-inbox"),
@@ -908,6 +914,11 @@ def _tab_allowed(user, url_name, active_church=None):
             and _church_feature(active_church, "assets", user)
         ),
         "announcements:upcoming_calendar": lambda: can_view_announcements(user),
+        "announcements:birthday_desk": lambda: (
+            can_view_announcements(user)
+            and can_view_members(user)
+            and getattr(user, "role", None) != UserRole.MEMBER
+        ),
         "announcements:announcement_list": lambda: (
             can_view_announcements(user) or can_archive_announcements(user)
         ),

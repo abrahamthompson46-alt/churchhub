@@ -4,10 +4,11 @@ from functools import wraps
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import redirect, render
+from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from announcements import repositories as repo
 from announcements import selectors
@@ -80,6 +81,19 @@ def view_required(view_func):
     @permission_required("view_announcements")
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
+
+def birthday_desk_required(view_func):
+    @login_required
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        from .birthday_services import can_use_birthday_desk
+
+        if not can_use_birthday_desk(request.user):
+            raise PermissionDenied
         return view_func(request, *args, **kwargs)
 
     return _wrapped
@@ -406,6 +420,12 @@ def upcoming_calendar(request):
         except Exception:
             create_meeting_url = ""
 
+    from .birthday_services import can_use_birthday_desk
+
+    birthday_desk_url = ""
+    if can_use_birthday_desk(request.user):
+        birthday_desk_url = reverse("announcements:birthday_desk")
+
     return render(request, "announcements/upcoming_calendar.html", {
         "items": items,
         "grouped_items": grouped,
@@ -415,8 +435,114 @@ def upcoming_calendar(request):
         "today": today,
         "tomorrow": tomorrow,
         "create_meeting_url": create_meeting_url,
+        "birthday_desk_url": birthday_desk_url,
         "breadcrumbs": [
             {"label": "Communications", "url": "/announcements/"},
             {"label": "Upcoming"},
         ],
     })
+
+
+def _birthday_dispatch_for_church(request, pk):
+    from .birthday_services import require_birthday_church
+    from .models import BirthdayWishDispatch
+
+    church = require_birthday_church(request)
+    return get_object_or_404(
+        BirthdayWishDispatch.objects.select_related("member", "church"),
+        pk=pk,
+        church=church,
+    )
+
+
+@birthday_desk_required
+def birthday_desk(request):
+    from datetime import date
+
+    from .birthday_services import (
+        WINDOWS,
+        list_birthday_desk_rows,
+        require_birthday_church,
+    )
+
+    church = require_birthday_church(request)
+    window = request.GET.get("window", "today")
+    if window not in WINDOWS:
+        window = "today"
+    rows = list_birthday_desk_rows(church, window=window)
+    return render(
+        request,
+        "announcements/birthdays.html",
+        {
+            "church": church,
+            "window": window,
+            "windows": WINDOWS,
+            "rows": rows,
+            "today": date.today(),
+            "breadcrumbs": [
+                {"label": "Communications", "url": "/announcements/"},
+                {"label": "Upcoming", "url": reverse("announcements:upcoming_calendar")},
+                {"label": "Birthday flyers"},
+            ],
+        },
+    )
+
+
+@birthday_desk_required
+@require_POST
+def birthday_prepare(request):
+    from datetime import date
+
+    from members.models import Member
+
+    from .birthday_services import (
+        BirthdayFlyerError,
+        prepare_birthday_flyer,
+        require_birthday_church,
+    )
+
+    church = require_birthday_church(request)
+    member_id = request.POST.get("member_id")
+    raw_date = request.POST.get("occurrence_date")
+    window = request.POST.get("window", "today")
+    try:
+        occurrence = date.fromisoformat(raw_date or "")
+        member = Member.objects.select_related("church", "department").get(
+            pk=member_id, church=church
+        )
+        prepare_birthday_flyer(
+            user=request.user,
+            church=church,
+            member=member,
+            occurrence_date=occurrence,
+        )
+        flash_success(request, "Flyer ready. Copy the caption and download the image for WhatsApp.")
+    except (Member.DoesNotExist, ValueError, BirthdayFlyerError) as exc:
+        flash_exception(request, exc if isinstance(exc, BirthdayFlyerError) else BirthdayFlyerError("Could not prepare that flyer."))
+    return redirect(f"{reverse('announcements:birthday_desk')}?window={window}")
+
+
+@birthday_desk_required
+@require_GET
+def birthday_download(request, pk):
+    from .birthday_services import mark_birthday_downloaded
+
+    dispatch = _birthday_dispatch_for_church(request, pk)
+    if not dispatch.flyer:
+        raise Http404("Flyer file is missing.")
+    mark_birthday_downloaded(user=request.user, dispatch=dispatch)
+    handle = dispatch.flyer.open("rb")
+    filename = f"birthday-{dispatch.occurrence_date.isoformat()}.png"
+    return FileResponse(handle, as_attachment=True, filename=filename, content_type="image/png")
+
+
+@birthday_desk_required
+@require_POST
+def birthday_mark_posted(request, pk):
+    from .birthday_services import mark_birthday_posted
+
+    dispatch = _birthday_dispatch_for_church(request, pk)
+    mark_birthday_posted(user=request.user, dispatch=dispatch)
+    flash_success(request, "Marked as posted in the church WhatsApp group.")
+    window = request.POST.get("window", "today")
+    return redirect(f"{reverse('announcements:birthday_desk')}?window={window}")

@@ -334,6 +334,9 @@ class AnnouncementAuditLog(models.Model):
         ("PIN", "Pin"),
         ("UNPIN", "Unpin"),
         ("EXPORT", "Export"),
+        ("BIRTHDAY_PREP", "Birthday flyer prepared"),
+        ("BIRTHDAY_GET", "Birthday flyer downloaded"),
+        ("BIRTHDAY_POST", "Birthday marked posted"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -371,3 +374,83 @@ class AnnouncementAuditLog(models.Model):
 
     def __str__(self):
         return f"{self.action} — {self.announcement_id}"
+
+
+def birthday_flyer_upload_to(instance, filename):
+    church_id = getattr(instance, "church_id", None) or "unknown"
+    member_id = getattr(instance, "member_id", None) or "unknown"
+    occ = getattr(instance, "occurrence_date", None)
+    occ_part = occ.isoformat() if occ else "undated"
+    return f"announcements/birthdays/{church_id}/{occ_part}_{member_id}.png"
+
+
+class BirthdayWishDispatch(models.Model):
+    """Clerk-prepared WhatsApp-group flyer for one member birthday occurrence.
+
+    Current: generate/download PNG + caption. Staff post in the church group.
+    There is no WhatsApp Cloud API or unofficial Web send in v1.
+    """
+
+    STATUS_PREPARED = "PREPARED"
+    STATUS_DOWNLOADED = "DOWNLOADED"
+    STATUS_POSTED = "POSTED"
+    STATUS_CHOICES = (
+        (STATUS_PREPARED, "Prepared"),
+        (STATUS_DOWNLOADED, "Downloaded"),
+        (STATUS_POSTED, "Posted"),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    church = models.ForeignKey(
+        Church,
+        on_delete=models.CASCADE,
+        related_name="birthday_wish_dispatches",
+    )
+    member = models.ForeignKey(
+        "members.Member",
+        on_delete=models.CASCADE,
+        related_name="birthday_wish_dispatches",
+    )
+    occurrence_date = models.DateField()
+    flyer = models.ImageField(upload_to=birthday_flyer_upload_to, blank=True)
+    caption = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PREPARED,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="birthday_flyers_created",
+    )
+    posted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="birthday_flyers_posted",
+    )
+    posted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-occurrence_date", "member__last_name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["church", "member", "occurrence_date"],
+                name="uniq_birthday_wish_church_member_day",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["church", "occurrence_date"],
+                name="bday_wish_church_day_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.member_id} @ {self.occurrence_date}"

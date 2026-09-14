@@ -100,7 +100,7 @@
                         <p class="calendar-item__time text-muted small mb-0">{{ item.date|date:"g:i A" }}</p>
                         {% endif %}
                     </div>
-                    {% if item.kind == 'birthday' and item.member.profile_picture %}
+                    {% if item.kind == 'birthday' and item.member.show_birthday_photo %}
                     <div class="calendar-item__avatar">
                         <img src="{{ item.member.profile_picture.url }}" alt="" class="calendar-item__photo">
                     </div>

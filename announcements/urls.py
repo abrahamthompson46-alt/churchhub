@@ -9,6 +9,12 @@ urlpatterns = [
     path("upcoming/", views.upcoming_calendar, name="upcoming_calendar"),
     path("birthdays/", views.birthday_desk, name="birthday_desk"),
     path("birthdays/prepare/", views.birthday_prepare, name="birthday_prepare"),
+    path("birthdays/prepare-all/", views.birthday_prepare_all, name="birthday_prepare_all"),
+    path(
+        "birthdays/<uuid:pk>/caption/",
+        views.birthday_save_caption,
+        name="birthday_save_caption",
+    ),
     path(
         "birthdays/<uuid:pk>/download/",
         views.birthday_download,

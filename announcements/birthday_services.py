@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from calendar import monthrange
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.core.files.base import ContentFile
 from django.db import transaction
@@ -21,6 +21,8 @@ from permissions.org_scope import church_in_user_scope
 from permissions.roles import UserRole
 
 WINDOWS = ("today", "week", "month")
+CAPTION_MAX = 2000
+DEFAULT_FLYER_RETENTION_DAYS = 90
 
 
 class BirthdayFlyerError(Exception):
@@ -48,6 +50,13 @@ def birthday_caption(*, member, church) -> str:
     )
 
 
+def normalize_caption(text, *, member, church) -> str:
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return birthday_caption(member=member, church=church)
+    return cleaned[:CAPTION_MAX]
+
+
 def _window_bounds(today, window: str):
     if window not in WINDOWS:
         window = "today"
@@ -56,37 +65,60 @@ def _window_bounds(today, window: str):
     if window == "week":
         return today, today + timedelta(days=6)
     last = monthrange(today.year, today.month)[1]
-    from datetime import date
-
     return date(today.year, today.month, 1), date(today.year, today.month, last)
 
 
 def list_birthday_desk_rows(church, *, window="today", today=None):
     today = today or timezone.localdate()
     start, end = _window_bounds(today, window)
-    members = selectors.active_members_with_dob_for_church(church)
+    members = list(selectors.active_members_with_dob_for_church(church))
+    dispatch_map = {}
+    if members:
+        dispatch_map = {
+            (row.member_id, row.occurrence_date): row
+            for row in BirthdayWishDispatch.objects.filter(
+                church=church,
+                member_id__in=[m.pk for m in members],
+                occurrence_date__gte=start,
+                occurrence_date__lte=end,
+            )
+        }
     rows = []
-    for member in members.iterator():
+    for member in members:
         occ = _birthday_in_window(member.date_of_birth, start, end)
         if not occ:
             continue
-        dispatch = (
-            BirthdayWishDispatch.objects.filter(
-                church=church, member=member, occurrence_date=occ
-            )
-            .only("id", "status", "caption", "flyer")
-            .first()
-        )
+        dispatch = dispatch_map.get((member.pk, occ))
         rows.append(
             {
                 "member": member,
                 "occurrence_date": occ,
                 "dispatch": dispatch,
-                "caption": (dispatch.caption if dispatch else birthday_caption(member=member, church=church)),
+                "caption": (
+                    dispatch.caption
+                    if dispatch and dispatch.caption
+                    else birthday_caption(member=member, church=church)
+                ),
             }
         )
-    rows.sort(key=lambda row: (row["occurrence_date"], row["member"].last_name, row["member"].first_name))
+    rows.sort(
+        key=lambda row: (row["occurrence_date"], row["member"].last_name, row["member"].first_name)
+    )
     return rows
+
+
+def list_missing_birthday_photos(church, *, today=None):
+    rows = list_birthday_desk_rows(church, window="month", today=today)
+    return [row for row in rows if not row["member"].show_birthday_photo]
+
+
+def church_missing_birthday_logo(church) -> bool:
+    from church_system.denomination_scope import get_church_denomination
+
+    denom = get_church_denomination(church)
+    if not denom:
+        return True
+    return not bool(getattr(getattr(denom, "logo", None), "name", ""))
 
 
 def _assert_occurrence_matches(member, occurrence_date):
@@ -97,27 +129,29 @@ def _assert_occurrence_matches(member, occurrence_date):
 
 
 @transaction.atomic
-def prepare_birthday_flyer(*, user, church, member, occurrence_date):
+def prepare_birthday_flyer(*, user, church, member, occurrence_date, caption=None):
     if member.church_id != church.pk:
         raise BirthdayFlyerError("Member is not in the active church.")
+    if getattr(member, "hide_public_birthday", False):
+        raise BirthdayFlyerError("This member is on the quiet birthday list.")
     if not member.is_active or not member.date_of_birth:
         raise BirthdayFlyerError("Only active members with a date of birth can be featured.")
     occ = _assert_occurrence_matches(member, occurrence_date)
     png = render_birthday_flyer_png(member=member, church=church, occurrence_date=occ)
-    caption = birthday_caption(member=member, church=church)
+    caption_text = normalize_caption(caption, member=member, church=church)
     dispatch, _created = BirthdayWishDispatch.objects.select_for_update().get_or_create(
         church=church,
         member=member,
         occurrence_date=occ,
         defaults={
-            "caption": caption,
+            "caption": caption_text,
             "created_by": user,
             "status": BirthdayWishDispatch.STATUS_PREPARED,
         },
     )
     filename = f"{occ.isoformat()}_{member.pk}.png"
     dispatch.flyer.save(filename, ContentFile(png), save=False)
-    dispatch.caption = caption
+    dispatch.caption = caption_text
     if dispatch.status == BirthdayWishDispatch.STATUS_POSTED:
         dispatch.status = BirthdayWishDispatch.STATUS_PREPARED
         dispatch.posted_at = None
@@ -133,6 +167,39 @@ def prepare_birthday_flyer(*, user, church, member, occurrence_date):
             "occurrence_date": occ.isoformat(),
             "dispatch_id": str(dispatch.pk),
         },
+    )
+    return dispatch
+
+
+def prepare_birthday_flyers_for_window(*, user, church, window="today", today=None):
+    prepared = 0
+    skipped = 0
+    for row in list_birthday_desk_rows(church, window=window, today=today):
+        try:
+            prepare_birthday_flyer(
+                user=user,
+                church=church,
+                member=row["member"],
+                occurrence_date=row["occurrence_date"],
+                caption=row["caption"],
+            )
+            prepared += 1
+        except BirthdayFlyerError:
+            skipped += 1
+    return prepared, skipped
+
+
+def save_birthday_caption(*, user, dispatch, caption):
+    text = (caption or "").strip()
+    if not text:
+        raise BirthdayFlyerError("Caption cannot be empty.")
+    dispatch.caption = text[:CAPTION_MAX]
+    dispatch.save(update_fields=["caption", "updated_at"])
+    repo.create_audit_log(
+        church=dispatch.church,
+        action="BIRTHDAY_CAP",
+        performed_by=user,
+        details={"dispatch_id": str(dispatch.pk), "member_id": str(dispatch.member_id)},
     )
     return dispatch
 
@@ -162,6 +229,19 @@ def mark_birthday_posted(*, user, dispatch):
         details={"dispatch_id": str(dispatch.pk), "member_id": str(dispatch.member_id)},
     )
     return dispatch
+
+
+def purge_old_birthday_flyers(*, days=DEFAULT_FLYER_RETENTION_DAYS, now=None) -> int:
+    days = max(1, int(days))
+    cutoff = (now or timezone.now()) - timedelta(days=days)
+    removed = 0
+    qs = BirthdayWishDispatch.objects.exclude(flyer="").filter(updated_at__lt=cutoff)
+    for dispatch in qs.iterator():
+        dispatch.flyer.delete(save=False)
+        dispatch.flyer = ""
+        dispatch.save(update_fields=["flyer", "updated_at"])
+        removed += 1
+    return removed
 
 
 def require_birthday_church(request):
@@ -195,8 +275,9 @@ def notify_church_birthday_desk(church, *, today=None) -> int:
     sent = 0
     event_key = f"birthday.desk.{church.pk}.{today.isoformat()}"
     title = "Birthday flyer desk"
+    when_label = "today" if today == timezone.localdate() else today.strftime("%A, %b %d")
     message = (
-        f"{len(rows)} birthday(s) today at {church.name}: {names}. "
+        f"{len(rows)} birthday(s) {when_label} at {church.name}: {names}. "
         "Prepare the flyer and post it in the church WhatsApp group."
     )
     for user in users:
@@ -215,17 +296,21 @@ def notify_church_birthday_desk(church, *, today=None) -> int:
     return sent
 
 
-def remind_all_church_birthday_desks(*, today=None) -> dict:
+def remind_all_church_birthday_desks(*, today=None, days_ahead=0) -> dict:
     from organization.models import Church
 
     today = today or timezone.localdate()
+    days_ahead = max(0, int(days_ahead))
+    dates = [today + timedelta(days=offset) for offset in range(days_ahead + 1)]
     churches_notified = 0
     notifications = 0
     for church in Church.objects.select_related(
         "district__zone__conference__denomination"
     ).iterator():
-        count = notify_church_birthday_desk(church, today=today)
-        if count:
+        church_sent = 0
+        for occ in dates:
+            church_sent += notify_church_birthday_desk(church, today=occ)
+        if church_sent:
             churches_notified += 1
-            notifications += count
+            notifications += church_sent
     return {"churches": churches_notified, "notifications": notifications}

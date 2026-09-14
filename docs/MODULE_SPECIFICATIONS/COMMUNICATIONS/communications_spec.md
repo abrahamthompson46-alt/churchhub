@@ -52,7 +52,7 @@ erDiagram
 
 **PK type:** integer (not UUID) on Announcement.
 
-**`BirthdayWishDispatch` (Current):** UUID PK; church + member + `occurrence_date` unique; flyer PNG under `announcements/birthdays/`; statuses PREPARED / DOWNLOADED / POSTED; caption stored at prepare time. **Does not show turning age.** Photo used when `Member.profile_picture` is set, otherwise initials.
+**`BirthdayWishDispatch` (Current):** UUID PK; church + member + `occurrence_date` unique; flyer PNG under `announcements/birthdays/`; statuses PREPARED / DOWNLOADED / POSTED; editable caption. **Does not show turning age.** Photo used only when `Member.profile_picture` is set **and** `allow_birthday_photo` is true; otherwise initials. `hide_public_birthday` excludes the member from the desk, calendar, and reminders.
 
 **Managers:** none custom.
 
@@ -69,7 +69,7 @@ erDiagram
 7. Calendar combines birthdays (members), meetings, announcement event dates. Birthday cards and flyers **do not display turning age**.  
 8. Optional `target_roles` + department targeting; empty = entire visibility scope.  
 9. List/detail/calendar require `view_announcements`; export uses `export_announcements`.  
-10. **Birthday flyer desk** (`/announcements/birthdays/`): requires an **active church**, `view_announcements` **and** `view_members`, and is denied for portal `MEMBER`. Staff generate/download a PNG and copy a caption; a human posts in the church WhatsApp group. `manage.py remind_birthday_desk` notifies SECRETARY / LOCAL_PASTOR for today's birthdays (`event_key` `birthday.desk.<church_id>.<date>`).  
+10. **Birthday flyer desk** (`/announcements/birthdays/`): requires an **active church**, `view_announcements` **and** `view_members`, and is denied for portal `MEMBER`. Staff generate/download/share a PNG, copy or edit the caption, and post in the church WhatsApp group. Prepare-all covers the current window. `manage.py remind_birthday_desk` notifies SECRETARY / LOCAL_PASTOR (`event_key` `birthday.desk.<church_id>.<date>`); schedule daily ~06:00 local, optional Friday `--days-ahead 1`. `manage.py purge_birthday_flyers` removes PNG files older than 90 days by default.  
 11. **No `@require_feature`** on announcement views — module is available whenever the user has announcement permissions.
 
 ---
@@ -106,6 +106,8 @@ erDiagram
 | `upcoming/` | `upcoming_calendar` |
 | `birthdays/` | `birthday_desk` |
 | `birthdays/prepare/` | `birthday_prepare` (POST) |
+| `birthdays/prepare-all/` | `birthday_prepare_all` (POST) |
+| `birthdays/<uuid:pk>/caption/` | `birthday_save_caption` (POST) |
 | `birthdays/<uuid:pk>/download/` | `birthday_download` |
 | `birthdays/<uuid:pk>/posted/` | `birthday_mark_posted` (POST) |
 | `create/` | `create_announcement` |
@@ -186,7 +188,7 @@ flowchart LR
 | Channels | In-app announcements + dashboard notifications | Multi-channel comms | Email for publish/export (Phase 3) |
 | Audience | Church/general + optional roles/departments | Richer pastoral targeting | Keep server-side filters |
 | Calendar | Aggregated upcoming (no turning age on birthday UI) | Richer pastoral calendar | Keep service-based aggregation |
-| Birthday outreach | Clerk-assisted PNG + caption; staff posts in WhatsApp | WhatsApp Cloud API (cannot join existing groups as Current) | Member photo consent flags |
+| Birthday outreach | Clerk PNG + caption (copy/preview/share/prepare-all); photo consent; quiet list; 90-day flyer purge | WhatsApp Cloud API (cannot join existing groups as Current) | Story (1080×1920) layout |
 | Status fields | status + booleans | Single status | Migrate carefully |
 | Notifications | Inbox filters, POST mark-read, MEETING/SYSTEM categories, export-ready notify | Preferences / push | Optional email prefs |
 

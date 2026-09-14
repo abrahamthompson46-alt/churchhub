@@ -251,7 +251,9 @@ def announcement_with_church_for_export(qs, *, limit=5000):
 def active_members_with_dob_for_request(request):
     return filter_by_church(
         Member.objects.filter(
-            is_active=True, date_of_birth__isnull=False
+            is_active=True,
+            date_of_birth__isnull=False,
+            hide_public_birthday=False,
         ).select_related("department", "church"),
         request,
     )
@@ -264,6 +266,7 @@ def active_members_with_dob_for_church(church):
         church=church,
         is_active=True,
         date_of_birth__isnull=False,
+        hide_public_birthday=False,
     ).select_related("department", "church")
 
 

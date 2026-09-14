@@ -339,6 +339,14 @@ class Member(SoftDeleteModel):
         null=True,
         blank=True,
     )
+    allow_birthday_photo = models.BooleanField(
+        default=True,
+        help_text="Use this member's photo on church birthday flyers when a picture is on file.",
+    )
+    hide_public_birthday = models.BooleanField(
+        default=False,
+        help_text="Do not list this member on the birthday flyer desk or communications calendar.",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -402,6 +410,10 @@ class Member(SoftDeleteModel):
     @property
     def age_group(self):
         return age_group_for_age(self.age)
+
+    @property
+    def show_birthday_photo(self):
+        return bool(self.allow_birthday_photo and self.profile_picture)
 
     def clean(self):
         errors = {}

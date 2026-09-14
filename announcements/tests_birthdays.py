@@ -166,3 +166,65 @@ class BirthdayFlyerTests(TestCase):
                 user=self.secretary, event_key=f"birthday.desk.{self.church.pk}.{self.today.isoformat()}"
             ).exists()
         )
+
+    def test_quiet_list_hidden_from_desk(self):
+        self.member.hide_public_birthday = True
+        self.member.save(update_fields=["hide_public_birthday"])
+        self.client.login(username="bday_sec", password="pass12345")
+        response = self.client.get(reverse("announcements:birthday_desk"))
+        self.assertNotContains(response, "Ada Lovelace")
+
+    def test_prepare_all_creates_flyer(self):
+        self.client.login(username="bday_sec", password="pass12345")
+        response = self.client.post(
+            reverse("announcements:birthday_prepare_all"),
+            {"window": "today"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            BirthdayWishDispatch.objects.filter(
+                member=self.member, church=self.church, occurrence_date=self.today
+            ).exists()
+        )
+
+    def test_save_caption_keeps_custom_text(self):
+        dispatch = prepare_birthday_flyer(
+            user=self.secretary,
+            church=self.church,
+            member=self.member,
+            occurrence_date=self.today,
+        )
+        self.client.login(username="bday_sec", password="pass12345")
+        response = self.client.post(
+            reverse("announcements:birthday_save_caption", kwargs={"pk": dispatch.pk}),
+            {"caption": "Happy Birthday Ada! We celebrate you.", "window": "today"},
+        )
+        self.assertEqual(response.status_code, 302)
+        dispatch.refresh_from_db()
+        self.assertEqual(dispatch.caption, "Happy Birthday Ada! We celebrate you.")
+        self.assertNotIn("Turning", dispatch.caption)
+
+    def test_photo_consent_off_skips_portrait_file(self):
+        from announcements.flyer_composer import _open_member_photo
+
+        self.member.allow_birthday_photo = False
+        self.assertIsNone(_open_member_photo(self.member))
+
+    def test_purge_removes_old_flyer_file(self):
+        from datetime import timedelta
+
+        from announcements.birthday_services import purge_old_birthday_flyers
+
+        dispatch = prepare_birthday_flyer(
+            user=self.secretary,
+            church=self.church,
+            member=self.member,
+            occurrence_date=self.today,
+        )
+        BirthdayWishDispatch.objects.filter(pk=dispatch.pk).update(
+            updated_at=timezone.now() - timedelta(days=120)
+        )
+        removed = purge_old_birthday_flyers(days=90)
+        self.assertEqual(removed, 1)
+        dispatch.refresh_from_db()
+        self.assertFalse(dispatch.flyer)

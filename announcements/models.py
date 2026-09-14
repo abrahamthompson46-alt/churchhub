@@ -337,6 +337,7 @@ class AnnouncementAuditLog(models.Model):
         ("BIRTHDAY_PREP", "Birthday flyer prepared"),
         ("BIRTHDAY_GET", "Birthday flyer downloaded"),
         ("BIRTHDAY_POST", "Birthday marked posted"),
+        ("BIRTHDAY_CAP", "Birthday caption saved"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

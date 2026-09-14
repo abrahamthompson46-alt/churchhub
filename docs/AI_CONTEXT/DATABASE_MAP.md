@@ -127,7 +127,7 @@ Age groups (computed, not a stored enum on Member): `CHILD`, `TEEN`, `YOUTH`, `A
 | `Department` | UUID; FK `church`; `name`; … |
 | `Family` | UUID; FK `church`; `name`; optional FK `head` → Member; unique `(church, name)` |
 | `Occupation` | UUID; FK `church`; … |
-| `Member` | UUID; FK `church`, optional `occupation` / `department` / `family`; `first_name`, `last_name`; `gender`; `marital_status`; `date_of_birth`; `date_joined`; `membership_status`; `is_active`; `membership_number`; `phone`; `address`; baptism fields; `profile_picture`; `created_by`; timestamps |
+| `Member` | UUID; FK `church`, optional `occupation` / `department` / `family`; `first_name`, `last_name`; `gender`; `marital_status`; `date_of_birth`; `date_joined`; `membership_status`; `is_active`; `membership_number`; `phone`; `address`; baptism fields; `profile_picture`; `allow_birthday_photo`; `hide_public_birthday`; `created_by`; timestamps |
 | `MemberTransfer` | UUID; FK `member`, `from_church`, `to_church`; status; approval metadata |
 | `Record` / `RecordImage` | Member records + images |
 | `History` / `HistoryImage` | Membership history events + images |

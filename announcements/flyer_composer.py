@@ -81,6 +81,8 @@ def _initials(member):
 
 
 def _open_member_photo(member):
+    if not getattr(member, "allow_birthday_photo", True):
+        return None
     picture = getattr(member, "profile_picture", None)
     if not picture:
         return None

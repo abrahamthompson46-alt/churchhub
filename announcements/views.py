@@ -461,7 +461,9 @@ def birthday_desk(request):
 
     from .birthday_services import (
         WINDOWS,
+        church_missing_birthday_logo,
         list_birthday_desk_rows,
+        list_missing_birthday_photos,
         require_birthday_church,
     )
 
@@ -470,6 +472,7 @@ def birthday_desk(request):
     if window not in WINDOWS:
         window = "today"
     rows = list_birthday_desk_rows(church, window=window)
+    missing_photos = list_missing_birthday_photos(church)
     return render(
         request,
         "announcements/birthdays.html",
@@ -479,6 +482,13 @@ def birthday_desk(request):
             "windows": WINDOWS,
             "rows": rows,
             "today": date.today(),
+            "missing_photos": missing_photos,
+            "missing_logo": church_missing_birthday_logo(church),
+            "unprepared_count": sum(
+                1
+                for row in rows
+                if not (row["dispatch"] and row["dispatch"].flyer)
+            ),
             "breadcrumbs": [
                 {"label": "Communications", "url": "/announcements/"},
                 {"label": "Upcoming", "url": reverse("announcements:upcoming_calendar")},
@@ -515,10 +525,54 @@ def birthday_prepare(request):
             church=church,
             member=member,
             occurrence_date=occurrence,
+            caption=request.POST.get("caption"),
         )
         flash_success(request, "Flyer ready. Copy the caption and download the image for WhatsApp.")
     except (Member.DoesNotExist, ValueError, BirthdayFlyerError) as exc:
         flash_exception(request, exc if isinstance(exc, BirthdayFlyerError) else BirthdayFlyerError("Could not prepare that flyer."))
+    return redirect(f"{reverse('announcements:birthday_desk')}?window={window}")
+
+
+@birthday_desk_required
+@require_POST
+def birthday_prepare_all(request):
+    from .birthday_services import (
+        prepare_birthday_flyers_for_window,
+        require_birthday_church,
+    )
+
+    church = require_birthday_church(request)
+    window = request.POST.get("window", "today")
+    prepared, skipped = prepare_birthday_flyers_for_window(
+        user=request.user, church=church, window=window
+    )
+    if prepared:
+        flash_success(
+            request,
+            f"Prepared {prepared} flyer(s)."
+            + (f" {skipped} skipped." if skipped else ""),
+        )
+    elif skipped:
+        flash_info(request, "No flyers could be prepared.")
+    else:
+        flash_info(request, "No birthdays in this window.")
+    return redirect(f"{reverse('announcements:birthday_desk')}?window={window}")
+
+
+@birthday_desk_required
+@require_POST
+def birthday_save_caption(request, pk):
+    from .birthday_services import BirthdayFlyerError, save_birthday_caption
+
+    dispatch = _birthday_dispatch_for_church(request, pk)
+    window = request.POST.get("window", "today")
+    try:
+        save_birthday_caption(
+            user=request.user, dispatch=dispatch, caption=request.POST.get("caption")
+        )
+        flash_success(request, "Caption saved.")
+    except BirthdayFlyerError as exc:
+        flash_exception(request, exc)
     return redirect(f"{reverse('announcements:birthday_desk')}?window={window}")
 
 

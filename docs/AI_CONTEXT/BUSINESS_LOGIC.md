@@ -297,7 +297,7 @@ Editable when DRAFT or REJECTED. Approval / capitalize / depreciate paths post i
 
 ## 9. Announcements
 
-**Church:** `announcements.Announcement` — church-scoped, approval/archive/pin patterns, images, views, audit. **`BirthdayWishDispatch`** — clerk-prepared birthday PNG + caption for the church WhatsApp group (no auto-send; no turning age on flyer or calendar). Desk is local-church, `view_announcements` + `view_members`, not portal MEMBER. Daily in-app reminder: `manage.py remind_birthday_desk`.
+**Church:** `announcements.Announcement` — church-scoped, approval/archive/pin patterns, images, views, audit. **`BirthdayWishDispatch`** — clerk-prepared birthday PNG + caption for the church WhatsApp group (no auto-send; no turning age). Desk supports copy/preview/share, prepare-all, editable captions, photo consent (`Member.allow_birthday_photo`, default true), and quiet list (`Member.hide_public_birthday`). Reminders: `manage.py remind_birthday_desk` (daily 06:00; optional `--days-ahead 1`). Retention: `manage.py purge_birthday_flyers`.
 
 **Platform:** `sitecontrol.PlatformAnnouncement` — separate platform messaging.
 

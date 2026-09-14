@@ -582,11 +582,14 @@ def birthday_download(request, pk):
     from .birthday_services import mark_birthday_downloaded
 
     dispatch = _birthday_dispatch_for_church(request, pk)
-    if not dispatch.flyer:
+    kind = request.GET.get("kind", "square")
+    image = dispatch.flyer_story if kind == "story" else dispatch.flyer
+    if not image:
         raise Http404("Flyer file is missing.")
     mark_birthday_downloaded(user=request.user, dispatch=dispatch)
-    handle = dispatch.flyer.open("rb")
-    filename = f"birthday-{dispatch.occurrence_date.isoformat()}.png"
+    handle = image.open("rb")
+    suffix = "-status" if kind == "story" else ""
+    filename = f"birthday{suffix}-{dispatch.occurrence_date.isoformat()}.png"
     return FileResponse(handle, as_attachment=True, filename=filename, content_type="image/png")
 
 

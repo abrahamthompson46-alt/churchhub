@@ -173,8 +173,10 @@ def _birthday_flyer(user, path: str) -> bool:
         return False
     if not (can_view_members(user) and can_view_announcements(user)):
         return False
+    from django.db.models import Q
+
     row = (
-        BirthdayWishDispatch.objects.filter(flyer=path)
+        BirthdayWishDispatch.objects.filter(Q(flyer=path) | Q(flyer_story=path))
         .select_related("church")
         .first()
     )

@@ -8,7 +8,7 @@
 
     <p class="text-muted small mb-3">
         Active church: <strong>{{ church.name }}</strong>.
-        Download or share the image, copy the caption, and send both in the group.
+        Download or share the square group flyer or the tall Status image, copy the caption, and send in WhatsApp.
     </p>
 
     {% if missing_logo %}
@@ -56,7 +56,18 @@
                 </div>
             </div>
             {% if row.dispatch and row.dispatch.flyer %}
-            <img src="{{ row.dispatch.flyer.url }}" alt="Birthday flyer preview" class="birthday-desk-preview">
+            <div class="birthday-desk-previews">
+                <figure>
+                    <img src="{{ row.dispatch.flyer.url }}" alt="Square group flyer" class="birthday-desk-preview">
+                    <figcaption>Group (square)</figcaption>
+                </figure>
+                {% if row.dispatch.flyer_story %}
+                <figure>
+                    <img src="{{ row.dispatch.flyer_story.url }}" alt="WhatsApp Status flyer" class="birthday-desk-preview birthday-desk-preview--story">
+                    <figcaption>Status (story)</figcaption>
+                </figure>
+                {% endif %}
+            </div>
             {% endif %}
             <label class="form-label small text-muted mb-1" for="caption-{{ row.member.pk }}">WhatsApp caption</label>
             <textarea id="caption-{{ row.member.pk }}" name="caption" form="prepare-{{ row.member.pk }}" class="form-control form-control-sm birthday-desk-caption" rows="6">{{ row.caption }}</textarea>
@@ -80,8 +91,12 @@
                 </form>
                 {% endif %}
                 {% if row.dispatch and row.dispatch.flyer %}
-                <a class="btn btn-outline-primary btn-sm" href="{% url 'announcements:birthday_download' row.dispatch.pk %}">Download PNG</a>
-                <button type="button" class="btn btn-outline-primary btn-sm" data-share-flyer="{{ row.dispatch.flyer.url }}" data-share-caption="caption-{{ row.member.pk }}" data-share-name="{{ row.member.full_name }}">Share</button>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'announcements:birthday_download' row.dispatch.pk %}">Download square</a>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-share-flyer="{{ row.dispatch.flyer.url }}" data-share-caption="caption-{{ row.member.pk }}" data-share-name="{{ row.member.full_name }}">Share square</button>
+                {% if row.dispatch.flyer_story %}
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'announcements:birthday_download' row.dispatch.pk %}?kind=story">Download status</a>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-share-flyer="{{ row.dispatch.flyer_story.url }}" data-share-caption="caption-{{ row.member.pk }}" data-share-name="{{ row.member.full_name }}">Share status</button>
+                {% endif %}
                 <form method="post" action="{% url 'announcements:birthday_mark_posted' row.dispatch.pk %}">
                     {% csrf_token %}
                     <input type="hidden" name="window" value="{{ window }}">

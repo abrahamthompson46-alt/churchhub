@@ -198,6 +198,7 @@ class BirthdayWishDispatchAdmin(ReadOnlyAuditModelAdmin):
         "member",
         "occurrence_date",
         "flyer",
+        "flyer_story",
         "caption",
         "status",
         "created_by",

@@ -320,7 +320,7 @@ Enums: MeetingStatus SCHEDULED/HELD/CANCELLED; MeetingType BOARD/CHURCH_BOARD/DE
 | `AnnouncementImage` | BigAuto | FK announcement | via ann |
 | `AnnouncementView` | BigAuto | unique `(announcement, user)` | via ann |
 | `AnnouncementAuditLog` | UUID | CREATE/UPDATE/APPROVE/REJECT/ARCHIVE/PIN/UNPIN/EXPORT/BIRTHDAY_PREP/GET/POST | church |
-| `BirthdayWishDispatch` | UUID | unique `(church, member, occurrence_date)`; flyer PNG; statuses PREPARED/DOWNLOADED/POSTED | church |
+| `BirthdayWishDispatch` | UUID | unique `(church, member, occurrence_date)`; flyer + flyer_story PNG; statuses PREPARED/DOWNLOADED/POSTED | church |
 
 ---
 

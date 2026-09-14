@@ -32,7 +32,7 @@
 | **payroll** (3) | `0001_payroll` → `0002_payrollrun_budget_warning_and_more` → `0003_payroll_enterprise` |
 | **assets** (3) | `0001_initial` → `0002_seed_category_templates` → `0003_assets_enterprise` |
 | **ledger** (2) | `0001_ledger_category` → `0002_ledger_enterprise` |
-| **announcements** (7) | `0001_initial` → `0002_…archived…` → `0003_announcements_enterprise` → `0004_enterprise_comms_phase12` → `0005_announcement_denomination` → `0006_birthdaywishdispatch` → `0007_member_birthday_privacy` |
+| **announcements** (8) | `0001_initial` → `0002_…archived…` → `0003_announcements_enterprise` → `0004_enterprise_comms_phase12` → `0005_announcement_denomination` → `0006_birthdaywishdispatch` → `0007_member_birthday_privacy` → `0008_birthdaywishdispatch_flyer_story` |
 | **meetings** (2) | `0001_initial` → `0002_meeting_workflow` |
 | **dashboard** (2) | `0001_initial` → `0002_alter_notification_options_…` |
 | **reports** (2) | `0001_initial` → `0002_reports_enterprise` |

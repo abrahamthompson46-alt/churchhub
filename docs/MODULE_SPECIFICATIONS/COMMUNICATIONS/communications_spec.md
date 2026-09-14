@@ -52,7 +52,7 @@ erDiagram
 
 **PK type:** integer (not UUID) on Announcement.
 
-**`BirthdayWishDispatch` (Current):** UUID PK; church + member + `occurrence_date` unique; flyer PNG under `announcements/birthdays/`; statuses PREPARED / DOWNLOADED / POSTED; editable caption. **Does not show turning age.** Photo used only when `Member.profile_picture` is set **and** `allow_birthday_photo` is true; otherwise initials. `hide_public_birthday` excludes the member from the desk, calendar, and reminders.
+**`BirthdayWishDispatch` (Current):** UUID PK; church + member + `occurrence_date` unique; square flyer PNG plus `flyer_story` (1080×1920) under `announcements/birthdays/`; statuses PREPARED / DOWNLOADED / POSTED; editable caption. **Does not show turning age.** Photo used only when `Member.profile_picture` is set **and** `allow_birthday_photo` is true; otherwise initials. `hide_public_birthday` excludes the member from the desk, calendar, and reminders.
 
 **Managers:** none custom.
 
@@ -188,7 +188,7 @@ flowchart LR
 | Channels | In-app announcements + dashboard notifications | Multi-channel comms | Email for publish/export (Phase 3) |
 | Audience | Church/general + optional roles/departments | Richer pastoral targeting | Keep server-side filters |
 | Calendar | Aggregated upcoming (no turning age on birthday UI) | Richer pastoral calendar | Keep service-based aggregation |
-| Birthday outreach | Clerk PNG + caption (copy/preview/share/prepare-all); photo consent; quiet list; 90-day flyer purge | WhatsApp Cloud API (cannot join existing groups as Current) | Story (1080×1920) layout |
+| Birthday outreach | Clerk PNG + caption (copy/preview/share/prepare-all); square + story layouts; photo consent; quiet list; 90-day flyer purge | WhatsApp Cloud API (cannot join existing groups as Current) | — |
 | Status fields | status + booleans | Single status | Migrate carefully |
 | Notifications | Inbox filters, POST mark-read, MEETING/SYSTEM categories, export-ready notify | Preferences / push | Optional email prefs |
 

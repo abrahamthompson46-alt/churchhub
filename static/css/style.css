@@ -6051,11 +6051,22 @@ a.alert-banner:hover {
     gap: 0.5rem;
     margin-top: 0.75rem;
 }
+.birthday-desk-previews {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.birthday-desk-previews figcaption {
+    font-size: 0.75rem;
+    color: var(--ch-muted);
+    margin-top: 0.25rem;
+}
 .birthday-desk-preview {
     width: 100%;
     border-radius: var(--ch-radius, 0.5rem);
-    margin-bottom: 0.75rem;
     aspect-ratio: 1;
     object-fit: cover;
     background: #0f2942;
 }
+.birthday-desk-preview--story { aspect-ratio: 9 / 16; }

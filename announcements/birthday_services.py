@@ -13,7 +13,7 @@ from django.utils import timezone
 from announcements import repositories as repo
 from announcements import selectors
 from announcements.calendar_services import _birthday_in_window
-from announcements.flyer_composer import render_birthday_flyer_png
+from announcements.flyer_composer import LAYOUT_SQUARE, LAYOUT_STORY, render_birthday_flyer_png
 from announcements.models import BirthdayWishDispatch
 from church_system.church_scope import require_church
 from permissions.checks import can_view_announcements, can_view_members
@@ -137,7 +137,12 @@ def prepare_birthday_flyer(*, user, church, member, occurrence_date, caption=Non
     if not member.is_active or not member.date_of_birth:
         raise BirthdayFlyerError("Only active members with a date of birth can be featured.")
     occ = _assert_occurrence_matches(member, occurrence_date)
-    png = render_birthday_flyer_png(member=member, church=church, occurrence_date=occ)
+    png = render_birthday_flyer_png(
+        member=member, church=church, occurrence_date=occ, layout=LAYOUT_SQUARE
+    )
+    story_png = render_birthday_flyer_png(
+        member=member, church=church, occurrence_date=occ, layout=LAYOUT_STORY
+    )
     caption_text = normalize_caption(caption, member=member, church=church)
     dispatch, _created = BirthdayWishDispatch.objects.select_for_update().get_or_create(
         church=church,
@@ -149,8 +154,10 @@ def prepare_birthday_flyer(*, user, church, member, occurrence_date, caption=Non
             "status": BirthdayWishDispatch.STATUS_PREPARED,
         },
     )
-    filename = f"{occ.isoformat()}_{member.pk}.png"
-    dispatch.flyer.save(filename, ContentFile(png), save=False)
+    dispatch.flyer.save(f"{occ.isoformat()}_{member.pk}.png", ContentFile(png), save=False)
+    dispatch.flyer_story.save(
+        f"{occ.isoformat()}_{member.pk}_story.png", ContentFile(story_png), save=False
+    )
     dispatch.caption = caption_text
     if dispatch.status == BirthdayWishDispatch.STATUS_POSTED:
         dispatch.status = BirthdayWishDispatch.STATUS_PREPARED
@@ -235,11 +242,17 @@ def purge_old_birthday_flyers(*, days=DEFAULT_FLYER_RETENTION_DAYS, now=None) ->
     days = max(1, int(days))
     cutoff = (now or timezone.now()) - timedelta(days=days)
     removed = 0
-    qs = BirthdayWishDispatch.objects.exclude(flyer="").filter(updated_at__lt=cutoff)
+    qs = BirthdayWishDispatch.objects.filter(updated_at__lt=cutoff).exclude(
+        flyer="", flyer_story=""
+    )
     for dispatch in qs.iterator():
-        dispatch.flyer.delete(save=False)
-        dispatch.flyer = ""
-        dispatch.save(update_fields=["flyer", "updated_at"])
+        if dispatch.flyer:
+            dispatch.flyer.delete(save=False)
+            dispatch.flyer = ""
+        if dispatch.flyer_story:
+            dispatch.flyer_story.delete(save=False)
+            dispatch.flyer_story = ""
+        dispatch.save(update_fields=["flyer", "flyer_story", "updated_at"])
         removed += 1
     return removed
 

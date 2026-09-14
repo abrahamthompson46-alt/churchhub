@@ -8,8 +8,6 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-FLYER_SIZE = 1080
-
 
 def _parse_hex(value, fallback):
     raw = (value or "").strip().lstrip("#")
@@ -112,8 +110,14 @@ def _open_logo(denomination):
         return None
 
 
-def render_birthday_flyer_png(*, member, church, occurrence_date) -> bytes:
-    """Return 1080×1080 PNG bytes. Caption/age must not be drawn on the image."""
+LAYOUT_SQUARE = "square"
+LAYOUT_STORY = "story"
+
+
+def render_birthday_flyer_png(*, member, church, occurrence_date, layout=LAYOUT_SQUARE) -> bytes:
+    """Return PNG bytes. Caption/age must not be drawn on the image."""
+    story = layout == LAYOUT_STORY
+    width, height = (1080, 1920) if story else (1080, 1080)
     denomination = getattr(
         getattr(getattr(church, "district", None), "zone", None),
         "conference",
@@ -129,12 +133,14 @@ def render_birthday_flyer_png(*, member, church, occurrence_date) -> bytes:
     accent = _parse_hex(getattr(denomination, "accent_color", None), (201, 162, 39))
     highlight = _parse_hex(getattr(denomination, "highlight_color", None), (14, 116, 144))
 
-    canvas = Image.new("RGB", (FLYER_SIZE, FLYER_SIZE), primary)
+    canvas = Image.new("RGB", (width, height), primary)
     draw = ImageDraw.Draw(canvas)
 
-    draw.rectangle((0, 0, FLYER_SIZE, 28), fill=accent)
-    draw.rectangle((0, FLYER_SIZE - 140, FLYER_SIZE, FLYER_SIZE), fill=(255, 255, 255))
-    draw.ellipse((-220, 720, 280, 1220), fill=highlight)
+    draw.rectangle((0, 0, width, 28), fill=accent)
+    footer_h = 180 if story else 140
+    draw.rectangle((0, height - footer_h, width, height), fill=(255, 255, 255))
+    blob = (-220, height - 520, 280, height + 80) if story else (-220, 720, 280, 1220)
+    draw.ellipse(blob, fill=highlight)
 
     logo = _open_logo(denomination)
     if logo is not None:
@@ -142,21 +148,21 @@ def render_birthday_flyer_png(*, member, church, occurrence_date) -> bytes:
         canvas.paste(logo, (48, 56), logo if logo.mode == "RGBA" else None)
 
     title_font = _load_font(36, bold=True)
-    name_font = _load_font(64, bold=True)
+    name_font = _load_font(72 if story else 64, bold=True)
     church_font = _load_font(28, bold=True)
-    date_font = _load_font(26)
+    date_font = _load_font(28 if story else 26)
     blessing_font = _load_font(30)
     footer_font = _load_font(22)
-    initial_font = _load_font(72, bold=True)
+    initial_font = _load_font(84 if story else 72, bold=True)
 
     church_name = (church.name or "Our church").strip()
     header = church_name.upper()
     draw.text((200 if logo is not None else 48, 78), header[:42], font=church_font, fill=(255, 255, 255))
-    draw.text((48, 170), "HAPPY BIRTHDAY", font=title_font, fill=accent)
+    draw.text((48, 200 if story else 170), "HAPPY BIRTHDAY", font=title_font, fill=accent)
 
-    portrait_d = 420
-    cx = (FLYER_SIZE - portrait_d) // 2
-    cy = 250
+    portrait_d = 560 if story else 420
+    cx = (width - portrait_d) // 2
+    cy = 420 if story else 250
     ring = 14
     draw.ellipse(
         (cx - ring, cy - ring, cx + portrait_d + ring, cy + portrait_d + ring),
@@ -171,30 +177,31 @@ def render_birthday_flyer_png(*, member, church, occurrence_date) -> bytes:
         initials = _initials(member)
         iw = _text_width(draw, initials, initial_font)
         draw.text(
-            (cx + (portrait_d - iw) / 2, cy + 155),
+            (cx + (portrait_d - iw) / 2, cy + portrait_d * 0.37),
             initials,
             font=initial_font,
             fill=primary,
         )
 
     display_name = (member.full_name or "").strip() or "Church family"
-    name_lines = _wrap_text(draw, display_name, name_font, FLYER_SIZE - 96)
-    y = 700
+    name_lines = _wrap_text(draw, display_name, name_font, width - 96)
+    y = cy + portrait_d + (80 if story else 30)
     for line in name_lines[:2]:
         lw = _text_width(draw, line, name_font)
-        draw.text(((FLYER_SIZE - lw) / 2, y), line, font=name_font, fill=(255, 255, 255))
-        y += 72
+        draw.text(((width - lw) / 2, y), line, font=name_font, fill=(255, 255, 255))
+        y += 80 if story else 72
 
     date_label = occurrence_date.strftime("%B %d").replace(" 0", " ")
     dw = _text_width(draw, date_label, date_font)
-    draw.text(((FLYER_SIZE - dw) / 2, y + 8), date_label, font=date_font, fill=(255, 255, 255))
+    draw.text(((width - dw) / 2, y + 8), date_label, font=date_font, fill=(255, 255, 255))
 
     blessing = "We celebrate you today. May God bless you."
     bw = _text_width(draw, blessing, blessing_font)
-    draw.text(((FLYER_SIZE - bw) / 2, 970), blessing, font=blessing_font, fill=primary)
-    footer = "Share this in your church WhatsApp group"
+    footer_y = height - footer_h + 36
+    draw.text(((width - bw) / 2, footer_y), blessing, font=blessing_font, fill=primary)
+    footer = "WhatsApp Status" if story else "Share this in your church WhatsApp group"
     fw = _text_width(draw, footer, footer_font)
-    draw.text(((FLYER_SIZE - fw) / 2, 1020), footer, font=footer_font, fill=primary)
+    draw.text(((width - fw) / 2, footer_y + 48), footer, font=footer_font, fill=primary)
 
     buffer = BytesIO()
     canvas.save(buffer, format="PNG", optimize=True)

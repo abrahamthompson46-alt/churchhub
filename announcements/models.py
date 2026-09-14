@@ -382,7 +382,12 @@ def birthday_flyer_upload_to(instance, filename):
     member_id = getattr(instance, "member_id", None) or "unknown"
     occ = getattr(instance, "occurrence_date", None)
     occ_part = occ.isoformat() if occ else "undated"
-    return f"announcements/birthdays/{church_id}/{occ_part}_{member_id}.png"
+    kind = "story" if "story" in (filename or "").lower() else "square"
+    return f"announcements/birthdays/{church_id}/{occ_part}_{member_id}_{kind}.png"
+
+
+def birthday_story_upload_to(instance, filename):
+    return birthday_flyer_upload_to(instance, "story.png")
 
 
 class BirthdayWishDispatch(models.Model):
@@ -414,6 +419,7 @@ class BirthdayWishDispatch(models.Model):
     )
     occurrence_date = models.DateField()
     flyer = models.ImageField(upload_to=birthday_flyer_upload_to, blank=True)
+    flyer_story = models.ImageField(upload_to=birthday_story_upload_to, blank=True)
     caption = models.TextField(blank=True, default="")
     status = models.CharField(
         max_length=20,

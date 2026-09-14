@@ -95,7 +95,10 @@ class BirthdayFlyerTests(TestCase):
         self.assertTrue(dispatch.flyer)
         raw = dispatch.flyer.read()
         self.assertTrue(raw.startswith(b"\x89PNG"))
-        Image.open(BytesIO(raw)).verify()
+        self.assertEqual(Image.open(BytesIO(raw)).size, (1080, 1080))
+        self.assertTrue(dispatch.flyer_story)
+        story = Image.open(BytesIO(dispatch.flyer_story.read()))
+        self.assertEqual(story.size, (1080, 1920))
 
     def test_desk_requires_staff_not_portal_member(self):
         self.client.login(username="bday_mem", password="pass12345")
@@ -126,6 +129,11 @@ class BirthdayFlyerTests(TestCase):
             reverse("announcements:birthday_download", kwargs={"pk": dispatch.pk})
         )
         self.assertEqual(download.status_code, 200)
+        story = self.client.get(
+            reverse("announcements:birthday_download", kwargs={"pk": dispatch.pk})
+            + "?kind=story"
+        )
+        self.assertEqual(story.status_code, 200)
         self.assertEqual(download["Content-Type"], "image/png")
         dispatch.refresh_from_db()
         self.assertEqual(dispatch.status, BirthdayWishDispatch.STATUS_DOWNLOADED)
@@ -152,6 +160,7 @@ class BirthdayFlyerTests(TestCase):
         )
         path = dispatch.flyer.name
         self.assertTrue(user_may_access_media(self.secretary, path))
+        self.assertTrue(user_may_access_media(self.secretary, dispatch.flyer_story.name))
         self.assertFalse(user_may_access_media(self.other_sec, path))
         self.assertFalse(user_may_access_media(self.member_user, path))
 
@@ -228,3 +237,4 @@ class BirthdayFlyerTests(TestCase):
         self.assertEqual(removed, 1)
         dispatch.refresh_from_db()
         self.assertFalse(dispatch.flyer)
+        self.assertFalse(dispatch.flyer_story)

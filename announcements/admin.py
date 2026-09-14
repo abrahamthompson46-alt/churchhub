@@ -2,7 +2,13 @@ from django.contrib import admin
 
 from admin_custom.audit_admin import ReadOnlyAuditModelAdmin
 from admin_custom.tenancy import filter_admin_qs_by_church
-from announcements.models import Announcement, AnnouncementAuditLog, AnnouncementImage, AnnouncementView
+from announcements.models import (
+    Announcement,
+    AnnouncementAuditLog,
+    AnnouncementImage,
+    AnnouncementView,
+    BirthdayWishDispatch,
+)
 from announcements.services import approve_announcement, archive_announcement, reject_announcement
 
 
@@ -175,6 +181,31 @@ class AnnouncementAuditLogAdmin(ReadOnlyAuditModelAdmin):
         "performed_by",
         "details",
         "created_at",
+    )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return filter_admin_qs_by_church(qs, request.user)
+
+
+@admin.register(BirthdayWishDispatch)
+class BirthdayWishDispatchAdmin(ReadOnlyAuditModelAdmin):
+    list_display = ("occurrence_date", "member", "church", "status", "created_by", "posted_at")
+    list_filter = ("status", "occurrence_date")
+    search_fields = ("member__first_name", "member__last_name", "church__name")
+    readonly_fields = (
+        "church",
+        "member",
+        "occurrence_date",
+        "flyer",
+        "flyer_story",
+        "caption",
+        "status",
+        "created_by",
+        "posted_by",
+        "posted_at",
+        "created_at",
+        "updated_at",
     )
 
     def get_queryset(self, request):

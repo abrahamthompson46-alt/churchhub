@@ -17,13 +17,14 @@
 
 ## 1. Purpose and responsibilities
 
-Church **announcements** with create → approve/reject → archive lifecycle, pinning, scheduling (`publish_at`), images, view tracking, audit log, and a **communications calendar** (birthdays + meetings + announcement events).
+Church **announcements** with create → approve/reject → archive lifecycle, pinning, scheduling (`publish_at`), images, view tracking, audit log, a **communications calendar** (birthdays + meetings + announcement events), and a **birthday flyer desk** (clerk-prepared PNG + caption for the church WhatsApp group).
 
 | Owns | Does not own |
 |------|----------------|
 | Announcement + images + views + audit | Platform announcements (→ `sitecontrol` `/platform/announcements/`) |
 | Approval workflow | Email/SMS blast engine (absent) |
 | Upcoming calendar aggregation | Member pastoral edits |
+| Birthday flyer desk (`BirthdayWishDispatch`) | WhatsApp Cloud API / unofficial Web send |
 | Nav label "Church Life" | App folder remains `announcements` |
 | Church History mega-nav entry (UI) | Chronicle model lives in `organization.ChurchHistoryEntry` |
 
@@ -38,6 +39,8 @@ erDiagram
   Announcement ||--o{ AnnouncementView : views
   Announcement ||--o{ AnnouncementAuditLog : audit
   User ||--o{ Announcement : created_by
+  Church ||--o{ BirthdayWishDispatch : flyers
+  Member ||--o{ BirthdayWishDispatch : featured
 ```
 
 ### `Announcement`
@@ -48,6 +51,8 @@ erDiagram
 - Image rules: max 5 MB; jpeg/png/gif/webp via shared `church_system.uploads` validators
 
 **PK type:** integer (not UUID) on Announcement.
+
+**`BirthdayWishDispatch` (Current):** UUID PK; church + member + `occurrence_date` unique; square flyer PNG plus `flyer_story` (1080×1920) under `announcements/birthdays/`; statuses PREPARED / DOWNLOADED / POSTED; editable caption. **Does not show turning age.** Photo used only when `Member.profile_picture` is set **and** `allow_birthday_photo` is true; otherwise initials. `hide_public_birthday` excludes the member from the desk, calendar, and reminders.
 
 **Managers:** none custom.
 
@@ -61,10 +66,11 @@ erDiagram
 4. Pending queue excludes the submitter's own rows; approve/reject require `approve_announcements` + church scope.  
 5. Archive / reject recorded with audit; archive requires `archive_announcements` or creator.  
 6. View tracking via `mark_viewed` / `track_view`.  
-7. Calendar combines birthdays (members), meetings, announcement event dates.  
+7. Calendar combines birthdays (members), meetings, announcement event dates. Birthday cards and flyers **do not display turning age**.  
 8. Optional `target_roles` + department targeting; empty = entire visibility scope.  
 9. List/detail/calendar require `view_announcements`; export uses `export_announcements`.  
-10. **No `@require_feature`** on announcement views — module is available whenever the user has announcement permissions.
+10. **Birthday flyer desk** (`/announcements/birthdays/`): requires an **active church**, `view_announcements` **and** `view_members`, and is denied for portal `MEMBER`. Staff generate/download/share a PNG, copy or edit the caption, and post in the church WhatsApp group. Prepare-all covers the current window. `manage.py remind_birthday_desk` notifies SECRETARY / LOCAL_PASTOR (`event_key` `birthday.desk.<church_id>.<date>`); schedule daily ~06:00 local, optional Friday `--days-ahead 1`. `manage.py purge_birthday_flyers` removes PNG files older than 90 days by default.  
+11. **No `@require_feature`** on announcement views — module is available whenever the user has announcement permissions.
 
 ---
 
@@ -76,6 +82,7 @@ erDiagram
 | `repositories.py` | Announcement save/create, audit log, view tracking, image formset persistence |
 | `services.py` | Create/update/approve/reject/archive, visibility rules, pin limits, export table, mark viewed |
 | `calendar_services.py` | Upcoming birthdays/meetings/announcement events, grouped calendar, summary counts |
+| `birthday_services.py` / `flyer_composer.py` | Desk windows, caption (no age), PNG flyer, prepare/download/posted, daily reminders |
 
 **Layering (P1-2):** Views → services → selectors/repositories → models. Views handle HTTP/forms only; image formsets save via repositories. Church/visibility scope, approval workflow, and audit behavior are unchanged.
 
@@ -85,7 +92,7 @@ erDiagram
 
 ## 5. Permissions (Current)
 
-`view_announcements`, `create_announcements`, `approve_announcements`, `archive_announcements`, `export_announcements`.
+`view_announcements`, `create_announcements`, `approve_announcements`, `archive_announcements`, `export_announcements`. Birthday flyer desk also requires `view_members` and is denied for portal `MEMBER`.
 
 ---
 
@@ -97,6 +104,12 @@ erDiagram
 |------|------|
 | `` | `announcement_list` |
 | `upcoming/` | `upcoming_calendar` |
+| `birthdays/` | `birthday_desk` |
+| `birthdays/prepare/` | `birthday_prepare` (POST) |
+| `birthdays/prepare-all/` | `birthday_prepare_all` (POST) |
+| `birthdays/<uuid:pk>/caption/` | `birthday_save_caption` (POST) |
+| `birthdays/<uuid:pk>/download/` | `birthday_download` |
+| `birthdays/<uuid:pk>/posted/` | `birthday_mark_posted` (POST) |
 | `create/` | `create_announcement` |
 | `mine/` | `my_announcements` |
 | `pending/` | `pending_approvals` |
@@ -109,9 +122,9 @@ erDiagram
 
 **Forms:** `AnnouncementForm`, `AnnouncementEditForm`, `AnnouncementRejectForm`, `AnnouncementImageForm`.
 
-**Views:** create/list/detail/edit; pending approve/reject; archive; calendar; track.
+**Views:** create/list/detail/edit; pending approve/reject; archive; calendar; birthday flyer desk; track.
 
-**Templates:** `templates/announcements/`.
+**Templates:** `templates/announcements/` (`birthdays.html` for the flyer desk).
 
 ---
 
@@ -152,7 +165,8 @@ flowchart LR
 - Approval segregation.  
 - Church visibility filtering.  
 - Do not expose rejected content broadly.  
-- Upload path sanitization via Django storage.
+- Upload path sanitization via Django storage.  
+- Birthday flyer files use prefix `announcements/birthdays/` **before** generic `announcements/` media ACL; require `view_members` + `view_announcements` and church in `get_manageable_churches`. Portal MEMBER cannot fetch flyers.
 
 ---
 
@@ -173,7 +187,8 @@ flowchart LR
 |-------|---------|------------------|-------------|
 | Channels | In-app announcements + dashboard notifications | Multi-channel comms | Email for publish/export (Phase 3) |
 | Audience | Church/general + optional roles/departments | Richer pastoral targeting | Keep server-side filters |
-| Calendar | Aggregated upcoming | Richer pastoral calendar | Keep service-based aggregation |
+| Calendar | Aggregated upcoming (no turning age on birthday UI) | Richer pastoral calendar | Keep service-based aggregation |
+| Birthday outreach | Clerk PNG + caption (copy/preview/share/prepare-all); square + story layouts; photo consent; quiet list; 90-day flyer purge | WhatsApp Cloud API (cannot join existing groups as Current) | — |
 | Status fields | status + booleans | Single status | Migrate carefully |
 | Notifications | Inbox filters, POST mark-read, MEETING/SYSTEM categories, export-ready notify | Preferences / push | Optional email prefs |
 

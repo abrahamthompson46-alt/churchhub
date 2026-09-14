@@ -931,6 +931,7 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertIsNotNone(response.context.get("membership_analysis"))
         self.assertContains(response, "Membership")
         self.assertContains(response, "memberCompareChart")
+        self.assertNotContains(response, "Counts use membership status Active")
         self.assertContains(response, "Active members")
 
     def test_district_pastor_defaults_to_subtree_exception_board(self):
@@ -1029,10 +1030,15 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertTrue(response.context.get("show_finance_chart"))
         self.assertEqual(response.context.get("finance_chart_series"), "tithe")
         self.assertContains(response, 'data-finance-chart="combined"')
+        self.assertContains(response, 'data-finance-chart="expense"')
+        self.assertContains(response, 'data-finance-chart="compare"')
         self.assertContains(response, "finance-chart-data")
         self.assertContains(response, "cc-finance-chart__plot")
         combined = client.get(reverse("dashboard:home") + "?finance_chart=combined")
         self.assertEqual(combined.context.get("finance_chart_series"), "combined")
+        compare = client.get(reverse("dashboard:home") + "?finance_chart=compare")
+        self.assertEqual(compare.context.get("finance_chart_series"), "compare")
+        self.assertIn("expense", compare.context["finance_chart_payload"])
 
     def test_home_kpis_follow_open_working_month_not_clock(self):
         from datetime import date

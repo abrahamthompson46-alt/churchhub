@@ -25,14 +25,14 @@
 |-----|----------------------|
 | **accounts** (11) | `0001_initial` → `0002_useractivitylog_userinvitation_user_phone` → `0003_alter_user_options_and_more` → `0004_platform_control_room` → `0005_user_member` → `0006_user_denomination` → `0007_user_managed_denominations` → `0008_control_tower_enterprise` → `0009_assign_platform_roles` → `0010_accounts_enterprise` → `0011_org_scope` |
 | **organization** (5) | `0001_initial` → `0002_generalconference_union_conference_union` → `0003_conference_denomination` → `0004_organization_enterprise` → `0005_backfill_financials_provisioned` |
-| **members** (4) | `0001_initial` → `0002_department_…` → `0003_leadershiprole_spiritualgift_…` → `0004_members_enterprise` |
+| **members** (10) | `0001_initial` → … → `0009_alter_member_date_of_birth` → `0010_member_birthday_privacy` |
 | **transactions** (17) | `0001_initial` → `0002_financialperiod` → `0003_…void…` → `0004_ledger_category` → `0005_remittance_accounts_and_fund` → `0006_fix_welfare_fund_account_type` → `0007_payroll` → `0008_alter_account_account_type_and_more` → `0009_financialidempotencykey` → `0010_workingday` → `0011_welfare_enterprise` → `0012_budget_enterprise` → `0013_transactions_enterprise` → `0014_transaction_reference_per_church` → `0015_ledger_idempotency_action` → `0016_payroll_idempotency_actions` → `0017_account_code_and_active` |
 | **sitecontrol** (10) | `0001_initial` → `0002_platform_control_room` → `0003_tenant_registration` → `0004_…assets…` → `0005_denomination_saas` → `0006_denomination_phases` → `0007_rename_…idx` → `0008_control_tower_enterprise` → `0009_billing_provisioning` → `0010_login_highlights` |
 | **remittance** (3) | `0001_initial` → `0002_rename_…idx` → `0003_welfare_enterprise` |
 | **payroll** (3) | `0001_payroll` → `0002_payrollrun_budget_warning_and_more` → `0003_payroll_enterprise` |
 | **assets** (3) | `0001_initial` → `0002_seed_category_templates` → `0003_assets_enterprise` |
 | **ledger** (2) | `0001_ledger_category` → `0002_ledger_enterprise` |
-| **announcements** (3) | `0001_initial` → `0002_…archived…` → `0003_announcements_enterprise` |
+| **announcements** (8) | `0001_initial` → `0002_…archived…` → `0003_announcements_enterprise` → `0004_enterprise_comms_phase12` → `0005_announcement_denomination` → `0006_birthdaywishdispatch` → `0007_member_birthday_privacy` → `0008_birthdaywishdispatch_flyer_story` |
 | **meetings** (2) | `0001_initial` → `0002_meeting_workflow` |
 | **dashboard** (2) | `0001_initial` → `0002_alter_notification_options_…` |
 | **reports** (2) | `0001_initial` → `0002_reports_enterprise` |
@@ -179,6 +179,8 @@ timeline
 | Denomination operational settings | `sitecontrol.0026` | Money decimals + inbox retention |
 | Notification severity / event_key | `dashboard.0005` | Coalesced enterprise inbox |
 | Drop one-time last_event_at default | `dashboard.0006` | Field matches `auto_now_add=True` only |
+| Birthday flyer dispatch | `announcements.0006` | Clerk WhatsApp-group flyers; audit actions |
+| Birthday photo consent / quiet list | `members.0010` | `allow_birthday_photo`, `hide_public_birthday` |
 
 ---
 

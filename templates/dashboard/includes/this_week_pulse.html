@@ -13,7 +13,7 @@
         </a>
         {% endif %}
         {% if this_week_pulse.counts.birthdays %}
-        <a href="{% url 'announcements:upcoming_calendar' %}" class="cc-pulse-hero__chip cc-pulse-hero__chip--birthdays" title="Birthdays this week">
+        <a href="{% if this_week_pulse.birthday_desk_url %}{{ this_week_pulse.birthday_desk_url }}{% else %}{% url 'announcements:upcoming_calendar' %}{% endif %}" class="cc-pulse-hero__chip cc-pulse-hero__chip--birthdays" title="Birthday flyers this week">
             <strong>{{ this_week_pulse.counts.birthdays }}</strong>
             <span>Birthdays</span>
         </a>

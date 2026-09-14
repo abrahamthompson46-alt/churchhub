@@ -162,7 +162,7 @@ Tenant: **global** catalog (not church-scoped). Authorization scope is applied a
 | `Department` | UUID | FK church; unique `(church, name)` | church |
 | `Family` | UUID | FK church; FK head → Member SET_NULL; unique `(church, name)` | church |
 | `Occupation` | BigAuto | FK church; unique `(church, name)` | church |
-| `Member` | UUID | FKs church, occupation, department, family, created_by; indexes church+active/status/name/phone; **UniqueConstraint** `uniq_member_phone_per_church`, `uniq_member_number_per_church` (non-empty) | church |
+| `Member` | UUID | FKs church, occupation, department, family, created_by; `allow_birthday_photo`; `hide_public_birthday`; indexes church+active/status/name/phone; **UniqueConstraint** `uniq_member_phone_per_church`, `uniq_member_number_per_church` (non-empty) | church |
 | `MemberTransfer` | UUID | FKs member, from_church, to_church, requested_by, processed_by; indexes status/churches | via churches |
 | `RecordImage` | BigAuto | — | — |
 | `Record` | BigAuto | FK church, member; **M2M** images → RecordImage; FK created_by; index `(church, record_type, event_date)` | church |
@@ -312,14 +312,15 @@ Enums: MeetingStatus SCHEDULED/HELD/CANCELLED; MeetingType BOARD/CHURCH_BOARD/DE
 
 ---
 
-### 4.12 `announcements` (4 models)
+### 4.12 `announcements` (5 models)
 
 | Model | PK | Key points | Tenant |
 |-------|-----|------------|--------|
 | `Announcement` | BigAuto | visibility general/church; status PENDING/APPROVED/REJECTED/ARCHIVED; FK church nullable; named indexes | church (nullable if general) |
 | `AnnouncementImage` | BigAuto | FK announcement | via ann |
 | `AnnouncementView` | BigAuto | unique `(announcement, user)` | via ann |
-| `AnnouncementAuditLog` | UUID | CREATE/UPDATE/APPROVE/REJECT/ARCHIVE/PIN/UNPIN/EXPORT | church |
+| `AnnouncementAuditLog` | UUID | CREATE/UPDATE/APPROVE/REJECT/ARCHIVE/PIN/UNPIN/EXPORT/BIRTHDAY_PREP/GET/POST | church |
+| `BirthdayWishDispatch` | UUID | unique `(church, member, occurrence_date)`; flyer + flyer_story PNG; statuses PREPARED/DOWNLOADED/POSTED | church |
 
 ---
 

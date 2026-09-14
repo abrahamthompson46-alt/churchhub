@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Birthday flyers — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Church Life" page_title="Birthday flyers" page_description="Prepare a square flyer and caption, then post them in your church WhatsApp group. Age is never shown." %}
+
+    <p class="text-muted small mb-3">
+        Active church: <strong>{{ church.name }}</strong>.
+        Download or share the square group flyer or the tall Status image, copy the caption, and send in WhatsApp.
+    </p>
+
+    {% if missing_logo %}
+    <div class="alert alert-info py-2">Add a denomination logo in institution branding so flyers include your church mark.</div>
+    {% endif %}
+
+    {% if unprepared_count %}
+    <form method="post" action="{% url 'announcements:birthday_prepare_all' %}" class="mb-3">
+        {% csrf_token %}
+        <input type="hidden" name="window" value="{{ window }}">
+        <button type="submit" class="btn btn-primary btn-sm">Prepare all in this window ({{ unprepared_count }})</button>
+    </form>
+    {% endif %}
+
+    <ul class="nav nav-pills birthday-desk-windows mb-4">
+        <li class="nav-item">
+            <a class="nav-link{% if window == 'today' %} active{% endif %}" href="?window=today">Today</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link{% if window == 'week' %} active{% endif %}" href="?window=week">This week</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link{% if window == 'month' %} active{% endif %}" href="?window=month">This month</a>
+        </li>
+    </ul>
+
+    {% if rows %}
+    <div class="birthday-desk-grid">
+        {% for row in rows %}
+        <article class="birthday-desk-card panel">
+            <div class="birthday-desk-card__hero">
+                {% if row.member.show_birthday_photo %}
+                <img src="{{ row.member.profile_picture.url }}" alt="" class="birthday-desk-card__photo">
+                {% else %}
+                <div class="birthday-desk-card__initials" aria-hidden="true">
+                    {{ row.member.first_name|first|upper }}{{ row.member.last_name|first|upper }}
+                </div>
+                {% endif %}
+                <div>
+                    <h2 class="h5 mb-1">{{ row.member.full_name }}</h2>
+                    <p class="text-muted small mb-0">{{ row.occurrence_date|date:"l, F j" }}</p>
+                    {% if row.dispatch %}
+                    <span class="chip chip--muted">{{ row.dispatch.get_status_display }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if row.dispatch and row.dispatch.flyer %}
+            <div class="birthday-desk-previews">
+                <figure>
+                    <img src="{{ row.dispatch.flyer.url }}" alt="Square group flyer" class="birthday-desk-preview">
+                    <figcaption>Group (square)</figcaption>
+                </figure>
+                {% if row.dispatch.flyer_story %}
+                <figure>
+                    <img src="{{ row.dispatch.flyer_story.url }}" alt="WhatsApp Status flyer" class="birthday-desk-preview birthday-desk-preview--story">
+                    <figcaption>Status (story)</figcaption>
+                </figure>
+                {% endif %}
+            </div>
+            {% endif %}
+            <label class="form-label small text-muted mb-1" for="caption-{{ row.member.pk }}">WhatsApp caption</label>
+            <textarea id="caption-{{ row.member.pk }}" name="caption" form="prepare-{{ row.member.pk }}" class="form-control form-control-sm birthday-desk-caption" rows="6">{{ row.caption }}</textarea>
+            <div class="birthday-desk-card__actions">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-copy-caption="caption-{{ row.member.pk }}">Copy caption</button>
+                <form method="post" action="{% url 'announcements:birthday_prepare' %}" id="prepare-{{ row.member.pk }}">
+                    {% csrf_token %}
+                    <input type="hidden" name="member_id" value="{{ row.member.pk }}">
+                    <input type="hidden" name="occurrence_date" value="{{ row.occurrence_date|date:'Y-m-d' }}">
+                    <input type="hidden" name="window" value="{{ window }}">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        {% if row.dispatch %}Regenerate flyer{% else %}Prepare flyer{% endif %}
+                    </button>
+                </form>
+                {% if row.dispatch %}
+                <form method="post" action="{% url 'announcements:birthday_save_caption' row.dispatch.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="window" value="{{ window }}">
+                    <textarea name="caption" hidden id="save-caption-{{ row.dispatch.pk }}"></textarea>
+                    <button type="submit" class="btn btn-outline-secondary btn-sm" data-sync-caption="caption-{{ row.member.pk }}">Save caption</button>
+                </form>
+                {% endif %}
+                {% if row.dispatch and row.dispatch.flyer %}
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'announcements:birthday_download' row.dispatch.pk %}">Download square</a>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-share-flyer="{{ row.dispatch.flyer.url }}" data-share-caption="caption-{{ row.member.pk }}" data-share-name="{{ row.member.full_name }}">Share square</button>
+                {% if row.dispatch.flyer_story %}
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'announcements:birthday_download' row.dispatch.pk %}?kind=story">Download status</a>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-share-flyer="{{ row.dispatch.flyer_story.url }}" data-share-caption="caption-{{ row.member.pk }}" data-share-name="{{ row.member.full_name }}">Share status</button>
+                {% endif %}
+                <form method="post" action="{% url 'announcements:birthday_mark_posted' row.dispatch.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="window" value="{{ window }}">
+                    <button type="submit" class="btn btn-outline-secondary btn-sm"{% if row.dispatch.status == 'POSTED' %} disabled{% endif %}>Mark posted</button>
+                </form>
+                {% endif %}
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    {% include "includes/empty_state.html" with icon="bi-gift" message="No active members with a birthday in this window." %}
+    {% endif %}
+
+    {% if missing_photos %}
+    <section class="mt-4">
+        <h2 class="h6">Needs a photo this month</h2>
+        <p class="text-muted small">Flyers use initials until a consented portrait is on the member record.</p>
+        <ul class="list-unstyled mb-0">
+            {% for row in missing_photos %}
+            <li class="mb-1">
+                <a href="{% url 'members:detail' member_id=row.member.pk %}" class="table-link">{{ row.member.full_name }}</a>
+                <span class="text-muted small"> · {{ row.occurrence_date|date:"M j" }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    document.querySelectorAll("[data-copy-caption]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var field = document.getElementById(btn.getAttribute("data-copy-caption"));
+            if (!field) return;
+            navigator.clipboard.writeText(field.value).then(function () {
+                btn.textContent = "Copied";
+                setTimeout(function () { btn.textContent = "Copy caption"; }, 1600);
+            });
+        });
+    });
+    document.querySelectorAll("[data-sync-caption]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var source = document.getElementById(btn.getAttribute("data-sync-caption"));
+            var form = btn.closest("form");
+            var dest = form ? form.querySelector("textarea[name='caption']") : null;
+            if (source && dest) dest.value = source.value;
+        });
+    });
+    document.querySelectorAll("[data-share-flyer]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var captionEl = document.getElementById(btn.getAttribute("data-share-caption"));
+            var caption = captionEl ? captionEl.value : "";
+            var name = btn.getAttribute("data-share-name") || "Birthday";
+            fetch(btn.getAttribute("data-share-flyer"), { credentials: "same-origin" })
+                .then(function (res) { return res.blob(); })
+                .then(function (blob) {
+                    var file = new File([blob], "birthday.png", { type: "image/png" });
+                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                        return navigator.share({ title: name, text: caption, files: [file] });
+                    }
+                    if (navigator.share) {
+                        return navigator.share({ title: name, text: caption });
+                    }
+                    if (captionEl) {
+                        navigator.clipboard.writeText(caption);
+                    }
+                    window.location.href = btn.getAttribute("data-share-flyer");
+                })
+                .catch(function () {
+                    window.open(btn.getAttribute("data-share-flyer"), "_blank");
+                });
+        });
+    });
+})();
+</script>
+{% endblock %}

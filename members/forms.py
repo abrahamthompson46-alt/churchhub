@@ -67,6 +67,8 @@ class MemberForm(forms.ModelForm):
             "family": forms.Select(attrs=_select()),
             "family_relationship": forms.Select(attrs=_select()),
             "profile_picture": forms.ClearableFileInput(attrs=input_attrs()),
+            "allow_birthday_photo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "hide_public_birthday": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
     def __init__(self, *args, church=None, **kwargs):

@@ -228,23 +228,25 @@
     <section class="cc-panel cc-panel--chart mb-3" id="finance-trend">
         <div class="cc-panel__header">
             <div>
-                <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Giving{% if dashboard_scope.finance_scope_label %} · {{ dashboard_scope.finance_scope_label }}{% endif %}</h2>
-                <p class="cc-member-chart__meta mb-0">Approved amounts by posting month. Line is the running total.</p>
+                <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Financial trend{% if dashboard_scope.finance_scope_label %} · {{ dashboard_scope.finance_scope_label }}{% endif %}</h2>
+                <p class="cc-member-chart__meta mb-0">Approved amounts by posting month.</p>
             </div>
         </div>
         <div class="cc-member-chart__controls px-3 pt-2">
-            <div class="cc-finance-seg" role="tablist" aria-label="Giving series">
+            <div class="cc-finance-seg" role="tablist" aria-label="Financial series">
                 <button type="button" class="cc-finance-seg__btn cc-finance-seg__btn--tithe{% if finance_chart_series == 'tithe' %} is-active{% endif %}" role="tab" data-finance-chart="tithe" aria-selected="{% if finance_chart_series == 'tithe' %}true{% else %}false{% endif %}">Tithe</button>
                 <button type="button" class="cc-finance-seg__btn cc-finance-seg__btn--combined{% if finance_chart_series == 'combined' %} is-active{% endif %}" role="tab" data-finance-chart="combined" aria-selected="{% if finance_chart_series == 'combined' %}true{% else %}false{% endif %}">Combined</button>
                 <button type="button" class="cc-finance-seg__btn cc-finance-seg__btn--income{% if finance_chart_series == 'income' %} is-active{% endif %}" role="tab" data-finance-chart="income" aria-selected="{% if finance_chart_series == 'income' %}true{% else %}false{% endif %}">Income</button>
+                <button type="button" class="cc-finance-seg__btn cc-finance-seg__btn--expense{% if finance_chart_series == 'expense' %} is-active{% endif %}" role="tab" data-finance-chart="expense" aria-selected="{% if finance_chart_series == 'expense' %}true{% else %}false{% endif %}">Expense</button>
+                <button type="button" class="cc-finance-seg__btn cc-finance-seg__btn--compare{% if finance_chart_series == 'compare' %} is-active{% endif %}" role="tab" data-finance-chart="compare" aria-selected="{% if finance_chart_series == 'compare' %}true{% else %}false{% endif %}">Income vs expense</button>
             </div>
         </div>
         <div class="cc-panel__body cc-panel__body--chart">
             <div class="cc-finance-chart__plot">
-                <canvas id="trendChart" aria-label="Monthly giving and cumulative total"></canvas>
+                <canvas id="trendChart" aria-label="Monthly financial trend"></canvas>
             </div>
             {% if not chart_has_activity %}
-            <p class="small text-muted px-1 pt-2 mb-0">No approved giving in the last 12 posting months for this scope. The axes still show the month range.</p>
+            <p class="small text-muted px-1 pt-2 mb-0">No approved activity in the last 12 posting months for this scope. The axes still show the month range.</p>
             {% else %}
             <p class="small text-muted px-1 pt-2 mb-0" id="trendChartCaption">Bars: amount by posting month. Line: cumulative.</p>
             {% endif %}
@@ -730,13 +732,44 @@
     try { payload = JSON.parse(raw.textContent); } catch (e) { return; }
 
     const seriesPack = {
-        tithe: { bar: payload.tithe || [], line: payload.tithe_cumulative || [], barLabel: 'Tithe', lineLabel: 'Cumulative tithe' },
-        combined: { bar: payload.combined || [], line: payload.combined_cumulative || [], barLabel: 'Combined', lineLabel: 'Cumulative combined' },
-        income: { bar: payload.income || [], line: payload.income_cumulative || [], barLabel: 'Income', lineLabel: 'Cumulative income' }
+        tithe: {
+            bar: payload.tithe || [],
+            line: payload.tithe_cumulative || [],
+            barLabel: 'Tithe',
+            lineLabel: 'Cumulative tithe',
+            barColor: '#f59e0b',
+            lineColor: '#b45309'
+        },
+        combined: {
+            bar: payload.combined || [],
+            line: payload.combined_cumulative || [],
+            barLabel: 'Combined',
+            lineLabel: 'Cumulative combined',
+            barColor: '#14b8a6',
+            lineColor: '#0f766e'
+        },
+        income: {
+            bar: payload.income || [],
+            line: payload.income_cumulative || [],
+            barLabel: 'Income',
+            lineLabel: 'Cumulative income',
+            barColor: '#22c55e',
+            lineColor: '#15803d'
+        },
+        expense: {
+            bar: payload.expense || [],
+            line: payload.expense_cumulative || [],
+            barLabel: 'Expense',
+            lineLabel: 'Cumulative expense',
+            barColor: '#e11d48',
+            lineColor: '#9f1239'
+        }
     };
+    const allowed = { tithe: 1, combined: 1, income: 1, expense: 1, compare: 1 };
     let series = payload.series || 'tithe';
-    if (!seriesPack[series]) series = 'tithe';
+    if (!allowed[series]) series = 'tithe';
     let chart;
+    const caption = document.getElementById('trendChartCaption');
 
     function persist(next) {
         const url = new URL(window.location.href);
@@ -752,30 +785,43 @@
         });
     }
 
-    function pack() {
-        return seriesPack[series];
+    function netMonthly() {
+        const income = payload.income || [];
+        const expense = payload.expense || [];
+        const len = Math.max(income.length, expense.length);
+        const out = [];
+        for (let i = 0; i < len; i += 1) {
+            out.push(Number(income[i] || 0) - Number(expense[i] || 0));
+        }
+        return out;
     }
 
-    function render() {
-        const next = pack();
-        const data = {
-            labels: payload.labels || [],
-            datasets: [
+    function datasets() {
+        if (series === 'compare') {
+            return [
                 {
                     type: 'bar',
-                    label: next.barLabel,
-                    data: next.bar,
-                    backgroundColor: '#5b7c99',
+                    label: 'Income',
+                    data: payload.income || [],
+                    backgroundColor: '#22c55e',
+                    borderSkipped: false,
+                    order: 2
+                },
+                {
+                    type: 'bar',
+                    label: 'Expense',
+                    data: payload.expense || [],
+                    backgroundColor: '#e11d48',
                     borderSkipped: false,
                     order: 2
                 },
                 {
                     type: 'line',
-                    label: next.lineLabel,
-                    data: next.line,
+                    label: 'Net',
+                    data: netMonthly(),
                     borderColor: '#1e3a5f',
-                    backgroundColor: 'rgba(30, 58, 95, 0.12)',
-                    fill: true,
+                    backgroundColor: 'transparent',
+                    fill: false,
                     tension: 0.15,
                     pointRadius: 3,
                     pointBackgroundColor: '#fff',
@@ -783,8 +829,47 @@
                     pointBorderWidth: 2,
                     order: 1
                 }
-            ]
+            ];
+        }
+        const next = seriesPack[series];
+        return [
+            {
+                type: 'bar',
+                label: next.barLabel,
+                data: next.bar,
+                backgroundColor: next.barColor,
+                borderSkipped: false,
+                order: 2
+            },
+            {
+                type: 'line',
+                label: next.lineLabel,
+                data: next.line,
+                borderColor: next.lineColor,
+                fill: false,
+                tension: 0.15,
+                pointRadius: 3,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: next.lineColor,
+                pointBorderWidth: 2,
+                order: 1
+            }
+        ];
+    }
+
+    function setCaption() {
+        if (!caption) return;
+        caption.textContent = series === 'compare'
+            ? 'Grouped bars: income vs expense. Line: monthly net.'
+            : 'Bars: amount by posting month. Line: cumulative.';
+    }
+
+    function render() {
+        const data = {
+            labels: payload.labels || [],
+            datasets: datasets()
         };
+        setCaption();
         if (chart) {
             chart.data = data;
             chart.update();
@@ -796,6 +881,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
                 plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 12, font: { size: 11 } } } },
                 scales: {
                     y: { beginAtZero: true, grid: { color: '#e8edf4' }, border: { display: false }, ticks: { font: { size: 10 } } },

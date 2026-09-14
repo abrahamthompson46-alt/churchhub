@@ -70,12 +70,9 @@ def get_upcoming_birthdays(request, days=60, limit=100):
         occ = _birthday_in_window(member.date_of_birth, today, end)
         if not occ:
             continue
-        turning_age = occ.year - member.date_of_birth.year
         subtitle_parts = []
         if member.department:
             subtitle_parts.append(member.department.name)
-        if turning_age:
-            subtitle_parts.append(f"Turning {turning_age}")
         items.append(
             _calendar_item(
                 kind="birthday",
@@ -85,7 +82,6 @@ def get_upcoming_birthdays(request, days=60, limit=100):
                 url_name="members:detail",
                 url_kwargs={"member_id": member.pk},
                 member=member,
-                turning_age=turning_age,
             )
         )
     items.sort(key=lambda row: (row["date"], row["title"]))

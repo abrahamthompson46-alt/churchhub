@@ -414,3 +414,4 @@ class CalendarServiceTests(AnnouncementTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Upcoming Events")
         self.assertContains(response, "Jane Doe")
+        self.assertNotContains(response, "Turning")

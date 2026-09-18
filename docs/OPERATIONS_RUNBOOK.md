@@ -160,7 +160,7 @@ Encrypted dumps (`.sql.gz.age`) need `--age-identity` or `CHURCHHUB_BACKUP_AGE_I
 
 ### Secret rotation
 
-- Rotating `DJANGO_SECRET_KEY` invalidates sessions and **breaks Fernet decryption of MFA TOTP secrets** (key derived from `SECRET_KEY`). Plan a maintenance window + re-enrollment or re-encrypt migration before rotating.  
+- Rotating `DJANGO_SECRET_KEY` invalidates sessions. MFA TOTP secrets use `MFA_ENCRYPTION_KEY` when set (decrypt still tries `SECRET_KEY` for old ciphertext). After introducing a dedicated key, run `python manage.py reencrypt_mfa_secrets`.  
 - Rotate SMTP / Redis / DB passwords via platform env; restart web (and Celery).
 
 ---

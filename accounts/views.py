@@ -36,6 +36,7 @@ from accounts.permissions import (
     get_manageable_churches,
     get_manageable_users,
 )
+from accounts.session_security import stamp_session
 from accounts.services import (
     accept_invitation,
     activate_user,
@@ -76,9 +77,9 @@ def profile(request):
         elif action == "password":
             password_form = StaffPasswordChangeForm(request.user, request.POST)
             if password_form.is_valid():
-                user = password_form.save(commit=False)
-                repo.save_user(user)
+                user = password_form.save()
                 update_session_auth_hash(request, user)
+                stamp_session(request, user)
                 log_activity(user, "PASSWORD_CHANGE", ip_address=get_client_ip(request))
                 flash_success(request, "Sign in again on other devices if needed.", title="Password changed")
                 return redirect("accounts:profile")
@@ -90,6 +91,25 @@ def profile(request):
         "password_form": password_form,
         "is_platform_user": getattr(request.user, "is_platform_user", False),
     })
+
+
+@login_required
+@require_POST
+def logout_all_devices(request):
+    """Invalidate other browser sessions and MFA trusted devices; keep this session."""
+    from accounts.mfa import revoke_all_trusted_devices
+    from accounts.session_security import bump_session_epoch
+
+    bump_session_epoch(request.user)
+    revoke_all_trusted_devices(request.user)
+    stamp_session(request, request.user)
+    log_activity(request.user, "SESSION_REVOKE", ip_address=get_client_ip(request))
+    flash_success(
+        request,
+        "Other devices must sign in again. This browser stays signed in.",
+        title="Signed out everywhere else",
+    )
+    return redirect("accounts:profile")
 
 
 @login_required

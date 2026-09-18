@@ -12,11 +12,11 @@ This document lists **accepted** limitations at RC1. Items marked **Blocker** mu
 
 | ID | Limitation | Severity | Pilot OK? | Mitigation |
 |----|------------|----------|-----------|------------|
-| KL-SEC-01 | MFA encryption key derived from `DJANGO_SECRET_KEY` | Medium | Yes | Do not rotate SECRET_KEY during pilot; plan dedicated `MFA_ENCRYPTION_KEY` post-GA |
-| KL-SEC-02 | MFA verify endpoint not separately rate-limited | Medium | Yes | Keep login lockout; monitor auth logs |
+| KL-SEC-01 | MFA uses `MFA_ENCRYPTION_KEY` when set; otherwise `SECRET_KEY` | Low | Yes | Set dedicated key in production; `reencrypt_mfa_secrets` |
+| KL-SEC-02 | MFA verify is cache-throttled (not account `is_active` lock) | Low | Yes | Keep Redis so throttle is shared across workers |
 | KL-SEC-03 | Report exports not always gated by `can_export_reports_*` | Medium | Yes | Limit report access roles; review export audit |
-| KL-SEC-04 | Absolute session timeout / logout-all devices not implemented | Low | Yes | Idle timeout via `SiteSettings` |
-| KL-SEC-05 | Password history / expiration not implemented | Low | Yes | Policy via external IdP if required |
+| KL-SEC-04 | Session listing UI not implemented (epoch + absolute timeout exist) | Low | Yes | Profile logout-all; 12h absolute age |
+| KL-SEC-05 | Password expiration not implemented (history exists for privileged roles) | Low | Yes | Rotate finance passwords operationally |
 
 ---
 
@@ -24,7 +24,7 @@ This document lists **accepted** limitations at RC1. Items marked **Blocker** mu
 
 | ID | Limitation | Severity | Pilot OK? | Mitigation |
 |----|------------|----------|-----------|------------|
-| KL-DAT-01 | No automated soft-delete / retention for PII | Medium | Yes | Manual export + DB procedures |
+| KL-DAT-01 | No product-wide soft-delete; flyer and report-export file purge exist | Medium | Yes | Clerk process for deceased/transferred members; do not delete journals |
 | KL-DAT-02 | Formal RoPA / DPIA not in repository | Low | Yes | Ops privacy pack external |
 | KL-DAT-03 | Member erasure is manual / partial | Medium | Yes | Document church-level process |
 

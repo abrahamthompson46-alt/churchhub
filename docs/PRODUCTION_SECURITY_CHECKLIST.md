@@ -17,7 +17,10 @@ Mark each item **Done** before declaring production live.
 - [ ] Database URL points to managed PostgreSQL (not SQLite)
 - [ ] `REDIS_URL` set on **all** web and Celery workers
 - [ ] Email credentials / API keys via env only
-- [ ] Optional: dedicated `MFA_ENCRYPTION_KEY` once implemented (today MFA uses SECRET_KEY-derived Fernet)
+- [ ] Optional: `MFA_ENCRYPTION_KEY` (Fernet for TOTP; `manage.py reencrypt_mfa_secrets` after first set)
+- [ ] `CHURCHHUB_SESSION_ABSOLUTE_AGE` reviewed (default 12 hours)
+- [ ] Fail2Ban + UFW applied from `deploy/fail2ban/` and `deploy/firewall/ufw-churchhub.sh`
+- [ ] `python manage.py restore_drill` recorded for the latest backup
 
 ---
 
@@ -37,10 +40,11 @@ Mark each item **Done** before declaring production live.
 
 - [ ] SiteSettings MFA policy set intentionally (off until ready, or on with selected roles)
 - [ ] If MFA on: selected platform/institution roles enrolled before go-live
-- [ ] Login lockout thresholds reviewed (`login_max_attempts`, `login_lockout_minutes`)
+- [ ] Login lockout thresholds reviewed (`login_max_attempts`, `login_lockout_minutes`; identifier lock is secondary)
 - [ ] Password reset email delivery verified (no open redirect in reset links)
 - [ ] Impersonation only used by authorized platform operators; exit path tested
-- [ ] Session idle timeout acceptable for finance users
+- [ ] Session idle timeout and 12h absolute timeout acceptable for finance users
+- [ ] Privileged users know **Sign out all other devices** on profile
 
 ---
 

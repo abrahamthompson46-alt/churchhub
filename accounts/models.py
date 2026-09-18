@@ -151,6 +151,11 @@ class User(AbstractUser):
         ),
     )
 
+    session_epoch = models.PositiveIntegerField(
+        default=0,
+        help_text="Incremented to invalidate other browser sessions (password change / logout-all).",
+    )
+
     class Meta:
         indexes = [
             models.Index(fields=["role", "is_active"]),
@@ -299,6 +304,7 @@ class UserActivityLog(models.Model):
         ("MFA_TRUSTED_DEVICE", "MFA Trusted Device Login"),
         ("INSTITUTION_BRANDING_UPDATE", "Institution Branding Updated"),
         ("SYSTEM_SETTINGS_UPDATE", "System Settings Updated"),
+        ("SESSION_REVOKE", "Other Sessions Revoked"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -438,3 +444,25 @@ class TrustedDevice(models.Model):
     @property
     def is_valid(self):
         return timezone.now() < self.expires_at
+
+
+class PasswordHistory(models.Model):
+    """Previous password hashes for privileged roles (reuse prevention)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="password_history",
+    )
+    password = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"PasswordHistory({self.user_id}, {self.created_at:%Y-%m-%d})"

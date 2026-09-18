@@ -108,19 +108,23 @@ class StaffPasswordResetView(PasswordResetView):
 
 class StaffPasswordChangeForm(PasswordChangeForm):
     def save(self, commit=True):
-        user = super().save(commit=commit)
+        previous_hash = self.user.password
+        user = super().save(commit=False)
         if commit:
-            from accounts.mfa import revoke_all_trusted_devices
+            user.save()
+            from accounts.session_security import on_password_replaced
 
-            revoke_all_trusted_devices(user)
+            on_password_replaced(user, previous_hash=previous_hash)
         return user
 
 
 class StaffSetPasswordForm(SetPasswordForm):
     def save(self, commit=True):
-        user = super().save(commit=commit)
+        previous_hash = self.user.password
+        user = super().save(commit=False)
         if commit:
-            from accounts.mfa import revoke_all_trusted_devices
+            user.save()
+            from accounts.session_security import on_password_replaced
 
-            revoke_all_trusted_devices(user)
+            on_password_replaced(user, previous_hash=previous_hash)
         return user

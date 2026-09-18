@@ -2,24 +2,13 @@
 
 from __future__ import annotations
 
-import base64
-import hashlib
-
-from django.conf import settings
-
-
-def _fernet():
-    from cryptography.fernet import Fernet
-
-    digest = hashlib.sha256(settings.SECRET_KEY.encode("utf-8")).digest()
-    key = base64.urlsafe_b64encode(digest)
-    return Fernet(key)
+from church_system.crypto import decrypt_fernet, encrypt_fernet
 
 
 def encrypt_secret(plaintext: str) -> str:
     if not plaintext:
         return ""
-    return _fernet().encrypt(plaintext.encode("utf-8")).decode("utf-8")
+    return encrypt_fernet(plaintext)
 
 
 def decrypt_secret(token: str) -> str:
@@ -28,7 +17,7 @@ def decrypt_secret(token: str) -> str:
     from cryptography.fernet import InvalidToken
 
     try:
-        return _fernet().decrypt(token.encode("utf-8")).decode("utf-8")
+        return decrypt_fernet(token)
     except (InvalidToken, ValueError):
         return ""
 

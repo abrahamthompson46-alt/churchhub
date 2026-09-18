@@ -238,3 +238,35 @@ def health_probe_task():
     else:
         logger.info("Health probe ok duration_ms=%s", payload.get("duration_ms"))
     return {"http_status": status, "status": payload.get("status")}
+
+
+@shared_task(bind=True, max_retries=1, default_retry_delay=300)
+def remind_birthday_desk_task(self, days_ahead=0):
+    from announcements.birthday_services import remind_all_church_birthday_desks
+
+    stats = remind_all_church_birthday_desks(days_ahead=days_ahead)
+    logger.info("Birthday desk reminders: %s", stats)
+    return stats
+
+
+@shared_task(bind=True, max_retries=1, default_retry_delay=300)
+def purge_birthday_flyers_task(self, days=None):
+    from announcements.birthday_services import (
+        DEFAULT_FLYER_RETENTION_DAYS,
+        purge_old_birthday_flyers,
+    )
+
+    retention = DEFAULT_FLYER_RETENTION_DAYS if days is None else days
+    removed = purge_old_birthday_flyers(days=retention)
+    logger.info("Purged birthday flyers: %s", removed)
+    return {"removed": removed}
+
+
+@shared_task(bind=True, max_retries=1, default_retry_delay=300)
+def purge_report_exports_task(self, days=None):
+    from reports.services import DEFAULT_EXPORT_RETENTION_DAYS, purge_old_export_files
+
+    retention = DEFAULT_EXPORT_RETENTION_DAYS if days is None else days
+    removed = purge_old_export_files(days=retention)
+    logger.info("Purged report export files: %s", removed)
+    return {"removed": removed}

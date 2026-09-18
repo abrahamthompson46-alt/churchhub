@@ -234,7 +234,7 @@ Configured in `church_system/settings.py` (optional `.env` load):
 | Concern | Environment variable |
 |---------|----------------------|
 | Debug | `DJANGO_DEBUG` (defaults True if unset) |
-| Secret | `DJANGO_SECRET_KEY` (required when DEBUG is False) |
+| Secret | `DJANGO_SECRET_KEY` (required when DEBUG is False); optional `MFA_ENCRYPTION_KEY` for TOTP/SMTP Fernet |
 | Hosts | `DJANGO_ALLOWED_HOSTS` |
 | CSRF | `DJANGO_CSRF_TRUSTED_ORIGINS` |
 | Database | `DATABASE_URL` or `DB_ENGINE=postgresql` + `DB_*` |

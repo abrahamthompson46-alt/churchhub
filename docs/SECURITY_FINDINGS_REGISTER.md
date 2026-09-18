@@ -37,10 +37,10 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 | CH-SEC-016 | MEDIUM | CONFIRMED | FIXED | Some financial CSVs unaudited | No | Staff |
 | CH-SEC-017 | LOW | CONFIRMED | FIXED | GET logout CSRF | No | Victim session |
 | CH-SEC-018 | LOW | CONFIRMED | FIXED | GET church switch | No | Staff |
-| CH-SEC-019 | LOW | CONFIRMED | OPEN | Identifier lockout DoS | N/A | No |
-| CH-SEC-020 | LOW | CONFIRMED | OPEN | Django pin drift 6.0 vs 5.1.15 | N/A | N/A |
-| CH-SEC-021 | LOW | CONFIRMED | OPEN | Compose publishes DB/Redis + default passwords | Dev | N/A |
-| CH-SEC-022 | LOW | CONFIRMED | OPEN | Django HSTS 1h vs Nginx 1y | N/A | N/A |
+| CH-SEC-019 | LOW | CONFIRMED | FIXED | Identifier lockout DoS | N/A | No |
+| CH-SEC-020 | LOW | CONFIRMED | FIXED | Django pin drift 6.0 vs 5.1.15 | N/A | N/A |
+| CH-SEC-021 | LOW | CONFIRMED | FIXED | Compose publishes DB/Redis + default passwords | Dev | N/A |
+| CH-SEC-022 | LOW | CONFIRMED | FIXED | Django HSTS 1h vs Nginx 1y | N/A | N/A |
 | CH-SEC-L1 | HIGH | LIKELY | FIXED (Phase 4) | Unanchored SUPER_ADMIN is global | Yes | If user exists |
 | CH-SEC-L2 | MEDIUM | LIKELY | FIXED | Upload validation is MIME/extension only | Maybe | Yes |
 | CH-SEC-L3 | MEDIUM | LIKELY | FIXED (Phase 3) | Settlement/district remittance races | No | Staff |
@@ -326,33 +326,28 @@ Asset register/activity CSV and contribution member-total export lack `audit_exp
 
 ## CH-SEC-019 — LOW — CONFIRMED
 
-Failed logins lock by submitted identifier (`sitecontrol/middleware.py` 260–330). Attacker can lock a known username. Tradeoff of lockouts.  
-**Remediation:** Prefer IP-primary limits; CAPTCHA after N; do not lock victim id from unauthenticated guesses alone.  
-**Confidence:** High.
+Failed logins lock **IP first** at `login_max_attempts`. Identifier lock only after `max(20, attempts * 5)` failures (`LOGIN_IDENTIFIER_LOCK_*`).  
+**Remediation (2026-09-17):** **FIXED** (IP-primary). Residual: no CAPTCHA.
 
 ---
 
 ## CH-SEC-020 — LOW — CONFIRMED
 
 `requirements.txt` line 5 `Django>=6.0.6` vs local install 5.1.15. Fresh CI/prod install may major-upgrade unexpectedly.  
-**Remediation:** Pin `Django==5.1.15` (or actually upgrade and test 6.x).  
-**Confidence:** High.
+**Remediation (2026-09-17):** **FIXED.** `requirements.txt` pins `Django>=6.0.6,<6.1`. Deploy from that lock range in CI.
 
 ---
 
 ## CH-SEC-021 — LOW — CONFIRMED
 
 `docker-compose.yml` publishes 5432/6379 and uses `churchhub`/`admin12345`-class secrets. Development only; dangerous if used as production topology.  
-**Remediation:** Do not publish DB/Redis on host network in any prod overlay.  
-**Confidence:** High.
+**Remediation (2026-09-17):** **FIXED.** Compose binds Postgres/Redis to `127.0.0.1`; passwords come from env; `docker-compose.prod.yml` publishes no DB/Redis ports.
 
 ---
 
 ## CH-SEC-022 — LOW — CONFIRMED
 
-`production.py` `SECURE_HSTS_SECONDS = 3600` vs Nginx `max-age=31536000`. Browsers may see mixed policy depending on which header wins.  
-**Remediation:** Align on one year if HTTPS-only is permanent.  
-**Confidence:** High.
+**Remediation (2026-09-17):** **FIXED.** `production.py` sets `SECURE_HSTS_SECONDS = 31536000` (duplicate 3600 assignment removed).
 
 ---
 

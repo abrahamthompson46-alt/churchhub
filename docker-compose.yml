@@ -2,15 +2,15 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: churchhub
-      POSTGRES_USER: churchhub
-      POSTGRES_PASSWORD: churchhub
+      POSTGRES_DB: ${POSTGRES_DB:-churchhub}
+      POSTGRES_USER: ${POSTGRES_USER:-churchhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-churchhub}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U churchhub -d churchhub"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-churchhub} -d ${POSTGRES_DB:-churchhub}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -18,7 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -30,15 +30,15 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DJANGO_SECRET_KEY: docker-dev-secret-change-in-production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-docker-dev-secret-change-in-production}
       DJANGO_DEBUG: "True"
       DJANGO_ENV: development
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,web
       DJANGO_SETTINGS_MODULE: church_system.settings
       DB_ENGINE: postgresql
-      DB_NAME: churchhub
-      DB_USER: churchhub
-      DB_PASSWORD: churchhub
+      DB_NAME: ${POSTGRES_DB:-churchhub}
+      DB_USER: ${POSTGRES_USER:-churchhub}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-churchhub}
       DB_HOST: db
       DB_PORT: "5432"
       REDIS_URL: redis://redis:6379/0
@@ -58,14 +58,14 @@ services:
     build: .
     command: celery -A church_system worker -l info --concurrency=2
     environment:
-      DJANGO_SECRET_KEY: docker-dev-secret-change-in-production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-docker-dev-secret-change-in-production}
       DJANGO_DEBUG: "True"
       DJANGO_ENV: development
       DJANGO_SETTINGS_MODULE: church_system.settings
       DB_ENGINE: postgresql
-      DB_NAME: churchhub
-      DB_USER: churchhub
-      DB_PASSWORD: churchhub
+      DB_NAME: ${POSTGRES_DB:-churchhub}
+      DB_USER: ${POSTGRES_USER:-churchhub}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-churchhub}
       DB_HOST: db
       DB_PORT: "5432"
       REDIS_URL: redis://redis:6379/0
@@ -84,14 +84,14 @@ services:
     build: .
     command: celery -A church_system beat -l info --schedule=/app/var/celerybeat-schedule
     environment:
-      DJANGO_SECRET_KEY: docker-dev-secret-change-in-production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-docker-dev-secret-change-in-production}
       DJANGO_DEBUG: "True"
       DJANGO_ENV: development
       DJANGO_SETTINGS_MODULE: church_system.settings
       DB_ENGINE: postgresql
-      DB_NAME: churchhub
-      DB_USER: churchhub
-      DB_PASSWORD: churchhub
+      DB_NAME: ${POSTGRES_DB:-churchhub}
+      DB_USER: ${POSTGRES_USER:-churchhub}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-churchhub}
       DB_HOST: db
       DB_PORT: "5432"
       REDIS_URL: redis://redis:6379/0

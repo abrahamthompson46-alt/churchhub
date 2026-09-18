@@ -340,8 +340,8 @@ class Member(SoftDeleteModel):
         blank=True,
     )
     allow_birthday_photo = models.BooleanField(
-        default=True,
-        help_text="Use this member's photo on church birthday flyers when a picture is on file.",
+        default=False,
+        help_text="Use this member's photo on church birthday flyers only with explicit consent.",
     )
     hide_public_birthday = models.BooleanField(
         default=False,

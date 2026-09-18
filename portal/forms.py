@@ -98,13 +98,14 @@ class PortalPasswordChangeForm(PasswordChangeForm):
         return password
 
     def save(self, commit=True):
+        previous_hash = self.user.password
         user = super().save(commit=False)
         user.must_change_password = False
         if commit:
             user.save()
-            from accounts.mfa import revoke_all_trusted_devices
+            from accounts.session_security import on_password_replaced
 
-            revoke_all_trusted_devices(user)
+            on_password_replaced(user, previous_hash=previous_hash)
         return user
 
 
@@ -219,13 +220,14 @@ class PortalSetPasswordForm(SetPasswordForm):
         return password
 
     def save(self, commit=True):
+        previous_hash = self.user.password
         user = super().save(commit=False)
         user.must_change_password = False
         if commit:
             user.save()
-            from accounts.mfa import revoke_all_trusted_devices
+            from accounts.session_security import on_password_replaced
 
-            revoke_all_trusted_devices(user)
+            on_password_replaced(user, previous_hash=previous_hash)
         return user
 
 

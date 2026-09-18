@@ -96,3 +96,46 @@ class MfaEnforcementMiddleware:
             return self.get_response(request)
 
         return self.get_response(request)
+
+
+class SessionLifecycleMiddleware:
+    """Absolute session age and logout-all via User.session_epoch."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from django.contrib.auth import logout
+        from django.utils import timezone
+
+        from accounts.session_security import (
+            SESSION_EPOCH_KEY,
+            SESSION_STARTED_AT,
+            session_epoch_mismatch,
+            session_exceeded_absolute_age,
+            stamp_session,
+        )
+
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated or not hasattr(request, "session"):
+            return self.get_response(request)
+
+        if request.session.get(SESSION_EPOCH_KEY) is None:
+            stamp_session(request, user)
+        elif session_epoch_mismatch(request, user):
+            logout(request)
+            flash_warning(
+                request,
+                "This session ended because you signed out everywhere or changed your password.",
+            )
+            return redirect("login")
+
+        if not request.session.get(SESSION_STARTED_AT):
+            request.session[SESSION_STARTED_AT] = timezone.now().isoformat()
+            request.session.modified = True
+        elif session_exceeded_absolute_age(request):
+            logout(request)
+            flash_warning(request, "Your session expired. Please sign in again.")
+            return redirect("login")
+
+        return self.get_response(request)

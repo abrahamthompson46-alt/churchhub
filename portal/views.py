@@ -288,6 +288,9 @@ def password_change(request):
     if request.method == "POST" and form.is_valid():
         user = form.save()
         update_session_auth_hash(request, user)
+        from accounts.session_security import stamp_session
+
+        stamp_session(request, user)
         flash_success(request, "Your password has been updated.")
         return redirect("portal:home")
     return render(

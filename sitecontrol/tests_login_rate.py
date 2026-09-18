@@ -81,6 +81,7 @@ class LoginRateLimitMiddlewareTests(SiteControlClientHarness, TestCase):
         for _ in range(3):
             self.client.post(url, {"username": "nobody", "password": "wrong"})
         self.assertTrue(cache.get("login_lock:127.0.0.1"))
+        self.assertIsNone(cache.get("login_lock_user:nobody"))
 
     def test_password_reset_locks_after_max_attempts(self):
         url = reverse("password_reset")

@@ -39,3 +39,19 @@ class PlatformUppercaseValidator:
 
     def get_help_text(self):
         return _("Your password must contain at least one uppercase letter.")
+
+
+class PrivilegedPasswordHistoryValidator:
+    """Block reuse of the last passwords for treasury and platform security roles."""
+
+    def validate(self, password, user=None):
+        from accounts.session_security import password_was_used_recently
+
+        if password_was_used_recently(user, password):
+            raise ValidationError(
+                _("You cannot reuse a recent password for this role."),
+                code="password_in_history",
+            )
+
+    def get_help_text(self):
+        return _("Privileged roles cannot reuse one of the last five passwords.")

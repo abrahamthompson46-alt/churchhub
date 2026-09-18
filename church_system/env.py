@@ -123,6 +123,8 @@ def validate_production_environment(
     allow_sqlite: bool = False,
     health_check_token: str = "",
     require_health_token: bool = True,
+    mfa_encryption_key: str = "",
+    require_mfa_encryption_key: bool = True,
 ) -> None:
     """Raise ImproperlyConfigured when production essentials are missing."""
     errors: list[str] = []
@@ -182,6 +184,12 @@ def validate_production_environment(
         if require_health_token and not (health_check_token or "").strip():
             errors.append(
                 "CHURCHHUB_HEALTH_TOKEN must be set so /health/ probes are not public."
+            )
+        if require_mfa_encryption_key and not (mfa_encryption_key or "").strip():
+            errors.append(
+                "MFA_ENCRYPTION_KEY must be a unique secret so TOTP ciphertext "
+                "survives DJANGO_SECRET_KEY rotation. Generate one and run "
+                "manage.py reencrypt_mfa_secrets."
             )
 
     if errors:

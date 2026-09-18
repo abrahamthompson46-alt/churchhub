@@ -13,6 +13,7 @@ from accounts.mfa import (
     stamp_mfa_pending,
     user_requires_mfa,
 )
+from accounts.session_security import stamp_session
 from accounts.services import get_client_ip, log_activity
 from permissions.roles import UserRole
 
@@ -58,6 +59,7 @@ class MfaAwareLoginMixin:
                 if request_has_trusted_device(self.request, user):
                     login(self.request, user)
                     mark_mfa_verified(self.request)
+                    stamp_session(self.request, user)
                     log_activity(
                         user,
                         "MFA_TRUSTED_DEVICE",
@@ -73,9 +75,11 @@ class MfaAwareLoginMixin:
             login(self.request, user)
             self.request.session["mfa_verified"] = False
             self.request.session.modified = True
+            stamp_session(self.request, user)
             return redirect("accounts:mfa_enroll")
         login(self.request, user)
         mark_mfa_verified(self.request)
+        stamp_session(self.request, user)
         return redirect(self.get_success_url())
 
 

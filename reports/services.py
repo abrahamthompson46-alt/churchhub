@@ -750,3 +750,21 @@ def get_hierarchy_context(user):
     ctx["districts"] = selectors.districts_by_ids(ids["district_ids"])
     ctx["churches"] = selectors.manageable_churches_ordered(manageable)
     return ctx
+
+
+DEFAULT_EXPORT_RETENTION_DAYS = 30
+
+
+def purge_old_export_files(*, days: int = DEFAULT_EXPORT_RETENTION_DAYS) -> int:
+    """Delete stored report export files older than ``days``. Keep job/audit rows."""
+    from reports.models import ReportExportJob
+
+    cutoff = timezone.now() - timedelta(days=days)
+    removed = 0
+    jobs = ReportExportJob.objects.filter(updated_at__lt=cutoff).exclude(export_file="")
+    for job in jobs.iterator():
+        job.export_file.delete(save=False)
+        job.export_file = ""
+        job.save(update_fields=["export_file", "updated_at"])
+        removed += 1
+    return removed

@@ -107,15 +107,11 @@ See `docs/MODULE_SPECIFICATIONS/ACCOUNTS/accounts_spec.md`.
 4. `CommonPasswordValidator`  
 5. `NumericPasswordValidator`  
 
-**In-session change:** profile view uses Django `PasswordChangeForm`, `update_session_auth_hash`, logs `PASSWORD_CHANGE` on `UserActivityLog`.
+**In-session change:** profile view uses Django `PasswordChangeForm`, `update_session_auth_hash`, logs `PASSWORD_CHANGE` on `UserActivityLog`. Privileged roles (platform OWNER/SECURITY, institution SUPER_ADMIN / TREASURY / DISTRICT_TREASURY) cannot reuse the last five password hashes (`PasswordHistory`). Profile **Sign out all other devices** increments `User.session_epoch`.
 
 ### Planned (AGENTS.md)
 
-Lowercase / special character / password history / expiration / reuse prevention — **not** SiteSettings fields today.
-
-### Recommended
-
-Expand SiteSettings (or a policy model) for complexity and history; force reset after invite for privileged roles.
+Lowercase / special character / password expiration — **not** SiteSettings fields today.
 
 ---
 
@@ -125,6 +121,9 @@ Expand SiteSettings (or a policy model) for complexity and history; force reset 
 |---------|-------|
 | `SESSION_COOKIE_AGE` | 4 hours (`60 * 60 * 4`) |
 | `SESSION_EXPIRE_AT_BROWSER_CLOSE` | `False` |
+| `SESSION_SAVE_EVERY_REQUEST` | `True` (idle timeout refreshes) |
+| Absolute lifetime | `CHURCHHUB_SESSION_ABSOLUTE_AGE` default **12 hours** (`SessionLifecycleMiddleware`) |
+| Logout all devices | `POST /accounts/logout-all/` + `User.session_epoch` |
 | Effective idle timeout | `PlatformSessionMiddleware` sets `session.set_expiry(session_timeout_minutes * 60)` from `SiteSettings` (default **240** minutes; allowed 5–1440) |
 
 ### Production cookie hardening (`DEBUG=False`)
@@ -139,11 +138,11 @@ Always: `X_FRAME_OPTIONS=DENY`, `SECURE_CONTENT_TYPE_NOSNIFF=True`, `SECURE_BROW
 
 ### Planned (AGENTS.md)
 
-Absolute session timeout, logout-from-all-devices, device tracking, broader invalidate-on-password-change.
+Device inventory UI and broader session listing.
 
 ### Recommended
 
-Document absolute max lifetime; add “logout all sessions” for privileged roles; rotate session on privilege elevation.
+CAPTCHA after repeated failures; password expiration policy knobs in SiteSettings.
 
 ---
 
@@ -178,7 +177,8 @@ sequenceDiagram
 | `AuthenticationMiddleware` | Loads session user |
 | `PlatformSessionMiddleware` | Idle timeout from SiteSettings |
 | `MaintenanceModeMiddleware` | Logs out non-platform users when maintenance on |
-| `LoginRateLimitMiddleware` | Throttles failed login POSTs |
+| `accounts.middleware.SessionLifecycleMiddleware` | Absolute session age + epoch mismatch logout |
+| `LoginRateLimitMiddleware` | IP-primary login throttle; identifier lock only after a much higher threshold |
 | `UserScopeMiddleware` | Lane isolation after auth (see AUTHORIZATION) |
 | `RoleEnforcementMiddleware` | Redirects local roles without church to profile |
 
@@ -287,9 +287,8 @@ Public tenant onboarding: `/apply/` — when auto-provision is on, instant 30-da
 
 | State | Detail |
 |-------|--------|
-| **Current** | MFA is **on by default** for privileged audiences. Platform owners configure audiences under **Platform → Security** (`SiteSettings.mfa_required_for_privileged`, default **True**) and choose **who**: institution roles (`mfa_institution_roles`), platform roles (`mfa_platform_roles`), and optionally Django superusers (`mfa_include_django_superusers`). Recommended starter audiences: OWNER/SECURITY + SUPER_ADMIN/TREASURY. Methods: **TOTP** (QR enroll), **email OTP**, **recovery codes**. **Trusted device** cookie skips MFA for 30 days when checked. Secrets stored encrypted. **Impersonation** requires MFA enrollment + verified session when policy applies. |
+| **Current** | MFA is **on by default** for privileged audiences. Platform owners configure audiences under **Platform → Security**. Methods: **TOTP**, **email OTP**, **recovery codes**. Trusted device: **7 days** for MFA-required users, otherwise **30 days**. Production (except PythonAnywhere) **requires** `MFA_ENCRYPTION_KEY`; decrypt still falls back to `SECRET_KEY` for old ciphertext. Run `reencrypt_mfa_secrets` after first enable. **Impersonation** requires MFA when policy applies. |
 | **Planned (AGENTS.md)** | Optional SMS OTP, richer device management UI |
-| **Recommended** | Dedicated `MFA_ENCRYPTION_KEY`; rate-limit TOTP verify attempts |
 
 Login flow: password success → trusted device (if cookie valid) → home; else if site policy requires MFA for that user and enrolled → `/accounts/mfa/verify/` (TOTP, email code, or recovery) → if required and not enrolled → `/accounts/mfa/enroll/` (scannable QR). `MfaEnforcementMiddleware` blocks the rest of the app until verified (or trusted device). When enforcement is off, MFA is not required even if a user has enrolled.
 
@@ -350,25 +349,23 @@ SiteSettings also: session timeout, login attempts/lockout, password min length 
 | Topic | Current | Planned (AGENTS.md) | Recommended |
 |-------|---------|---------------------|-------------|
 | Auth style | Session + custom User | + MFA, OAuth readiness, API tokens | Keep session; add MFA before tokens |
-| Password | Min length + optional uppercase + Django defaults | History, expiry, full complexity | Expand SiteSettings validators |
-| Lockout | Cache rate-limit | Account lock + admin unlock | Persist lock events; unlock UI |
-| Sessions | Idle via SiteSettings | Absolute + logout-all + devices | Absolute timeout + logout-all |
-| MFA | TOTP + email OTP + recovery; trusted device 30d | SMS OTP | Expand optional roles |
+| Password | Min length + optional uppercase + Django defaults; last-5 history for privileged roles | Expiry / full complexity knobs | SiteSettings expiration |
+| Lockout | IP-primary cache rate-limit; identifier lock only after 20+ failures | Account lock + admin unlock | Persist lock events; unlock UI |
+| Sessions | Idle via SiteSettings + 12h absolute + logout-all | Device inventory UI | — |
+| MFA | TOTP + email OTP + recovery; trusted device 7d privileged / 30d others; optional `MFA_ENCRYPTION_KEY` | SMS OTP | Set dedicated key in production |
 | Portal | Email + set-password email, device confirm, portal reset | Richer member auth / optional portal MFA | Keep lane separation; unique member email |
 
 ---
 
 ## 14. Security recommendations
 
-1. Dedicated MFA encryption key separate from `SECRET_KEY`; rate-limit TOTP verify attempts.
+1. Set `MFA_ENCRYPTION_KEY` in production and run `manage.py reencrypt_mfa_secrets`.
 2. Require Redis in production for shared login lockout.  
 3. Keep `DJANGO_DEBUG=False` in production (startup + `/health/` already reject unsafe DEBUG).
 4. Set **`CHURCHHUB_HEALTH_TOKEN`** in production — `/health/`, `/health/live/`, and `/health/ready/` require `?token=` or `X-Health-Token` header when configured.
-5. **Platform `/platform/` access:** prefer **MFA** for operators on dynamic home ISPs — leave `platform_ip_allowlist` empty (production default does **not** require a list). Set `CHURCHHUB_REQUIRE_PLATFORM_IP_ALLOWLIST=true` only when you maintain a **static or dedicated VPN** IP allowlist.  
-4. Rate-limit password reset / invite accept endpoints.  
-5. Password history + optional expiry for finance/platform roles.  
-6. Session absolute timeout + logout-all.  
-7. Keep CSRF enabled globally.  
+5. **Platform `/platform/` access:** prefer **MFA** for operators on dynamic home ISPs — leave `platform_ip_allowlist` empty (production default does **not** require a list). Set `CHURCHHUB_REQUIRE_PLATFORM_IP_ALLOWLIST=true` only when you maintain a **static or dedicated VPN** IP allowlist.
+6. Rate-limit password reset / invite accept endpoints.
+7. Keep CSRF enabled globally.
 8. Never log passwords, reset tokens, or SMTP secrets.
 
 ---

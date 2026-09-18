@@ -4,12 +4,23 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 
 from accounts.password_reset import StaffPasswordResetView, StaffPasswordChangeForm, StaffSetPasswordForm
+from accounts.session_security import stamp_session
+
+
+class ChurchHubPasswordChangeView(auth_views.PasswordChangeView):
+    form_class = StaffPasswordChangeForm
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        stamp_session(self.request, form.user)
+        return response
+
 
 urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path(
         "password_change/",
-        auth_views.PasswordChangeView.as_view(form_class=StaffPasswordChangeForm),
+        ChurchHubPasswordChangeView.as_view(),
         name="password_change",
     ),
     path(

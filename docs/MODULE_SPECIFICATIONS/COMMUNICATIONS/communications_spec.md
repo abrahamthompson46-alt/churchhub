@@ -52,7 +52,7 @@ erDiagram
 
 **PK type:** integer (not UUID) on Announcement.
 
-**`BirthdayWishDispatch` (Current):** UUID PK; church + member + `occurrence_date` unique; square flyer PNG plus `flyer_story` (1080×1920) under `announcements/birthdays/`; statuses PREPARED / DOWNLOADED / POSTED; editable caption. **Does not show turning age.** Photo used only when `Member.profile_picture` is set **and** `allow_birthday_photo` is true; otherwise initials. `hide_public_birthday` excludes the member from the desk, calendar, and reminders.
+**`BirthdayWishDispatch` (Current):** UUID PK; church + member + `occurrence_date` unique; square flyer PNG plus `flyer_story` (1080×1920) under `announcements/birthdays/`; statuses PREPARED / DOWNLOADED / POSTED; editable caption. **Does not show turning age.** Photo used only when `Member.profile_picture` is set **and** `allow_birthday_photo` is true (default **false**, including a data migration that clears prior opt-in). Clerks may re-enable per member. `hide_public_birthday` excludes the member from the desk, calendar, and reminders. Flyers use denomination brand colors with an ornamental framed layout (gradient, gold corners, portrait rings); they never print turning age.
 
 **Managers:** none custom.
 
@@ -69,7 +69,7 @@ erDiagram
 7. Calendar combines birthdays (members), meetings, announcement event dates. Birthday cards and flyers **do not display turning age**.  
 8. Optional `target_roles` + department targeting; empty = entire visibility scope.  
 9. List/detail/calendar require `view_announcements`; export uses `export_announcements`.  
-10. **Birthday flyer desk** (`/announcements/birthdays/`): requires an **active church**, `view_announcements` **and** `view_members`, and is denied for portal `MEMBER`. Staff generate/download/share a PNG, copy or edit the caption, and post in the church WhatsApp group. Prepare-all covers the current window. `manage.py remind_birthday_desk` notifies SECRETARY / LOCAL_PASTOR (`event_key` `birthday.desk.<church_id>.<date>`); schedule daily ~06:00 local, optional Friday `--days-ahead 1`. `manage.py purge_birthday_flyers` removes PNG files older than 90 days by default.  
+10. **Birthday flyer desk** (`/announcements/birthdays/`): requires an **active church**, `view_announcements` **and** `view_members`, and is denied for portal `MEMBER`. Staff generate/download/share a PNG, copy or edit the caption, and post in the church WhatsApp group. Prepare-all covers the current window. Celery Beat `remind_birthday_desk_task` at 06:00 (`manage.py remind_birthday_desk`; optional Friday `--days-ahead 1`). `purge_birthday_flyers_task` weekly removes PNG files older than 90 days by default.  
 11. **No `@require_feature`** on announcement views — module is available whenever the user has announcement permissions.
 
 ---

@@ -82,9 +82,11 @@ Church properties (not columns): `zone`, `conference`, `union`, `general_confere
 
 | Model | Key fields / relationships |
 |-------|----------------------------|
-| `User` | UUID PK; Django `AbstractUser` fields; `role`; `scope_level`; FK `church`; FKs `scope_district` / `scope_zone` / `scope_conference` / `scope_union` / `scope_general_conference`; OneToOne `member` → `members.Member`; `is_platform_user`; `platform_role`; FK `denomination`; M2M `managed_denominations`; `mfa_enabled` (**stub**); `phone` |
+| `User` | UUID PK; Django `AbstractUser` fields; `role`; `scope_level`; FK `church`; FKs `scope_district` / `scope_zone` / `scope_conference` / `scope_union` / `scope_general_conference`; OneToOne `member` → `members.Member`; `is_platform_user`; `platform_role`; FK `denomination`; M2M `managed_denominations`; `mfa_enabled` / `mfa_secret` / `mfa_recovery_hashes`; `session_epoch`; `phone` |
 | `UserActivityLog` | User activity audit |
 | `UserInvitation` | Invitation workflow |
+| `TrustedDevice` | MFA remember-this-device |
+| `PasswordHistory` | Previous hashes for privileged reuse checks |
 
 ---
 

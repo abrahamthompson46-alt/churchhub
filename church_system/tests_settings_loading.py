@@ -132,6 +132,7 @@ class ProductionSettingsModuleTests(SimpleTestCase):
                 "REDIS_URL": "redis://127.0.0.1:6379/0",
                 "DATABASE_URL": "postgres://churchhub:churchhub@127.0.0.1:5432/churchhub",
                 "CHURCHHUB_HEALTH_TOKEN": "health-token-for-settings-test",
+                "MFA_ENCRYPTION_KEY": "mfa-encryption-key-for-settings-test",
                 "SECURE_SSL_REDIRECT": "true",
                 "CHURCHHUB_REQUIRE_REDIS": "false",
             }
@@ -196,6 +197,7 @@ class ProductionSettingsModuleTests(SimpleTestCase):
                         "REDIS_URL=redis://127.0.0.1:6379/0",
                         "DATABASE_URL=postgres://churchhub:churchhub@127.0.0.1:5432/churchhub",
                         "CHURCHHUB_HEALTH_TOKEN=health-token-dotenv-only",
+                        "MFA_ENCRYPTION_KEY=mfa-encryption-key-dotenv-only",
                         "SECURE_SSL_REDIRECT=true",
                         "CHURCHHUB_REQUIRE_REDIS=false",
                     ]
@@ -223,6 +225,7 @@ class ProductionSettingsModuleTests(SimpleTestCase):
                 "REDIS_URL",
                 "DATABASE_URL",
                 "CHURCHHUB_HEALTH_TOKEN",
+                "MFA_ENCRYPTION_KEY",
                 "SECURE_SSL_REDIRECT",
                 "CHURCHHUB_REQUIRE_REDIS",
             )

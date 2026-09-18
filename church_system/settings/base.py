@@ -40,6 +40,7 @@ PRODUCTION_LIKE = is_production_like_env(
 
 _INSECURE_SECRET = insecure_secret_default()
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", _INSECURE_SECRET)
+MFA_ENCRYPTION_KEY = env_str("MFA_ENCRYPTION_KEY") or ""
 
 DEBUG = resolve_debug(production_like=PRODUCTION_LIKE)
 
@@ -167,6 +168,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
 
     "accounts.middleware.MfaEnforcementMiddleware",
+    "accounts.middleware.SessionLifecycleMiddleware",
     "permissions.middleware.RoleEnforcementMiddleware",
 
     "audit.middleware.AuditRequestMiddleware",
@@ -399,6 +401,11 @@ AUTH_PASSWORD_VALIDATORS = [
             "NumericPasswordValidator"
         ),
     },
+    {
+        "NAME": (
+            "accounts.validators.PrivilegedPasswordHistoryValidator"
+        ),
+    },
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -470,6 +477,18 @@ apply_s3_settings(globals())
 
 SESSION_COOKIE_AGE = 60 * 60 * 4
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_ABSOLUTE_AGE = env_int("CHURCHHUB_SESSION_ABSOLUTE_AGE", 60 * 60 * 12)
+MFA_TRUSTED_DEVICE_DAYS = env_int("CHURCHHUB_MFA_TRUSTED_DEVICE_DAYS", 30)
+MFA_PRIVILEGED_TRUSTED_DEVICE_DAYS = env_int(
+    "CHURCHHUB_MFA_PRIVILEGED_TRUSTED_DEVICE_DAYS",
+    7,
+)
+LOGIN_IDENTIFIER_LOCK_MIN = env_int("CHURCHHUB_LOGIN_IDENTIFIER_LOCK_MIN", 20)
+LOGIN_IDENTIFIER_LOCK_MULTIPLIER = env_int(
+    "CHURCHHUB_LOGIN_IDENTIFIER_LOCK_MULTIPLIER",
+    5,
+)
 
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
@@ -847,6 +866,47 @@ if env_flag(
             ),
             "options": {
                 "expires": 600,
+            },
+        },
+        "remind-birthday-desk-daily": {
+            "task": (
+                "church_system.tasks."
+                "remind_birthday_desk_task"
+            ),
+            "schedule": crontab(
+                hour=6,
+                minute=0,
+            ),
+            "options": {
+                "expires": 3600,
+            },
+        },
+        "purge-birthday-flyers-weekly": {
+            "task": (
+                "church_system.tasks."
+                "purge_birthday_flyers_task"
+            ),
+            "schedule": crontab(
+                hour=4,
+                minute=30,
+                day_of_week=0,
+            ),
+            "options": {
+                "expires": 7200,
+            },
+        },
+        "purge-report-exports-weekly": {
+            "task": (
+                "church_system.tasks."
+                "purge_report_exports_task"
+            ),
+            "schedule": crontab(
+                hour=4,
+                minute=45,
+                day_of_week=0,
+            ),
+            "options": {
+                "expires": 7200,
             },
         },
     }

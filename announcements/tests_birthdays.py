@@ -213,6 +213,30 @@ class BirthdayFlyerTests(TestCase):
         self.assertEqual(dispatch.caption, "Happy Birthday Ada! We celebrate you.")
         self.assertNotIn("Turning", dispatch.caption)
 
+    def test_flyer_png_dimensions_and_format(self):
+        from io import BytesIO
+
+        from PIL import Image
+
+        from announcements.flyer_composer import LAYOUT_STORY, render_birthday_flyer_png
+
+        square = render_birthday_flyer_png(
+            member=self.member,
+            church=self.church,
+            occurrence_date=self.today,
+        )
+        story = render_birthday_flyer_png(
+            member=self.member,
+            church=self.church,
+            occurrence_date=self.today,
+            layout=LAYOUT_STORY,
+        )
+        sq = Image.open(BytesIO(square))
+        st = Image.open(BytesIO(story))
+        self.assertEqual(sq.size, (1080, 1080))
+        self.assertEqual(st.size, (1080, 1920))
+        self.assertEqual(sq.format, "PNG")
+
     def test_photo_consent_off_skips_portrait_file(self):
         from announcements.flyer_composer import _open_member_photo
 

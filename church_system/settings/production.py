@@ -12,6 +12,7 @@ from church_system.settings.base import (
     CSRF_TRUSTED_ORIGINS,
     DEBUG,
     HEALTH_CHECK_TOKEN,
+    MFA_ENCRYPTION_KEY,
     ON_PYTHONANYWHERE,
     REDIS_URL,
     SECRET_KEY,
@@ -45,15 +46,12 @@ TRUST_X_FORWARDED_FOR = env_flag("CHURCHHUB_TRUST_X_FORWARDED_FOR", True)
 X_FRAME_OPTIONS = "DENY"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
-# HTTPS Security Hardening
+# HTTPS Security Hardening (HSTS max-age is set once below to 1 year).
 
 SECURE_SSL_REDIRECT = True
 
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-
-SECURE_HSTS_SECONDS = 3600
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
@@ -110,6 +108,8 @@ validate_production_environment(
     health_check_token=HEALTH_CHECK_TOKEN,
     # PA free tier often omits this; empty token keeps /health/ open (acceptable there).
     require_health_token=not ON_PYTHONANYWHERE,
+    mfa_encryption_key=MFA_ENCRYPTION_KEY,
+    require_mfa_encryption_key=not ON_PYTHONANYWHERE,
 )
 
 # File logs on by default in production

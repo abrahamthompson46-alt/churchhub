@@ -297,7 +297,7 @@ Editable when DRAFT or REJECTED. Approval / capitalize / depreciate paths post i
 
 ## 9. Announcements
 
-**Church:** `announcements.Announcement` — church-scoped, approval/archive/pin patterns, images, views, audit. **`BirthdayWishDispatch`** — clerk-prepared birthday PNG + caption for the church WhatsApp group (no auto-send; no turning age). Desk supports copy/preview/share, prepare-all, square + story (1080×1920) layouts, editable captions, photo consent (`Member.allow_birthday_photo`, default true), and quiet list (`Member.hide_public_birthday`). Reminders: `manage.py remind_birthday_desk` (daily 06:00; optional `--days-ahead 1`). Retention: `manage.py purge_birthday_flyers`.
+**Church:** `announcements.Announcement` — church-scoped, approval/archive/pin patterns, images, views, audit. **`BirthdayWishDispatch`** — clerk-prepared birthday PNG + caption for the church WhatsApp group (no auto-send; no turning age). Desk supports copy/preview/share, prepare-all, square + story (1080×1920) layouts, editable captions, photo consent (`Member.allow_birthday_photo`, default false; existing rows cleared by `members.0012`), and quiet list (`Member.hide_public_birthday`). Reminders: Celery Beat daily 06:00 (`remind_birthday_desk_task`) or `manage.py remind_birthday_desk`. Retention: weekly Beat `purge_birthday_flyers_task` or `manage.py purge_birthday_flyers`. Report export files: `manage.py purge_report_exports` (weekly Beat).
 
 **Platform:** `sitecontrol.PlatformAnnouncement` — separate platform messaging.
 

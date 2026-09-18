@@ -1,5 +1,7 @@
 """Platform middleware: session timeout, login rate limit, maintenance mode, user scope."""
 
+import logging
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
@@ -16,6 +18,8 @@ from sitecontrol.services import (
     ip_allowed_for_platform,
     platform_ip_allowlist_configured,
 )
+
+logger = logging.getLogger("churchhub.auth")
 
 SHARED_EXEMPT_PREFIXES = (
     "/accounts/login",
@@ -222,7 +226,7 @@ class LoginRateLimitMiddleware:
     RESET_REQUEST_PATHS = frozenset({"/accounts/password_reset", "/portal/password/reset"})
     APPLY_PATH = "/apply"
     PORTAL_LOGIN_MAX_ATTEMPTS = 3
-    APPLY_MAX_ATTEMPTS = 5
+    APPLY_MAX_ATTEMPTS = 3
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -320,6 +324,10 @@ class LoginRateLimitMiddleware:
             redirect_name = "portal:login" if path == "/portal/login" else "login"
             portal_attempt_cap = min(self.PORTAL_LOGIN_MAX_ATTEMPTS, max_attempts)
             attempt_cap = portal_attempt_cap if path == "/portal/login" else max_attempts
+            identifier_cap = max(
+                int(getattr(settings, "LOGIN_IDENTIFIER_LOCK_MIN", 20)),
+                attempt_cap * int(getattr(settings, "LOGIN_IDENTIFIER_LOCK_MULTIPLIER", 5)),
+            )
 
             if cache.get(lock_key) or (user_lock_key and cache.get(user_lock_key)):
                 messages.error(
@@ -348,9 +356,14 @@ class LoginRateLimitMiddleware:
                 user_fail_key = f"login_fail_user:{username}"
                 user_fails = cache.get(user_fail_key, 0) + 1
                 cache.set(user_fail_key, user_fails, ttl)
-                if user_fails >= attempt_cap:
+                if user_fails >= identifier_cap:
                     cache.set(user_lock_key, True, ttl)
                     cache.delete(user_fail_key)
+                    logger.warning(
+                        "Login identifier lockout after %s failures (ip=%s).",
+                        user_fails,
+                        ip,
+                    )
             return response
 
         # Password reset request / confirm — throttle by IP (+ email when present).

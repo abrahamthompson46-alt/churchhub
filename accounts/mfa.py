@@ -55,19 +55,16 @@ MFA_VERIFY_IP_MAX_ATTEMPTS = 20
 MFA_TOTP_REPLAY_TTL_SECONDS = 180
 
 
-def _fernet():
-    from cryptography.fernet import Fernet
-
-    digest = hashlib.sha256(settings.SECRET_KEY.encode("utf-8")).digest()
-    return Fernet(base64.urlsafe_b64encode(digest))
-
-
 def encrypt_totp_secret(secret: str) -> str:
-    return _fernet().encrypt(secret.encode("utf-8")).decode("ascii")
+    from church_system.crypto import encrypt_fernet
+
+    return encrypt_fernet(secret)
 
 
 def decrypt_totp_secret(token: str) -> str:
-    return _fernet().decrypt(token.encode("ascii")).decode("utf-8")
+    from church_system.crypto import decrypt_fernet
+
+    return decrypt_fernet(token)
 
 
 def hash_recovery_code(code: str) -> str:
@@ -494,16 +491,18 @@ def create_trusted_device(user, request) -> str:
     """Persist a trusted device and return the raw cookie token."""
     from accounts.models import TrustedDevice
     from accounts.services import get_client_ip
+    from accounts.session_security import trusted_device_days_for_user
 
     token = secrets.token_urlsafe(32)
     now = timezone.now()
+    days = trusted_device_days_for_user(user)
     TrustedDevice.objects.create(
         user=user,
         token_hash=hash_device_token(token),
         label=_device_label(request),
         user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:300],
         ip_address=get_client_ip(request),
-        expires_at=now + timedelta(days=TRUSTED_DEVICE_DAYS),
+        expires_at=now + timedelta(days=days),
         last_used_at=now,
     )
     # Cap devices per user — drop oldest expired/extra
@@ -548,11 +547,12 @@ def request_has_trusted_device(request, user) -> bool:
     return True
 
 
-def attach_trusted_device_cookie(response, token: str):
+def attach_trusted_device_cookie(response, token: str, *, days: int | None = None):
     """Set HttpOnly trusted-device cookie on the response."""
     # Align with production SESSION_COOKIE_SECURE (False on transitional HTTP IP access).
     secure = bool(getattr(settings, "SESSION_COOKIE_SECURE", not settings.DEBUG))
-    max_age = TRUSTED_DEVICE_DAYS * 24 * 60 * 60
+    cookie_days = days if days is not None else TRUSTED_DEVICE_DAYS
+    max_age = cookie_days * 24 * 60 * 60
     response.set_cookie(
         TRUSTED_DEVICE_COOKIE,
         token,

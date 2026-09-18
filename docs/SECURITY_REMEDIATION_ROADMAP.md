@@ -144,10 +144,10 @@ Do these first. They are the reason the verdict is **READY WITH CRITICAL REMEDIA
 |----|---------|--------|
 | P3-1 | CH-SEC-017 | Logout via POST + CSRF; change portal navbar |
 | P3-2 | CH-SEC-018 | Church switch via POST + CSRF |
-| P3-3 | CH-SEC-019 | Prefer IP-primary lockout; CAPTCHA after N; avoid locking victim identifiers from unauthenticated guesses |
-| P3-4 | CH-SEC-020 | Pin `Django==5.1.15` or actually upgrade and test 6.x |
-| P3-5 | CH-SEC-021 | Never publish Postgres/Redis host ports in a production overlay; rotate compose default passwords if ever used live |
-| P3-6 | CH-SEC-022 | Align Django `SECURE_HSTS_SECONDS` with Nginx `max-age=31536000` |
+| P3-3 | CH-SEC-019 | **Done (2026-09-17):** IP-primary lockout; identifier lock at 20+ failures |
+| P3-4 | CH-SEC-020 | **Done (2026-09-17):** `Django>=6.0.6,<6.1` |
+| P3-5 | CH-SEC-021 | **Done (2026-09-17):** Compose binds DB/Redis to 127.0.0.1; prod overlay publishes no DB ports |
+| P3-6 | CH-SEC-022 | **Done (2026-09-17):** Django HSTS 31536000 matches Nginx |
 | P3-7 | CH-SEC-L4 | **Done (2026-09-11):** Revoke trusted devices on staff/portal password-change and reset confirm |
 | P3-8 | CH-SEC-P1 | Compare health tokens with `hmac.compare_digest` |
 | P3-9 | CH-SEC-P2 | Confirm live Nginx `server_name` is `mychurch.zreta.com` (repo template may differ) |

@@ -10,7 +10,6 @@ from accounts.mfa import (
     SESSION_MFA_ENROLL_SECRET,
     SESSION_MFA_PENDING_BACKEND,
     SESSION_MFA_PENDING_USER,
-    TRUSTED_DEVICE_DAYS,
     attach_trusted_device_cookie,
     clear_mfa_failures,
     clear_mfa_session,
@@ -32,6 +31,7 @@ from accounts.mfa import (
     verify_user_mfa,
 )
 from accounts.services import get_client_ip, log_activity
+from accounts.session_security import stamp_session, trusted_device_days_for_user
 from church_system.auth import post_login_url
 from church_system.flash import flash_error, flash_success
 
@@ -66,10 +66,15 @@ def _complete_mfa_login(request, user, *, method: str, remember_device: bool):
         "trusted": "MFA_TRUSTED_DEVICE",
     }.get(method, "MFA_VERIFY")
     log_activity(user, action, ip_address=get_client_ip(request))
+    stamp_session(request, user)
     response = redirect(post_login_url(user))
     if remember_device:
         token = create_trusted_device(user, request)
-        attach_trusted_device_cookie(response, token)
+        attach_trusted_device_cookie(
+            response,
+            token,
+            days=trusted_device_days_for_user(user),
+        )
     return response
 
 
@@ -108,7 +113,7 @@ def mfa_enroll(request):
                     "provisioning_uri": totp_provisioning_uri(user, secret),
                     "qr_data_uri": totp_qr_data_uri(user, secret),
                     "error": error,
-                    "trusted_device_days": TRUSTED_DEVICE_DAYS,
+                    "trusted_device_days": trusted_device_days_for_user(user),
                 },
                 status=429,
             )
@@ -127,12 +132,16 @@ def mfa_enroll(request):
                 {
                     "recovery_codes": codes,
                     "continue_url": post_login_url(user),
-                    "trusted_device_days": TRUSTED_DEVICE_DAYS,
+                    "trusted_device_days": trusted_device_days_for_user(user),
                 },
             )
             if request.POST.get("remember_device"):
                 device_token = create_trusted_device(user, request)
-                attach_trusted_device_cookie(response, device_token)
+                attach_trusted_device_cookie(
+                    response,
+                    device_token,
+                    days=trusted_device_days_for_user(user),
+                )
             return response
         record_mfa_failure(user, ip)
         still_ok, lock_msg = mfa_verify_allowed(user, ip)
@@ -146,7 +155,7 @@ def mfa_enroll(request):
                     "provisioning_uri": totp_provisioning_uri(user, secret),
                     "qr_data_uri": totp_qr_data_uri(user, secret),
                     "error": error,
-                    "trusted_device_days": TRUSTED_DEVICE_DAYS,
+                    "trusted_device_days": trusted_device_days_for_user(user),
                 },
                 status=429,
             )
@@ -163,7 +172,7 @@ def mfa_enroll(request):
             "provisioning_uri": totp_provisioning_uri(user, secret),
             "qr_data_uri": totp_qr_data_uri(user, secret),
             "error": error,
-            "trusted_device_days": TRUSTED_DEVICE_DAYS,
+            "trusted_device_days": trusted_device_days_for_user(user),
         },
     )
 
@@ -235,7 +244,7 @@ def mfa_verify(request):
             "username": user.get_username(),
             "email_masked": _mask_email(user.email) if user_can_receive_email_otp(user) else "",
             "can_email_otp": user_can_receive_email_otp(user),
-            "trusted_device_days": TRUSTED_DEVICE_DAYS,
+            "trusted_device_days": trusted_device_days_for_user(user),
         },
         status=status,
     )

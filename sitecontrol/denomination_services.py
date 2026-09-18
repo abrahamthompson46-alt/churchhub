@@ -108,7 +108,7 @@ def ensure_builtin_denominations():
                 "tagline": spec.get("tagline", ""),
                 "hierarchy_labels": merge_hierarchy_labels(spec.get("hierarchy_labels")),
                 "seed_config": spec.get("seed_config", {}),
-                "allow_public_registration": spec.get("allow_public_registration", True),
+                "allow_public_registration": spec.get("allow_public_registration", False),
                 "is_default": spec.get("is_default", False),
                 "is_active": True,
             },

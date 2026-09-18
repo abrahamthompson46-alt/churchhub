@@ -17,7 +17,9 @@ Mark each item **Done** before declaring production live.
 - [ ] Database URL points to managed PostgreSQL (not SQLite)
 - [ ] `REDIS_URL` set on **all** web and Celery workers
 - [ ] Email credentials / API keys via env only
-- [ ] Optional: `MFA_ENCRYPTION_KEY` (Fernet for TOTP; `manage.py reencrypt_mfa_secrets` after first set)
+- [ ] `MFA_ENCRYPTION_KEY` set (required off PythonAnywhere); `manage.py reencrypt_mfa_secrets`
+- [ ] `python manage.py check_production_ready` (fix MISSING rows)
+- [ ] `python manage.py migrate` includes members.0012 and sitecontrol.0027
 - [ ] `CHURCHHUB_SESSION_ABSOLUTE_AGE` reviewed (default 12 hours)
 - [ ] Fail2Ban + UFW applied from `deploy/fail2ban/` and `deploy/firewall/ufw-churchhub.sh`
 - [ ] `python manage.py restore_drill` recorded for the latest backup

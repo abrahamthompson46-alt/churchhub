@@ -23,7 +23,7 @@ Versioning per [Semantic Versioning](https://semver.org/).
 - Marketing collateral accepts HTTPS links only; lead PII is excluded from audit details and application logs.
 - Public inquiry activation now requires an HTTPS privacy policy and consent configuration; throttling combines validated IP, hashed email, campaign and global limits.
 - Forwarded client IPs are accepted only from explicitly trusted proxy addresses.
-- Dedicated `MFA_ENCRYPTION_KEY` with `SECRET_KEY` decrypt fallback; absolute sessions; logout-all; IP-primary lockout; privileged password history; birthday photo consent default-off; Beat birthday/export purge.
+- Dedicated `MFA_ENCRYPTION_KEY` with `SECRET_KEY` decrypt fallback; absolute sessions; logout-all; IP-primary lockout; privileged password history; birthday photo consent default-off (including existing members via migration); Beat birthday/export purge; non-DEMO denominations close public `/apply/`.
 
 ### Fixed
 

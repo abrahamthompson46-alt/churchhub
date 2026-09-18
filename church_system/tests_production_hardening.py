@@ -151,3 +151,29 @@ class SessionAndPasswordHistoryTests(TestCase):
         delta = device.expires_at - timezone.now()
         self.assertLess(delta, timedelta(days=8))
         self.assertGreater(delta, timedelta(days=6))
+
+
+class PrivacyAndPublicApplyTests(TestCase):
+    def test_new_member_photo_consent_defaults_off(self):
+        conf = Conference.objects.create(code="PC", name="PC Conf")
+        zone = Zone.objects.create(conference=conf, code="PCZ", name="PC Zone")
+        district = District.objects.create(zone=zone, code="PCD", name="PC Dist")
+        church = Church.objects.create(district=district, code="PCC", name="PC Church")
+        from datetime import date
+
+        from members.models import Member
+
+        member = Member.objects.create(
+            church=church,
+            first_name="Noa",
+            last_name="Consent",
+            gender="Female",
+            date_of_birth=date(1990, 1, 1),
+        )
+        self.assertFalse(member.allow_birthday_photo)
+
+    def test_non_demo_denomination_defaults_closed_for_apply(self):
+        from sitecontrol.models import Denomination
+
+        denom = Denomination.objects.create(code="live-sda", name="Live SDA")
+        self.assertFalse(denom.allow_public_registration)

@@ -52,7 +52,7 @@ erDiagram
 
 **PK type:** integer (not UUID) on Announcement.
 
-**`BirthdayWishDispatch` (Current):** UUID PK; church + member + `occurrence_date` unique; square flyer PNG plus `flyer_story` (1080×1920) under `announcements/birthdays/`; statuses PREPARED / DOWNLOADED / POSTED; editable caption. **Does not show turning age.** Photo used only when `Member.profile_picture` is set **and** `allow_birthday_photo` is true (new members default **false**); otherwise initials. `hide_public_birthday` excludes the member from the desk, calendar, and reminders.
+**`BirthdayWishDispatch` (Current):** UUID PK; church + member + `occurrence_date` unique; square flyer PNG plus `flyer_story` (1080×1920) under `announcements/birthdays/`; statuses PREPARED / DOWNLOADED / POSTED; editable caption. **Does not show turning age.** Photo used only when `Member.profile_picture` is set **and** `allow_birthday_photo` is true (default **false**, including a data migration that clears prior opt-in). Clerks may re-enable per member. `hide_public_birthday` excludes the member from the desk, calendar, and reminders.
 
 **Managers:** none custom.
 

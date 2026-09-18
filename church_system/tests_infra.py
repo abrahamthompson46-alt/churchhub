@@ -55,6 +55,7 @@ class EnvHelperTests(SimpleTestCase):
             public_site_url="https://app.example.com",
             require_redis=True,
             health_check_token="probe-secret-token",
+            mfa_encryption_key="dedicated-mfa-key",
         )
 
     def test_validate_production_rejects_localhost_public_url(self):
@@ -101,7 +102,24 @@ class EnvHelperTests(SimpleTestCase):
             allow_mysql=True,
             require_health_token=False,
             health_check_token="",
+            require_mfa_encryption_key=False,
         )
+
+    def test_validate_production_rejects_missing_mfa_key(self):
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            validate_production_environment(
+                secret_key="unique-production-secret-key-value",
+                debug=False,
+                allowed_hosts=["app.example.com"],
+                database_engine="django.db.backends.postgresql",
+                redis_url="redis://localhost:6379/0",
+                csrf_trusted_origins=["https://app.example.com"],
+                public_site_url="https://app.example.com",
+                health_check_token="probe-secret-token",
+                mfa_encryption_key="",
+                require_mfa_encryption_key=True,
+            )
+        self.assertIn("MFA_ENCRYPTION_KEY", str(ctx.exception))
 
 
 class StorageConfigTests(SimpleTestCase):

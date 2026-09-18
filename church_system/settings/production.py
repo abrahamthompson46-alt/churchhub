@@ -12,6 +12,7 @@ from church_system.settings.base import (
     CSRF_TRUSTED_ORIGINS,
     DEBUG,
     HEALTH_CHECK_TOKEN,
+    MFA_ENCRYPTION_KEY,
     ON_PYTHONANYWHERE,
     REDIS_URL,
     SECRET_KEY,
@@ -107,6 +108,8 @@ validate_production_environment(
     health_check_token=HEALTH_CHECK_TOKEN,
     # PA free tier often omits this; empty token keeps /health/ open (acceptable there).
     require_health_token=not ON_PYTHONANYWHERE,
+    mfa_encryption_key=MFA_ENCRYPTION_KEY,
+    require_mfa_encryption_key=not ON_PYTHONANYWHERE,
 )
 
 # File logs on by default in production

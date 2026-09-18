@@ -287,9 +287,8 @@ Public tenant onboarding: `/apply/` — when auto-provision is on, instant 30-da
 
 | State | Detail |
 |-------|--------|
-| **Current** | MFA is **on by default** for privileged audiences. Platform owners configure audiences under **Platform → Security** (`SiteSettings.mfa_required_for_privileged`, default **True**) and choose **who**: institution roles (`mfa_institution_roles`), platform roles (`mfa_platform_roles`), and optionally Django superusers (`mfa_include_django_superusers`). Recommended starter audiences: OWNER/SECURITY + SUPER_ADMIN/TREASURY. Methods: **TOTP** (QR enroll), **email OTP**, **recovery codes**. **Trusted device** cookie skips MFA for **7 days** for MFA-required users, otherwise **30 days**. Secrets stored Fernet-encrypted with `MFA_ENCRYPTION_KEY` when set (fallback `SECRET_KEY`; decrypt tries both). **Impersonation** requires MFA enrollment + verified session when policy applies. |
+| **Current** | MFA is **on by default** for privileged audiences. Platform owners configure audiences under **Platform → Security**. Methods: **TOTP**, **email OTP**, **recovery codes**. Trusted device: **7 days** for MFA-required users, otherwise **30 days**. Production (except PythonAnywhere) **requires** `MFA_ENCRYPTION_KEY`; decrypt still falls back to `SECRET_KEY` for old ciphertext. Run `reencrypt_mfa_secrets` after first enable. **Impersonation** requires MFA when policy applies. |
 | **Planned (AGENTS.md)** | Optional SMS OTP, richer device management UI |
-| **Recommended** | Set `MFA_ENCRYPTION_KEY` in production and run `manage.py reencrypt_mfa_secrets` after first enable |
 
 Login flow: password success → trusted device (if cookie valid) → home; else if site policy requires MFA for that user and enrolled → `/accounts/mfa/verify/` (TOTP, email code, or recovery) → if required and not enrolled → `/accounts/mfa/enroll/` (scannable QR). `MfaEnforcementMiddleware` blocks the rest of the app until verified (or trusted device). When enforcement is off, MFA is not required even if a user has enrolled.
 

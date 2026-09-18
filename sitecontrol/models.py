@@ -1024,8 +1024,8 @@ class Denomination(models.Model):
         help_text="Default offering categories, remittance, and payroll seeds for new churches.",
     )
     allow_public_registration = models.BooleanField(
-        default=True,
-        help_text="Allow /apply/ registrations scoped to this denomination.",
+        default=False,
+        help_text="Allow /apply/ trial registrations scoped to this denomination. Keep off for live churches; DEMO may stay on.",
     )
     allow_institution_branding = models.BooleanField(
         default=True,

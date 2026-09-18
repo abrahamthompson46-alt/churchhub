@@ -12,7 +12,7 @@ This document lists **accepted** limitations at RC1. Items marked **Blocker** mu
 
 | ID | Limitation | Severity | Pilot OK? | Mitigation |
 |----|------------|----------|-----------|------------|
-| KL-SEC-01 | MFA uses `MFA_ENCRYPTION_KEY` when set; otherwise `SECRET_KEY` | Low | Yes | Set dedicated key in production; `reencrypt_mfa_secrets` |
+| KL-SEC-01 | MFA_ENCRYPTION_KEY required in production (not PythonAnywhere); SECRET_KEY fallback decrypt remains | Low | Yes | Set the key and run `reencrypt_mfa_secrets` |
 | KL-SEC-02 | MFA verify is cache-throttled (not account `is_active` lock) | Low | Yes | Keep Redis so throttle is shared across workers |
 | KL-SEC-03 | Report exports not always gated by `can_export_reports_*` | Medium | Yes | Limit report access roles; review export audit |
 | KL-SEC-04 | Session listing UI not implemented (epoch + absolute timeout exist) | Low | Yes | Profile logout-all; 12h absolute age |

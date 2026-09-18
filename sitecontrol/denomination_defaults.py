@@ -46,7 +46,7 @@ BUILTIN_DENOMINATIONS = [
         "tagline": "Conference administration for Adventist churches",
         "hierarchy_labels": DEFAULT_LEVEL_LABELS,
         "seed_config": DEFAULT_SEED_CONFIG,
-        "allow_public_registration": True,
+        "allow_public_registration": False,
         "is_default": True,
     },
     {
@@ -79,7 +79,7 @@ BUILTIN_DENOMINATIONS = [
             ],
             "enable_remittance": False,
         },
-        "allow_public_registration": True,
+        "allow_public_registration": False,
     },
     {
         "code": "cop",
@@ -111,7 +111,7 @@ BUILTIN_DENOMINATIONS = [
             ],
             "remittance_preset": "area_district",
         },
-        "allow_public_registration": True,
+        "allow_public_registration": False,
     },
     {
         "code": "generic",
@@ -120,6 +120,6 @@ BUILTIN_DENOMINATIONS = [
         "tagline": "Flexible hierarchy for any Christian denomination",
         "hierarchy_labels": DEFAULT_LEVEL_LABELS,
         "seed_config": DEFAULT_SEED_CONFIG,
-        "allow_public_registration": True,
+        "allow_public_registration": False,
     },
 ]

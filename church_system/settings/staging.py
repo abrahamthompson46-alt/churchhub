@@ -10,6 +10,8 @@ from church_system.settings.base import (
     CSRF_TRUSTED_ORIGINS,
     DATABASES,
     DEBUG,
+    HEALTH_CHECK_TOKEN,
+    MFA_ENCRYPTION_KEY,
     REDIS_URL,
     SECRET_KEY,
     _INSECURE_SECRET,
@@ -51,6 +53,10 @@ validate_production_environment(
     require_redis=os.environ.get("CHURCHHUB_REQUIRE_REDIS", "true").lower()
     in ("true", "1", "yes"),
     allow_mysql=True,
+    health_check_token=HEALTH_CHECK_TOKEN,
+    require_health_token=not DEBUG,
+    mfa_encryption_key=MFA_ENCRYPTION_KEY,
+    require_mfa_encryption_key=not DEBUG,
 )
 
 REQUIRE_REDIS = os.environ.get("CHURCHHUB_REQUIRE_REDIS", "true").lower() in (

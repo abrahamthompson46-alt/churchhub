@@ -24,9 +24,9 @@
 | App | Migrations (ordered) |
 |-----|----------------------|
 | **accounts** | `0001_initial` → … → `0019_system_settings_activity_action` → `0020_session_epoch_password_history` |
-| **members** (10) | `0001_initial` → … → `0009_alter_member_date_of_birth` → `0010_member_birthday_privacy` → `0011_birthday_photo_consent_default` |
+| **members** (10) | `0001_initial` → … → `0009_alter_member_date_of_birth` → `0010_member_birthday_privacy` → `0011_birthday_photo_consent_default` → `0012_clear_birthday_photo_consent` |
 | **transactions** (17) | `0001_initial` → `0002_financialperiod` → `0003_…void…` → `0004_ledger_category` → `0005_remittance_accounts_and_fund` → `0006_fix_welfare_fund_account_type` → `0007_payroll` → `0008_alter_account_account_type_and_more` → `0009_financialidempotencykey` → `0010_workingday` → `0011_welfare_enterprise` → `0012_budget_enterprise` → `0013_transactions_enterprise` → `0014_transaction_reference_per_church` → `0015_ledger_idempotency_action` → `0016_payroll_idempotency_actions` → `0017_account_code_and_active` |
-| **sitecontrol** (10) | `0001_initial` → `0002_platform_control_room` → `0003_tenant_registration` → `0004_…assets…` → `0005_denomination_saas` → `0006_denomination_phases` → `0007_rename_…idx` → `0008_control_tower_enterprise` → `0009_billing_provisioning` → `0010_login_highlights` |
+| **sitecontrol** (10) | `0001_initial` → … → `0026_denomination_system_settings` → `0027_close_non_demo_public_registration` |
 | **remittance** (3) | `0001_initial` → `0002_rename_…idx` → `0003_welfare_enterprise` |
 | **payroll** (3) | `0001_payroll` → `0002_payrollrun_budget_warning_and_more` → `0003_payroll_enterprise` |
 | **assets** (3) | `0001_initial` → `0002_seed_category_templates` → `0003_assets_enterprise` |

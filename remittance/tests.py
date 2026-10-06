@@ -161,8 +161,8 @@ class RemittancePolicyTests(TestCase):
         batch.refresh_from_db()
         self.assertEqual(batch.status, "POSTED")
 
-    def test_district_settlement_post_refused_without_gl(self):
-        """District+ batches must not become POSTED without a ledger journal."""
+    def test_district_settlement_posts_on_child_church_coa(self):
+        """District→conference posting writes church-scoped clearing journals."""
         txn = record_receipt(
             church=self.church,
             created_by=self.treasurer,
@@ -193,14 +193,45 @@ class RemittancePolicyTests(TestCase):
         self.assertEqual(district_batch.status, "DRAFT")
         self.assertGreater(district_batch.gross_received, Decimal("0.00"))
 
-        with self.assertRaises(RemittancePolicyError) as ctx:
-            post_settlement_batch(district_batch, self.treasurer)
-        self.assertIn("not yet implemented", str(ctx.exception).lower())
+        posted = post_settlement_batch(district_batch, self.pastor)
+        self.assertEqual(posted.status, "POSTED")
+        self.assertTrue(posted.lines.exists())
+        line = posted.lines.select_related("source_transaction").first()
+        trx = line.source_transaction
+        self.assertEqual(trx.church_id, self.church.pk)
+        self.assertEqual(trx.approval_status, "APPROVED")
+        validate_transaction_balance(trx)
+        debit = trx.lines.get(amount__gt=0)
+        credit = trx.lines.get(amount__lt=0)
+        self.assertEqual(debit.account.code, "DISTRICT_TITHE_REMIT")
+        self.assertEqual(credit.account.code, "CONF_TITHE_REMIT")
 
-        district_batch.refresh_from_db()
-        self.assertEqual(district_batch.status, "DRAFT")
-        self.assertIsNone(district_batch.posted_at)
-        self.assertFalse(district_batch.lines.exists())
+    def test_union_settlement_post_still_refused(self):
+        """Union/GC batches stay DRAFT until those clearing postings exist."""
+        from organization.models import GeneralConference, Union
+        from remittance.models import SettlementBatch
+
+        gc = GeneralConference.objects.create(name="Test GC", code="TGC")
+        union = Union.objects.create(name="Test Union", code="TU", general_conference=gc)
+        batch = SettlementBatch.objects.create(
+            offering_type="TITHE",
+            from_unit_type="UNION",
+            from_unit_id=union.pk,
+            to_unit_type="GENERAL_CONFERENCE",
+            to_unit_id=gc.pk,
+            period_start=timezone.now().date().replace(day=1),
+            period_end=timezone.now().date(),
+            gross_received=Decimal("10.00"),
+            retain_amount=Decimal("0.00"),
+            remit_amount=Decimal("10.00"),
+            status="DRAFT",
+            created_by=self.treasurer,
+        )
+        with self.assertRaises(RemittancePolicyError) as ctx:
+            post_settlement_batch(batch, self.pastor)
+        self.assertIn("not yet implemented", str(ctx.exception).lower())
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, "DRAFT")
 
     def test_hierarchy_settlement_policies_seeded(self):
         created = ensure_hierarchy_settlement_policies(self.church)

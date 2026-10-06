@@ -5,7 +5,42 @@
 
 {% block content %}
 <div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Treasury" page_title="Remittance desk" page_description="Live remittance payable for the working-day month. The dashboard KPI uses the same figure. Recording a payment posts a journal that still needs approval." %}
+    {% include "includes/page_header.html" with page_subtitle="Treasury" page_title="Remittance desk" page_description="Follow these steps in order. Live remittance payable matches the dashboard KPI. Recording a payment posts a journal that still needs a different user to approve." %}
+
+    {% if desk %}
+    <ol class="list-group list-group-numbered mb-4">
+        <li class="list-group-item {% if not desk.working_day_open %}list-group-item-warning{% endif %}">
+            <strong>Open the working day</strong>
+            {% if desk.working_day_open %}
+            <span class="text-muted"> — open for {{ desk.as_of|date:"j M Y" }}.</span>
+            {% else %}
+            <span class="d-block small mt-1">Posting is blocked until a working day is open.
+            {% if desk.can_open_working_day %}
+            <a href="{% url 'transactions:period_list' %}">Open working day</a>
+            {% endif %}
+            </span>
+            {% endif %}
+        </li>
+        <li class="list-group-item">
+            <strong>Confirm amounts due</strong>
+            <span class="text-muted"> — tithe and combined payable for {{ desk.period_label }}. Optional snapshot archives the totals; viewing does not overwrite them.</span>
+        </li>
+        <li class="list-group-item">
+            <strong>Optional: post settlement</strong>
+            <span class="text-muted"> — moves liability to district clearing. It does not send cash.</span>
+            {% if desk.settlement_url %}
+            <a class="d-block small mt-1" href="{{ desk.settlement_url }}">Settlement desk</a>
+            {% endif %}
+        </li>
+        <li class="list-group-item {% if desk.pending_payment %}list-group-item-info{% elif desk.status == 'outstanding' or desk.status == 'incomplete' %}list-group-item-warning{% endif %}">
+            <strong>Record the bank remittance, then approve</strong>
+            <span class="text-muted"> — cash leaves the church. A checker (not the maker) approves the journal.</span>
+            {% if desk.pending_payment %}
+            <a class="d-block small mt-1" href="{{ desk.approvals_url }}">Open pending approvals</a>
+            {% endif %}
+        </li>
+    </ol>
+    {% endif %}
 
     {% if desk %}
     <p class="text-muted small mb-3">
@@ -81,6 +116,14 @@
             {% if desk.status == "incomplete" %}
             <div class="alert alert-warning mt-3 mb-0">
                 This month was marked remitted, but <strong>{{ remaining|floatformat:money_decimal_places|intcomma }}</strong> is still on the books. You can record another district remittance for the remainder.
+            </div>
+            {% endif %}
+            {% if not desk.working_day_open %}
+            <div class="alert alert-warning mt-3 mb-0">
+                Open the working day before recording a district remittance.
+                {% if desk.can_open_working_day %}
+                <a href="{% url 'transactions:period_list' %}">Open working day</a>
+                {% endif %}
             </div>
             {% endif %}
             {% if can_remit %}

@@ -497,6 +497,34 @@ class ViewTests(DashboardTestMixin, TestCase):
         session.save()
         response = self.client.get(reverse("dashboard:cutoff"))
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Open the working day")
+        self.assertContains(response, "Record the bank remittance")
+
+    def test_work_inbox_for_treasury(self):
+        self._login("treasury")
+        response = self.client.get(reverse("dashboard:work_inbox"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Work inbox")
+        self.assertContains(response, "Do next")
+
+    def test_work_inbox_forbidden_for_member(self):
+        member = User.objects.create_user(
+            username="inbox_member",
+            password="pass12345",
+            role=UserRole.MEMBER,
+            church=self.church,
+        )
+        self._login("inbox_member")
+        response = self.client.get(reverse("dashboard:work_inbox"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_home_shows_do_next_and_skip_link(self):
+        self._login("treasury")
+        response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Do next")
+        self.assertContains(response, "Skip to content")
+        self.assertContains(response, 'id="main-content"')
 
     def test_cutoff_shows_live_payable_when_snapshot_is_stale(self):
         from django.utils import timezone as tz

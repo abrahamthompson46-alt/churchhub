@@ -270,3 +270,12 @@ def purge_report_exports_task(self, days=None):
     removed = purge_old_export_files(days=retention)
     logger.info("Purged report export files: %s", removed)
     return {"removed": removed}
+
+
+@shared_task(bind=True, max_retries=1, default_retry_delay=300)
+def remind_visitor_follow_up_task(self, stale_days=14):
+    from members.notifications import remind_stale_visitor_follow_ups
+
+    stats = remind_stale_visitor_follow_ups(stale_days=stale_days)
+    logger.info("Visitor follow-up reminders: %s", stats)
+    return stats

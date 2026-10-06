@@ -245,7 +245,7 @@ class RecordForm(forms.ModelForm):
             "status",
         )
         widgets = {
-            "member": forms.HiddenInput(),
+            "member": forms.Select(attrs=_select()),
             "record_type": forms.Select(attrs=_select()),
             "title": forms.TextInput(attrs=_text()),
             "description": forms.Textarea(attrs={**_text(), "rows": 3}),
@@ -256,12 +256,13 @@ class RecordForm(forms.ModelForm):
             "status": forms.Select(attrs=_select()),
         }
 
-    def __init__(self, *args, church=None, member=None, **kwargs):
+    def __init__(self, *args, church=None, member=None, lock_record_type=None, **kwargs):
         super().__init__(*args, **kwargs)
         from .lookups import LookupCategory, apply_lookup_choices
 
         apply_lookup_choices(self.fields["record_type"], LookupCategory.RECORD_TYPE)
         apply_lookup_choices(self.fields["status"], LookupCategory.RECORD_STATUS)
+        self.fields["member"].required = True
         if church:
             self.fields["member"].queryset = Member.objects.filter(church=church).order_by(
                 "last_name", "first_name"
@@ -269,6 +270,10 @@ class RecordForm(forms.ModelForm):
         if member:
             self.fields["member"].initial = member.pk
             self.fields["member"].queryset = Member.objects.filter(pk=member.pk)
+            self.fields["member"].widget = forms.HiddenInput()
+        if lock_record_type:
+            self.fields["record_type"].initial = lock_record_type
+            self.fields["record_type"].widget = forms.HiddenInput()
 
 
 class MemberTransferForm(forms.ModelForm):

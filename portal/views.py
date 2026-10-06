@@ -675,6 +675,47 @@ def welfare_case_detail(request, pk):
 
 
 @login_required
+def my_giving(request):
+    member, denied = _portal_member_or_redirect(request)
+    if denied:
+        return denied
+    if getattr(request.user, "must_change_password", False):
+        return redirect("portal:password_change")
+    if not member:
+        flash_info(request, "Link your account to a member profile to view your giving statement.")
+        return redirect("portal:home")
+
+    from django.core.exceptions import PermissionDenied
+
+    from giving.services import can_view_member_giving, member_giving_lines, member_giving_summary
+
+    if not can_view_member_giving(request.user, member):
+        raise PermissionDenied
+
+    year = timezone.localdate().year
+    year_param = request.GET.get("year")
+    if year_param:
+        try:
+            year = int(year_param)
+        except (TypeError, ValueError):
+            pass
+
+    return render(
+        request,
+        "portal/giving.html",
+        {
+            "member": member,
+            "giving_summary": member_giving_summary(member, year=year),
+            "giving_lines": list(member_giving_lines(member, year=year)),
+            "giving_year": year,
+            "giving_year_choices": list(
+                range(timezone.localdate().year, timezone.localdate().year - 6, -1)
+            ),
+        },
+    )
+
+
+@login_required
 def my_contributions(request):
     member, denied = _portal_member_or_redirect(request)
     if denied:

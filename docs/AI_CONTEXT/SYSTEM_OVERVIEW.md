@@ -100,7 +100,7 @@ Defined in `church_system/urls.py`:
 | `/apply/` | Public tenant application |
 | `/contact/` | Public marketing inquiry |
 | `/admin/` | Django admin |
-| `/dashboard/` | `dashboard` |
+| `/dashboard/` | `dashboard` (home, work inbox, notifications, remittance desk) |
 | `/members/` | `members` |
 | `/organization/` | `organization` |
 | `/transactions/` | `transactions` |

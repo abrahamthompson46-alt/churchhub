@@ -118,7 +118,7 @@ Management: `export_member_data`.
 | `member_export` | Per-member JSON download |
 | Record / department / family CRUD | Supporting entities |
 | `transfer_*` | Transfer list/create/detail (+ complete/reject) |
-| `baptism_register` | Baptism list/export |
+| `baptism_register` | Baptism list/export; **Add baptism** when `manage_member_records` or `manage_baptisms` |
 | Leadership / spiritual gift views | Roles and gifts |
 | `configuration_hub` / `occupation_*` / `member_lookup_*` | Administration → Configuration (occupations + form lists) |
 
@@ -205,7 +205,7 @@ stateDiagram-v2
 | Complete | Pending only; process permission; end leadership at from-church; TRANSFER records both sides; move church; set Active |
 | Reject | Pending → Rejected |
 
-Baptism record add may backfill empty member baptism fields.
+Record add from **Baptism Register** (`?record_type=Baptism`) locks type to Baptism, shows a church-scoped member picker, and uses `manage_member_records` **or** `manage_baptisms`. From a member profile (`?member=`), the member field stays hidden. Saving a baptism still backfills empty member baptism fields.
 
 ---
 

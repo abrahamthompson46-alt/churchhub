@@ -909,6 +909,19 @@ if env_flag(
                 "expires": 7200,
             },
         },
+        "remind-visitor-follow-up-daily": {
+            "task": (
+                "church_system.tasks."
+                "remind_visitor_follow_up_task"
+            ),
+            "schedule": crontab(
+                hour=7,
+                minute=0,
+            ),
+            "options": {
+                "expires": 3600,
+            },
+        },
     }
 
 

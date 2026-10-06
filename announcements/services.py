@@ -308,6 +308,13 @@ def create_announcement(
         )
         if auto_approve:
             _log_audit(ann, "APPROVE", user, details={"auto": True})
+    if not auto_approve:
+        try:
+            from announcements.notifications import notify_announcement_pending
+
+            notify_announcement_pending(ann)
+        except Exception:
+            pass
     return ann
 
 
@@ -470,6 +477,12 @@ def approve_announcement(announcement, user):
         announcement.status = Announcement.STATUS_APPROVED
         repo.save_announcement(announcement)
         _log_audit(announcement, "APPROVE", user, details={"title": announcement.title})
+    try:
+        from announcements.notifications import notify_announcement_outcome
+
+        notify_announcement_outcome(announcement, approved=True, actor=user)
+    except Exception:
+        pass
     return announcement
 
 
@@ -503,6 +516,14 @@ def reject_announcement(announcement, user, reason=""):
             user,
             details={"title": title, "reason": reason},
         )
+    try:
+        from announcements.notifications import notify_announcement_outcome
+
+        notify_announcement_outcome(
+            announcement, approved=False, actor=user, reason=reason
+        )
+    except Exception:
+        pass
     return creator, title, announcement
 
 

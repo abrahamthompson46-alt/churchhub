@@ -656,6 +656,12 @@ def post_ledger_entry(church, user, draft, idempotency_key=None):
 
     if idem_record:
         complete_financial_idempotency(idem_record, trx)
+    try:
+        from transactions.services import _notify_pending_journal
+
+        _notify_pending_journal(trx)
+    except Exception:
+        pass
     return trx
 
 

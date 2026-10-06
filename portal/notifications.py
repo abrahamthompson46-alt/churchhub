@@ -57,5 +57,6 @@ def notify_pastoral_team_new_submission(submission):
         f"{who} shared a {kind_label.lower()} via the member portal.",
         category="INFO",
         action_url=url,
+        event_key=f"portal.submission.{submission.pk}",
     )
     return recipients

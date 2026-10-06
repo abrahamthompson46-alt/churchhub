@@ -13,6 +13,8 @@ from permissions.checks import (
     can_manage_finances,
     can_manage_members,
     can_manage_receipts,
+    can_manage_member_records,
+    can_manage_baptisms,
     can_run_cutoff,
     can_view_members,
     can_view_meetings,
@@ -484,6 +486,62 @@ def get_dashboard_coaching_hints(context):
             "url_name": "dashboard:home",
         })
     return hints[:3]
+
+
+def get_do_next_steps(request, dashboard_role, action_queue):
+    """Role-ordered next jobs: pending queue first, then the idle next duty."""
+    steps = []
+    seen = set()
+    for item in action_queue or []:
+        key = item.get("kind") or item.get("title")
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        steps.append({
+            "label": item.get("title") or "",
+            "detail": item.get("subtitle") or "",
+            "count": item.get("count") or 0,
+            "url_name": item.get("url_name") or "",
+            "url_suffix": item.get("url_suffix") or "",
+            "priority": item.get("priority") or "medium",
+        })
+        if len(steps) >= 4:
+            return steps
+
+    user = request.user
+    church = get_active_church(request)
+
+    def _idle(label, detail, url_name, url_suffix=""):
+        if url_name in seen:
+            return
+        seen.add(url_name)
+        steps.append({
+            "label": label,
+            "detail": detail,
+            "count": 0,
+            "url_name": url_name,
+            "url_suffix": url_suffix,
+            "priority": "low",
+        })
+
+    if dashboard_role in ("treasury", "finance", "district_treasury"):
+        if church and can_manage_receipts(user):
+            _idle("Record a receipt", "Tithe and combined offerings start remittance payable.", "transactions:record_receipt")
+        if can_manage_finances(user) or can_run_cutoff(user):
+            _idle("Remittance desk", "Confirm due amounts, settle if needed, then pay district.", "dashboard:cutoff")
+    elif dashboard_role in ("secretary",):
+        if can_view_members(user) or can_manage_members(user):
+            _idle("Visitors", "Record visits, then convert when they join.", "members:visitor_list")
+        if can_manage_member_records(user) or can_manage_baptisms(user):
+            _idle("Baptism register", "Add a baptism from the register for the member.", "members:baptism_register")
+        if can_view_meetings(user):
+            _idle("Attendance", "Mark Sabbath worship attendance.", "meetings:attendance_list")
+    elif dashboard_role in ("leadership", "admin", "overseer", "district_overseer"):
+        _idle("Work inbox", "Journals, minutes, announcements, and welfare in one list.", "dashboard:work_inbox")
+        if can_view_members(user):
+            _idle("Member directory", "Review membership for your church.", "members:list")
+
+    return steps[:4]
 
 
 def get_portal_staff_alerts(request):

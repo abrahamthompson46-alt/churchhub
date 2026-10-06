@@ -6,6 +6,12 @@
 {% include "includes/form_open.html" with form_subtitle="Members" form_title=title wide=True %}
 <form method="post" novalidate>
     {% csrf_token %}
+    {% if member %}
+    <p class="text-muted mb-3">Member: <strong>{{ member.full_name }}</strong></p>
+    {% endif %}
+    {% if lock_record_type %}
+    <p class="small text-muted mb-3">This entry is saved on the baptism register.</p>
+    {% endif %}
     <div class="row g-3">
         {% for field in form %}
         <div class="col-md-6{% if 'notes' in field.name or 'description' in field.name or field.field.widget.input_type == 'textarea' %} col-12{% endif %}">

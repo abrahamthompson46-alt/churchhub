@@ -81,6 +81,13 @@
                 hideDropdown(toggle);
             });
         });
+
+        document.addEventListener('keydown', function (evt) {
+            if (evt.key !== 'Escape') return;
+            document.querySelectorAll('.hover-dropdown [data-bs-toggle="dropdown"]').forEach(function (toggle) {
+                hideDropdown(toggle);
+            });
+        });
     }
 
     function initFlashMessages() {

@@ -18,6 +18,7 @@ from permissions.checks import (
     can_manage_remittance_policy,
     can_manage_settlements,
     can_manage_welfare_cases,
+    can_post_settlements,
     can_view_remittance,
     can_view_welfare,
 )
@@ -402,6 +403,7 @@ def settlement_list(request):
         }
         for batch in batches
     ]
+    show_post_actions = can_create_church or any(row["can_post"] for row in batch_rows)
 
     return render(request, "remittance/settlements.html", {
         "batches": batches,
@@ -411,6 +413,7 @@ def settlement_list(request):
         "show_incoming": request.GET.get("incoming") == "1" or bool(incoming_rows),
         "active_church": church,
         "can_edit": can_create_church,
+        "show_post_actions": show_post_actions,
         "can_hierarchy_edit": can_create_hierarchy,
         "draft_form": draft_form,
         "hierarchy_draft_form": hierarchy_draft_form,
@@ -453,6 +456,10 @@ def _batch_can_post(user, batch, church):
         if not can_manage_finances(user) or not church:
             return False
         return str(batch.from_unit_id) == str(church.pk)
+    if batch.from_unit_type == "DISTRICT" and batch.to_unit_type == "CONFERENCE":
+        if not can_post_settlements(user):
+            return False
+        return user_can_access_settlement_batch(user, batch, church=church)
     return False
 
 
@@ -473,8 +480,15 @@ def settlement_post(request, pk):
             if str(batch.from_unit_id) not in manageable:
                 raise PermissionDenied
             church = selectors.church_by_pk(batch.from_unit_id)
+    elif batch.from_unit_type == "DISTRICT":
+        if not can_post_settlements(request.user):
+            raise PermissionDenied
+        if not _batch_can_post(request.user, batch, church):
+            raise PermissionDenied
     else:
-        raise PermissionDenied("Only church settlement batches can be posted at this time.")
+        raise PermissionDenied(
+            "Union and General Conference settlement posting is not available yet."
+        )
     if request.method == "POST":
         try:
             post_settlement_batch(batch, request.user)

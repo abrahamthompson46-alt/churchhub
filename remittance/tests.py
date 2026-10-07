@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import UserRole
@@ -205,6 +206,47 @@ class RemittancePolicyTests(TestCase):
         credit = trx.lines.get(amount__lt=0)
         self.assertEqual(debit.account.code, "DISTRICT_TITHE_REMIT")
         self.assertEqual(credit.account.code, "CONF_TITHE_REMIT")
+
+    def test_district_settlement_post_view_allowed(self):
+        from remittance.views import _batch_can_post
+
+        txn = record_receipt(
+            church=self.church,
+            created_by=self.treasurer,
+            tithe_amount=Decimal("100.00"),
+        )
+        approve_transaction(txn, self.pastor)
+        today = timezone.now().date()
+        church_batch = create_settlement_draft(
+            from_unit_type="CHURCH",
+            from_unit_id=self.church.pk,
+            offering_type="TITHE",
+            period_start=today.replace(day=1),
+            period_end=today,
+            user=self.treasurer,
+            church=self.church,
+        )
+        post_settlement_batch(church_batch, self.pastor)
+        ensure_hierarchy_settlement_policies(self.church)
+        district_batch = create_settlement_draft(
+            from_unit_type="DISTRICT",
+            from_unit_id=self.church.district.pk,
+            offering_type="TITHE",
+            period_start=today.replace(day=1),
+            period_end=today,
+            user=self.treasurer,
+        )
+        self.assertTrue(_batch_can_post(self.pastor, district_batch, self.church))
+        self.client.login(username="pastor", password="pass12345")
+        session = self.client.session
+        session["current_church_id"] = str(self.church.pk)
+        session.save()
+        response = self.client.post(
+            reverse("remittance:settlement_post", args=[district_batch.pk])
+        )
+        self.assertEqual(response.status_code, 302)
+        district_batch.refresh_from_db()
+        self.assertEqual(district_batch.status, "POSTED")
 
     def test_union_settlement_post_still_refused(self):
         """Union/GC batches stay DRAFT until those clearing postings exist."""

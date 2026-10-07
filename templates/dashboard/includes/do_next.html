@@ -16,7 +16,7 @@
         </li>
         {% endfor %}
     </ol>
-    {% if dashboard_role != "member" %}
+    {% if dashboard_role != "member" and not hide_inbox_link %}
     <p class="small mt-2 mb-0"><a href="{% url 'dashboard:work_inbox' %}">Open full work inbox</a></p>
     {% endif %}
 </section>

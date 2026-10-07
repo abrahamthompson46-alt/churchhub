@@ -127,12 +127,7 @@
             </div>
             {% endif %}
             {% if can_remit %}
-            <form method="post" action="{% url 'transactions:record_remittance' %}" class="mt-4">
-                {% csrf_token %}
-                <input type="hidden" name="month" value="{{ cutoff.month|date:'Y-m-d' }}">
-                <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
-                <button type="submit" class="btn btn-primary">Record district remittance ({{ remaining|floatformat:money_decimal_places|intcomma }})</button>
-            </form>
+            <a class="btn btn-primary mt-4" href="{% url 'transactions:record_remittance' %}?month={{ cutoff.month|date:'Y-m-d' }}">Record district remittance ({{ remaining|floatformat:money_decimal_places|intcomma }})</a>
             {% elif desk.pending_payment %}
             <p class="text-muted small mt-3 mb-0">A remittance journal is waiting for approval. Approve it, then return here if any balance remains.</p>
             {% elif remaining and remaining > 0 and not can_remit %}

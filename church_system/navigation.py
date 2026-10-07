@@ -262,7 +262,7 @@ def _finance_sections(user, active_church=None):
             remittance_items.append(
                 _item("Remittance desk", "dashboard:cutoff", "bi-calendar-check")
             )
-        if can_manage_settlements(user):
+        if can_view_remittance(user) or can_manage_settlements(user):
             remittance_items.append(
                 _item("Settlement Desk", "remittance:settlements", "bi-arrow-up-right-circle")
             )
@@ -913,6 +913,7 @@ def _tab_allowed(user, url_name, active_church=None):
             can_manage_finances(user)
             or can_manage_settlements(user)
             or can_manage_remittance_policy(user)
+            or can_view_remittance(user)
         ),
         "payroll:index": lambda: (
             (can_view_payroll(user) or can_manage_payroll(user))

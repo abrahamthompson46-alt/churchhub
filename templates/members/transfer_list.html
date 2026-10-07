@@ -3,7 +3,7 @@
 {% block title %}Transfers — ChurchHub{% endblock %}
 
 {% block content %}
-<div class="page-container">
+<div class="page-container page-shell">
     {% if can_transfer_members %}
     {% url 'members:transfer_create' as transfer_url %}
     {% include "includes/page_header.html" with page_subtitle="Members" page_title="Member Transfers" action_url=transfer_url action_label="Request Transfer" %}

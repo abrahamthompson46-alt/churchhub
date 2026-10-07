@@ -29,7 +29,7 @@
     <div class="form-text">
         Tithe {{ outstanding.tithe|floatformat:2|intcomma }}
         · Combined {{ outstanding.combined|floatformat:2|intcomma }}
-        {% if cutoff and cutoff.transferred %}· Cut-off marked remitted{% endif %}
+        {% if cutoff and cutoff.transferred and amount > 0 %}· Marked remitted — balance remaining{% elif cutoff and cutoff.transferred %}· Cut-off marked remitted{% endif %}
     </div>
     {% elif cutoff %}
     <div class="form-text">
@@ -45,10 +45,8 @@
     <input type="hidden" name="month" value="{{ month_date|date:'Y-m-d' }}">
     <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
     <div class="d-flex flex-wrap gap-2">
-        {% if amount > 0 and not cutoff.transferred %}
+        {% if amount > 0 %}
         <button type="submit" class="btn btn-primary">Record District Remittance</button>
-        {% elif cutoff.transferred %}
-        <button type="button" class="btn btn-secondary" disabled>Already remitted</button>
         {% else %}
         <button type="button" class="btn btn-secondary" disabled>No payable amount</button>
         {% endif %}

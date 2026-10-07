@@ -164,7 +164,7 @@ Services include `assert_working_day_allows_posting`, `assert_period_open`, open
 `MonthlyCutoff` per `(church, month)`:
 
 - Snapshot of remittance payable MTD (`total_tithe`, `total_combined`); `total_payable` = tithe + combined
-- The remittance desk (`dashboard:cutoff`) **displays live GL** for the **working-day month** (same figure as the dashboard remittance-payable KPI) and a numbered path: open working day → confirm due → optional settlement → bank remittance → checker approval. Recording payment from the desk requires an **open working day**. A stored snapshot is archival and is not used as the headline when it is stale.
+- The remittance desk (`dashboard:cutoff`) **displays live GL** for the **working-day month** (same figure as the dashboard remittance-payable KPI) and a numbered path: open working day → confirm due → optional settlement → **payment screen** (`transactions:record_remittance`) → checker approval. The desk CTA is a link to that screen, not a second POST. Recording payment requires an **open working day**. A stored snapshot is archival and is not used as the headline when it is stale. District→conference settlement drafts can be posted from the Settlement Desk; union/GC drafts remain review-only.
 - `transferred` is set on remittance **approval** only when outstanding payable + district clearing is zero. A transferred flag with remaining GL is treated as incomplete; another district remittance may be recorded.
 - Duplicate bank remittance is blocked while a **PENDING** remittance journal exists for that cutoff — not merely because a prior approved remittance exists.
 

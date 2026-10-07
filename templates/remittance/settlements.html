@@ -235,7 +235,7 @@
                         <th class="text-end">Retain</th>
                         <th class="text-end">Remit</th>
                         <th>Status</th>
-                        {% if can_edit %}<th></th>{% endif %}
+                        {% if show_post_actions %}<th></th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -250,11 +250,11 @@
                         <td class="text-end">{{ row.batch.remit_amount|floatformat:2 }}</td>
                         <td>
                             {{ row.batch.get_status_display }}
-                            {% if row.batch.status == "DRAFT" and row.batch.from_unit_type != "CHURCH" %}
-                            <span class="badge bg-secondary-subtle text-secondary ms-1" title="GL post not yet available">Review</span>
+                            {% if row.batch.status == "DRAFT" and row.batch.from_unit_type != "CHURCH" and row.batch.from_unit_type != "DISTRICT" %}
+                            <span class="badge bg-secondary-subtle text-secondary ms-1" title="Union and General Conference ledger posting is not available">Review only</span>
                             {% endif %}
                         </td>
-                        {% if can_edit %}
+                        {% if show_post_actions %}
                         <td class="text-end">
                             {% if row.can_post %}
                             <form method="post" action="{% url 'remittance:settlement_post' row.batch.pk %}" class="d-inline">
@@ -267,7 +267,9 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="{% if can_edit %}9{% else %}8{% endif %}" class="text-muted text-center py-4">No settlement batches in this view.</td>
+                        <td colspan="{% if show_post_actions %}9{% else %}8{% endif %}">
+                            {% include "includes/empty_state.html" with icon="bi-arrow-up-right-circle" message="No settlement batches in this view." compact=True %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

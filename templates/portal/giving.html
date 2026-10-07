@@ -48,7 +48,7 @@
                         <td class="text-end text-currency">{{ line.amount|floatformat:2|intcomma }}</td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="3" class="text-muted text-center py-4">No recorded giving this year.</td></tr>
+                    <tr><td colspan="3">{% include "includes/empty_state.html" with icon="bi-receipt" message="No approved receipts linked to your member profile for this year. Ask the church treasurer if a gift is missing." compact=True %}</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

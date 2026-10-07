@@ -183,7 +183,7 @@
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="6">No lines defined.</td></tr>
+                    <tr><td colspan="6">{% if can_manage_budgets %}{% include "includes/empty_state.html" with icon="bi-clipboard-data" message="No budget lines for this year and level." action_url=create_url action_label="Add Line" compact=True %}{% else %}{% include "includes/empty_state.html" with icon="bi-clipboard-data" message="No budget lines for this year and level." compact=True %}{% endif %}</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

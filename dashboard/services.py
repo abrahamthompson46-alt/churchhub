@@ -39,6 +39,7 @@ from permissions.checks import (
     can_view_meetings,
     can_view_members,
     can_view_pending_approvals,
+    can_view_remittance,
     can_view_transactions,
 )
 from permissions.scoping import get_manageable_churches
@@ -173,7 +174,11 @@ def get_remittance_desk(church, user=None):
 
     wd = get_working_day_status(church)
     working_day_open = bool(wd.get("is_open"))
-    can_settle = bool(user and can_manage_settlements(user) and church_has_feature(church, "remittance"))
+    can_settle = bool(
+        user
+        and church_has_feature(church, "remittance")
+        and (can_manage_settlements(user) or can_view_remittance(user))
+    )
     settlement_url = reverse("remittance:settlements") if can_settle else ""
     approvals_url = reverse("transactions:pending_approvals")
     can_open_day = bool(user and can_manage_working_day(user))
@@ -513,7 +518,7 @@ def get_quick_actions(user):
             _add(_item("Organization", "organization:hierarchy", "bi-diagram-3"))
             _add(_item("Roll-up Report", report_key="hierarchy_rollup", icon="bi-bar-chart-steps"))
         if can_run_cutoff(user) or can_view_dashboard_finance(user):
-            _add(_item("Cut-off", "dashboard:cutoff", "bi-calendar-check"))
+            _add(_item("Remittance desk", "dashboard:cutoff", "bi-calendar-check"))
     else:
         if can_manage_finances(user) or can_manage_ledger_entries(user):
             _add(_item("Journal Entry", "ledger:entry", "bi-journal-plus"))

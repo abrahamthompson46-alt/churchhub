@@ -38,6 +38,7 @@
             <a href="{% url 'portal:contributions' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-bullseye me-1"></i>Campaigns</a>
             {% endif %}
             <a href="{% url 'portal:thanksgiving_testimony' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-stars me-1"></i>Thanksgiving</a>
+            <a href="{% url 'portal:giving' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-receipt me-1"></i>Giving</a>
             <a href="{% url 'portal:profile' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-person me-1"></i>Profile</a>
             {% include "includes/logout_button.html" with extra_class="" button_class="btn btn-primary btn-sm" label="Sign out" %}
         </div>
@@ -149,8 +150,9 @@
 
         <div class="col-lg-8 portal-home__main">
             <section class="cc-panel mb-4">
-                <div class="cc-panel__header">
-                    <h2 class="cc-panel__title"><i class="bi bi-receipt"></i> Recent giving</h2>
+                <div class="cc-panel__header d-flex justify-content-between align-items-center">
+                    <h2 class="cc-panel__title mb-0"><i class="bi bi-receipt"></i> Recent giving</h2>
+                    <a href="{% url 'portal:giving' %}?year={{ giving_year }}" class="btn btn-link btn-sm">Full statement</a>
                 </div>
                 <div class="table-responsive table-in-card">
                     <table class="table table-sm mb-0 align-middle">

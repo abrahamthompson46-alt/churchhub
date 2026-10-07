@@ -342,6 +342,12 @@ def create_welfare_case(
         case=case,
         user=user,
     )
+    try:
+        from remittance.notifications import notify_welfare_case_submitted
+
+        notify_welfare_case_submitted(case)
+    except Exception:
+        pass
     return case
 
 
@@ -399,6 +405,12 @@ def approve_welfare_case(case, user, amount_approved=None):
     case.approved_by = user
     case.approved_at = timezone.now()
     repo.save_welfare_case(case)
+    try:
+        from remittance.notifications import notify_welfare_case_resolved
+
+        notify_welfare_case_resolved(case, approved=True)
+    except Exception:
+        pass
     return case
 
 
@@ -415,6 +427,12 @@ def reject_welfare_case(case, user, rejection_reason=""):
     case.approved_by = user
     case.approved_at = timezone.now()
     repo.save_welfare_case(case)
+    try:
+        from remittance.notifications import notify_welfare_case_resolved
+
+        notify_welfare_case_resolved(case, approved=False)
+    except Exception:
+        pass
     return case
 
 

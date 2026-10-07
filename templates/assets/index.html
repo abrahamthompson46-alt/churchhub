@@ -3,8 +3,8 @@
 {% block title %}Fixed Assets{% endblock %}
 
 {% block content %}
-<div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Fixed Asset Register" %}
+<div class="page-container page-shell">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Fixed Assets overview" page_description="Summary of the register. Open All Assets for the searchable list." %}
     <div class="row g-3 mb-4">
         <div class="col-md-3">
             <div class="card border-0 shadow-sm">
@@ -74,11 +74,7 @@
                 {% for alert in alerts %}
                 <tr>
                     <td><a href="{% url 'assets:asset_detail' alert.asset.pk %}">{{ alert.asset.asset_code }}</a></td>
-                    <td>
-                        
-                            {{ alert.type }}
-                        
-                    </td>
+                    <td>{{ alert.type }}</td>
                     <td>{{ alert.expiry }}</td>
                     <td>{{ alert.days_left }}</td>
                 </tr>

@@ -482,6 +482,25 @@ def auto_approve_receipt(transaction, user):
     return transaction
 
 
+def _notify_pending_journal(transaction):
+    """In-app checker notice for PENDING journals; no-op when already approved."""
+    try:
+        from transactions.notifications import notify_pending_journal
+
+        notify_pending_journal(transaction)
+    except Exception:
+        pass
+
+
+def _notify_journal_outcome(transaction, *, approved, actor=None):
+    try:
+        from transactions.notifications import notify_journal_outcome
+
+        notify_journal_outcome(transaction, approved=approved, actor=actor)
+    except Exception:
+        pass
+
+
 # ==========================================
 # RECORD RECEIPT (balanced double-entry)
 # ==========================================
@@ -575,6 +594,7 @@ def record_receipt(
     )
     if receipt_should_auto_approve(created_by, church, total_received):
         trx = auto_approve_receipt(trx, created_by)
+    _notify_pending_journal(trx)
     return trx
 
 
@@ -661,6 +681,7 @@ def record_expense(
         transaction=trx,
         details={"type": "EXPENSE", "amount": str(amount)},
     )
+    _notify_pending_journal(trx)
     return trx
 
 
@@ -725,6 +746,7 @@ def record_expense_by_category(
             "category": category.code,
         },
     )
+    _notify_pending_journal(trx)
     return trx
 
 
@@ -774,6 +796,7 @@ def record_transfer(
             "amount": str(amount),
         },
     )
+    _notify_pending_journal(trx)
     return trx
 
 
@@ -902,6 +925,7 @@ def record_district_remittance(
             transaction=trx,
             details={"amount": str(amount), "month": str(month_date)},
         )
+    _notify_pending_journal(trx)
     return trx
 
 
@@ -983,6 +1007,7 @@ def approve_transaction(transaction, user):
         )
     except Exception:
         pass
+    _notify_journal_outcome(locked, approved=True, actor=user)
     return locked
 
 
@@ -1042,6 +1067,7 @@ def reject_transaction(transaction, user, reason=""):
         transaction=transaction,
         details={"reference": transaction.reference, "reason": reason},
     )
+    _notify_journal_outcome(transaction, approved=False, actor=user)
     return transaction
 
 

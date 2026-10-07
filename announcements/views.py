@@ -48,14 +48,6 @@ from .services import (
 )
 
 
-def _notify_creator(user, title, message, action_url=""):
-    if not user:
-        return
-    from dashboard.services import notify_user
-
-    notify_user(user, title, message, category="INFO", action_url=action_url)
-
-
 def create_required(view_func):
     @login_required
     @permission_required("create_announcements")
@@ -261,13 +253,6 @@ def approve_announcement_view(request, pk):
     try:
         approve_announcement(announcement, request.user)
         flash_success(request, f'"{announcement.title}" approved and published.')
-        if announcement.created_by_id and announcement.created_by_id != request.user.id:
-            _notify_creator(
-                announcement.created_by,
-                "Announcement approved",
-                f'Your announcement "{announcement.title}" has been approved.',
-                f"/announcements/{announcement.pk}/",
-            )
     except (PermissionError, AnnouncementServiceError, ValueError) as exc:
         flash_exception(request, str(exc))
     return redirect("announcements:pending_approvals")
@@ -288,12 +273,6 @@ def reject_announcement_view(request, pk):
             announcement, request.user, reason=form.cleaned_data["reason"]
         )
         flash_success(request, f'"{title}" rejected.')
-        if creator and creator.id != request.user.id:
-            _notify_creator(
-                creator,
-                "Announcement rejected",
-                f'Your announcement "{title}" was not approved. Reason: {form.cleaned_data["reason"]}',
-            )
     except (PermissionError, AnnouncementServiceError, ValueError) as exc:
         flash_exception(request, str(exc))
     return redirect("announcements:pending_approvals")

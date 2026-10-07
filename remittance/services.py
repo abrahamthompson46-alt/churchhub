@@ -678,6 +678,123 @@ def user_can_edit_remittance_policy(user, policy, active_church=None):
     return False
 
 
+def _post_hierarchy_settlement(batch, user):
+    """
+    Post district→conference settlement on each child church CoA.
+
+    Debit from-level remittance clearing, credit to-level clearing using
+    ``get_remit_clearing_account``. Union / GC batches still refuse (no GC
+    clearing code). Journals stay church-scoped — this is not a second GL.
+    """
+    from ledger.services import seed_ledger_accounts
+    from transactions.account_codes import get_remit_clearing_account
+    from transactions.services import (
+        _log_audit,
+        approve_module_journal,
+        assert_period_open,
+        validate_transaction_balance,
+    )
+
+    pair = (batch.from_unit_type, batch.to_unit_type)
+    if pair != ("DISTRICT", "CONFERENCE"):
+        raise RemittancePolicyError(
+            "Ledger posting for union and general conference settlement batches "
+            "is not yet implemented. District-to-conference posting uses each "
+            "child church chart of accounts. The batch remains DRAFT."
+        )
+
+    children = list(selectors.posted_church_child_settlements(batch))
+    if not children:
+        raise RemittancePolicyError(
+            "No posted church settlements to roll up for this district period."
+        )
+
+    gross = batch.gross_received
+    remit = batch.remit_amount
+    if gross <= 0:
+        raise RemittancePolicyError("No settlement amount to post.")
+
+    allocated = Decimal("0.00")
+    church_children = children
+    posted_any = False
+    for index, child in enumerate(church_children):
+        if index == len(church_children) - 1:
+            share = _quantize(remit - allocated)
+        else:
+            share = _quantize(child.gross_received * remit / gross)
+            allocated += share
+        if share <= 0:
+            continue
+        church = selectors.church_by_pk(child.from_unit_id)
+        seed_ledger_accounts(church)
+        assert_period_open(church, batch.period_end)
+        trx = txn_repo.create_transaction(
+            transaction_type="TRANSFER",
+            church=church,
+            created_by=batch.created_by or user,
+            description=(
+                f"District settlement {batch.get_offering_type_display()} "
+                f"{batch.period_start} to {batch.period_end}"
+            ),
+            date=batch.period_end,
+        )
+        debit_account = get_remit_clearing_account(
+            church, batch.offering_type, unit_level="DISTRICT"
+        )
+        credit_account = get_remit_clearing_account(
+            church, batch.offering_type, unit_level="CONFERENCE"
+        )
+        if debit_account.pk == credit_account.pk:
+            raise RemittancePolicyError(
+                "District and conference remittance clearing accounts must differ."
+            )
+        fund = f"{batch.offering_type}_TRUST"
+        txn_repo.create_transaction_line(
+            transaction=trx,
+            account=debit_account,
+            amount=share,
+            fund=fund,
+        )
+        txn_repo.create_transaction_line(
+            transaction=trx,
+            account=credit_account,
+            amount=-share,
+            fund=fund,
+        )
+        validate_transaction_balance(trx)
+        trx = approve_module_journal(trx, user)
+        if trx.approval_status != "APPROVED":
+            raise RemittancePolicyError(
+                "Settlement journal requires approval by an officer other than "
+                "the batch creator before posting."
+            )
+        _log_audit(
+            church,
+            "CREATE",
+            user,
+            transaction=trx,
+            details={
+                "type": "SETTLEMENT",
+                "batch_id": str(batch.pk),
+                "offering_type": batch.offering_type,
+                "from_unit_type": batch.from_unit_type,
+                "to_unit_type": batch.to_unit_type,
+                "amount": str(share),
+                "child_batch_id": str(child.pk),
+            },
+        )
+        repo.create_settlement_line(
+            batch=batch,
+            source_transaction=trx,
+            amount=share,
+            notes=f"{church.name} district roll-up",
+        )
+        posted_any = True
+
+    if remit > 0 and not posted_any:
+        raise RemittancePolicyError("Could not allocate settlement amount to church journals.")
+
+
 @db_transaction.atomic
 def post_settlement_batch(batch, user):
     """Post settlement to the ledger and mark the batch as posted."""
@@ -771,12 +888,7 @@ def post_settlement_batch(batch, user):
     elif batch.gross_received <= 0:
         raise RemittancePolicyError("No settlement amount to post.")
     else:
-        # Higher-unit (district+) GL posting is not implemented. Never mark POSTED
-        # without a balanced journal — refuse until CoA/clearing for those units exists.
-        raise RemittancePolicyError(
-            "Ledger posting for district and higher settlement batches is not yet "
-            "implemented. The batch remains DRAFT until higher-unit GL posting is available."
-        )
+        _post_hierarchy_settlement(batch, user)
 
     batch.status = "POSTED"
     batch.posted_at = timezone.now()
@@ -787,6 +899,13 @@ def post_settlement_batch(batch, user):
             from remittance.notifications import notify_district_settlement_posted
 
             notify_district_settlement_posted(batch, church=church)
+        except Exception:
+            pass
+    elif batch.from_unit_type == "DISTRICT":
+        try:
+            from remittance.notifications import notify_hierarchy_settlement_posted
+
+            notify_hierarchy_settlement_posted(batch)
         except Exception:
             pass
     return batch

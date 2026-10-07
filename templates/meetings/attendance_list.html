@@ -3,7 +3,7 @@
 {% block title %}Attendance — ChurchHub{% endblock %}
 
 {% block content %}
-<div class="page-container">
+<div class="page-container page-shell">
     {% if can_manage_attendance %}
     {% url 'meetings:attendance_create' as event_url %}
     {% include "includes/page_header.html" with page_subtitle="Operations" page_title="Attendance Events" page_description="Worship and event roll call." action_url=event_url action_label="New Event" %}

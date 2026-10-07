@@ -5,6 +5,7 @@ from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
+from accounts.models import UserRole
 from accounts.permissions import can_manage_finances
 from announcements.services import pending_for_user
 from church_system.church_scope import get_active_church
@@ -14,6 +15,7 @@ from dashboard import selectors
 from dashboard.services import (
     _church_finance_as_of,
     build_home_context,
+    get_action_queue,
     get_quick_actions,
     get_remittance_desk,
 )
@@ -90,6 +92,24 @@ def teller_console_api(request):
 def home(request):
     context = build_home_context(request)
     return render(request, "dashboard/home.html", context)
+
+
+@login_required
+def work_inbox(request):
+    """Single list of pending journals, minutes, announcements, welfare, and gates."""
+    user = request.user
+    if getattr(user, "is_platform_user", False) or getattr(user, "role", None) == UserRole.MEMBER:
+        return HttpResponseForbidden("Staff inbox only.")
+    from dashboard.home_panels import get_do_next_steps
+    from dashboard.services import get_dashboard_role
+
+    queue = get_action_queue(request, user)
+    role = get_dashboard_role(user)
+    return render(request, "dashboard/inbox.html", {
+        "action_queue": queue,
+        "do_next_steps": get_do_next_steps(request, role, queue),
+        "dashboard_role": role,
+    })
 
 
 @login_required

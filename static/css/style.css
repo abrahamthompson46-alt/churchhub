@@ -4802,10 +4802,35 @@ main .page-container,
 .workspace-status-pill.is-open strong { color: var(--ch-success); }
 .workspace-status-pill.is-closed strong { color: var(--ch-warning); }
 .workspace-status-pill.is-unset strong { color: #64748b; }
-.workspace-status-pill__link {
-    font-size: 0.7rem;
+.workspace-status-pill__form {
+    display: inline-flex;
+    margin: 0;
+}
+
+.skip-link {
+    position: absolute;
+    left: 0.75rem;
+    top: -3.5rem;
+    z-index: 2000;
+    padding: 0.45rem 0.75rem;
+    background: var(--ch-navy);
+    color: #fff;
     font-weight: 600;
-    margin-left: 0.15rem;
+    text-decoration: none;
+}
+.skip-link:focus {
+    top: 0.75rem;
+    color: #fff;
+}
+
+@media (max-width: 767.98px) {
+    .workspace-status-bar__cash,
+    .workspace-status-bar__finance {
+        display: none;
+    }
+    .app-chrome-secondary .module-tabs--section {
+        display: none;
+    }
 }
 .workspace-status-pill--cash strong { font-variant-numeric: tabular-nums; }
 .workspace-status-pill--finance strong { font-variant-numeric: tabular-nums; }

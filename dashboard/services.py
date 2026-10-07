@@ -5,6 +5,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
+from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import UserRole
@@ -16,6 +17,7 @@ from permissions.checks import (
     can_approve_announcements,
     can_approve_minutes,
     can_approve_transactions,
+    can_approve_welfare,
     can_create_announcements,
     can_manage_expenses,
     can_manage_finances,
@@ -23,7 +25,10 @@ from permissions.checks import (
     can_manage_meetings,
     can_manage_members,
     can_manage_receipts,
+    can_manage_settlements,
     can_manage_users,
+    can_manage_working_day,
+    can_manage_welfare_cases,
     can_run_cutoff,
     can_transfer_members,
     can_view_all_churches,
@@ -34,6 +39,7 @@ from permissions.checks import (
     can_view_meetings,
     can_view_members,
     can_view_pending_approvals,
+    can_view_remittance,
     can_view_transactions,
 )
 from permissions.scoping import get_manageable_churches
@@ -163,6 +169,20 @@ def get_remittance_desk(church, user=None):
         total_combined=live_combined,
         transferred=False,
     )
+    from sitecontrol.services import church_has_feature
+    from transactions.services import get_working_day_status
+
+    wd = get_working_day_status(church)
+    working_day_open = bool(wd.get("is_open"))
+    can_settle = bool(
+        user
+        and church_has_feature(church, "remittance")
+        and (can_manage_settlements(user) or can_view_remittance(user))
+    )
+    settlement_url = reverse("remittance:settlements") if can_settle else ""
+    approvals_url = reverse("transactions:pending_approvals")
+    can_open_day = bool(user and can_manage_working_day(user))
+
     return {
         "as_of": as_of,
         "month_start": month_start,
@@ -179,7 +199,12 @@ def get_remittance_desk(church, user=None):
         "pending_payment": pending_payment,
         "status": status,
         "can_recompute": True,
-        "can_remit": can_record,
+        "can_remit": can_record and working_day_open,
+        "working_day_open": working_day_open,
+        "can_open_working_day": can_open_day,
+        "can_settle": can_settle,
+        "settlement_url": settlement_url,
+        "approvals_url": approvals_url,
         "idempotency_key": f"remit-{church.pk}-{month_start.strftime('%Y-%m')}-{uuid4().hex[:12]}",
     }
 
@@ -493,7 +518,7 @@ def get_quick_actions(user):
             _add(_item("Organization", "organization:hierarchy", "bi-diagram-3"))
             _add(_item("Roll-up Report", report_key="hierarchy_rollup", icon="bi-bar-chart-steps"))
         if can_run_cutoff(user) or can_view_dashboard_finance(user):
-            _add(_item("Cut-off", "dashboard:cutoff", "bi-calendar-check"))
+            _add(_item("Remittance desk", "dashboard:cutoff", "bi-calendar-check"))
     else:
         if can_manage_finances(user) or can_manage_ledger_entries(user):
             _add(_item("Journal Entry", "ledger:entry", "bi-journal-plus"))
@@ -977,6 +1002,24 @@ def get_action_queue(request, user):
                 icon="bi-arrow-left-right",
             )
 
+    if church_ids and (can_approve_welfare(user) or can_manage_welfare_cases(user)):
+        from remittance.models import WelfareAssistanceCase
+
+        welfare_pending = WelfareAssistanceCase.objects.filter(
+            church_id__in=church_ids,
+            status__in=("PENDING", "UNDER_REVIEW"),
+        ).count()
+        if welfare_pending:
+            _add(
+                "high",
+                "Welfare cases",
+                "Assistance cases awaiting review or approval",
+                kind="welfare_cases",
+                count=welfare_pending,
+                url_name="remittance:welfare",
+                icon="bi-heart-pulse",
+            )
+
     if church and can_manage_finances(user):
         from transactions.services import get_working_day_status
 
@@ -1013,6 +1056,8 @@ MY_ACTION_QUEUE_KINDS = frozenset({
     "church_assignment_missing",
     "member_transfers",
     "asset_approvals",
+    "welfare_cases",
+    "overdue_remittances",
 })
 
 
@@ -1673,6 +1718,9 @@ def build_home_context(request):
     else:
         context["member_role_extras"] = None
     context["dashboard_coaching"] = home_panels.get_dashboard_coaching_hints(context)
+    context["do_next_steps"] = home_panels.get_do_next_steps(
+        request, role, context.get("action_queue") or []
+    )
     context["portal_staff_alerts"] = home_panels.get_portal_staff_alerts(request)
     if role in ("member", "members"):
         context["member_portal_banner"] = home_panels.get_member_portal_banner(user)

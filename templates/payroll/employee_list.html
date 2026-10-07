@@ -3,16 +3,18 @@
 {% block title %}Employees — Payroll{% endblock %}
 
 {% block content %}
-<div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Payroll" page_title="Employees" page_description="Staff and stipend recipients at {{ active_church.name }}." %}
-    <div class="d-flex gap-2 mb-3">
-        {% if can_manage_payroll %}
-        <a href="{% url 'payroll:employee_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Add Employee</a>
-        {% endif %}
+<div class="page-container page-shell">
+    {% if can_manage_payroll %}
+    {% url 'payroll:employee_create' as create_url %}
+    {% include "includes/page_header.html" with page_subtitle="Payroll" page_title="Employees" page_description="Staff and stipend recipients at this church." action_url=create_url action_label="Add Employee" action_icon="bi-person-plus" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Payroll" page_title="Employees" page_description="Staff and stipend recipients at this church." %}
+    {% endif %}
+    <div class="mb-3">
         <a href="{% url 'payroll:index' %}" class="btn btn-outline-secondary btn-sm">Payroll Home</a>
     </div>
-    <div class="table-wrap table-wrap--center table-wrap--compact">
-        <div class="table-responsive table-in-card">
+    <div class="data-card">
+        <div class="table-responsive">
             <table class="table table-hover table-sm mb-0">
                 <thead>
                     <tr>
@@ -35,7 +37,7 @@
                         <td class="text-end"><a href="{% url 'payroll:employee_detail' emp.pk %}" class="btn btn-sm btn-outline-secondary">View</a></td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="6" class="text-muted text-center py-4">No employees registered.</td></tr>
+                    <tr><td colspan="6">{% include "includes/empty_state.html" with icon="bi-people" message="No employees registered." action_url=create_url action_label="Add Employee" compact=True %}</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

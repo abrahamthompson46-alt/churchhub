@@ -162,15 +162,6 @@ def approve_transaction_view(request, pk):
         outcome = record_approval(transaction, request.user)
         flash_success(request, outcome.message)
         transaction = outcome.transaction
-        if outcome.posted and transaction.created_by_id and transaction.created_by_id != request.user.id:
-            from dashboard.services import notify_user
-            notify_user(
-                transaction.created_by,
-                title="Transaction Approved",
-                message=f"{transaction.reference} has been approved.",
-                category="FINANCE",
-                action_url=f"/transactions/transactions/{transaction.pk}/",
-            )
     except ValueError as exc:
         flash_exception(request, str(exc))
     return redirect("transactions:pending_approvals")
@@ -187,16 +178,6 @@ def reject_transaction_view(request, pk):
     try:
         record_rejection(transaction, request.user)
         flash_success(request, f"{transaction.reference} rejected.")
-        if transaction.created_by_id and transaction.created_by_id != request.user.id:
-            from dashboard.services import notify_user
-
-            notify_user(
-                transaction.created_by,
-                title="Transaction Rejected",
-                message=f"{transaction.reference} was rejected.",
-                category="FINANCE",
-                action_url=f"/transactions/transactions/{transaction.pk}/",
-            )
     except ValueError as exc:
         flash_exception(request, str(exc))
     return redirect("transactions:pending_approvals")
@@ -211,7 +192,6 @@ def bulk_approve(request):
     qs = selectors.pending_transactions_by_ids_qs(request, ids)
     count = 0
     skipped = 0
-    notified = set()
     for txn in qs:
         try:
             if not actor_may_decide(request.user, txn):
@@ -222,22 +202,8 @@ def bulk_approve(request):
                 skipped += 1
                 continue
             count += 1
-            if txn.created_by_id and txn.created_by_id != request.user.id:
-                notified.add(txn.created_by_id)
         except (ValueError, PermissionDenied):
             skipped += 1
-    if notified:
-        from accounts.models import User
-        from dashboard.services import notify_users
-
-        creators = User.objects.filter(pk__in=notified, is_active=True)
-        notify_users(
-            creators,
-            "Transactions approved",
-            f"{count} transaction(s) you submitted were approved in a bulk review.",
-            category="FINANCE",
-            action_url="/transactions/pending/",
-        )
     if skipped:
         flash_warning(request, f"{skipped} transaction(s) could not be approved.")
     flash_success(request, f"{count} transaction(s) approved.")

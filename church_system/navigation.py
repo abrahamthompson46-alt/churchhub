@@ -258,7 +258,11 @@ def _finance_sections(user, active_church=None):
         remittance_items = []
         if can_manage_remittance_policy(user) and _church_feature(active_church, "remittance", user):
             remittance_items.append(_item("Remittance Policies", "remittance:index", "bi-percent"))
-        if can_manage_settlements(user):
+        if can_run_cutoff(user) or can_manage_finances(user) or can_view_dashboard_finance(user):
+            remittance_items.append(
+                _item("Remittance desk", "dashboard:cutoff", "bi-calendar-check")
+            )
+        if can_view_remittance(user) or can_manage_settlements(user):
             remittance_items.append(
                 _item("Settlement Desk", "remittance:settlements", "bi-arrow-up-right-circle")
             )
@@ -428,8 +432,9 @@ def get_main_navigation(user, active_church=None):
 
     nav = []
     home_items = [_item("Overview", "dashboard:home", "bi-speedometer2")]
+    home_items.append(_item("Work inbox", "dashboard:work_inbox", "bi-inbox"))
     if can_run_cutoff(user) or can_view_dashboard_finance(user):
-        home_items.append(_item("Monthly Cut-off", "dashboard:cutoff", "bi-calendar-check"))
+        home_items.append(_item("Remittance desk", "dashboard:cutoff", "bi-calendar-check"))
     if can_view_enterprise_controls(user):
         home_items.append(_item("Enterprise controls", "audit:controls_home", "bi-shield-check"))
     if can_view_risk_alerts(user):
@@ -649,6 +654,7 @@ def resolve_module_key(namespace, current_view=""):
     if current_view in (
         "transactions:period_list",
         "dashboard:cutoff",
+        "dashboard:work_inbox",
         "members:configuration",
         "members:occupation_list",
         "members:occupation_add",
@@ -660,7 +666,7 @@ def resolve_module_key(namespace, current_view=""):
         "permissions:index",
         "permissions:audit_log",
     ):
-        if current_view == "dashboard:cutoff":
+        if current_view in ("dashboard:cutoff", "dashboard:work_inbox"):
             return "home"
         return "settings"
     if current_view == "dashboard:home":
@@ -831,7 +837,9 @@ def get_page_eyebrow(module_key, module_tabs, current_view="", report_key=""):
         return None
     section = MODULE_LABELS.get(module_key, module_key.replace("_", " ").title())
     if module_key == "home" and current_view == "dashboard:cutoff":
-        return {"section": "Dashboard", "page": "Monthly Cut-off"}
+        return {"section": "Dashboard", "page": "Remittance desk"}
+    if module_key == "home" and current_view == "dashboard:work_inbox":
+        return {"section": "Dashboard", "page": "Work inbox"}
     page = None
     for tab in module_tabs or []:
         if tab.get("report_key") and report_key and tab["report_key"] == report_key:
@@ -857,6 +865,7 @@ def _tab_allowed(user, url_name, active_church=None):
     """Return True if the module tab URL is allowed for this user."""
     checkers = {
         "dashboard:home": lambda: True,
+        "dashboard:work_inbox": lambda: True,
         "dashboard:cutoff": lambda: can_run_cutoff(user) or can_view_dashboard_finance(user),
         "members:configuration": lambda: (
             can_manage_member_configuration(user)
@@ -904,6 +913,7 @@ def _tab_allowed(user, url_name, active_church=None):
             can_manage_finances(user)
             or can_manage_settlements(user)
             or can_manage_remittance_policy(user)
+            or can_view_remittance(user)
         ),
         "payroll:index": lambda: (
             (can_view_payroll(user) or can_manage_payroll(user))

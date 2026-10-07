@@ -33,8 +33,10 @@ from members.access import (
 from permissions.checks import (
     can_add_members,
     can_edit_members,
+    can_manage_baptisms,
     can_manage_member_configuration,
     can_manage_member_lookups,
+    can_manage_member_records,
     can_manage_members,
     can_manage_occupations,
     can_view_members,
@@ -421,19 +423,39 @@ def record_list(request):
     })
 
 
+def _locked_record_type(request):
+    raw = (request.POST.get("record_type") or request.GET.get("record_type") or "").strip()
+    if raw == RecordType.BAPTISM:
+        return RecordType.BAPTISM
+    return ""
+
+
 @login_required
 def record_add(request):
-    require_manage_records(request)
     church = require_church(request)
-    member_id = request.GET.get("member")
+    lock_type = _locked_record_type(request)
+    if lock_type == RecordType.BAPTISM:
+        if not (
+            can_manage_member_records(request.user) or can_manage_baptisms(request.user)
+        ):
+            raise PermissionDenied
+    else:
+        require_manage_records(request)
     member = None
-    if member_id:
-        member = selectors.member_pk_for_request(request, member_id)
-    form = RecordForm(request.POST or None, church=church, member=member)
+    if request.GET.get("member"):
+        member = selectors.member_pk_for_request(request, request.GET.get("member"))
+    form = RecordForm(
+        request.POST or None,
+        church=church,
+        member=member,
+        lock_record_type=lock_type or None,
+    )
     if request.method == "POST" and form.is_valid():
         record = form.save(commit=False)
         record.church = church
         record.created_by = request.user
+        if lock_type:
+            record.record_type = lock_type
         save_record(record=record, user=request.user, is_new=True)
         if record.record_type == RecordType.BAPTISM and record.member_id:
             updates = {}
@@ -447,10 +469,12 @@ def record_add(request):
                 update_member(record.member, performed_by=request.user, **updates)
         flash_success(request, "Record saved.")
         return redirect("members:record_detail", pk=record.pk)
+    title = "Add baptism" if lock_type == RecordType.BAPTISM else "Add Record"
     return render(request, "members/record_form.html", {
         "form": form,
-        "title": "Add Record",
+        "title": title,
         "member": member,
+        "lock_record_type": lock_type,
     })
 
 
@@ -759,12 +783,18 @@ def baptism_register(request):
 
     paginator = Paginator(records_qs, 50)
     records = paginator.get_page(request.GET.get("page"))
+    can_add_baptism = can_manage_member_records(request.user) or can_manage_baptisms(
+        request.user
+    )
+    add_url = reverse("members:record_add") + f"?record_type={RecordType.BAPTISM}"
     return render(request, "members/baptism_register.html", {
         "records": records,
         "page_obj": records,
         "filter_form": filter_form,
         "filter_qs": _filter_querystring(request),
         "can_manage": can_manage_members(request.user),
+        "can_add_baptism": can_add_baptism,
+        "add_url": add_url if can_add_baptism else "",
     })
 
 

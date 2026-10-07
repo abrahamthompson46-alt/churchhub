@@ -176,6 +176,12 @@ def request_transfer(member, to_church, transfer_date, requested_by, reason=""):
             "transfer_id": str(transfer.pk),
         },
     )
+    try:
+        from members.notifications import notify_transfer_requested
+
+        notify_transfer_requested(transfer)
+    except Exception:
+        pass
     return transfer
 
 
@@ -256,6 +262,12 @@ def complete_transfer(transfer, processed_by, notes=""):
             "transfer_id": str(transfer.pk),
         },
     )
+    try:
+        from members.notifications import notify_transfer_resolved
+
+        notify_transfer_resolved(transfer, completed=True)
+    except Exception:
+        pass
     return transfer
 
 
@@ -282,6 +294,12 @@ def reject_transfer(transfer, processed_by, notes=""):
         member=transfer.member,
         details={"transfer_id": str(transfer.pk), "notes": notes},
     )
+    try:
+        from members.notifications import notify_transfer_resolved
+
+        notify_transfer_resolved(transfer, completed=False)
+    except Exception:
+        pass
     return transfer
 
 

@@ -4,7 +4,11 @@
 
 {% block content %}
 <div class="page-container">
+    {% if can_add_baptism %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Baptism Register" page_description="Water baptism records for your church. Add a baptism here to create the register entry and fill empty profile fields." action_url=add_url action_label="Add baptism" action_icon="bi-plus-lg" %}
+    {% else %}
     {% include "includes/page_header.html" with page_subtitle="Members" page_title="Baptism Register" page_description="Water baptism records for your church." %}
+    {% endif %}
 
     <div class="filter-bar filter-bar--sticky mb-3">
         <form method="get" class="filter-form">
@@ -53,7 +57,13 @@
                         <td class="text-end"><a href="{% url 'members:record_detail' r.pk %}" class="btn btn-sm btn-outline-secondary">View</a></td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="6">{% include "includes/empty_state.html" with icon="bi-droplet" message="No baptism records match these filters." %}</td></tr>
+                    <tr><td colspan="6">
+                        {% if can_add_baptism %}
+                        {% include "includes/empty_state.html" with icon="bi-droplet" message="No baptism records match these filters." action_url=add_url action_label="Add baptism" %}
+                        {% else %}
+                        {% include "includes/empty_state.html" with icon="bi-droplet" message="No baptism records match these filters." %}
+                        {% endif %}
+                    </td></tr>
                     {% endfor %}
                 </tbody>
             </table>

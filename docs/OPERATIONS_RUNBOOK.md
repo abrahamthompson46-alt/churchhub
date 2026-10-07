@@ -55,7 +55,7 @@ Probes (`church_system.health`):
 
 **Settings:** `DJANGO_ENV=development|staging|production` selects `church_system.settings.*`.
 
-**Celery Beat (Current):** daily notification purge, daily `backup_database` (Postgres), hourly health probe. Logs under `CHURCHHUB_LOG_DIR` (`application.log`, `security.log`, `audit.log`) when file logging enabled.
+**Celery Beat (Current):** daily notification purge, daily `backup_database` (Postgres), hourly health probe, daily birthday desk reminder, weekly flyer/export purge, daily visitor follow-up reminder (`remind_visitor_follow_up_task`). Logs under `CHURCHHUB_LOG_DIR` (`application.log`, `security.log`, `audit.log`) when file logging enabled.
 
 ---
 

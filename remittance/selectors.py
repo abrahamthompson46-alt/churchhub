@@ -259,6 +259,19 @@ def posted_settlements_received_total(
     return total or Decimal("0.00")
 
 
+def posted_church_child_settlements(batch):
+    """Posted church settlements that roll up into a hierarchy batch."""
+    return SettlementBatch.objects.filter(
+        from_unit_type="CHURCH",
+        to_unit_type=batch.from_unit_type,
+        to_unit_id=batch.from_unit_id,
+        offering_type=batch.offering_type,
+        status="POSTED",
+        period_start__lte=batch.period_end,
+        period_end__gte=batch.period_start,
+    ).order_by("from_unit_id")
+
+
 def posted_church_settlement_overlaps(church, month_start, month_end, offering_types):
     return SettlementBatch.objects.filter(
         from_unit_type="CHURCH",

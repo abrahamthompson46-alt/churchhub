@@ -58,7 +58,7 @@
                         <td class="text-end"><a href="{% url 'payroll:run_detail' run.pk %}" class="btn btn-sm btn-outline-secondary">Open</a></td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="6" class="text-muted text-center py-4">No payroll runs yet.</td></tr>
+                    <tr><td colspan="6">{% if can_manage_payroll %}{% url 'payroll:run_create' as run_create_url %}{% include "includes/empty_state.html" with icon="bi-calendar2-check" message="No payroll runs yet." action_url=run_create_url action_label="New Run" compact=True %}{% else %}{% include "includes/empty_state.html" with icon="bi-calendar2-check" message="No payroll runs yet." compact=True %}{% endif %}</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

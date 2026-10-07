@@ -137,7 +137,7 @@ flowchart LR
 
 | Concept | Model | Notes |
 |---------|-------|-------|
-| Cutoff | `transactions.MonthlyCutoff` | Snapshot of MTD remit payables. Desk UI uses **live GL** for the working-day month (matches KPI). `transferred` only when outstanding payable+clearing is zero. |
+| Cutoff | `transactions.MonthlyCutoff` | Snapshot of MTD remit payables. Desk UI (`/dashboard/cutoff/`) uses **live GL** for the working-day month (matches KPI) and a numbered stepper (working day → confirm due → optional settlement → bank remittance → approval). `transferred` only when outstanding payable+clearing is zero. |
 | Settlement | `remittance.SettlementBatch` | Hierarchy unit-to-unit settlement lifecycle |
 | Settlement | `remittance.SettlementBatch` | Hierarchy unit-to-unit settlement lifecycle |
 

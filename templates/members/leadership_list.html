@@ -3,7 +3,7 @@
 {% block title %}Leadership — ChurchHub{% endblock %}
 
 {% block content %}
-<div class="page-container">
+<div class="page-container page-shell">
     {% if can_manage_leadership %}
     {% url 'members:leadership_add' as leadership_url %}
     {% include "includes/page_header.html" with page_subtitle="Members" page_title="Leadership Roles" action_url=leadership_url action_label="Assign Role" %}

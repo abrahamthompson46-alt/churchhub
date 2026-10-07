@@ -34,6 +34,7 @@ class Command(BaseCommand):
         beat = getattr(settings, "CELERY_BEAT_SCHEDULE", {}) or {}
         note("remind-birthday-desk-daily" in beat, "Celery Beat includes birthday reminder")
         note("purge-birthday-flyers-weekly" in beat, "Celery Beat includes flyer purge")
+        note("remind-visitor-follow-up-daily" in beat, "Celery Beat includes visitor follow-up")
         note("database-backup-daily" in beat, "Celery Beat includes database backup")
         note(int(getattr(settings, "SESSION_ABSOLUTE_AGE", 0) or 0) > 0, "Absolute session age configured")
         note(int(getattr(settings, "SECURE_HSTS_SECONDS", 0) or 0) >= 31536000, "HSTS at least 1 year")

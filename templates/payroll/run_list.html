@@ -3,35 +3,45 @@
 {% block title %}Payroll Runs{% endblock %}
 
 {% block content %}
-<div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Payroll" page_title="Payroll Runs" %}
+<div class="page-container page-shell">
     {% if can_manage_payroll %}
-    <div class="mb-3"><a href="{% url 'payroll:run_create' %}" class="btn btn-primary btn-sm">New Run</a></div>
+    {% url 'payroll:run_create' as create_url %}
+    {% include "includes/page_header.html" with page_subtitle="Payroll" page_title="Payroll Runs" action_url=create_url action_label="New Run" action_icon="bi-plus-lg" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Payroll" page_title="Payroll Runs" %}
     {% endif %}
-    <div class="table-responsive table-in-card">
-        <table class="table table-hover table-sm mb-0">
-            <thead>
-                <tr>
-                    <th>Reference</th><th>Period</th><th>Unit</th>
-                    <th class="text-end">Gross</th><th class="text-end">Net</th><th>Status</th><th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for run in runs %}
-                <tr>
-                    <td>{{ run.reference }}</td>
-                    <td>{{ run.period_label }}</td>
-                    <td>{{ run.get_paying_unit_type_display }}</td>
-                    <td class="text-end">{{ run.total_gross|floatformat:2 }}</td>
-                    <td class="text-end">{{ run.total_net|floatformat:2 }}</td>
-                    <td>{{ run.get_status_display }}</td>
-                    <td><a href="{% url 'payroll:run_detail' run.pk %}" class="btn btn-sm btn-outline-secondary">Open</a></td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="7" class="text-center text-muted py-4">No runs.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+
+    <div class="data-card">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Reference</th>
+                        <th>Period</th>
+                        <th>Unit</th>
+                        <th class="text-end">Gross</th>
+                        <th class="text-end">Net</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in runs %}
+                    <tr>
+                        <td>{{ run.reference }}</td>
+                        <td>{{ run.period_label }}</td>
+                        <td>{{ run.get_paying_unit_type_display }}</td>
+                        <td class="text-end text-currency">{{ run.total_gross|floatformat:2 }}</td>
+                        <td class="text-end text-currency">{{ run.total_net|floatformat:2 }}</td>
+                        <td><span class="chip">{{ run.get_status_display }}</span></td>
+                        <td><a href="{% url 'payroll:run_detail' run.pk %}" class="btn btn-sm btn-outline-secondary">Open</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">No runs.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}

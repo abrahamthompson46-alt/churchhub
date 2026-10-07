@@ -19,7 +19,15 @@
                     {% else %}No day open{% endif %}
                 </strong>
                 {% if can_manage_working_day %}
+                {% if working_day_is_open %}
                 <a href="{% url 'transactions:period_list' %}" class="workspace-status-pill__link">Manage</a>
+                {% else %}
+                <form method="post" action="{% url 'transactions:working_day_open' %}" class="workspace-status-pill__form">
+                    {% csrf_token %}
+                    <input type="hidden" name="date" value="{{ system_date|date:'Y-m-d' }}">
+                    <button type="submit" class="btn btn-link btn-sm p-0 workspace-status-pill__link">Open today</button>
+                </form>
+                {% endif %}
                 {% endif %}
             </span>
             {% endif %}

@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import UserRole
 from members.models import (
@@ -181,6 +182,37 @@ class ViewTests(MembersTestMixin, TestCase):
         response = self.client.get(reverse("members:baptism_register"))
         self.assertEqual(response.status_code, 200)
 
+    def test_baptism_register_add_cta_for_secretary(self):
+        self.client.login(username="secretary", password="pass12345")
+        response = self.client.get(reverse("members:baptism_register"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Add baptism")
+        self.assertContains(response, "record_type=Baptism")
+
+    def test_record_add_shows_member_select(self):
+        self.client.login(username="secretary", password="pass12345")
+        response = self.client.get(reverse("members:record_add"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="member"')
+        self.assertNotContains(response, 'type="hidden" name="member"')
+
+    def test_baptism_add_locks_type_and_shows_member_select(self):
+        self.client.login(username="secretary", password="pass12345")
+        response = self.client.get(
+            reverse("members:record_add"), {"record_type": RecordType.BAPTISM}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Add baptism")
+        self.assertContains(response, 'name="member"')
+        self.assertContains(response, 'type="hidden" name="record_type"')
+
+    def test_member_cannot_add_baptism_record(self):
+        self.client.login(username="member", password="pass12345")
+        response = self.client.get(
+            reverse("members:record_add"), {"record_type": RecordType.BAPTISM}
+        )
+        self.assertEqual(response.status_code, 403)
+
     def test_add_department(self):
         self.client.login(username="secretary", password="pass12345")
         response = self.client.post(
@@ -319,3 +351,24 @@ class ViewTests(MembersTestMixin, TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Department.objects.filter(pk=dept.pk).exists())
+
+    def test_stale_visitor_follow_up_reminder(self):
+        from datetime import timedelta
+
+        from dashboard.models import Notification
+        from members.models import Visitor
+        from members.notifications import remind_stale_visitor_follow_ups
+
+        Visitor.objects.create(
+            church=self.church,
+            first_name="Sam",
+            last_name="Guest",
+            visit_date=timezone.localdate() - timedelta(days=20),
+        )
+        result = remind_stale_visitor_follow_ups(stale_days=14)
+        self.assertGreaterEqual(result["churches"], 1)
+        self.assertTrue(
+            Notification.objects.filter(
+                event_key__startswith=f"visitors.stale.{self.church.pk}."
+            ).exists()
+        )

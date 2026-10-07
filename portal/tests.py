@@ -71,6 +71,12 @@ class PortalTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Ada Member")
 
+    def test_member_giving_statement_page(self):
+        self.client.login(username="portal_member", password="pass12345")
+        response = self.client.get(reverse("portal:giving"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Giving statement")
+
     def test_member_can_submit_prayer_request(self):
         self.client.login(username="portal_member", password="pass12345")
         response = self.client.post(

@@ -147,6 +147,7 @@ Giving filters: `approval_status=APPROVED`, `is_voided=False`, member set, accou
 |------|--------|
 | `giving_index` | login + feature `giving_portal` + (`view_giving` or `manage_finances`) |
 | `member_statement` | login + feature + `can_view_member_giving`; church-scoped member via `filter_by_church` |
+| Portal `my_giving` (`portal:giving`) | login + linked member + `can_view_member_giving` (member `view_own_giving`); not gated by staff `giving_portal` feature flag |
 
 Export on statement: `?export=csv|excel|pdf` requires `export_giving` or `manage_finances`.
 

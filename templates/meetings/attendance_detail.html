@@ -16,9 +16,15 @@
     <form method="post" action="{% url 'meetings:attendance_record' event.pk %}">
         {% csrf_token %}
         <div class="panel">
-            <div class="panel-header d-flex justify-content-between align-items-center">
+            <div class="panel-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <span>Member Roll</span>
-                <button type="submit" class="btn btn-primary btn-sm">Save Roll</button>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <label class="small text-muted mb-0" for="roll-filter">Find</label>
+                    <input type="search" id="roll-filter" class="form-control form-control-sm" placeholder="Filter names" style="max-width:12rem;" autocomplete="off">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="roll-all">Mark all</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="roll-none">Mark none</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Save Roll</button>
+                </div>
             </div>
             <div class="panel-body">
                 <div class="roll-grid">
@@ -56,4 +62,34 @@
     </div>
     {% endif %}
 </div>
+{% if can_manage_attendance %}
+<script>
+(function () {
+    const form = document.querySelector('.roll-grid');
+    if (!form) return;
+    const items = Array.from(document.querySelectorAll('.roll-item'));
+    const filter = document.getElementById('roll-filter');
+    function visibleCheckboxes() {
+        return items.filter(function (item) {
+            return item.style.display !== 'none';
+        }).map(function (item) {
+            return item.querySelector('input[type="checkbox"]');
+        }).filter(Boolean);
+    }
+    document.getElementById('roll-all')?.addEventListener('click', function () {
+        visibleCheckboxes().forEach(function (box) { box.checked = true; });
+    });
+    document.getElementById('roll-none')?.addEventListener('click', function () {
+        visibleCheckboxes().forEach(function (box) { box.checked = false; });
+    });
+    filter?.addEventListener('input', function () {
+        const q = (filter.value || '').trim().toLowerCase();
+        items.forEach(function (item) {
+            const name = (item.textContent || '').toLowerCase();
+            item.style.display = !q || name.indexOf(q) !== -1 ? '' : 'none';
+        });
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}

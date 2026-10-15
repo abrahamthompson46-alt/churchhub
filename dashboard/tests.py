@@ -616,6 +616,140 @@ class ViewTests(DashboardTestMixin, TestCase):
         denied = self.client.post(reverse("dashboard:cutoff"), {"recompute": "1"})
         self.assertEqual(denied.status_code, 403)
 
+    def test_cutoff_readonly_for_district_pastor(self):
+        from permissions.checks import (
+            can_manage_finances,
+            can_run_cutoff,
+            can_view_dashboard_finance,
+        )
+        from permissions.org_scope import apply_org_scope
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        user = User.objects.create_user(
+            username="dp_cutoff",
+            password="pass12345",
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+        )
+        apply_org_scope(
+            user,
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+            district=self.district,
+        )
+        user.save()
+        self.assertTrue(can_view_dashboard_finance(user))
+        self.assertFalse(can_manage_finances(user))
+        self.assertFalse(can_run_cutoff(user))
+        self._login("dp_cutoff")
+        session = self.client.session
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        response = self.client.get(reverse("dashboard:cutoff"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Remittance desk")
+        self.assertFalse(response.context["can_recompute"])
+        before = MonthlyCutoff.objects.filter(church=self.church).count()
+        denied = self.client.post(reverse("dashboard:cutoff"), {"recompute": "1"})
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(
+            MonthlyCutoff.objects.filter(church=self.church).count(),
+            before,
+        )
+
+    def test_cutoff_ignores_cross_district_church_query(self):
+        from permissions.org_scope import apply_org_scope
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        other_district = District.objects.create(
+            zone=self.zone, code="D2X", name="Other District"
+        )
+        other_church = Church.objects.create(
+            district=other_district, code="C2X", name="Other District Church"
+        )
+        other_treasury = User.objects.create_user(
+            username="other_tx_cutoff",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=other_church,
+        )
+        other_pastor = User.objects.create_user(
+            username="other_lp_cutoff",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=other_church,
+        )
+        open_working_day(other_church, timezone.localdate(), other_pastor)
+        txn = record_receipt(
+            church=other_church,
+            created_by=other_treasury,
+            tithe_amount=Decimal("7777.00"),
+        )
+        approve_transaction(txn, other_pastor)
+
+        user = User.objects.create_user(
+            username="dp_cross_cutoff",
+            password="pass12345",
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+        )
+        apply_org_scope(
+            user,
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+            district=self.district,
+        )
+        user.save()
+        self._login("dp_cross_cutoff")
+        session = self.client.session
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        response = self.client.get(
+            reverse("dashboard:cutoff") + f"?church={other_church.id}"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(response.context["monthly_total"], Decimal("7777.00"))
+        desk = response.context["desk"]
+        self.assertEqual(desk["cutoff"].church_id, self.church.id)
+        self.assertEqual(self.client.session.get("current_church_id"), str(self.church.id))
+
+    def test_cutoff_secretary_snapshot_allowed_via_run_cutoff(self):
+        from permissions.checks import can_manage_finances, can_run_cutoff
+        from permissions.org_scope import apply_org_scope
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        user = User.objects.create_user(
+            username="sec_cutoff",
+            password="pass12345",
+            role=UserRole.SECRETARY,
+            church=self.church,
+        )
+        apply_org_scope(
+            user,
+            role=UserRole.SECRETARY,
+            church=self.church,
+        )
+        user.save()
+        self.assertTrue(can_run_cutoff(user))
+        self.assertFalse(can_manage_finances(user))
+        self._login("sec_cutoff")
+        session = self.client.session
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        response = self.client.get(reverse("dashboard:cutoff"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["can_recompute"])
+        before = MonthlyCutoff.objects.filter(church=self.church).count()
+        saved = self.client.post(reverse("dashboard:cutoff"), {"recompute": "1"})
+        self.assertEqual(saved.status_code, 302)
+        self.assertEqual(
+            MonthlyCutoff.objects.filter(church=self.church).count(),
+            before + 1,
+        )
+
     def test_switcher_clears_session_with_empty_church(self):
         self._login("treasury")
         session = self.client.session

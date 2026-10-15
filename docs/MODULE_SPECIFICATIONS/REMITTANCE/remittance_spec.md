@@ -115,7 +115,7 @@ Note: thin wrappers of some welfare functions also exist on `services.py` for co
 
 Views also accept `manage_finances` on some finance/policy gates.
 
-**Current:** District remittance **payment** (`transactions:record_remittance`) requires `manage_finances`. Default SECRETARY does **not** have that code (receipts/expenses remain). Hierarchy and treasury still do. Re-seed with `python manage.py seed_permissions --reset` to apply on existing databases.
+**Current:** District remittance **payment** (`transactions:record_remittance`) requires `manage_finances`. Default SECRETARY does **not** have that code (receipts/expenses remain). Hierarchy and treasury still do. The remittance desk (`dashboard:cutoff`) is **read** for `view_dashboard_finance` / `run_cutoff` / `manage_finances` (nav and GET match). Saving a cut-off snapshot still requires `manage_finances` or `run_cutoff`. Default District Treasurer can open the desk and Settlement Desk but cannot record payment or save a snapshot. Re-seed with `python manage.py seed_permissions --reset` to apply on existing databases.
 
 ---
 

@@ -16,8 +16,10 @@ from permissions.checks import (
     can_manage_member_records,
     can_manage_baptisms,
     can_run_cutoff,
+    can_view_dashboard_finance,
     can_view_members,
     can_view_meetings,
+    can_view_remittance,
     can_view_transactions,
 )
 from sitecontrol.services import church_has_feature
@@ -76,6 +78,8 @@ def get_settlement_strip(request, church_ids):
         can_manage_finances(user)
         or can_run_cutoff(user)
         or can_manage_receipts(user)
+        or can_view_dashboard_finance(user)
+        or can_view_remittance(user)
     ):
         return None
     from organization.models import Church
@@ -527,7 +531,11 @@ def get_do_next_steps(request, dashboard_role, action_queue):
     if dashboard_role in ("treasury", "finance", "district_treasury"):
         if church and can_manage_receipts(user):
             _idle("Record a receipt", "Tithe and combined offerings start remittance payable.", "transactions:record_receipt")
-        if can_manage_finances(user) or can_run_cutoff(user):
+        if (
+            can_manage_finances(user)
+            or can_run_cutoff(user)
+            or can_view_dashboard_finance(user)
+        ):
             _idle("Remittance desk", "Confirm due amounts, settle if needed, then pay district.", "dashboard:cutoff")
     elif dashboard_role in ("secretary",):
         if can_view_members(user) or can_manage_members(user):

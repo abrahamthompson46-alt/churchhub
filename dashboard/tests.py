@@ -585,6 +585,37 @@ class ViewTests(DashboardTestMixin, TestCase):
         response = self.client.get(reverse("dashboard:cutoff"))
         self.assertEqual(response.status_code, 403)
 
+    def test_cutoff_readonly_for_district_treasurer(self):
+        from permissions.org_scope import apply_org_scope
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        user = User.objects.create_user(
+            username="dt_cutoff",
+            password="pass12345",
+            role=UserRole.DISTRICT_TREASURY,
+            church=self.church,
+        )
+        apply_org_scope(
+            user,
+            role=UserRole.DISTRICT_TREASURY,
+            church=self.church,
+            district=self.district,
+        )
+        user.save()
+        self._login("dt_cutoff")
+        session = self.client.session
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        response = self.client.get(reverse("dashboard:cutoff"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Remittance desk")
+        self.assertFalse(response.context["can_recompute"])
+        self.assertFalse(response.context["can_remit"])
+        self.assertNotContains(response, "Save cut-off snapshot")
+        denied = self.client.post(reverse("dashboard:cutoff"), {"recompute": "1"})
+        self.assertEqual(denied.status_code, 403)
+
     def test_switcher_clears_session_with_empty_church(self):
         self._login("treasury")
         session = self.client.session

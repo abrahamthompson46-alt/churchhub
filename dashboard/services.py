@@ -198,7 +198,9 @@ def get_remittance_desk(church, user=None):
         "transferred": transferred,
         "pending_payment": pending_payment,
         "status": status,
-        "can_recompute": True,
+        "can_recompute": bool(
+            user and (can_manage_finances(user) or can_run_cutoff(user))
+        ),
         "can_remit": can_record and working_day_open,
         "working_day_open": working_day_open,
         "can_open_working_day": can_open_day,
@@ -519,6 +521,13 @@ def get_quick_actions(user):
             _add(_item("Roll-up Report", report_key="hierarchy_rollup", icon="bi-bar-chart-steps"))
         if can_run_cutoff(user) or can_view_dashboard_finance(user):
             _add(_item("Remittance desk", "dashboard:cutoff", "bi-calendar-check"))
+    elif role == "district_treasury":
+        if can_run_cutoff(user) or can_view_dashboard_finance(user):
+            _add(_item("Remittance desk", "dashboard:cutoff", "bi-calendar-check"))
+        if can_view_remittance(user) or can_manage_settlements(user):
+            _add(_item("Settlement Desk", "remittance:settlements", "bi-arrow-up-right-circle"))
+        if can_view_pending_approvals(user) or can_approve_transactions(user):
+            _add(_item("Pending Approvals", "transactions:pending_approvals", "bi-hourglass-split"))
     else:
         if can_manage_finances(user) or can_manage_ledger_entries(user):
             _add(_item("Journal Entry", "ledger:entry", "bi-journal-plus"))

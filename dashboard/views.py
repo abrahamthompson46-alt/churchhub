@@ -6,7 +6,6 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from accounts.models import UserRole
-from accounts.permissions import can_manage_finances
 from announcements.services import pending_for_user
 from church_system.church_scope import get_active_church
 from church_system.flash import flash_exception, flash_success, flash_warning
@@ -20,7 +19,24 @@ from dashboard.services import (
     get_remittance_desk,
 )
 from dashboard.utils import safe_internal_redirect
+from permissions.checks import (
+    can_manage_finances,
+    can_run_cutoff,
+    can_view_dashboard_finance,
+)
 from transactions.services import generate_monthly_cutoff
+
+
+def _can_view_remittance_desk(user):
+    return (
+        can_manage_finances(user)
+        or can_run_cutoff(user)
+        or can_view_dashboard_finance(user)
+    )
+
+
+def _can_save_cutoff_snapshot(user):
+    return can_manage_finances(user) or can_run_cutoff(user)
 
 
 def _apply_church_switch(request, church_param):
@@ -224,7 +240,7 @@ def custom_logout(request):
 
 @login_required
 def cutoff(request):
-    if not can_manage_finances(request.user):
+    if not _can_view_remittance_desk(request.user):
         return HttpResponseForbidden("Finance permission required.")
 
     try:
@@ -245,6 +261,8 @@ def cutoff(request):
         as_of = _church_finance_as_of(church)
 
         if request.method == "POST" and request.POST.get("recompute") == "1":
+            if not _can_save_cutoff_snapshot(request.user):
+                return HttpResponseForbidden("Cut-off snapshot permission required.")
             generate_monthly_cutoff(church, as_of)
             flash_success(
                 request,

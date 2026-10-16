@@ -41,7 +41,7 @@ flowchart TB
 | Login | `/accounts/login/` — `ChurchHubLoginView` |
 | Login rate limit | `LoginRateLimitMiddleware` (IP + username; SiteSettings thresholds) |
 | Invitations | `UserInvitation` + `accounts.services` |
-| MFA | `User.mfa_enabled` **stub only** — enforcement not implemented |
+| MFA | Implemented: TOTP, email OTP, recovery codes (`accounts/mfa.py`, enroll/verify views). `User.mfa_enabled` = **enrolled**. `MfaEnforcementMiddleware` + `MfaAwareLoginMixin` enforce only when `SiteSettings.mfa_required_for_privileged` includes that user’s audience (field default True). Production except PythonAnywhere requires `MFA_ENCRYPTION_KEY`. Live host policy/key/edge **unverified**. SMS OTP not implemented. |
 
 ### Planned (AGENTS.md)
 
@@ -49,9 +49,9 @@ Username/email login, MFA (TOTP/email OTP/recovery codes), password history/expi
 
 ### Recommended
 
-1. Implement TOTP MFA for platform operators, SUPER_ADMIN, and high-privilege finance roles.  
+1. Keep MFA audiences aligned with finance approvers in production Site Settings; do not assume every staff role is in the default set.
 2. Keep rate limiting; add clearer permanent lock / admin unlock if not already complete in SiteSettings flows.  
-3. Do not claim MFA is live until enforcement exists.
+3. Do not treat git MFA code as proof that a given production host has the key, cache-based throttling, and policy enabled.
 
 ---
 
@@ -248,7 +248,7 @@ Small session-authenticated JSON helpers (e.g. ledger) must remain permissioned 
 
 | Threat | Mitigations present | Residual gap |
 |--------|---------------------|--------------|
-| Credential stuffing | Login rate limit, password validators | MFA stub |
+| Credential stuffing | Login rate limit, password validators, optional MFA for configured audiences | MFA is not universal; live enforcement unverified; no SMS OTP |
 | Privilege escalation | RBAC + overrides audit + platform lane | Post-fetch check inconsistency risk |
 | Cross-tenant leakage | Denomination + church scope + tests | Polymorphic units; admin scoping unevenness |
 | Financial fraud | Maker-checker, lock, void, periods | Dual remittance paths need care |

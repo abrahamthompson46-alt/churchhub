@@ -51,11 +51,12 @@ Browser
 Cross-cutting middleware:
   PermissionCache → RoleEnforcement → DenominationContext
   → UserScope → PlatformSession → Maintenance → LoginRateLimit
+  → MfaEnforcement (installed and runs; challenges only when user_requires_mfa)
 ```
 
 **Documented ideal** (`AGENTS.md` / `ARCHITECTURE.md`): Views → Services → Selectors / Managers / Repositories → Models.
 
-**Actual code:** Views + flat `services.py` modules + models. There are **no** project-wide `managers.py`, `repositories/`, or `selectors/` packages. Prefer extending services rather than inventing those layers unless a change explicitly introduces them.
+**Actual code:** Views + `services.py` modules + models. Many apps also have a per-app `selectors.py` and/or `repositories.py`. There is **no** project-wide `managers.py`, `repositories/`, or `selectors/` package as in `AGENTS.md`. Per-app helper modules do not satisfy that layered package layout. Prefer extending existing services and those helpers rather than inventing a new layer unless a change explicitly requires it.
 
 ---
 
@@ -181,7 +182,7 @@ There is **no** `Division` model and **no** generic `Organization` model.
 - Org scope levels: `permissions/org_scope.py` (`OrgScopeLevel`)
 - Permission matrix: `permissions` models + `permissions/registry.py` + `permissions/services.user_has_permission`
 - View guards: `permissions.checks` (`permission_required`, `any_permission_required`, `can_*` helpers)
-- MFA: `User.mfa_enabled` exists as a **stub** — enforcement is not implemented
+- MFA: **implemented**, not a stub. `User.mfa_enabled` means the user is **enrolled**. Enforcement is **optional**: platform owners set `SiteSettings.mfa_required_for_privileged` and audiences (default True for starter privileged roles). Methods: TOTP, email OTP, recovery codes (`accounts/mfa.py`, `accounts/mfa_views.py`, `MfaEnforcementMiddleware`). Production (except PythonAnywhere) **requires** `MFA_ENCRYPTION_KEY`. Whether a given live host has the key, policy, and cache-based throttling configured is **unverified** from git. SMS OTP is not implemented.
 
 See `BUSINESS_LOGIC.md` § Permissions and `ADMINISTRATION_AND_PERMISSIONS.md` / `SECURITY.md` for policy intent.
 
@@ -231,11 +232,11 @@ Details: `BUSINESS_LOGIC.md` § Finance and `FINANCE.md`.
 | Topic | Live code | AGENTS / root docs aspiration |
 |-------|-----------|-------------------------------|
 | Soft delete (`is_deleted`) | Not on models | Required |
-| MFA enforcement | Stub field only | Required for privileged roles |
+| MFA | TOTP / email OTP / recovery + middleware; optional by site policy | Always-on MFA for all privileged AGENTS roles; SMS OTP |
 | REST API `/api/v1/` | Not present | Documented as future standard |
 | Visitors domain | Attendance headcount only | Full visitor CRM |
 | Inventory / procurement / petty cash | Not present | Documented domains |
-| Managers / repositories / selectors | Not present | Documented layers |
+| Managers / repositories / selectors | Per-app `selectors.py` / `repositories.py` in many apps; no project-wide packages | Documented layered packages |
 
 **Rule for agents:** implement against **code**. Treat AGENTS.md aspirations as roadmap, not as existing schema. Do not invent models or fields to match aspirational docs.
 

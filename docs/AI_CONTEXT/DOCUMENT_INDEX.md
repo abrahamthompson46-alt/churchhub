@@ -76,7 +76,7 @@ Persistent agent rules (always apply): `.cursor/rules/*.mdc` — architecture, d
 
 | File | Role |
 |------|------|
-| [AUTHENTICATION.md](../SECURITY/AUTHENTICATION.md) | Session auth, MFA stub, sessions |
+| [AUTHENTICATION.md](../SECURITY/AUTHENTICATION.md) | Session auth, optional MFA (TOTP / email OTP / recovery), sessions |
 | [AUTHORIZATION.md](../SECURITY/AUTHORIZATION.md) | RBAC, scope, platform capabilities |
 | [AUDIT_COMPLIANCE.md](../SECURITY/AUDIT_COMPLIANCE.md) | Domain audit trails, `AuditEvent` dual-write, retention gaps |
 

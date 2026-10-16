@@ -44,7 +44,7 @@ This document lists **accepted** limitations at RC1. Items marked **Blocker** mu
 
 | ID | Limitation | Severity | Pilot OK? | Mitigation |
 |----|------------|----------|-----------|------------|
-| KL-OPS-01 | Media not served by Django when `DEBUG=False` | High | Yes **if** disk/S3 + proxy configured | Follow `DEPLOYMENT_CHECKLIST.md` media strategy |
+| KL-OPS-01 | Application `/media/` always hits Django `protected_media` (DEBUG and production). That **does not** prove the live edge is safe. Private media must not be aliased to disk (or otherwise served) without Django ACL. Repo Nginx template (`deploy/nginx/churchhub.conf`) proxies `/media/` to the app and uses `internal` `/internal-media/` after `X-Accel-Redirect`; **live** Nginx, TLS, hostname (CH-SEC-P2), and bucket policy are **unverified**. Optional S3: `FileField.url` is a storage URL, not `/media/`; if `AWS_QUERYSTRING_AUTH` is off or the bucket is public, that can **bypass** `protected_media`. Staging/production verification still required. | High | Yes **if** edge matches the template and storage is private | Keep Django as the ACL gate; do not `alias` private `/media/` to filesystem; confirm S3 ACL + query-string auth; see `DEPLOYMENT_CHECKLIST.md` |
 | KL-OPS-02 | LocMemCache if Redis missing with multi-worker Gunicorn | Critical | **No** | `REDIS_URL` required in production settings |
 | KL-OPS-03 | Restore drill evidence is operator-owned | Medium | Yes | Run drill before pilot; record in runbook |
 | KL-OPS-04 | Celery/Beat optional in dev; required for backups/async at scale | Medium | Yes | Run worker + Beat in pilot prod |

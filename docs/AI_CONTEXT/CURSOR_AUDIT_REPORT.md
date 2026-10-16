@@ -5,6 +5,16 @@
 **Scope:** Requested AI/architecture docs, project Cursor rules, Django structure, tenancy, security, finance, and enterprise readiness  
 **Constraint:** No application code was modified for this report
 
+### Status clarification (15 October 2026)
+
+This document is a **historical** audit dated **19 July 2026**. Sections below remain that snapshot. They are **not** a claim that every listed gap is still Current.
+
+**Later Current (code inspection; not a full re-audit of every finding):**
+
+- **MFA** is implemented (`accounts/mfa.py`, `accounts/mfa_views.py`, `MfaEnforcementMiddleware`). `User.mfa_enabled` means enrolled. Enforcement is **optional** via `SiteSettings.mfa_required_for_privileged` and audience lists (field default True for a starter privileged set). Production except PythonAnywhere requires `MFA_ENCRYPTION_KEY`. Live production enforcement is **unverified** from git. SMS OTP is still absent.
+- **Selectors / repositories:** many apps now have per-app `selectors.py` and `repositories.py`. There is still **no** project-wide `selectors/` or `managers.py` package as `AGENTS.md` describes. July “none found” referred to that package layout.
+- Nested `docs/AI_CONTEXT/` and `.cursor/rules` are populated relative to July. Soft-delete, DRF `/api/v1/`, and live Nginx/media edge were **not** re-validated in this clarification.
+
 ---
 
 ## 0. Documentation sources examined
@@ -49,7 +59,7 @@ Additional nested-doc findings:
 
 ChurchHub is a **mature Django multi-tenant Church Management System** with a clear domain split, a real RBAC matrix, hierarchical org scoping, denomination SaaS isolation, and a financially serious transaction core (double-entry lines, approval lock, void/reversal, periods, working day, idempotency).
 
-It is **closer to a production ChMS than a prototype**, but it is **not fully aligned** with the layered enterprise ideal in `AGENTS.md` / `ARCHITECTURE.md` (managers, repositories, selectors, soft delete, MFA, versioned API).
+It is **closer to a production ChMS than a prototype**, but it is **not fully aligned** with the layered enterprise ideal in `AGENTS.md` / `ARCHITECTURE.md` (managers, repositories, selectors, soft delete, MFA, versioned API). *(July 2026 wording. MFA and per-app selectors/repos exist as of the 15 Oct 2026 clarification; project-wide packages, soft-delete, and `/api/v1/` still do not.)*
 
 ### Intended architecture (docs)
 
@@ -72,12 +82,12 @@ Cross-cutting: church_scope + denomination_scope + org_scope + sitecontrol middl
 |-------|------------|-------------|-----|
 | Thin views | Required | Partial — finance better; members/org/sitecontrol heavier | High |
 | Services | Required | Present in most domain apps | Low |
-| Managers / Repositories / Selectors | Required | **Absent** (no `managers.py`, no `repositories/`, no `selectors/`) | High |
+| Managers / Repositories / Selectors | Required | **Absent** (no `managers.py`, no `repositories/`, no `selectors/`) *(historical 19 Jul 2026; Current: per-app `selectors.py` / `repositories.py` in many apps; still no project-wide packages)* | High |
 | RBAC | Required | Strong (registry + matrix + overrides + middleware) | Low–Medium |
 | Multi-tenancy | Required | Strong (denomination + org subtree + church context) | Medium (polymorphic units) |
 | Soft delete | Required | **Not implemented in models** (docs only) | High |
 | Versioned REST API | Required | **Missing** (no DRF / `/api/v1/`) | High |
-| MFA | Required | Stub field only (`User.mfa_enabled`) | High |
+| MFA | Required | Stub field only (`User.mfa_enabled`) *(historical 19 Jul 2026; Current: implemented, optional by site policy — see Status clarification)* | High |
 
 ### Strengths
 
@@ -182,7 +192,7 @@ No catastrophic duplicate `Member` or `Church` tables were found.
 |------|----------------|----------|
 | **Post-fetch authorization** | Some paths can load by bare PK then authorize — IDOR / miss-check risk if inconsistent | P0–P1 |
 | **Soft-delete absent** | Hard deletes possible on many business objects contrary to AGENTS / DATABASE_STANDARDS | P0 |
-| **MFA stub** | `User.mfa_enabled` help text: “enforcement not yet implemented” | P0 |
+| **MFA stub** | `User.mfa_enabled` help text: “enforcement not yet implemented” *(historical 19 Jul 2026; Current help_text describes enrollment; enforcement is site policy)* | P0 |
 | **No versioned public API** | Future mobile/integrations may invent insecure ad-hoc JSON | P1 |
 | **Uneven Django admin scoping** | Quality varies by ModelAdmin; mitigated somewhat by admin lane restriction | P1 |
 | **Polymorphic UUID FKs** | Cannot enforce tenant integrity at DB level | P1 |
@@ -230,7 +240,7 @@ No catastrophic duplicate `Member` or `Church` tables were found.
 |-------|----------|--------|
 | Fat views | Large FBV modules in sitecontrol, members, organization, transactions, payroll | Maintainability, review cost |
 | Mega-services | Large `services.py` in payroll, transactions, dashboard, ledger | SRP / testability |
-| Missing managers/repos/selectors | AGENTS mandates them; none found | Query logic leaks into views/services |
+| Missing managers/repos/selectors | AGENTS mandates them; none found *(historical 19 Jul 2026; Current: per-app helpers exist; AGENTS package layout still not implemented)* | Query logic leaks into views/services |
 | View-only apps without schema | `budgets`, `giving`, `portal` (partly intentional) | Onboarding confusion |
 | Documentation scaffold hollow | Nearly all nested `docs/**` stubs empty | AI/human drift |
 | No `.cursor/rules` | Requested rules directory empty | Cursor cannot load project-local rules from that path |
@@ -247,7 +257,7 @@ Recent positive patterns already in codebase: org subtree scoping, granular memb
 | Feature | Status |
 |---------|--------|
 | Soft delete standard | Missing |
-| MFA / TOTP / recovery codes | Stub only |
+| MFA / TOTP / recovery codes | Stub only *(historical 19 Jul 2026; Current: implemented, optional by policy)* |
 | Versioned REST API + OpenAPI | Missing |
 | Visitors domain (records, follow-up, conversion) | Missing (only attendance headcount) |
 | Inventory / stock movements | Missing |
@@ -255,7 +265,7 @@ Recent positive patterns already in codebase: org subtree scoping, granular memb
 | Petty cash | Missing |
 | Full fund accounting entity model | Partial (fund concepts on lines / accounts) |
 | Multi-currency | Missing / future |
-| Managers + Repositories + Selectors | Missing |
+| Managers + Repositories + Selectors | Missing *(historical: no packages. Current: per-app files; still no project-wide packages)* |
 | Field-level PII masking framework | Missing (payroll encryption only) |
 | Celery Beat scheduled enterprise suite | Partial Celery; not full Beat suite |
 | Hard budget limits everywhere | Partial / soft |
@@ -278,7 +288,7 @@ Recent positive patterns already in codebase: org subtree scoping, granular memb
 
 1. Scoped querysets at fetch for remaining IDOR-ish paths (announcements, remittance, similar).  
 2. Soft-delete mixin + policy for Members and other business objects (finance already uses void/reversal).  
-3. MFA for SUPER_ADMIN / platform / high-privilege finance roles.  
+3. MFA for SUPER_ADMIN / platform / high-privilege finance roles. *(Historical Phase 1 item. Current: TOTP/email OTP/recovery exist; default Site Settings audiences cover a privileged starter set when enforcement is on. Confirm production policy and `MFA_ENCRYPTION_KEY`.)*
 4. Admin `ModelAdmin.get_queryset` audit for every registered model.  
 5. Privacy helpers for phone/DOB/address in templates and any JSON search endpoints.
 
@@ -313,10 +323,10 @@ Recent positive patterns already in codebase: org subtree scoping, granular memb
 | Multi-tenancy | **Strong** | Denomination + org scope + church context |
 | Permissions / RBAC | **Strong** | Registry/matrix/overrides; some post-fetch checks remain |
 | Financial integrity | **Strong** | Double-entry, lock, void, periods, idempotency |
-| Layered architecture | **Medium** | Services yes; managers/repos no; fat views |
-| Security posture | **Medium–Strong** | CSRF/lanes good; soft-delete/MFA/API weak |
+| Layered architecture | **Medium** | Services yes; managers/repos no; fat views *(July: no helper files. Current: per-app selectors/repos; still no AGENTS package layout)* |
+| Security posture | **Medium–Strong** | CSRF/lanes good; soft-delete/MFA/API weak *(July scorecard. Current: MFA implemented but optional and live-unverified; soft-delete and `/api/v1/` remain absent)* |
 | Documentation system | **Weak** | Root AGENTS strong; nested `docs/` mostly empty |
-| AGENTS completeness | **Medium** | Core ChMS present; visitors/inventory/API/MFA missing |
+| AGENTS completeness | **Medium** | Core ChMS present; visitors/inventory/API/MFA missing *(July wording. Current: MFA present; visitors/inventory/API still missing)* |
 | Schema hygiene | **Medium–Strong** | UUID-heavy; polymorphic units; dual remittance |
 
 ---

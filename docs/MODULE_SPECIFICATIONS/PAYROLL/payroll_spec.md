@@ -82,7 +82,7 @@ Views no longer call payroll model managers / `get_object_or_404` on domain mode
 5. Soft budget warning via `check_payroll_budget`.  
 6. Feature flag: `payroll`.  
 7. Segregation: distinct approve / post / pay permission codes.  
-8. **Reverse SoD (Current, intentional):** `reverse_payroll_run` calls `void_transaction`. The user who posted the PAYROLL journal cannot reverse that same journal unless institutional `is_superadmin`. A second authorized checker is required. This is not a regression. Programmatic payroll posting still calls `approve_transaction()` directly and is **not** covered by multi-step `ApprovalPolicy`.
+8. **Reverse SoD (Current, intentional):** `reverse_payroll_run` calls `void_transaction`. The user who posted the PAYROLL journal cannot reverse that same journal unless institutional `is_superadmin`. A second authorized checker is required. This is not a regression. Programmatic payroll post/pay still uses `approve_module_journal` (not multi-step `ApprovalPolicy`). Accrual/payment journals approve only when a candidate other than the preparer/payer passes `actor_may_decide`; otherwise `PayrollError` and the run is not POSTED/PAID. Run-level pastor + treasury approval is unchanged.
 
 ---
 

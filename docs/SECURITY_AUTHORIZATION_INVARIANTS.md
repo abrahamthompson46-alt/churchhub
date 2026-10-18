@@ -399,7 +399,7 @@ No in-place edit of APPROVED/locked lines. Correction = void/reversal. Unbalance
 
 Receipt auto-approve (`receipt_should_auto_approve`) is the **only** documented SoD exception: capped income receipts, audited with `auto_approved` / `sod_exception`. MUST NOT apply to expenses, transfers, remittance, ledger, assets, payroll, or welfare disbursement.
 
-`approve_module_journal` MUST NOT approve when no distinct checker exists; callers MUST NOT treat the register as posted while the journal is PENDING.
+`approve_module_journal` MUST NOT approve unless `resolve_authorized_journal_checker` finds a candidate who is distinct from `created_by` and passes `actor_may_decide` for that journal (manageable-church + `church_in_user_scope`, `approve_transactions` or a valid in-scope delegation, District Administrator blocked). Mere module-posting permission is not GL approval authority. Ineligible candidates MUST be skipped. When no eligible checker exists the journal MUST remain PENDING and callers MUST NOT mark the module register posted. The helper MUST NOT fall back to the poster, the maker, or an arbitrary user. The `approve_transaction` `is_superadmin` self-approve break-glass MUST NOT be broadened on this path (the maker is skipped before `approve_transaction`). Do not require `ApprovalCase` on programmatic module posts.
 
 Phase 2 multi-step `ApprovalPolicy` MUST be documented as HTTP pending-queue coverage only. Programmatic `approve_transaction()` callers (payroll, settlements, assets) MUST NOT be described as having full multi-step policy coverage.
 

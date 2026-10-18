@@ -301,7 +301,10 @@ def post_acquisition_to_ledger(asset, user):
     trx = approve_module_journal(trx, user)
     if trx.approval_status != "APPROVED":
         raise AssetError(
-            "Asset capitalization journal requires approval by an officer other than the submitter."
+            "Asset capitalization journal requires an authorized checker other "
+            "than the submitter (approve_transactions or a valid in-scope "
+            "delegation). Asset posting permission is not general-ledger "
+            "approval authority."
         )
     _log_audit(
         asset.church,
@@ -420,8 +423,8 @@ def post_depreciation_entry(asset, period_year, period_month, user, *, force=Fal
                 "pending_register": True,
             },
         )
-        # Maker ≠ checker: background jobs / sole actor leave PENDING.
-        trx = approve_module_journal(trx, checker, user) if (user or checker) else trx
+        # Authorized checker only; never fall back to the poster.
+        trx = approve_module_journal(trx, checker)
         if trx.approval_status != "APPROVED":
             entry, _ = repo.update_or_create_depreciation_entry(
                 asset=asset,
@@ -555,10 +558,13 @@ def post_disposal_to_ledger(asset, user, disposal_date=None, *, checker=None):
             "nbv": str(nbv),
         },
     )
-    trx = approve_module_journal(trx, checker, user) if (user or checker) else trx
+    trx = approve_module_journal(trx, checker)
     if trx.approval_status != "APPROVED":
         raise AssetError(
-            "Asset disposal journal requires approval by an officer other than the disposer. "
+            "Asset disposal journal requires an authorized checker other than "
+            "the disposer (approve_transactions or a valid in-scope "
+            "delegation). Asset posting permission is not general-ledger "
+            "approval authority. "
             f"Journal {trx.reference} is pending; asset not marked disposed."
         )
     asset.disposal_transaction = trx

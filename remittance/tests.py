@@ -56,6 +56,12 @@ class RemittancePolicyTests(TestCase):
             role="LOCAL_PASTOR",
             church=self.church,
         )
+        self.gl_checker = User.objects.create_user(
+            username="pastor_gl_checker",
+            password="pass12345",
+            role="LOCAL_PASTOR",
+            church=self.church,
+        )
         self.member = Member.objects.create(
             church=self.church,
             first_name="Jane",
@@ -304,7 +310,7 @@ class RemittancePolicyTests(TestCase):
         self.assertEqual(case.status, "APPROVED")
         self.assertEqual(case.amount_approved, Decimal("75.00"))
 
-        case, trx = disburse_welfare_case(case, self.treasurer)
+        case, trx = disburse_welfare_case(case, self.gl_checker)
         self.assertEqual(case.status, "DISBURSED")
         validate_transaction_balance(trx)
         self.assertEqual(trx.lines.count(), 2)

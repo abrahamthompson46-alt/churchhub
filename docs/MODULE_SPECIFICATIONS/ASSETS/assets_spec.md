@@ -73,7 +73,7 @@ Views no longer call asset model managers / `get_object_or_404` on domain models
 
 1. Draft → submit → approve/reject; approve may capitalize (`capitalize_on_approval`).  
 2. Segregation of duties: submitter cannot approve (assert helpers).  
-3. Monthly depreciation: calculate → post DEPRECIATION_EXPENSE / ACCUMULATED_DEPRECIATION via transactions when policy allows.  
+3. Monthly depreciation: calculate → post DEPRECIATION_EXPENSE / ACCUMULATED_DEPRECIATION via transactions when policy allows. CAPITAL journals use `approve_module_journal` with an authorized checker (`actor_may_decide`); depreciation/disposal do **not** fall back to the poster. No eligible checker: acquisition/disposal raise; depreciation leaves the register unchanged (Celery/`user=None` included).
 4. Dispose writes off NBV when `post_disposal_to_ledger`.  
 5. Church-scoped categories unique by code; templates are platform-wide.  
 6. Feature flag: `assets`.  

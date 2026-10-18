@@ -573,8 +573,10 @@ def _disburse_welfare_case_atomic(case_id, user, payment_account_type, idempoten
     trx = approve_module_journal(trx, user)
     if trx.approval_status != "APPROVED":
         raise RemittancePolicyError(
-            "Welfare disbursement journal requires approval by an officer "
-            "other than the case approver."
+            "Welfare disbursement journal requires an authorized checker "
+            "other than the case approver (approve_transactions or a valid "
+            "in-scope delegation). Disburse-welfare permission is not "
+            "general-ledger approval authority. The case remains APPROVED."
         )
 
     _log_audit(

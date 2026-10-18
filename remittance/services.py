@@ -765,8 +765,10 @@ def _post_hierarchy_settlement(batch, user):
         trx = approve_module_journal(trx, user)
         if trx.approval_status != "APPROVED":
             raise RemittancePolicyError(
-                "Settlement journal requires approval by an officer other than "
-                "the batch creator before posting."
+                "Settlement journal requires an authorized checker other than "
+                "the batch creator (approve_transactions or a valid in-scope "
+                "delegation). Module posting permission is not general-ledger "
+                "approval authority. The batch remains DRAFT."
             )
         _log_audit(
             church,
@@ -864,8 +866,10 @@ def post_settlement_batch(batch, user):
         trx = approve_module_journal(trx, user)
         if trx.approval_status != "APPROVED":
             raise RemittancePolicyError(
-                "Settlement journal requires approval by an officer other than "
-                "the batch creator before posting."
+                "Settlement journal requires an authorized checker other than "
+                "the batch creator (approve_transactions or a valid in-scope "
+                "delegation). Module posting permission is not general-ledger "
+                "approval authority. The batch remains DRAFT."
             )
         _log_audit(
             church,

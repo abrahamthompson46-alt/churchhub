@@ -52,7 +52,7 @@ class AssetServicesTests(TestCase):
         cls.approver = User.objects.create_user(
             username="assetapprover",
             password="test12345",
-            role=UserRole.DISTRICT_PASTOR,
+            role=UserRole.LOCAL_PASTOR,
             church=cls.church,
         )
 

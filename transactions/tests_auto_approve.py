@@ -6,9 +6,11 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
+from approvals.services import create_delegation
 from organization.models import Church, Conference, District, Zone
 from payroll.models import PayComponentType, PayrollRun
 from payroll.services import (
+    PayrollError,
     approve_payroll_run,
     calculate_payroll_run,
     create_payroll_run,
@@ -16,12 +18,15 @@ from payroll.services import (
     post_payroll_run,
     treasury_approve_payroll_run,
 )
-from payroll.services import PayrollError
+from permissions.org_scope import apply_org_scope
+from permissions.roles import UserRole
+from permissions.services import ensure_permission_matrix
 from remittance.services import (
     RemittancePolicyError,
     create_settlement_draft,
     post_settlement_batch,
 )
+from sitecontrol.models import Denomination
 from transactions.models import FinancialAuditLog, Transaction, TreasuryApprovalPolicy
 from transactions.services import (
     approve_module_journal,
@@ -29,6 +34,7 @@ from transactions.services import (
     get_or_create_treasury_approval_policy,
     open_working_day,
     record_receipt,
+    resolve_authorized_journal_checker,
     resolve_journal_checker,
 )
 
@@ -315,3 +321,184 @@ class ReceiptAutoApprovePolicyTests(TestCase):
             combined_amount=Decimal("20.00"),
         )
         self.assertEqual(txn.approval_status, "PENDING")
+
+
+class AuthorizedModuleJournalCheckerTests(TestCase):
+    """CH-ENT-002 — module journals require actor_may_decide for the checker."""
+
+    def setUp(self):
+        ensure_permission_matrix()
+        self.denomination = Denomination.objects.create(
+            code="amj", name="AMJ Denom", is_active=True
+        )
+        other_denom = Denomination.objects.create(
+            code="amjx", name="AMJ Other Denom", is_active=True
+        )
+        conference = Conference.objects.create(
+            name="AMJ Conf", code="AMJC", denomination=self.denomination
+        )
+        other_conf = Conference.objects.create(
+            name="AMJ Other Conf", code="AMJX", denomination=other_denom
+        )
+        zone = Zone.objects.create(name="AMJ Zone", code="AMJZ", conference=conference)
+        other_zone = Zone.objects.create(
+            name="AMJ XZone", code="AMJZX", conference=other_conf
+        )
+        district = District.objects.create(name="AMJ Dist", code="AMJD", zone=zone)
+        other_district = District.objects.create(
+            name="AMJ Dist 2", code="AMJD2", zone=zone
+        )
+        x_district = District.objects.create(name="AMJ XDist", code="AMJDX", zone=other_zone)
+        self.church = Church.objects.create(name="AMJ Church", code="AMJCH", district=district)
+        self.other_church = Church.objects.create(
+            name="AMJ Other Church", code="AMJOC", district=other_district
+        )
+        self.x_church = Church.objects.create(
+            name="AMJ Cross Denom", code="AMJXD", district=x_district
+        )
+        self.treasurer = User.objects.create_user(
+            username="amj_treasury",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        self.pastor = User.objects.create_user(
+            username="amj_pastor",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=self.church,
+        )
+        self.other_pastor = User.objects.create_user(
+            username="amj_other_pastor",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=self.other_church,
+        )
+        self.x_pastor = User.objects.create_user(
+            username="amj_x_pastor",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=self.x_church,
+        )
+        self.district_pastor = User.objects.create_user(
+            username="amj_dp",
+            password="pass12345",
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+        )
+        apply_org_scope(
+            self.district_pastor,
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+            district=district,
+        )
+        self.district_pastor.save()
+        self.superadmin = User.objects.create_user(
+            username="amj_sa",
+            password="pass12345",
+            role=UserRole.SUPER_ADMIN,
+            church=self.church,
+            denomination=self.denomination,
+        )
+        open_working_day(self.church, timezone.localdate(), self.pastor)
+        open_working_day(self.other_church, timezone.localdate(), self.other_pastor)
+        open_working_day(self.x_church, timezone.localdate(), self.x_pastor)
+        _require_second_approval(self.church)
+
+    def _pending(self, maker=None):
+        return record_receipt(
+            church=self.church,
+            created_by=maker or self.treasurer,
+            tithe_amount=Decimal("25.00"),
+        )
+
+    def test_authorized_in_scope_checker_approves(self):
+        txn = self._pending()
+        result = approve_module_journal(txn, self.pastor)
+        self.assertEqual(result.approval_status, "APPROVED")
+        self.assertTrue(result.locked)
+        self.assertEqual(result.approved_by_id, self.pastor.id)
+
+    def test_checker_without_approve_transactions_is_rejected(self):
+        txn = self._pending(maker=self.pastor)
+        result = approve_module_journal(txn, self.treasurer)
+        self.assertEqual(result.approval_status, "PENDING")
+        self.assertFalse(result.locked)
+        self.assertIsNone(result.approved_by_id)
+
+    def test_valid_delegation_authorizes_treasury_checker(self):
+        txn = self._pending(maker=self.pastor)
+        today = timezone.localdate()
+        create_delegation(
+            grantor=self.pastor,
+            grantee=self.treasurer,
+            church=self.church,
+            valid_from=today,
+            valid_until=today,
+            max_amount=Decimal("100.00"),
+        )
+        result = approve_module_journal(txn, self.treasurer)
+        self.assertEqual(result.approval_status, "APPROVED")
+        self.assertEqual(result.approved_by_id, self.treasurer.id)
+
+    def test_district_pastor_cannot_be_selected(self):
+        txn = self._pending()
+        self.assertIsNone(
+            resolve_authorized_journal_checker(txn, self.district_pastor)
+        )
+        result = approve_module_journal(txn, self.district_pastor)
+        self.assertEqual(result.approval_status, "PENDING")
+        self.assertFalse(result.locked)
+
+    def test_cross_district_and_cross_denomination_candidates_rejected(self):
+        txn = self._pending()
+        self.assertIsNone(
+            resolve_authorized_journal_checker(txn, self.other_pastor, self.x_pastor)
+        )
+        result = approve_module_journal(txn, self.other_pastor, self.x_pastor)
+        self.assertEqual(result.approval_status, "PENDING")
+        self.assertFalse(result.locked)
+
+    def test_ineligible_first_candidate_skipped_when_later_eligible(self):
+        txn = self._pending()
+        checker = resolve_authorized_journal_checker(
+            txn, self.treasurer, self.district_pastor, self.pastor
+        )
+        self.assertEqual(checker.pk, self.pastor.pk)
+        result = approve_module_journal(
+            txn, self.treasurer, self.district_pastor, self.pastor
+        )
+        self.assertEqual(result.approval_status, "APPROVED")
+        self.assertEqual(result.approved_by_id, self.pastor.id)
+
+    def test_no_eligible_checker_fails_closed(self):
+        txn = self._pending()
+        result = approve_module_journal(txn, self.treasurer, self.district_pastor)
+        self.assertEqual(result.approval_status, "PENDING")
+        self.assertFalse(result.locked)
+        txn.refresh_from_db()
+        self.assertEqual(txn.approval_status, "PENDING")
+        self.assertFalse(txn.locked)
+        self.assertFalse(
+            FinancialAuditLog.objects.filter(
+                transaction=txn,
+                action="APPROVE",
+            ).exists()
+        )
+
+    def test_maker_cannot_approve_own_module_journal_including_superadmin(self):
+        txn = self._pending()
+        result = approve_module_journal(txn, self.treasurer)
+        self.assertEqual(result.approval_status, "PENDING")
+        sa_txn = record_receipt(
+            church=self.church,
+            created_by=self.superadmin,
+            tithe_amount=Decimal("12.00"),
+        )
+        sa_result = approve_module_journal(sa_txn, self.superadmin)
+        self.assertEqual(sa_result.approval_status, "PENDING")
+        self.assertFalse(sa_result.locked)
+        with self.assertRaises(ValueError):
+            approve_transaction(txn, self.treasurer)
+        approved = approve_transaction(sa_txn, self.superadmin)
+        self.assertEqual(approved.approval_status, "APPROVED")

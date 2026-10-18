@@ -43,6 +43,12 @@ class WelfareDisburseBase:
             role="LOCAL_PASTOR",
             church=self.church,
         )
+        self.gl_checker = User.objects.create_user(
+            username="disb_gl_checker",
+            password="pass12345",
+            role="LOCAL_PASTOR",
+            church=self.church,
+        )
         self.reviewer = User.objects.create_user(
             username="disb_reviewer",
             password="pass12345",
@@ -85,13 +91,13 @@ class WelfareDisburseTests(WelfareDisburseBase, TestCase):
 
     def test_successful_disbursement(self):
         case = self._fund_and_approve_case()
-        case, trx = disburse_welfare_case(case, self.treasurer)
+        case, trx = disburse_welfare_case(case, self.gl_checker)
         self.assertEqual(case.status, "DISBURSED")
         self.assertTrue(trx.locked)
         self.assertEqual(trx.approval_status, "APPROVED")
         self.assertEqual(trx.lines.count(), 2)
         self.assertEqual(trx.created_by_id, self.pastor.id)
-        self.assertEqual(trx.approved_by_id, self.treasurer.id)
+        self.assertEqual(trx.approved_by_id, self.gl_checker.id)
         self.assertEqual(
             WelfareMemberLedger.objects.filter(
                 case=case, entry_type="DISBURSEMENT"
@@ -106,11 +112,25 @@ class WelfareDisburseTests(WelfareDisburseBase, TestCase):
             ).exists()
         )
 
-    def test_duplicate_submission_rejected(self):
+    def test_treasurer_disburse_fails_closed_without_gl_authority(self):
         case = self._fund_and_approve_case()
-        disburse_welfare_case(case, self.treasurer)
         with self.assertRaises(RemittancePolicyError) as ctx:
             disburse_welfare_case(case, self.treasurer)
+        self.assertIn("authorized checker", str(ctx.exception).lower())
+        case.refresh_from_db()
+        self.assertEqual(case.status, "APPROVED")
+        self.assertIsNone(case.disbursement_transaction_id)
+        self.assertFalse(
+            Transaction.objects.filter(
+                description__startswith="Welfare assistance —"
+            ).exists()
+        )
+
+    def test_duplicate_submission_rejected(self):
+        case = self._fund_and_approve_case()
+        disburse_welfare_case(case, self.gl_checker)
+        with self.assertRaises(RemittancePolicyError) as ctx:
+            disburse_welfare_case(case, self.gl_checker)
         self.assertIn("already been disbursed", str(ctx.exception).lower())
         self.assertEqual(
             Transaction.objects.filter(
@@ -149,7 +169,7 @@ class WelfareDisburseTests(WelfareDisburseBase, TestCase):
 
     def test_audit_records_created_correctly(self):
         case = self._fund_and_approve_case()
-        case, trx = disburse_welfare_case(case, self.treasurer)
+        case, trx = disburse_welfare_case(case, self.gl_checker)
         success = FinancialAuditLog.objects.get(
             transaction=trx, action="CREATE"
         )
@@ -157,13 +177,13 @@ class WelfareDisburseTests(WelfareDisburseBase, TestCase):
         self.assertEqual(success.details.get("case_number"), case.case_number)
 
         with self.assertRaises(RemittancePolicyError):
-            disburse_welfare_case(case, self.treasurer)
+            disburse_welfare_case(case, self.gl_checker)
         rejected = FinancialAuditLog.objects.filter(
             church=self.church,
             details__type="WELFARE_DISBURSE_REJECTED",
         ).latest("created_at")
         self.assertEqual(rejected.details.get("case_id"), str(case.pk))
-        self.assertEqual(rejected.performed_by_id, self.treasurer.id)
+        self.assertEqual(rejected.performed_by_id, self.gl_checker.id)
 
 
 class WelfareDisburseConcurrencyTests(WelfareDisburseBase, TransactionTestCase):
@@ -178,7 +198,7 @@ class WelfareDisburseConcurrencyTests(WelfareDisburseBase, TransactionTestCase):
         def worker():
             try:
                 with db_transaction.atomic():
-                    disburse_welfare_case(case, self.treasurer)
+                    disburse_welfare_case(case, self.gl_checker)
                 results["ok"] += 1
             except RemittancePolicyError:
                 results["err"] += 1

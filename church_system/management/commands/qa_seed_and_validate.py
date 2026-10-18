@@ -98,7 +98,19 @@ class Command(BaseCommand):
                 user=treasurer,
             )
             approve_welfare_case(case, pastor, amount_approved=Decimal("50.00"))
-            disburse_welfare_case(case, treasurer)
+            gl_checker = (
+                User.objects.filter(role=pastor.role, church=church)
+                .exclude(pk=pastor.pk)
+                .first()
+            )
+            if gl_checker is None:
+                gl_checker = User.objects.create_user(
+                    username="qa_gl_checker",
+                    password="pass12345",
+                    role=pastor.role,
+                    church=church,
+                )
+            disburse_welfare_case(case, gl_checker)
 
         today = timezone.now().date()
         try:

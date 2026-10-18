@@ -106,7 +106,7 @@ flowchart TD
 | `lock_financial_period` | Close books for month |
 | `generate_monthly_cutoff` | Aggregate remit payables for a month |
 
-**Downstream posters into this workflow:** payroll (`PAYROLL` type), assets (capital/depreciation), remittance settlements, ledger guided entry. Those modules still call `approve_transaction()` / `approve_module_journal()` directly. Phase 2 multi-step `ApprovalPolicy` is **not** claimed for those programmatic paths; it covers the HTTP pending-journal queue (`approvals.services` wrapping existing journal services). Default policy remains one checker. Escalation never auto-approves. Receipt auto-approve stays on `TreasuryApprovalPolicy`.
+**Downstream posters into this workflow:** payroll (`PAYROLL` type), assets (capital/depreciation), remittance settlements, welfare disbursement, ledger guided entry. Those modules still call `approve_module_journal()` / `approve_transaction()` directly. The module checker must pass `actor_may_decide` for the journal; they are **not** full multi-step `ApprovalPolicy` coverage. Default HTTP policy remains one checker. Escalation never auto-approves. Receipt auto-approve stays on `TreasuryApprovalPolicy`.
 
 ### Planned
 

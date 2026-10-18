@@ -700,7 +700,9 @@ def post_payroll_run(payroll_run, user, idempotency_key=None):
     )
     if trx.approval_status != "APPROVED":
         raise PayrollError(
-            "Payroll journal requires approval by an officer other than the preparer."
+            "Payroll journal requires an authorized checker other than the "
+            "preparer (approve_transactions or a valid in-scope delegation). "
+            "Module posting permission is not general-ledger approval authority."
         )
     _log_audit(
         church,
@@ -793,7 +795,9 @@ def pay_payroll_run(payroll_run, user, payment_account_type="BANK", idempotency_
     )
     if trx.approval_status != "APPROVED":
         raise PayrollError(
-            "Payroll payment journal requires approval by an officer other than the payer."
+            "Payroll payment journal requires an authorized checker other than "
+            "the payer (approve_transactions or a valid in-scope delegation). "
+            "Module posting permission is not general-ledger approval authority."
         )
     _log_audit(church, "CREATE", user, transaction=trx, details={"payroll_payment": payroll_run.reference})
 

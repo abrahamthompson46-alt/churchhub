@@ -42,6 +42,12 @@ class WelfareEnterpriseTests(TestCase):
             role="LOCAL_PASTOR",
             church=self.church,
         )
+        self.gl_checker = User.objects.create_user(
+            username="welfare_gl_checker",
+            password="pass12345",
+            role="LOCAL_PASTOR",
+            church=self.church,
+        )
         self.reviewer = User.objects.create_user(
             username="welfare_reviewer",
             password="pass12345",
@@ -92,7 +98,7 @@ class WelfareEnterpriseTests(TestCase):
         self.assertEqual(case.status, "UNDER_REVIEW")
 
         approve_welfare_case(case, self.pastor, amount_approved=Decimal("80.00"))
-        case, trx = disburse_welfare_case(case, self.treasurer)
+        case, trx = disburse_welfare_case(case, self.gl_checker)
         self.assertEqual(case.status, "DISBURSED")
         self.assertIsNotNone(case.disbursement_transaction)
         self.assertEqual(case.disbursement_transaction, trx)

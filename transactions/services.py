@@ -935,7 +935,11 @@ def record_district_remittance(
 
 
 def resolve_journal_checker(maker, *candidates):
-    """Return the first candidate user distinct from maker, or None."""
+    """Return the first candidate user distinct from maker, or None.
+
+    Identity-only. Do not use this as general-ledger approval authority.
+    Module journals must use ``resolve_authorized_journal_checker``.
+    """
     maker_id = getattr(maker, "pk", maker) if maker is not None else None
     for candidate in candidates:
         if candidate is None:
@@ -946,15 +950,44 @@ def resolve_journal_checker(maker, *candidates):
     return None
 
 
+def resolve_authorized_journal_checker(transaction, *candidates):
+    """First candidate who is not the maker and may decide this journal.
+
+    Uses ``actor_may_decide`` (org scope, ``approve_transactions`` or a valid
+    in-scope delegation, District Administrator blocked). Maker is skipped so
+    the ``approve_transaction`` superadmin self-approve break-glass is not
+    broadened on this path. Ineligible candidates are skipped; None means fail
+    closed (no authorized checker).
+    """
+    from approvals.services import actor_may_decide
+
+    maker = getattr(transaction, "created_by", None)
+    maker_id = getattr(maker, "pk", maker) if maker is not None else None
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        candidate_id = getattr(candidate, "pk", candidate)
+        if maker_id is not None and candidate_id == maker_id:
+            continue
+        if actor_may_decide(candidate, transaction):
+            return candidate
+    return None
+
+
 @db_transaction.atomic
 def approve_module_journal(transaction, *checker_candidates):
     """
-    Approve a module-created PENDING journal through approve_transaction when a
-    checker distinct from created_by is available.
+    Approve a module-created PENDING journal through approve_transaction when an
+    authorized checker distinct from created_by is available.
 
-    Returns the transaction (still PENDING when no distinct checker is found).
+    Candidates are evaluated with ``actor_may_decide`` for this journal.
+    Module posting permission is not GL approval authority.
+
+    Returns the transaction (still PENDING when no eligible checker is found).
+    Callers inside an atomic block must not mark module registers posted unless
+    the journal is APPROVED.
     """
-    checker = resolve_journal_checker(transaction.created_by, *checker_candidates)
+    checker = resolve_authorized_journal_checker(transaction, *checker_candidates)
     if checker is None:
         return transaction
     return approve_transaction(transaction, checker)

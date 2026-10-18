@@ -84,7 +84,7 @@ From `church_system/settings.py` `INSTALLED_APPS`:
 | `payroll` | Employees, payroll runs, statutory rules → posts journals |
 | `assets` | Fixed assets, depreciation, maintenance |
 | `audit` | Enterprise `AuditEvent` dual-write + `/controls/` summary/search (not a second GL) |
-| `approvals` | HTTP pending-queue maker-checker (cases/steps/delegations wrapping journal approve/reject/void). Multi-step policy does not cover programmatic payroll/settlement/asset posters |
+| `approvals` | HTTP pending-queue maker-checker (cases/steps/delegations wrapping journal approve/reject/void). Multi-step policy does not cover programmatic posters; `approve_module_journal` still requires `actor_may_decide` for the checker |
 | `intelligence` | Deterministic `RiskPolicy` / `RiskAlert` (no ML). HIGH pending alerts may attach an `ApprovalCase`; they never approve/reject or block receipt auto-approve |
 | `portal` | Member-linked self-service views |
 | `sitecontrol` | Platform SaaS: denominations, subscriptions, applications, owner marketing, settings |

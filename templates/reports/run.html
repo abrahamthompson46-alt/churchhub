@@ -67,7 +67,9 @@
             {% endif %}
         </div>
     </div>
-    {% if data.statement %}
+    {% if data.ledger %}
+    {% include "reports/includes/general_ledger.html" %}
+    {% elif data.statement %}
     {% include "reports/includes/financial_statement.html" %}
     {% else %}
     {% include "includes/table_open.html" with table_title="Results" table_icon="bi-table" %}

@@ -1,0 +1,73 @@
+{% load humanize %}
+<article class="stmt gl" aria-label="{{ data.title }}">
+    <header class="stmt__masthead">
+        <p class="stmt__kicker">ChurchHub · Books of record</p>
+        <h2 class="stmt__title">{{ data.title }}</h2>
+        <p class="stmt__period">{{ data.period_label }} · {{ data.start_date }} to {{ data.end_date }}</p>
+        {% if data.statement.balanced == True %}
+        <p class="stmt__badge stmt__badge--ok"><i class="bi bi-check-circle" aria-hidden="true"></i> Debits equal credits</p>
+        {% elif data.statement.balanced == False %}
+        <p class="stmt__badge stmt__badge--warn"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Debits and credits differ on this page</p>
+        {% endif %}
+    </header>
+
+    {% if data.statement.kpis %}
+    <div class="stmt__kpis" role="list">
+        {% for kpi in data.statement.kpis %}
+        <div class="stmt__kpi stmt__kpi--{{ kpi.tone|default:'primary' }}" role="listitem">
+            <span class="stmt__kpi-label">{{ kpi.label }}</span>
+            <span class="stmt__kpi-value{% if kpi.format != 'integer' %} text-currency{% endif %}">
+                {% if kpi.format == "integer" %}{{ kpi.value|intcomma }}{% else %}{{ kpi.value|floatformat:2|intcomma }}{% endif %}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if data.ledger.journals %}
+    <div class="gl__list">
+        {% for journal in data.ledger.journals %}
+        <section class="gl__journal">
+            <header class="gl__journal-head">
+                <div class="gl__journal-meta">
+                    <time datetime="{{ journal.date|date:'Y-m-d' }}">{{ journal.date }}</time>
+                    {% if journal.reference %}<span class="gl__ref">{{ journal.reference }}</span>{% endif %}
+                    <span class="gl__type">{{ journal.type }}</span>
+                    <span class="gl__church">{{ journal.church }}</span>
+                </div>
+                <p class="gl__narration">{{ journal.narration }}</p>
+                {% if journal.member %}<p class="gl__member">Member · {{ journal.member }}</p>{% endif %}
+            </header>
+            <table class="table table-sm mb-0 gl__lines">
+                <thead>
+                    <tr>
+                        <th>Account</th>
+                        <th class="text-end">Debit</th>
+                        <th class="text-end">Credit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for line in journal.lines %}
+                    <tr>
+                        <td>{{ line.account }}</td>
+                        <td class="text-end text-currency">{% if line.debit %}{{ line.debit|floatformat:2|intcomma }}{% endif %}</td>
+                        <td class="text-end text-currency">{% if line.credit %}{{ line.credit|floatformat:2|intcomma }}{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="p-4">{% include "includes/empty_state.html" with icon="bi-inbox" message="No approved journal entries for this period." %}</div>
+    {% endif %}
+
+    {% if data.statement.notes %}
+    <footer class="stmt__notes">
+        {% for note in data.statement.notes %}
+        <p>{{ note }}</p>
+        {% endfor %}
+    </footer>
+    {% endif %}
+</article>

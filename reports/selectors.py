@@ -80,6 +80,16 @@ def transaction_lines_for_transactions(txns):
     return TransactionLine.objects.filter(transaction__in=txns).select_related("account")
 
 
+def ledger_transactions_in_scope(request, start, end, **hierarchy):
+    """Approved, non-voided journals for the GL detail report, newest church-scope filters applied."""
+    return (
+        transactions_in_scope(request, start, end, **hierarchy)
+        .select_related("church", "member")
+        .prefetch_related("lines__account")
+        .order_by("date", "created_at", "reference", "pk")
+    )
+
+
 def sum_line_amount_for_type(lines, acc_type):
     return lines.filter(account__account_type=acc_type).aggregate(t=Sum("amount"))["t"]
 

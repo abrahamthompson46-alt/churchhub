@@ -7,6 +7,12 @@ REPORT_CATALOG = {
         "icon": "bi-cash-stack",
         "permission": "finance",
     },
+    "general_ledger": {
+        "label": "Detailed Financial Report",
+        "description": "Every approved journal entry in the period, with narration, accounts, and debit/credit lines.",
+        "icon": "bi-journal-text",
+        "permission": "finance",
+    },
     "member_summary": {
         "label": "Member Summary",
         "description": "Membership KPIs, demographics, trends, activity, and data quality.",

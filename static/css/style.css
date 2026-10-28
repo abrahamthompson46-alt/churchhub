@@ -6257,8 +6257,65 @@ a.alert-banner:hover {
     color: var(--ch-muted);
 }
 .stmt__notes p:last-child { margin-bottom: 0; }
+.gl__list {
+    padding: 0 1.25rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+.gl__journal {
+    border: 1px solid var(--ch-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #fff;
+}
+.gl__journal-head {
+    padding: 0.75rem 1rem 0.6rem;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--ch-border);
+}
+.gl__journal-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.75rem;
+    font-size: 0.78rem;
+    color: var(--ch-muted);
+    margin-bottom: 0.35rem;
+}
+.gl__ref {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--ch-text);
+}
+.gl__type {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    font-size: 0.7rem;
+}
+.gl__narration {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--ch-text);
+    line-height: 1.35;
+}
+.gl__member {
+    margin: 0.25rem 0 0;
+    font-size: 0.8rem;
+    color: var(--ch-muted);
+}
+.gl__lines {
+    font-variant-numeric: tabular-nums;
+}
+.gl__lines thead th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ch-muted);
+}
 @media print {
     .stmt__toolbar, .filter-panel, .export-toolbar { display: none !important; }
     .stmt__section { break-inside: avoid; }
     .stmt__section:not([open]) { display: block; }
+    .gl__journal { break-inside: avoid; }
 }

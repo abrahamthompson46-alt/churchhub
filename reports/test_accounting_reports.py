@@ -73,3 +73,54 @@ class AccountingReportTests(TestCase):
     def test_cash_position_builds(self):
         data = build_report("cash_position", self._request(), period="monthly")
         self.assertEqual(data["summary"]["total"], Decimal("100.00"))
+
+    def test_general_ledger_lists_each_line_with_narration(self):
+        data = build_report("general_ledger", self._request(), period="monthly")
+        self.assertEqual(data["title"], "Detailed Financial Report")
+        self.assertEqual(data["summary"]["journal_count"], 1)
+        self.assertEqual(data["summary"]["line_count"], 2)
+        self.assertEqual(data["summary"]["total_debit"], data["summary"]["total_credit"])
+        narrations = [row[4] for row in data["rows"]]
+        self.assertTrue(all(n == "Seed receipt" for n in narrations))
+        self.assertEqual(len(data["ledger"]["journals"]), 1)
+        self.assertEqual(data["ledger"]["journals"][0]["narration"], "Seed receipt")
+        self.assertEqual(len(data["ledger"]["journals"][0]["lines"]), 2)
+
+    def test_general_ledger_excludes_other_church_and_pending(self):
+        other = Church.objects.create(
+            name="Other",
+            code="CH2",
+            district=self.church.district,
+        )
+        cash = Account.objects.filter(church=other, account_type="CASH").first()
+        if not cash:
+            cash = Account.objects.create(name="Cash", account_type="CASH", church=other)
+        income = Account.objects.filter(church=other, account_type="INCOME").first()
+        if not income:
+            income = Account.objects.create(name="Income", account_type="INCOME", church=other)
+        foreign = Transaction.objects.create(
+            transaction_type="RECEIPT",
+            church=other,
+            created_by=self.treasury,
+            description="Foreign receipt",
+            approval_status="APPROVED",
+        )
+        TransactionLine.objects.create(transaction=foreign, account=cash, amount=Decimal("50.00"))
+        TransactionLine.objects.create(transaction=foreign, account=income, amount=Decimal("-50.00"))
+        pending = Transaction.objects.create(
+            transaction_type="EXPENSE",
+            church=self.church,
+            created_by=self.treasury,
+            description="Pending expense",
+            approval_status="PENDING",
+        )
+        own_cash = Account.objects.filter(church=self.church, account_type="CASH").first()
+        own_income = Account.objects.filter(church=self.church, account_type="INCOME").first()
+        TransactionLine.objects.create(transaction=pending, account=own_cash, amount=Decimal("-10.00"))
+        TransactionLine.objects.create(transaction=pending, account=own_income, amount=Decimal("10.00"))
+
+        data = build_report("general_ledger", self._request(), period="monthly")
+        narrations = [row[4] for row in data["rows"]]
+        self.assertIn("Seed receipt", narrations)
+        self.assertNotIn("Foreign receipt", narrations)
+        self.assertNotIn("Pending expense", narrations)

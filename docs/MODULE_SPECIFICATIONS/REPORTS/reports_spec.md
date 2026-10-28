@@ -49,14 +49,14 @@ erDiagram
 1. Access requires `view_reports` **plus** domain permission (`finance` / `members` / `overseer` per catalog).  
 2. Feature gates fail closed without church (`advanced_reports`, `payroll`, `assets`, `remittance`, `budgets`).  
 3. Hierarchy filters resolve manageable churches only.  
-4. Detail rows soft-capped (`REPORT_ROW_LIMIT = 500`).  
+4. Detail rows soft-capped (`REPORT_ROW_LIMIT = 500`). The Detailed Financial Report (`general_ledger`) lists approved journal lines with narration and stops at whole journals when the cap is reached.  
 5. Builders are read-only ORM aggregates — must not post journals.
 
 ### Catalog keys (Current)
 
 | Key | Domain | Extra gate |
 |-----|--------|------------|
-| financial_summary, tithe_report | finance | — |
+| financial_summary, general_ledger, tithe_report | finance | — |
 | trial_balance, balance_sheet, income_statement, cash_position | finance | `advanced_reports` |
 | payroll_summary | finance | feature `payroll` |
 | asset_register, depreciation_schedule | finance | feature `assets` |

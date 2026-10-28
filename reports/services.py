@@ -194,6 +194,7 @@ def build_report(report_key, request, period="monthly", start_date=None, end_dat
     start, end = resolve_date_range(period, start_date, end_date)
     builders = {
         "financial_summary": _financial_summary,
+        "general_ledger": _general_ledger,
         "member_summary": _member_summary,
         "tithe_report": _tithe_report,
         "transfer_report": _transfer_report,
@@ -218,6 +219,134 @@ def build_report(report_key, request, period="monthly", start_date=None, end_dat
     data["start_date"] = start
     data["end_date"] = end
     return data
+
+
+def _ledger_narration(txn):
+    text = (txn.description or "").strip()
+    if text:
+        return text
+    return txn.get_transaction_type_display()
+
+
+def _general_ledger(request, start, end, **hierarchy):
+    """Line-level books of record: every approved journal in the period, with narration."""
+    txns = selectors.ledger_transactions_in_scope(request, start, end, **hierarchy)
+    journal_count = txns.count()
+    total_lines = selectors.transaction_lines_for_transactions(txns).count()
+
+    headers = [
+        "Date",
+        "Reference",
+        "Church",
+        "Type",
+        "Narration",
+        "Member",
+        "Account",
+        "Debit",
+        "Credit",
+    ]
+    rows = []
+    journals = []
+    shown_lines = 0
+    truncated = False
+    total_debit = Decimal("0")
+    total_credit = Decimal("0")
+
+    for txn in txns:
+        lines = sorted(txn.lines.all(), key=lambda line: (line.amount < 0, str(line.pk)))
+        if not lines:
+            continue
+        if shown_lines and shown_lines + len(lines) > REPORT_ROW_LIMIT:
+            truncated = True
+            break
+        narration = _ledger_narration(txn)
+        member_name = txn.member.full_name if txn.member_id else ""
+        journal = {
+            "date": txn.date,
+            "reference": txn.reference or "",
+            "church": txn.church.name,
+            "type": txn.get_transaction_type_display(),
+            "narration": narration,
+            "member": member_name,
+            "lines": [],
+        }
+        for line in lines:
+            amount = _quantize(line.amount)
+            debit = amount if amount > 0 else Decimal("0")
+            credit = abs(amount) if amount < 0 else Decimal("0")
+            total_debit += debit
+            total_credit += credit
+            journal["lines"].append(
+                {
+                    "account": line.account.name,
+                    "debit": debit,
+                    "credit": credit,
+                }
+            )
+            rows.append(
+                [
+                    txn.date,
+                    txn.reference or "",
+                    txn.church.name,
+                    txn.get_transaction_type_display(),
+                    narration,
+                    member_name,
+                    line.account.name,
+                    debit if debit else "",
+                    credit if credit else "",
+                ]
+            )
+            shown_lines += 1
+        journals.append(journal)
+
+    if truncated:
+        rows.append(
+            [
+                "… truncated",
+                "",
+                "",
+                "",
+                f"Showing {shown_lines} of {total_lines} lines",
+                "",
+                "",
+                "",
+                "",
+            ]
+        )
+
+    notes = [
+        "Approved, non-voided journals only. Pending and voided entries are excluded.",
+        "Narration is the journal description; if blank, the transaction type is shown.",
+        "Amounts follow the books of record (positive line = debit, negative = credit).",
+    ]
+    if truncated:
+        notes.append(f"Display is capped at {REPORT_ROW_LIMIT} lines. Export the same view or narrow the period for the rest.")
+
+    return {
+        "title": "Detailed Financial Report",
+        "headers": headers,
+        "rows": rows,
+        "truncated": truncated,
+        "summary": {
+            "journal_count": journal_count,
+            "line_count": total_lines,
+            "shown_lines": shown_lines,
+            "total_debit": _quantize(total_debit),
+            "total_credit": _quantize(total_credit),
+        },
+        "ledger": {"journals": journals},
+        "statement": _statement(
+            kpis=[
+                {"label": "Journals", "value": journal_count, "tone": "primary", "format": "integer"},
+                {"label": "Lines", "value": total_lines, "tone": "primary", "format": "integer"},
+                {"label": "Debits", "value": _quantize(total_debit), "tone": "ok"},
+                {"label": "Credits", "value": _quantize(total_credit), "tone": "ok"},
+            ],
+            sections=[],
+            notes=notes,
+            balanced=_quantize(total_debit) == _quantize(total_credit) if shown_lines else None,
+        ),
+    }
 
 
 def _financial_summary(request, start, end, **hierarchy):

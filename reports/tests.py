@@ -201,6 +201,39 @@ class ReportsTests(TestCase):
         self.assertEqual(log.report_key, "financial_summary")
         self.assertEqual(log.action, ReportAccessAuditLog.ACTION_RUN)
 
+    def test_general_ledger_available_without_advanced_reports(self):
+        self.assertTrue(
+            user_may_access_report(self.treasury, "general_ledger", active_church=self.church)
+        )
+
+    def test_run_general_ledger_shows_narration(self):
+        from transactions.models import Account, Transaction, TransactionLine
+        from transactions.services import validate_transaction_balance
+
+        cash = Account.objects.filter(church=self.church, account_type="CASH").first()
+        if not cash:
+            cash = Account.objects.create(name="Cash", account_type="CASH", church=self.church)
+        income = Account.objects.filter(church=self.church, account_type="INCOME").first()
+        if not income:
+            income = Account.objects.create(name="Income", account_type="INCOME", church=self.church)
+        txn = Transaction.objects.create(
+            transaction_type="RECEIPT",
+            church=self.church,
+            created_by=self.treasury,
+            description="Sunday tithe envelope 12",
+            approval_status="APPROVED",
+        )
+        TransactionLine.objects.create(transaction=txn, account=cash, amount=Decimal("40.00"))
+        TransactionLine.objects.create(transaction=txn, account=income, amount=Decimal("-40.00"))
+        validate_transaction_balance(txn)
+
+        self._login("treasury_r")
+        response = self.client.get(reverse("reports:run", args=["general_ledger"]), {"period": "monthly"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="stmt gl"')
+        self.assertContains(response, "Sunday tithe envelope 12")
+        self.assertContains(response, "Detailed Financial Report")
+
     def test_member_without_view_reports_denied_index(self):
         # MEMBER is outside report catalog defaults; finance implies do not grant it.
         user = User.objects.create_user(

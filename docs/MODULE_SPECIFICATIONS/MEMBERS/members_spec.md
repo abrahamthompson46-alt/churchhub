@@ -55,6 +55,10 @@ Own **local church membership**: directory, member CRUD, families/departments, p
 |-------|------------|
 | `Department` | UUID; FK church; unique `(church, name)` |
 | `Family` | UUID; FK church; optional head Member; unique `(church, name)` |
+| `MemberLocation` | UUID; church-owned area/estate name for care groups |
+| `CareGroup` | UUID; church + location; optional leader; unique `(church, name)` |
+| `CareGroupMembership` | Member in one **active** care group (`left_at` null); role leader/member |
+| `CarePartnership` | Undirected one-to-one pair inside a group (`member_a` UUID &lt; `member_b`) |
 | `Occupation` | BigAuto PK; FK church; unique `(church, name)` |
 | `Member` | UUID; church + optional dept/family/occupation; demographics; baptism fields; phone/membership_number partial uniques; **unique non-blank email** (case-insensitive, active records); email implies required DOB (directory completeness, not a portal password); `is_active` synced from status |
 | `MemberTransfer` | from/to church; status; reason/notes; requested/processed by |
@@ -117,6 +121,7 @@ Management: `export_member_data`.
 | `add` / `edit` / `member_detail` / `member_timeline` | CRUD + timeline |
 | `member_export` | Per-member JSON download |
 | Record / department / family CRUD | Supporting entities |
+| Care group / location / pairing | Location groups + one-to-one links (`care_group_views`) |
 | `transfer_*` | Transfer list/create/detail (+ complete/reject) |
 | `baptism_register` | Baptism list/export; **Add baptism** when `manage_member_records` or `manage_baptisms` |
 | Leadership / spiritual gift views | Roles and gifts |
@@ -155,13 +160,13 @@ Management: `export_member_data`.
 
 ## 9. Forms (Current)
 
-`MemberForm`, `MemberFilterForm`, `DepartmentForm`, `FamilyForm`, `RecordForm`, `MemberTransferForm`, `SpiritualGiftForm`, `MemberGiftForm`, `LeadershipRoleForm` (+ admin forms).
+`MemberForm`, `MemberFilterForm`, `DepartmentForm`, `FamilyForm`, `MemberLocationForm`, `CareGroupForm`, `CareGroupAddMemberForm`, `CarePartnershipForm`, `RecordForm`, `MemberTransferForm`, `SpiritualGiftForm`, `MemberGiftForm`, `LeadershipRoleForm` (+ admin forms).
 
 ---
 
 ## 10. Permissions (Current)
 
-Codenames via access helpers: `view_members`, `manage_members`, `add_members`, `edit_members`, `export_members`, `transfer_members`, `process_transfers`, `view_member_records`, `manage_member_records`, `manage_departments`, `manage_families`, `manage_leadership`, `manage_spiritual_gifts`, `manage_baptisms`.
+Codenames via access helpers: `view_members`, `manage_members`, `add_members`, `edit_members`, `export_members`, `transfer_members`, `process_transfers`, `view_member_records`, `manage_member_records`, `manage_departments`, `manage_families`, `manage_care_groups`, `manage_leadership`, `manage_spiritual_gifts`, `manage_baptisms`.
 
 Search API also allows selected finance/welfare/ledger perms for picker UX.
 
@@ -185,6 +190,12 @@ Church scoping: `filter_by_church` / `require_church` / manageable churches for 
 
 - Must belong to member’s church; family head same church.  
 - Transfer completion clears department and family.
+
+**Care groups**
+
+- Church-scoped locations and groups. Members join **one active** care group.  
+- One-to-one partnerships only inside that group; both members must be on the roster; one active partner per member.  
+- Leaving a group ends that member’s active partnership. Writes require `manage_care_groups`.
 
 ---
 
@@ -291,7 +302,7 @@ Extend with isolation tests when changing detail/update URLs.
 
 ## 20. Known technical debt
 
-- Large AGENTS membership surface not modeled (skills, Bible studies, documents versioning, small groups).  
+- Large AGENTS membership surface not modeled (skills, Bible studies, documents versioning). Care groups (location + 1:1 pairing) are Current.  
 - Fat views in places.  
 - Hard delete on departments/gift assignments vs “never delete history” spirit — **mitigated:** departments blocked when referenced; gift unassign audited.  
 - `Occupation` / some record tables use BigAuto PKs vs UUID majority.  

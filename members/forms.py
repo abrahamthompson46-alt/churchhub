@@ -4,10 +4,13 @@ from organization.models import Church
 
 from .models import (
     AGE_GROUP_CHOICES,
+    CareGroup,
+    CareGroupRole,
     Department,
     Family,
     FamilyRelationship,
     Member,
+    MemberLocation,
     MemberTransfer,
     MembershipStatus,
     Occupation,
@@ -228,6 +231,90 @@ class FamilyForm(forms.ModelForm):
         if head and self.church and head.church_id != self.church.pk:
             raise forms.ValidationError("Family head must belong to this church.")
         return head
+
+
+class MemberLocationForm(forms.ModelForm):
+    class Meta:
+        model = MemberLocation
+        fields = ("name", "is_active")
+        widgets = {
+            "name": forms.TextInput(attrs=_text()),
+        }
+
+
+class CareGroupForm(forms.ModelForm):
+    class Meta:
+        model = CareGroup
+        fields = ("name", "location", "leader", "description", "is_active")
+        widgets = {
+            "name": forms.TextInput(attrs=_text()),
+            "location": forms.Select(attrs=_select()),
+            "leader": forms.Select(attrs=_select()),
+            "description": forms.Textarea(attrs={**_text(), "rows": 2}),
+        }
+
+    def __init__(self, *args, church=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.church = church
+        self.fields["leader"].required = False
+        if church:
+            self.fields["location"].queryset = MemberLocation.objects.filter(
+                church=church, is_active=True
+            ).order_by("name")
+            if self.instance and self.instance.location_id:
+                self.fields["location"].queryset = (
+                    self.fields["location"].queryset | MemberLocation.objects.filter(pk=self.instance.location_id)
+                ).distinct()
+            self.fields["leader"].queryset = Member.objects.filter(church=church).order_by(
+                "last_name", "first_name"
+            )
+        self.fields["leader"].empty_label = "No leader assigned"
+
+    def clean_location(self):
+        location = self.cleaned_data.get("location")
+        if location and self.church and location.church_id != self.church.pk:
+            raise forms.ValidationError("Location must belong to this church.")
+        return location
+
+    def clean_leader(self):
+        leader = self.cleaned_data.get("leader")
+        if leader and self.church and leader.church_id != self.church.pk:
+            raise forms.ValidationError("Leader must belong to this church.")
+        return leader
+
+
+class CareGroupAddMemberForm(forms.Form):
+    member = forms.ModelChoiceField(queryset=Member.objects.none(), widget=forms.Select(attrs=_select()))
+    role = forms.ChoiceField(choices=CareGroupRole.choices, initial=CareGroupRole.MEMBER, widget=forms.Select(attrs=_select()))
+
+    def __init__(self, *args, church=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        from members.selectors import members_available_for_care_group
+
+        self.fields["member"].queryset = members_available_for_care_group(church) if church else Member.objects.none()
+        self.fields["member"].label = "Member"
+
+
+class CarePartnershipForm(forms.Form):
+    first = forms.ModelChoiceField(queryset=Member.objects.none(), widget=forms.Select(attrs=_select()), label="First member")
+    second = forms.ModelChoiceField(queryset=Member.objects.none(), widget=forms.Select(attrs=_select()), label="Second member")
+    notes = forms.CharField(required=False, max_length=255, widget=forms.TextInput(attrs=_text()))
+
+    def __init__(self, *args, unpaired=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        qs = Member.objects.filter(pk__in=[m.pk for m in (unpaired or [])]).order_by(
+            "last_name", "first_name"
+        )
+        self.fields["first"].queryset = qs
+        self.fields["second"].queryset = qs
+
+    def clean(self):
+        cleaned = super().clean()
+        first = cleaned.get("first")
+        second = cleaned.get("second")
+        if first and second and first.pk == second.pk:
+            raise forms.ValidationError("Choose two different members.")
+        return cleaned
 
 
 class RecordForm(forms.ModelForm):

@@ -63,6 +63,20 @@ from .forms import (
     VisitorForm,
 )
 from .models import Member, RecordType
+from members.care_group_views import (  # re-exported for urls
+    care_group_add,
+    care_group_add_member,
+    care_group_delete,
+    care_group_detail,
+    care_group_edit,
+    care_group_list,
+    care_group_pair,
+    care_group_remove_member,
+    care_group_unpair,
+    location_add,
+    location_delete,
+    location_edit,
+)
 from .services import (
     MemberServiceError,
     assign_leadership_role,
@@ -201,6 +215,7 @@ def member_detail(request, member_id):
             welfare_summary = member_welfare_summary(member)
     except ImportError:
         pass
+    care = selectors.member_care_context(member)
     return render(request, "members/detail.html", {
         "member": member,
         "records": records,
@@ -208,6 +223,8 @@ def member_detail(request, member_id):
         "gifts": gifts,
         "roles": roles,
         "attendance_count": attendance_count,
+        "care_membership": care["membership"],
+        "care_partner": care["partner"],
         "welfare_summary": welfare_summary,
         "show_welfare": show_welfare,
         "can_manage": can_manage_members(request.user),
@@ -222,6 +239,7 @@ def member_detail(request, member_id):
 def member_search(request):
     """JSON member search for searchable pickers across members/finance forms."""
     from permissions.checks import (
+        can_manage_care_groups,
         can_manage_families,
         can_manage_finances,
         can_manage_leadership,
@@ -240,6 +258,7 @@ def member_search(request):
         or can_manage_member_records(request.user)
         or can_manage_leadership(request.user)
         or can_manage_families(request.user)
+        or can_manage_care_groups(request.user)
         or can_transfer_members(request.user)
         or can_manage_spiritual_gifts(request.user)
         or can_manage_receipts(request.user)

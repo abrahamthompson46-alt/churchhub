@@ -225,7 +225,7 @@ flowchart LR
 | **Client** | `static/js/member-picker.js` |
 | **Method** | GET |
 | **Auth** | Session |
-| **Permissions** | Any of: `can_view_members`, `can_manage_members`, `can_manage_finances`, `can_manage_member_records`, `can_manage_leadership`, `can_manage_families`, `can_transfer_members`, `can_manage_spiritual_gifts`, `can_manage_receipts`, `can_manage_ledger_entries`, `can_manage_welfare_cases` — else `PermissionDenied` |
+| **Permissions** | Any of: `can_view_members`, `can_manage_members`, `can_manage_finances`, `can_manage_member_records`, `can_manage_leadership`, `can_manage_families`, `can_manage_care_groups`, `can_transfer_members`, `can_manage_spiritual_gifts`, `can_manage_receipts`, `can_manage_ledger_entries`, `can_manage_welfare_cases` — else `PermissionDenied` |
 | **Tenant context** | `filter_by_church` on active/manageable church; `is_active=True` only |
 | **Related models** | `members.Member` (+ department/family/occupation) |
 

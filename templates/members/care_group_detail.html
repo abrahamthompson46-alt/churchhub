@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}{{ group.name }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'members:care_group_list' %}">Care groups</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ group.name }}</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle=group.location.name page_title=group.name page_description=group.description %}
+
+    {% if can_manage_care_groups %}
+    <div class="d-flex gap-2 mb-4">
+        <a href="{% url 'members:care_group_edit' group.pk %}" class="btn btn-outline-secondary btn-sm">Edit group</a>
+        <a href="{% url 'members:care_group_delete' group.pk %}" class="btn btn-outline-danger btn-sm">Remove group</a>
+    </div>
+    {% endif %}
+
+    <div class="detail-grid">
+        <div class="panel">
+            <div class="panel-header">Group details</div>
+            <div class="panel-body">
+                <dl class="mb-0">
+                    <dt class="text-muted small">Location</dt><dd>{{ group.location.name }}</dd>
+                    <dt class="text-muted small">Leader</dt><dd>{{ group.leader.full_name|default:"—" }}</dd>
+                    <dt class="text-muted small">Members</dt><dd>{{ roster|length }}</dd>
+                    <dt class="text-muted small">Unpaired</dt><dd>{{ unpaired|length }}</dd>
+                </dl>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header">Roster</div>
+            <ul class="list-plain">
+                {% for row in roster %}
+                <li class="d-flex justify-content-between align-items-center py-2 border-bottom gap-2">
+                    <span>
+                        <a href="{% url 'members:detail' row.member.id %}" class="table-link">{{ row.member.full_name }}</a>
+                        <span class="chip ms-1">{{ row.get_role_display }}</span>
+                    </span>
+                    <span class="d-flex align-items-center gap-2">
+                        {% if can_manage_care_groups %}
+                        <form method="post" action="{% url 'members:care_group_remove_member' group.pk row.member_id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                        </form>
+                        {% endif %}
+                    </span>
+                </li>
+                {% empty %}
+                <li class="py-3 text-muted">No members in this group yet.</li>
+                {% endfor %}
+            </ul>
+            {% if can_manage_care_groups %}
+            <div class="panel-body border-top">
+                <form method="post" action="{% url 'members:care_group_add_member' group.pk %}" class="row g-2 align-items-end">
+                    {% csrf_token %}
+                    <div class="col-md-6">{% include "includes/form_field.html" with field=add_form.member %}</div>
+                    <div class="col-md-3">{% include "includes/form_field.html" with field=add_form.role %}</div>
+                    <div class="col-md-3"><button type="submit" class="btn btn-primary w-100">Add</button></div>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="panel mt-4">
+        <div class="panel-header">One-to-one links</div>
+        <div class="panel-body">
+            <table class="table table-hover mb-0">
+                <thead><tr><th>Member</th><th>Partner</th><th></th></tr></thead>
+                <tbody>
+                    {% for pair in partnerships %}
+                    <tr>
+                        <td><a href="{% url 'members:detail' pair.member_a.id %}" class="table-link">{{ pair.member_a.full_name }}</a></td>
+                        <td><a href="{% url 'members:detail' pair.member_b.id %}" class="table-link">{{ pair.member_b.full_name }}</a></td>
+                        <td class="text-end">
+                            {% if can_manage_care_groups %}
+                            <form method="post" action="{% url 'members:care_group_unpair' group.pk pair.pk %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">Unlink</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-muted">No one-to-one links yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if unpaired %}
+            <p class="text-muted small mt-3 mb-2">Still unpaired: {% for member in unpaired %}{{ member.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+            {% endif %}
+            {% if can_manage_care_groups and unpaired|length >= 2 %}
+            <form method="post" action="{% url 'members:care_group_pair' group.pk %}" class="row g-2 align-items-end mt-2">
+                {% csrf_token %}
+                <div class="col-md-4">{% include "includes/form_field.html" with field=pair_form.first %}</div>
+                <div class="col-md-4">{% include "includes/form_field.html" with field=pair_form.second %}</div>
+                <div class="col-md-3">{% include "includes/form_field.html" with field=pair_form.notes %}</div>
+                <div class="col-md-1"><button type="submit" class="btn btn-primary">Link</button></div>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

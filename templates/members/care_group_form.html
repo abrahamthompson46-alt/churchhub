@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — ChurchHub{% endblock %}
+
+{% block content %}
+{% include "includes/form_open.html" with form_subtitle="Members" form_title=title wide=True %}
+<form method="post" novalidate>
+    {% csrf_token %}
+    <div class="row g-3">
+        {% for field in form %}
+        <div class="col-md-6{% if field.name == 'description' %} col-12{% endif %}">
+            {% include "includes/form_field.html" with field=field %}
+        </div>
+        {% endfor %}
+    </div>
+    <div class="d-flex gap-2 pt-3">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="{% if group %}{% url 'members:care_group_detail' group.pk %}{% else %}{% url 'members:care_group_list' %}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% include "includes/form_close.html" %}
+{% endblock %}

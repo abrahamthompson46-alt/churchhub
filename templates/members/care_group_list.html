@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Care groups — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    {% if can_manage_care_groups %}
+    {% url 'members:care_group_add' as add_url %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Care groups" page_description="Location groups for shepherding. Pair members one to one inside the same group." action_url=add_url action_label="Add care group" %}
+    {% else %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Care groups" page_description="Location groups for shepherding." %}
+    {% endif %}
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="data-card">
+                <div class="d-flex justify-content-between align-items-center px-3 pt-3 pb-2">
+                    <h2 class="h6 mb-0">Locations</h2>
+                    {% if can_manage_care_groups %}
+                    <a href="{% url 'members:care_location_add' %}" class="btn btn-sm btn-outline-secondary">Add location</a>
+                    {% endif %}
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead><tr><th>Name</th><th></th></tr></thead>
+                        <tbody>
+                            {% for location in locations %}
+                            <tr>
+                                <td>{{ location.name }}{% if not location.is_active %} <span class="chip chip--muted">Inactive</span>{% endif %}</td>
+                                <td class="text-end text-nowrap">
+                                    {% if can_manage_care_groups %}
+                                    <a href="{% url 'members:care_location_edit' location.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                    <a href="{% url 'members:care_location_delete' location.pk %}" class="btn btn-sm btn-outline-danger">Remove</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="2">
+                                {% include "includes/empty_state.html" with icon="bi-geo-alt" message="Add locations such as estates or villages, then create a group for each." %}
+                            </td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="data-card">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead><tr><th>Group</th><th>Location</th><th>Leader</th><th>Members</th></tr></thead>
+                        <tbody>
+                            {% for group in groups %}
+                            <tr>
+                                <td><a href="{% url 'members:care_group_detail' group.pk %}" class="table-link">{{ group.name }}</a></td>
+                                <td>{{ group.location.name }}</td>
+                                <td>{{ group.leader.full_name|default:"—" }}</td>
+                                <td>{{ group.members_total }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4">
+                                {% if can_manage_care_groups %}
+                                {% url 'members:care_group_add' as add_url %}
+                                {% include "includes/empty_state.html" with icon="bi-people" message="No care groups yet." action_url=add_url action_label="Add care group" %}
+                                {% else %}
+                                {% include "includes/empty_state.html" with icon="bi-people" message="No care groups yet." %}
+                                {% endif %}
+                            </td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -16,10 +16,14 @@ from church_system.church_scope import filter_by_church
 from permissions.scoping import get_manageable_churches
 
 from .models import (
+    CareGroup,
+    CareGroupMembership,
+    CarePartnership,
     Department,
     Family,
     LeadershipRole,
     Member,
+    MemberLocation,
     MemberSpiritualGift,
     MemberTransfer,
     Occupation,
@@ -358,6 +362,100 @@ def family_for_request(request, pk):
 
 def family_members(family):
     return family.members.order_by("last_name", "first_name")
+
+
+def member_locations_qs(request):
+    return filter_by_church(MemberLocation.objects.all().order_by("name"), request)
+
+
+def member_location_for_request(request, pk):
+    return get_object_or_404(filter_by_church(MemberLocation.objects.all(), request), pk=pk)
+
+
+def care_groups_qs(request):
+    return filter_by_church(
+        CareGroup.objects.select_related("location", "leader")
+        .annotate(
+            members_total=Count(
+                "memberships",
+                filter=Q(memberships__left_at__isnull=True),
+            )
+        )
+        .order_by("location__name", "name"),
+        request,
+    )
+
+
+def care_group_for_request(request, pk):
+    return get_object_or_404(
+        filter_by_church(CareGroup.objects.select_related("location", "leader"), request),
+        pk=pk,
+    )
+
+
+def care_group_roster(group):
+    return (
+        CareGroupMembership.objects.filter(group=group, left_at__isnull=True)
+        .select_related("member")
+        .order_by("member__last_name", "member__first_name")
+    )
+
+
+def care_group_partnerships(group):
+    return (
+        CarePartnership.objects.filter(group=group, is_active=True)
+        .select_related("member_a", "member_b")
+        .order_by("member_a__last_name", "member_a__first_name")
+    )
+
+
+def members_available_for_care_group(church, group=None):
+    """Church members not already in an active care group."""
+    taken_ids = CareGroupMembership.objects.filter(left_at__isnull=True).values("member_id")
+    return (
+        Member.objects.filter(church=church, is_deleted=False)
+        .exclude(pk__in=taken_ids)
+        .order_by("last_name", "first_name")
+    )
+
+
+def care_partnership_for_request(request, group, partnership_id):
+    return get_object_or_404(
+        CarePartnership.objects.filter(group=group, is_active=True).select_related(
+            "member_a", "member_b", "group"
+        ),
+        pk=partnership_id,
+    )
+
+
+def unpaired_members_in_group(group):
+    paired_ids = set()
+    for pair in care_group_partnerships(group):
+        paired_ids.add(pair.member_a_id)
+        paired_ids.add(pair.member_b_id)
+    return [
+        row.member
+        for row in care_group_roster(group)
+        if row.member_id not in paired_ids
+    ]
+
+
+def member_care_context(member):
+    membership = (
+        CareGroupMembership.objects.filter(member=member, left_at__isnull=True)
+        .select_related("group", "group__location")
+        .first()
+    )
+    if not membership:
+        return {"membership": None, "partner": None}
+    pair = (
+        CarePartnership.objects.filter(is_active=True, group=membership.group)
+        .filter(Q(member_a=member) | Q(member_b=member))
+        .select_related("member_a", "member_b")
+        .first()
+    )
+    partner = pair.other_member(member) if pair else None
+    return {"membership": membership, "partner": partner}
 
 
 # ---------------------------------------------------------------------------

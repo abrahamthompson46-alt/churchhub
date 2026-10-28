@@ -8,11 +8,15 @@ Selectors own read querysets. Do not put authorization or workflow rules here.
 from __future__ import annotations
 
 from .models import (
+    CareGroup,
+    CareGroupMembership,
+    CarePartnership,
     Department,
     Family,
     LeadershipRole,
     Member,
     MemberAuditLog,
+    MemberLocation,
     MemberSpiritualGift,
     MemberTransfer,
     Occupation,
@@ -122,6 +126,36 @@ def create_family(*, church, **fields):
 def save_family(family):
     family.save()
     return family
+
+
+def save_member_location(location):
+    location.full_clean()
+    location.save()
+    return location
+
+
+def delete_member_location(location):
+    location.delete()
+
+
+def save_care_group(group):
+    group.full_clean()
+    group.save()
+    return group
+
+
+def delete_care_group(group):
+    group.delete()
+
+
+def save_care_membership(membership):
+    membership.save()
+    return membership
+
+
+def save_care_partnership(partnership):
+    partnership.save()
+    return partnership
 
 
 def create_spiritual_gift(*, church, **fields):

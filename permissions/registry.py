@@ -39,7 +39,7 @@ PERMISSION_REGISTRY = {
         "implies": [
             "view_members", "add_members", "edit_members", "export_members",
             "transfer_members", "process_transfers", "manage_baptisms",
-            "manage_departments", "manage_families", "manage_leadership",
+            "manage_departments", "manage_families", "manage_care_groups", "manage_leadership",
             "manage_spiritual_gifts", "view_member_records", "manage_member_records",
             "manage_member_configuration", "manage_occupations", "manage_member_lookups",
         ],
@@ -118,6 +118,13 @@ PERMISSION_REGISTRY = {
         "name": "Manage Families",
         "category": "Members",
         "description": "Create and edit family households.",
+        "default_roles": _ROLE_LEADERSHIP | {"SECRETARY"},
+        "implies": ["view_members"],
+    },
+    "manage_care_groups": {
+        "name": "Manage Care Groups",
+        "category": "Members",
+        "description": "Create location care groups and pair members one-to-one inside a group.",
         "default_roles": _ROLE_LEADERSHIP | {"SECRETARY"},
         "implies": ["view_members"],
     },

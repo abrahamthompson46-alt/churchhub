@@ -12,6 +12,7 @@ from permissions.checks import (
     can_edit_members,
     can_export_members,
     can_manage_baptisms,
+    can_manage_care_groups,
     can_manage_departments,
     can_manage_families,
     can_manage_leadership,
@@ -84,6 +85,11 @@ def require_manage_departments(request):
 
 def require_manage_families(request):
     if not can_manage_families(request.user):
+        raise PermissionDenied
+
+
+def require_manage_care_groups(request):
+    if not can_manage_care_groups(request.user):
         raise PermissionDenied
 
 

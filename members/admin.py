@@ -6,8 +6,12 @@ from django.utils.html import format_html
 from admin_custom.audit_admin import ReadOnlyAuditModelAdmin
 
 from .models import (
+    CareGroup,
+    CareGroupMembership,
+    CarePartnership,
     Department,
     Family,
+    MemberLocation,
     History,
     HistoryImage,
     LeadershipRole,
@@ -145,6 +149,40 @@ class DepartmentAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         return _church_qs(super().get_queryset(request), request)
+
+
+@admin.register(MemberLocation)
+class MemberLocationAdmin(admin.ModelAdmin):
+    list_display = ["name", "church", "is_active"]
+    list_filter = ["church", "is_active"]
+    search_fields = ["name"]
+
+    def get_queryset(self, request):
+        return _church_qs(super().get_queryset(request), request)
+
+
+@admin.register(CareGroup)
+class CareGroupAdmin(admin.ModelAdmin):
+    list_display = ["name", "location", "leader", "church", "is_active"]
+    list_filter = ["church", "is_active"]
+    search_fields = ["name", "location__name"]
+
+    def get_queryset(self, request):
+        return _church_qs(super().get_queryset(request), request)
+
+
+@admin.register(CareGroupMembership)
+class CareGroupMembershipAdmin(admin.ModelAdmin):
+    list_display = ["member", "group", "role", "joined_at", "left_at"]
+    list_filter = ["role"]
+    search_fields = ["member__first_name", "member__last_name", "group__name"]
+
+
+@admin.register(CarePartnership)
+class CarePartnershipAdmin(admin.ModelAdmin):
+    list_display = ["member_a", "member_b", "group", "is_active", "created_at"]
+    list_filter = ["is_active", "group__church"]
+    search_fields = ["member_a__first_name", "member_a__last_name", "member_b__first_name"]
 
 
 @admin.register(Family)

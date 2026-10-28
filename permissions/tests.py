@@ -240,6 +240,7 @@ class MatrixTests(ChurchHubTestMixin, TestCase):
         self.assertGreaterEqual(registry_count(), 90)
         self.assertIn("view_ledger", PERMISSION_REGISTRY)
         self.assertIn("manage_receipts", PERMISSION_REGISTRY)
+        self.assertIn("manage_care_groups", PERMISSION_REGISTRY)
         self.assertIn("dispose_assets", PERMISSION_REGISTRY)
         self.assertIn("view_enterprise_controls", PERMISSION_REGISTRY)
         self.assertIn("view_enterprise_audit", PERMISSION_REGISTRY)

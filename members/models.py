@@ -262,6 +262,181 @@ class Family(SoftDeleteModel):
 
 
 # ==============================
+# CARE GROUPS (location small groups)
+# ==============================
+
+class CareGroupRole(models.TextChoices):
+    LEADER = "LEADER", "Leader"
+    MEMBER = "MEMBER", "Member"
+
+
+class MemberLocation(SoftDeleteModel):
+    """Church-owned place name used to organize care groups (estate, village, area)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    church = models.ForeignKey(Church, on_delete=models.CASCADE, related_name="member_locations")
+    name = models.CharField(max_length=150)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("church", "name")
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class CareGroup(SoftDeleteModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    church = models.ForeignKey(Church, on_delete=models.CASCADE, related_name="care_groups")
+    location = models.ForeignKey(
+        MemberLocation,
+        on_delete=models.PROTECT,
+        related_name="care_groups",
+    )
+    name = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
+    leader = models.ForeignKey(
+        "Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="care_groups_as_leader",
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("church", "name")
+        ordering = ["location__name", "name"]
+        indexes = [
+            models.Index(fields=["church", "is_active"]),
+            models.Index(fields=["church", "location"]),
+        ]
+
+    def clean(self):
+        if self.location_id and self.church_id and self.location.church_id != self.church_id:
+            raise ValidationError({"location": "Location must belong to the same church as the group."})
+        if self.leader_id and self.church_id and self.leader.church_id != self.church_id:
+            raise ValidationError({"leader": "Group leader must belong to the same church."})
+
+    def __str__(self):
+        return self.name
+
+
+class CareGroupMembership(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    group = models.ForeignKey(CareGroup, on_delete=models.CASCADE, related_name="memberships")
+    member = models.ForeignKey("Member", on_delete=models.CASCADE, related_name="care_group_memberships")
+    role = models.CharField(max_length=10, choices=CareGroupRole.choices, default=CareGroupRole.MEMBER)
+    joined_at = models.DateTimeField(auto_now_add=True)
+    left_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["member__last_name", "member__first_name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["member"],
+                condition=Q(left_at__isnull=True),
+                name="uniq_active_care_group_membership",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["group", "left_at"]),
+            models.Index(fields=["member", "left_at"]),
+        ]
+
+    def clean(self):
+        if self.group_id and self.member_id and self.group.church_id != self.member.church_id:
+            raise ValidationError("Member must belong to the same church as the care group.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def is_active(self):
+        return self.left_at is None
+
+    def __str__(self):
+        return f"{self.member} — {self.group}"
+
+
+class CarePartnership(models.Model):
+    """Undirected one-to-one pairing of two members inside the same care group."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    group = models.ForeignKey(CareGroup, on_delete=models.CASCADE, related_name="partnerships")
+    member_a = models.ForeignKey(
+        "Member",
+        on_delete=models.CASCADE,
+        related_name="care_partnerships_as_a",
+    )
+    member_b = models.ForeignKey(
+        "Member",
+        on_delete=models.CASCADE,
+        related_name="care_partnerships_as_b",
+    )
+    notes = models.CharField(max_length=255, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="care_partnerships_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~Q(member_a=models.F("member_b")),
+                name="care_partnership_distinct_members",
+            ),
+            models.UniqueConstraint(
+                fields=["group", "member_a", "member_b"],
+                condition=Q(is_active=True),
+                name="uniq_active_care_partnership_pair",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["group", "is_active"]),
+        ]
+
+    def clean(self):
+        if self.member_a_id and self.member_b_id and self.member_a_id == self.member_b_id:
+            raise ValidationError("A member cannot be paired with themselves.")
+        if self.member_a_id and self.member_b_id and self.member_a_id > self.member_b_id:
+            raise ValidationError("Partnership members must be stored in a stable order.")
+        if self.group_id:
+            if self.member_a_id and self.member_a.church_id != self.group.church_id:
+                raise ValidationError("Both members must belong to the group's church.")
+            if self.member_b_id and self.member_b.church_id != self.group.church_id:
+                raise ValidationError("Both members must belong to the group's church.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def other_member(self, member):
+        if member.pk == self.member_a_id:
+            return self.member_b
+        if member.pk == self.member_b_id:
+            return self.member_a
+        return None
+
+    def __str__(self):
+        return f"{self.member_a} ↔ {self.member_b}"
+
+
+# ==============================
 # OCCUPATION
 # ==============================
 
@@ -843,6 +1018,16 @@ class MemberAuditLog(models.Model):
         ("OCCUPATION_DELETE", "Occupation Deleted"),
         ("LOOKUP_CREATE", "Lookup Option Created"),
         ("LOOKUP_UPDATE", "Lookup Option Updated"),
+        ("LOCATION_CREATE", "Care Location Created"),
+        ("LOCATION_UPDATE", "Care Location Updated"),
+        ("LOCATION_DELETE", "Care Location Deleted"),
+        ("GROUP_CREATE", "Care Group Created"),
+        ("GROUP_UPDATE", "Care Group Updated"),
+        ("GROUP_DELETE", "Care Group Deleted"),
+        ("GROUP_JOIN", "Care Group Member Added"),
+        ("GROUP_LEAVE", "Care Group Member Removed"),
+        ("GROUP_PAIR", "Care Partnership Created"),
+        ("GROUP_UNPAIR", "Care Partnership Ended"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

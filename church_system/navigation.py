@@ -22,6 +22,7 @@ from permissions.checks import (
     can_manage_church_history,
     can_manage_departments,
     can_manage_expenses,
+    can_manage_care_groups,
     can_manage_families,
     can_manage_finances,
     can_manage_giving,
@@ -162,6 +163,7 @@ def _can_access_people(user):
         or can_manage_baptisms(user)
         or can_manage_departments(user)
         or can_manage_families(user)
+        or can_manage_care_groups(user)
         or can_manage_leadership(user)
         or can_manage_spiritual_gifts(user)
         or can_view_member_records(user)
@@ -344,6 +346,8 @@ def _people_sections(user):
         group_items.append(_item("Departments", "members:department_list", "bi-diagram-2"))
     if can_manage_families(user) or can_view_members(user):
         group_items.append(_item("Families", "members:family_list", "bi-house-heart"))
+    if can_manage_care_groups(user) or can_view_members(user):
+        group_items.append(_item("Care groups", "members:care_group_list", "bi-people"))
     if can_manage_leadership(user) or can_view_members(user):
         group_items.append(_item("Leadership", "members:leadership_list", "bi-award"))
     if can_manage_spiritual_gifts(user) or can_view_members(user):
@@ -880,6 +884,7 @@ def _tab_allowed(user, url_name, active_church=None):
         "members:visitor_list": lambda: can_view_members(user) or can_manage_members(user),
         "members:department_list": lambda: can_manage_departments(user) or can_view_members(user),
         "members:family_list": lambda: can_manage_families(user) or can_view_members(user),
+        "members:care_group_list": lambda: can_manage_care_groups(user) or can_view_members(user),
         "members:leadership_list": lambda: can_manage_leadership(user) or can_view_members(user),
         "members:spiritual_gift_list": lambda: can_manage_spiritual_gifts(user) or can_view_members(user),
         "members:baptism_register": lambda: can_manage_baptisms(user) or can_view_members(user),

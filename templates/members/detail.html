@@ -66,6 +66,19 @@
                             <a href="{% url 'members:family_detail' member.family_id %}" class="table-link">{{ member.family.name }}</a>
                             {% else %}—{% endif %}
                         </dd>
+                        <dt class="col-sm-4">Care group</dt>
+                        <dd class="col-sm-8">
+                            {% if care_membership %}
+                            <a href="{% url 'members:care_group_detail' care_membership.group_id %}" class="table-link">{{ care_membership.group.name }}</a>
+                            <span class="text-muted">· {{ care_membership.group.location.name }}</span>
+                            {% else %}—{% endif %}
+                        </dd>
+                        <dt class="col-sm-4">Care partner</dt>
+                        <dd class="col-sm-8">
+                            {% if care_partner %}
+                            <a href="{% url 'members:detail' care_partner.id %}" class="table-link">{{ care_partner.full_name }}</a>
+                            {% else %}—{% endif %}
+                        </dd>
                         <dt class="col-sm-4">Occupation</dt><dd class="col-sm-8">{{ member.occupation|default:"—" }}</dd>
                     </dl>
                 </div>

@@ -57,7 +57,7 @@ Own **local church membership**: directory, member CRUD, families/departments, p
 | `Family` | UUID; FK church; optional head Member; unique `(church, name)` |
 | `MemberLocation` | UUID; church-owned area/estate name for care groups |
 | `CareGroup` | UUID; church + location; optional leader; unique `(church, name)` |
-| `CareGroupMembership` | Member in one **active** care group (`left_at` null); role leader/member |
+| `CareGroupMembership` | Member in one **active** care group (`left_at` null); role leader/member; `awaiting_partner` for the odd member out |
 | `CarePartnership` | Undirected one-to-one pair inside a group (`member_a` UUID &lt; `member_b`) |
 | `Occupation` | BigAuto PK; FK church; unique `(church, name)` |
 | `Member` | UUID; church + optional dept/family/occupation; demographics; baptism fields; phone/membership_number partial uniques; **unique non-blank email** (case-insensitive, active records); email implies required DOB (directory completeness, not a portal password); `is_active` synced from status |
@@ -66,7 +66,7 @@ Own **local church membership**: directory, member CRUD, families/departments, p
 | `History` / `HistoryImage` | History events + images |
 | `SpiritualGift` / `MemberSpiritualGift` | Gift catalog + assignments |
 | `LeadershipRole` | title, dates, optional department, `is_active` |
-| `MemberAuditLog` | CREATE/UPDATE/STATUS/TRANSFER_*/EXPORT/DEACTIVATE/ACTIVATE |
+| `MemberAuditLog` | CREATE/UPDATE/STATUS/TRANSFER_*/EXPORT/DEACTIVATE/ACTIVATE/LOCATION_*/GROUP_* |
 
 `Member.save`: Inactive/Transferred/Deceased → `is_active=False`; Active → `True`. Department/family/occupation must match church.
 
@@ -121,7 +121,7 @@ Management: `export_member_data`.
 | `add` / `edit` / `member_detail` / `member_timeline` | CRUD + timeline |
 | `member_export` | Per-member JSON download |
 | Record / department / family CRUD | Supporting entities |
-| Care group / location / pairing | Location groups + one-to-one links (`care_group_views`) |
+| Care group / location / pairing / desk | Location groups, searchable add/leader, one-to-one links, unpaired desk (`care_group_views`) |
 | `transfer_*` | Transfer list/create/detail (+ complete/reject) |
 | `baptism_register` | Baptism list/export; **Add baptism** when `manage_member_records` or `manage_baptisms` |
 | Leadership / spiritual gift views | Roles and gifts |
@@ -142,6 +142,7 @@ Management: `export_member_data`.
 | `records/…` | `record_*` |
 | `departments/…` | `department_*` (includes hard delete) |
 | `families/…` | `family_*` |
+| `care-groups/…` | `care_group_*`, `care_location_*`, `care_group_desk` |
 | `transfers/…` | `transfer_*` |
 | `baptisms/` | `baptism_register` |
 | `leadership/…` | `leadership_*` |
@@ -154,7 +155,7 @@ Management: `export_member_data`.
 
 ## 8. Templates (Current)
 
-`templates/members/`: list/add/edit/detail/timeline, records, departments, families, transfers, baptism_register, leadership, spiritual gifts, assign_gift, confirm_delete, etc.
+`templates/members/`: list/add/edit/detail/timeline, records, departments, families, care_group_*, care_location_form, care_group_desk, transfers, baptism_register, leadership, spiritual gifts, assign_gift, confirm_delete, etc.
 
 ---
 
@@ -193,9 +194,10 @@ Church scoping: `filter_by_church` / `require_church` / manageable churches for 
 
 **Care groups**
 
-- Church-scoped locations and groups. Members join **one active** care group.  
-- One-to-one partnerships only inside that group; both members must be on the roster; one active partner per member.  
-- Leaving a group ends that member’s active partnership. Writes require `manage_care_groups`.
+- Church-scoped locations and groups. Members join **one active** care group. Adding from the group screen uses a searchable picker and can move the member from another group.  
+- Leader is a searchable member picker. Address `icontains` the location name suggests nearby members.  
+- One-to-one partnerships only inside that group; both members must be on the roster; one active partner per member. The odd member out can be marked `awaiting_partner`. The unpaired desk lists ungrouped and unpaired people.  
+- Leaving a group ends that member’s active partnership. Transfer completion, deceased/transferred/former status, and deactivation release care-group membership. Writes require `manage_care_groups`.
 
 ---
 
@@ -213,7 +215,7 @@ stateDiagram-v2
 | Step | Rules |
 |------|-------|
 | Request | Not same church; not already Transferred; no existing Pending; block cross-denomination when both denoms set |
-| Complete | Pending only; process permission; end leadership at from-church; TRANSFER records both sides; move church; set Active |
+| Complete | Pending only; process permission; end leadership at from-church; release care-group membership; TRANSFER records both sides; move church; set Active |
 | Reject | Pending → Rejected |
 
 Record add from **Baptism Register** (`?record_type=Baptism`) locks type to Baptism, shows a church-scoped member picker, and uses `manage_member_records` **or** `manage_baptisms`. From a member profile (`?member=`), the member field stays hidden. Saving a baptism still backfills empty member baptism fields.

@@ -139,6 +139,15 @@ def update_member(member, performed_by=None, **fields):
             member=member,
             details=changed,
         )
+        leave_statuses = {
+            MembershipStatus.DECEASED,
+            MembershipStatus.TRANSFERRED,
+            MembershipStatus.FORMER,
+        }
+        if member.membership_status in leave_statuses or member.is_active is False:
+            from members.care_group_services import release_member_from_care_groups
+
+            release_member_from_care_groups(member=member, user=performed_by)
     return member
 
 
@@ -202,6 +211,9 @@ def complete_transfer(transfer, processed_by, notes=""):
         church=from_church,
         end_date=transfer.transfer_date,
     )
+    from members.care_group_services import release_member_from_care_groups
+
+    release_member_from_care_groups(member=member, user=processed_by)
 
     # Outgoing church record: member left
     repo.create_record(

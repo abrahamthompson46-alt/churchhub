@@ -7,7 +7,7 @@ Business rules stay in services; persistence writes stay in repositories.
 
 from __future__ import annotations
 
-from django.db.models import Count, Q, Value
+from django.db.models import Count, Exists, OuterRef, Q, Value
 from django.db.models.functions import Concat
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -438,6 +438,52 @@ def unpaired_members_in_group(group):
         for row in care_group_roster(group)
         if row.member_id not in paired_ids
     ]
+
+
+def members_suggested_for_care_group(group, limit=8):
+    """Members likely to belong here: address matches location, then ungrouped people."""
+    loc = (group.location.name or "").strip()
+    in_this = CareGroupMembership.objects.filter(group=group, left_at__isnull=True).values("member_id")
+    base = Member.objects.filter(church=group.church, is_active=True).exclude(pk__in=in_this)
+    ungrouped = ~Exists(
+        CareGroupMembership.objects.filter(member_id=OuterRef("pk"), left_at__isnull=True)
+    )
+    suggested = []
+    if len(loc) >= 3:
+        suggested = list(base.filter(address__icontains=loc).order_by("last_name", "first_name")[:limit])
+    if len(suggested) < limit:
+        seen = {m.pk for m in suggested}
+        extra = list(
+            base.filter(ungrouped)
+            .exclude(pk__in=seen)
+            .order_by("last_name", "first_name")[: limit - len(suggested)]
+        )
+        suggested.extend(extra)
+    return suggested
+
+
+def care_group_desk(request):
+    """Ungrouped members and grouped members who still need a partner."""
+    groups = care_groups_qs(request)
+    members = filter_by_church(Member.objects.filter(is_active=True), request)
+    active_ids = CareGroupMembership.objects.filter(
+        left_at__isnull=True, group__in=groups
+    ).values("member_id")
+    ungrouped = members.exclude(pk__in=active_ids).order_by("last_name", "first_name")
+    paired_ids = CarePartnership.objects.filter(is_active=True, group__in=groups).values_list(
+        "member_a_id", "member_b_id"
+    )
+    paired = set()
+    for a, b in paired_ids:
+        paired.add(a)
+        paired.add(b)
+    unpaired = (
+        CareGroupMembership.objects.filter(left_at__isnull=True, group__in=groups)
+        .select_related("member", "group", "group__location")
+        .exclude(member_id__in=paired)
+        .order_by("group__location__name", "group__name", "member__last_name")
+    )
+    return {"ungrouped": ungrouped, "unpaired": unpaired}
 
 
 def member_care_context(member):

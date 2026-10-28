@@ -249,7 +249,7 @@ class CareGroupForm(forms.ModelForm):
         widgets = {
             "name": forms.TextInput(attrs=_text()),
             "location": forms.Select(attrs=_select()),
-            "leader": forms.Select(attrs=_select()),
+            "leader": forms.HiddenInput(),
             "description": forms.Textarea(attrs={**_text(), "rows": 2}),
         }
 
@@ -269,6 +269,7 @@ class CareGroupForm(forms.ModelForm):
                 "last_name", "first_name"
             )
         self.fields["leader"].empty_label = "No leader assigned"
+        self.fields["leader"].help_text = "Search by name or phone."
 
     def clean_location(self):
         location = self.cleaned_data.get("location")
@@ -284,25 +285,48 @@ class CareGroupForm(forms.ModelForm):
 
 
 class CareGroupAddMemberForm(forms.Form):
-    member = forms.ModelChoiceField(queryset=Member.objects.none(), widget=forms.Select(attrs=_select()))
-    role = forms.ChoiceField(choices=CareGroupRole.choices, initial=CareGroupRole.MEMBER, widget=forms.Select(attrs=_select()))
+    member = forms.ModelChoiceField(
+        queryset=Member.objects.none(),
+        widget=forms.HiddenInput(),
+        help_text="Search by name or phone. If they are already in another group, they will be moved here.",
+    )
+    role = forms.ChoiceField(
+        choices=CareGroupRole.choices,
+        initial=CareGroupRole.MEMBER,
+        widget=forms.Select(attrs=_select()),
+    )
+    move_if_needed = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Move them here if they are already in another care group",
+    )
 
     def __init__(self, *args, church=None, **kwargs):
         super().__init__(*args, **kwargs)
-        from members.selectors import members_available_for_care_group
-
-        self.fields["member"].queryset = members_available_for_care_group(church) if church else Member.objects.none()
+        self.fields["member"].queryset = (
+            Member.objects.filter(church=church, is_active=True).order_by("last_name", "first_name")
+            if church
+            else Member.objects.none()
+        )
         self.fields["member"].label = "Member"
 
 
 class CarePartnershipForm(forms.Form):
-    first = forms.ModelChoiceField(queryset=Member.objects.none(), widget=forms.Select(attrs=_select()), label="First member")
-    second = forms.ModelChoiceField(queryset=Member.objects.none(), widget=forms.Select(attrs=_select()), label="Second member")
+    first = forms.ModelChoiceField(
+        queryset=Member.objects.none(),
+        widget=forms.HiddenInput(),
+        label="First member",
+    )
+    second = forms.ModelChoiceField(
+        queryset=Member.objects.none(),
+        widget=forms.HiddenInput(),
+        label="Second member",
+    )
     notes = forms.CharField(required=False, max_length=255, widget=forms.TextInput(attrs=_text()))
 
-    def __init__(self, *args, unpaired=None, **kwargs):
+    def __init__(self, *args, members=None, **kwargs):
         super().__init__(*args, **kwargs)
-        qs = Member.objects.filter(pk__in=[m.pk for m in (unpaired or [])]).order_by(
+        qs = Member.objects.filter(pk__in=[m.pk for m in (members or [])]).order_by(
             "last_name", "first_name"
         )
         self.fields["first"].queryset = qs

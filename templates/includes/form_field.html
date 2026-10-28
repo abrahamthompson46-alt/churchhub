@@ -5,7 +5,7 @@ Usage: {% include "includes/form_field.html" with field=form.field_name %}
 {% endcomment %}
 {% with wt=field.field.widget.input_type field_name=field.name %}
 {% if field.is_hidden %}
-    {% if field_name == "member" or field_name == "head" or field_name == "invited_by" or field_name == "assigned_elder" %}
+    {% if field_name == "member" or field_name == "head" or field_name == "leader" or field_name == "first" or field_name == "second" or field_name == "invited_by" or field_name == "assigned_elder" %}
     <div class="form-group form-group--wide">
         <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="text-danger ms-1">*</span>{% endif %}</label>
         {% if field.value.pk %}

@@ -8,9 +8,11 @@ from church_system.church_scope import require_church
 from church_system.flash import flash_exception, flash_success
 from members.access import require_manage_care_groups, require_view_members
 from members.care_group_services import (
+    active_membership_for_member,
     add_member_to_care_group,
     delete_care_group,
     delete_member_location,
+    mark_awaiting_partner,
     pair_care_members,
     remove_member_from_care_group,
     save_care_group,
@@ -31,10 +33,12 @@ from permissions.checks import can_manage_care_groups
 @login_required
 def care_group_list(request):
     require_view_members(request)
+    can_manage = can_manage_care_groups(request.user)
     return render(request, "members/care_group_list.html", {
         "groups": selectors.care_groups_qs(request),
         "locations": selectors.member_locations_qs(request),
-        "can_manage": can_manage_care_groups(request.user),
+        "can_manage": can_manage,
+        "can_manage_care_groups": can_manage,
     })
 
 
@@ -146,15 +150,18 @@ def _detail_context(request, group):
     roster = list(selectors.care_group_roster(group))
     partnerships = list(selectors.care_group_partnerships(group))
     unpaired = selectors.unpaired_members_in_group(group)
-    church = group.church
+    roster_members = [row.member for row in roster]
+    can_manage = can_manage_care_groups(request.user)
     return {
         "group": group,
         "roster": roster,
         "partnerships": partnerships,
         "unpaired": unpaired,
-        "can_manage": can_manage_care_groups(request.user),
-        "add_form": CareGroupAddMemberForm(church=church),
-        "pair_form": CarePartnershipForm(unpaired=unpaired),
+        "suggestions": selectors.members_suggested_for_care_group(group),
+        "can_manage": can_manage,
+        "can_manage_care_groups": can_manage,
+        "add_form": CareGroupAddMemberForm(church=group.church),
+        "pair_form": CarePartnershipForm(members=roster_members),
     }
 
 
@@ -176,17 +183,24 @@ def care_group_add_member(request, pk):
         ctx = _detail_context(request, group)
         ctx["add_form"] = form
         return render(request, "members/care_group_detail.html", ctx)
+    member = form.cleaned_data["member"]
+    previous = active_membership_for_member(member)
+    previous_name = previous.group.name if previous and previous.group_id != group.pk else None
     try:
         add_member_to_care_group(
             group=group,
-            member=form.cleaned_data["member"],
+            member=member,
             user=request.user,
             role=form.cleaned_data["role"],
+            move=form.cleaned_data["move_if_needed"],
         )
     except MemberServiceError as exc:
         flash_exception(request, exc)
         return redirect("members:care_group_detail", pk=group.pk)
-    flash_success(request, f"{form.cleaned_data['member'].full_name} added to the group.")
+    if previous_name:
+        flash_success(request, f"{member.full_name} moved from {previous_name} to this group.")
+    else:
+        flash_success(request, f"{member.full_name} added to the group.")
     return redirect("members:care_group_detail", pk=group.pk)
 
 
@@ -212,8 +226,8 @@ def care_group_pair(request, pk):
     group = selectors.care_group_for_request(request, pk)
     if request.method != "POST":
         return redirect("members:care_group_detail", pk=group.pk)
-    unpaired = selectors.unpaired_members_in_group(group)
-    form = CarePartnershipForm(request.POST, unpaired=unpaired)
+    roster_members = [row.member for row in selectors.care_group_roster(group)]
+    form = CarePartnershipForm(request.POST, members=roster_members)
     if not form.is_valid():
         ctx = _detail_context(request, group)
         ctx["pair_form"] = form
@@ -247,3 +261,36 @@ def care_group_unpair(request, pk, partnership_id):
         return redirect("members:care_group_detail", pk=group.pk)
     flash_success(request, "Partnership ended.")
     return redirect("members:care_group_detail", pk=group.pk)
+
+
+@login_required
+def care_group_awaiting(request, pk, member_id):
+    require_manage_care_groups(request)
+    group = selectors.care_group_for_request(request, pk)
+    member = selectors.member_for_request(request, member_id)
+    if request.method != "POST":
+        return redirect("members:care_group_detail", pk=group.pk)
+    waiting = request.POST.get("waiting", "1") != "0"
+    try:
+        mark_awaiting_partner(group=group, member=member, user=request.user, waiting=waiting)
+    except MemberServiceError as exc:
+        flash_exception(request, exc)
+        return redirect("members:care_group_detail", pk=group.pk)
+    if waiting:
+        flash_success(request, f"{member.full_name} is waiting for a partner.")
+    else:
+        flash_success(request, f"{member.full_name} is no longer marked as waiting.")
+    return redirect("members:care_group_detail", pk=group.pk)
+
+
+@login_required
+def care_group_desk(request):
+    require_view_members(request)
+    desk = selectors.care_group_desk(request)
+    can_manage = can_manage_care_groups(request.user)
+    return render(request, "members/care_group_desk.html", {
+        "ungrouped": desk["ungrouped"][:50],
+        "unpaired": desk["unpaired"][:50],
+        "can_manage": can_manage,
+        "can_manage_care_groups": can_manage,
+    })

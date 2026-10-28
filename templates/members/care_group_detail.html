@@ -13,10 +13,11 @@
 
     {% include "includes/page_header.html" with page_subtitle=group.location.name page_title=group.name page_description=group.description %}
 
-    {% if can_manage_care_groups %}
+    {% if can_manage %}
     <div class="d-flex gap-2 mb-4">
         <a href="{% url 'members:care_group_edit' group.pk %}" class="btn btn-outline-secondary btn-sm">Edit group</a>
         <a href="{% url 'members:care_group_delete' group.pk %}" class="btn btn-outline-danger btn-sm">Remove group</a>
+        <a href="{% url 'members:care_group_desk' %}" class="btn btn-outline-secondary btn-sm">Unpaired desk</a>
     </div>
     {% endif %}
 
@@ -40,9 +41,24 @@
                     <span>
                         <a href="{% url 'members:detail' row.member.id %}" class="table-link">{{ row.member.full_name }}</a>
                         <span class="chip ms-1">{{ row.get_role_display }}</span>
+                        {% if row.awaiting_partner %}<span class="chip chip--muted ms-1">Waiting for partner</span>{% endif %}
                     </span>
                     <span class="d-flex align-items-center gap-2">
-                        {% if can_manage_care_groups %}
+                        {% if can_manage %}
+                        {% if row.member in unpaired %}
+                        {% if row.awaiting_partner %}
+                        <form method="post" action="{% url 'members:care_group_awaiting' group.pk row.member_id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="waiting" value="0">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Clear wait</button>
+                        </form>
+                        {% else %}
+                        <form method="post" action="{% url 'members:care_group_awaiting' group.pk row.member_id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Waiting</button>
+                        </form>
+                        {% endif %}
+                        {% endif %}
                         <form method="post" action="{% url 'members:care_group_remove_member' group.pk row.member_id %}">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
@@ -54,13 +70,30 @@
                 <li class="py-3 text-muted">No members in this group yet.</li>
                 {% endfor %}
             </ul>
-            {% if can_manage_care_groups %}
+            {% if can_manage %}
             <div class="panel-body border-top">
-                <form method="post" action="{% url 'members:care_group_add_member' group.pk %}" class="row g-2 align-items-end">
+                {% if suggestions %}
+                <p class="text-muted small mb-2">Suggested from this location or still ungrouped:</p>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    {% for person in suggestions %}
+                    <form method="post" action="{% url 'members:care_group_add_member' group.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="member" value="{{ person.pk }}">
+                        <input type="hidden" name="role" value="MEMBER">
+                        <input type="hidden" name="move_if_needed" value="on">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">{{ person.full_name }}</button>
+                    </form>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <form method="post" action="{% url 'members:care_group_add_member' group.pk %}">
                     {% csrf_token %}
-                    <div class="col-md-6">{% include "includes/form_field.html" with field=add_form.member %}</div>
-                    <div class="col-md-3">{% include "includes/form_field.html" with field=add_form.role %}</div>
-                    <div class="col-md-3"><button type="submit" class="btn btn-primary w-100">Add</button></div>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-7">{% include "includes/form_field.html" with field=add_form.member %}</div>
+                        <div class="col-md-3">{% include "includes/form_field.html" with field=add_form.role %}</div>
+                        <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Add</button></div>
+                        <div class="col-12">{% include "includes/form_field.html" with field=add_form.move_if_needed %}</div>
+                    </div>
                 </form>
             </div>
             {% endif %}
@@ -78,7 +111,7 @@
                         <td><a href="{% url 'members:detail' pair.member_a.id %}" class="table-link">{{ pair.member_a.full_name }}</a></td>
                         <td><a href="{% url 'members:detail' pair.member_b.id %}" class="table-link">{{ pair.member_b.full_name }}</a></td>
                         <td class="text-end">
-                            {% if can_manage_care_groups %}
+                            {% if can_manage %}
                             <form method="post" action="{% url 'members:care_group_unpair' group.pk pair.pk %}" class="d-inline">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-sm btn-outline-secondary">Unlink</button>
@@ -94,7 +127,7 @@
             {% if unpaired %}
             <p class="text-muted small mt-3 mb-2">Still unpaired: {% for member in unpaired %}{{ member.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
             {% endif %}
-            {% if can_manage_care_groups and unpaired|length >= 2 %}
+            {% if can_manage and roster|length >= 2 %}
             <form method="post" action="{% url 'members:care_group_pair' group.pk %}" class="row g-2 align-items-end mt-2">
                 {% csrf_token %}
                 <div class="col-md-4">{% include "includes/form_field.html" with field=pair_form.first %}</div>

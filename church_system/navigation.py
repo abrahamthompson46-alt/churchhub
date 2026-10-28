@@ -885,6 +885,7 @@ def _tab_allowed(user, url_name, active_church=None):
         "members:department_list": lambda: can_manage_departments(user) or can_view_members(user),
         "members:family_list": lambda: can_manage_families(user) or can_view_members(user),
         "members:care_group_list": lambda: can_manage_care_groups(user) or can_view_members(user),
+        "members:care_group_desk": lambda: can_manage_care_groups(user) or can_view_members(user),
         "members:leadership_list": lambda: can_manage_leadership(user) or can_view_members(user),
         "members:spiritual_gift_list": lambda: can_manage_spiritual_gifts(user) or can_view_members(user),
         "members:baptism_register": lambda: can_manage_baptisms(user) or can_view_members(user),

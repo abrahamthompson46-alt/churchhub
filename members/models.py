@@ -332,6 +332,10 @@ class CareGroupMembership(models.Model):
     group = models.ForeignKey(CareGroup, on_delete=models.CASCADE, related_name="memberships")
     member = models.ForeignKey("Member", on_delete=models.CASCADE, related_name="care_group_memberships")
     role = models.CharField(max_length=10, choices=CareGroupRole.choices, default=CareGroupRole.MEMBER)
+    awaiting_partner = models.BooleanField(
+        default=False,
+        help_text="Odd member out: waiting for a one-to-one partner in this group.",
+    )
     joined_at = models.DateTimeField(auto_now_add=True)
     left_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

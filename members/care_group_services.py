@@ -94,7 +94,13 @@ def save_care_group(*, group, user, is_new=False):
                 existing.role = CareGroupRole.LEADER
                 repo.save_care_membership(existing)
         else:
-            add_member_to_care_group(group=group, member=group.leader, user=user, role=CareGroupRole.LEADER)
+            add_member_to_care_group(
+                group=group,
+                member=group.leader,
+                user=user,
+                role=CareGroupRole.LEADER,
+                move=True,
+            )
     return group
 
 
@@ -115,26 +121,33 @@ def delete_care_group(group, user):
 
 
 @transaction.atomic
-def add_member_to_care_group(*, group, member, user, role=CareGroupRole.MEMBER):
+def add_member_to_care_group(*, group, member, user, role=CareGroupRole.MEMBER, move=True):
     if not group.is_active:
         raise MemberServiceError("Cannot add members to an inactive care group.")
     if member.church_id != group.church_id:
         raise MemberServiceError("Member must belong to the same church as the care group.")
     current = active_membership_for_member(member)
+    moved_from = None
     if current:
         if current.group_id == group.pk:
             raise MemberServiceError("This member is already in this care group.")
-        raise MemberServiceError(
-            f"{member.full_name} is already in {current.group.name}. A member may belong to one care group."
-        )
+        if not move:
+            raise MemberServiceError(
+                f"{member.full_name} is already in {current.group.name}. A member may belong to one care group."
+            )
+        moved_from = current.group.name
+        remove_member_from_care_group(group=current.group, member=member, user=user)
     membership = CareGroupMembership(group=group, member=member, role=role)
     repo.save_care_membership(membership)
+    details = {"group_id": str(group.pk), "group_name": group.name, "role": role}
+    if moved_from:
+        details["moved_from"] = moved_from
     log_member_audit(
         group.church,
         "GROUP_JOIN",
         performed_by=user,
         member=member,
-        details={"group_id": str(group.pk), "group_name": group.name, "role": role},
+        details=details,
     )
     return membership
 
@@ -200,6 +213,8 @@ def pair_care_members(*, group, first, second, user, notes=""):
             raise MemberServiceError(
                 f"{person.full_name} is already paired with {partner.full_name}."
             )
+        membership.awaiting_partner = False
+        repo.save_care_membership(membership)
     partnership = CarePartnership(
         group=group,
         member_a=member_a,
@@ -222,6 +237,41 @@ def pair_care_members(*, group, first, second, user, notes=""):
         },
     )
     return partnership
+
+
+@transaction.atomic
+def mark_awaiting_partner(*, group, member, user, waiting=True):
+    membership = (
+        CareGroupMembership.objects.filter(group=group, member=member, left_at__isnull=True)
+        .select_related("member")
+        .first()
+    )
+    if not membership:
+        raise MemberServiceError("This member is not in the care group.")
+    if waiting and active_partnership_for_member(member, group=group):
+        raise MemberServiceError("Unlink their current partner before marking them as waiting.")
+    membership.awaiting_partner = waiting
+    repo.save_care_membership(membership)
+    log_member_audit(
+        group.church,
+        "GROUP_UPDATE",
+        performed_by=user,
+        member=member,
+        details={
+            "group_id": str(group.pk),
+            "awaiting_partner": waiting,
+        },
+    )
+    return membership
+
+
+@transaction.atomic
+def release_member_from_care_groups(*, member, user):
+    """End active care-group membership and partnership (transfer, death, leave)."""
+    membership = active_membership_for_member(member)
+    if not membership:
+        return None
+    return remove_member_from_care_group(group=membership.group, member=member, user=user)
 
 
 @transaction.atomic

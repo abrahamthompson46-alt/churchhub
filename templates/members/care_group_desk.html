@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Unpaired desk — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="app-breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'members:care_group_list' %}">Care groups</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Unpaired desk</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Unpaired desk" page_description="People still without a care group, and grouped members who still need a one-to-one partner." %}
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="data-card">
+                <div class="px-3 pt-3 pb-2"><h2 class="h6 mb-0">Not in a care group</h2></div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead><tr><th>Member</th></tr></thead>
+                        <tbody>
+                            {% for member in ungrouped %}
+                            <tr>
+                                <td><a href="{% url 'members:detail' member.id %}" class="table-link">{{ member.full_name }}</a></td>
+                            </tr>
+                            {% empty %}
+                            <tr><td class="text-muted">Everyone in scope is already in a care group.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="data-card">
+                <div class="px-3 pt-3 pb-2"><h2 class="h6 mb-0">In a group, still unpaired</h2></div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead><tr><th>Member</th><th>Group</th></tr></thead>
+                        <tbody>
+                            {% for row in unpaired %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'members:detail' row.member.id %}" class="table-link">{{ row.member.full_name }}</a>
+                                    {% if row.awaiting_partner %}<span class="chip chip--muted ms-1">Waiting</span>{% endif %}
+                                </td>
+                                <td><a href="{% url 'members:care_group_detail' row.group_id %}" class="table-link">{{ row.group.name }}</a></td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="2" class="text-muted">No unpaired members in a group.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

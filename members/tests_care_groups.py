@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from accounts.models import UserRole
 from members.care_group_services import (
+    active_membership_for_member,
     add_member_to_care_group,
     pair_care_members,
     save_care_group,
@@ -13,12 +14,14 @@ from members.care_group_services import (
 )
 from members.models import (
     CareGroup,
+    CareGroupMembership,
     CarePartnership,
     Gender,
     Member,
     MemberLocation,
+    MembershipStatus,
 )
-from members.services import MemberServiceError
+from members.services import MemberServiceError, update_member
 from organization.models import Church, Conference, District, Zone
 from permissions.services import ensure_permission_matrix
 
@@ -53,7 +56,11 @@ class CareGroupTests(TestCase):
             church=cls.church, first_name="Ben", last_name="Boateng", gender=Gender.MALE
         )
         cls.cynthia = Member.objects.create(
-            church=cls.church, first_name="Cynthia", last_name="Mensah", gender=Gender.FEMALE
+            church=cls.church,
+            first_name="Cynthia",
+            last_name="Mensah",
+            gender=Gender.FEMALE,
+            address="House 12, East Legon",
         )
         cls.foreign = Member.objects.create(
             church=cls.other_church, first_name="Other", last_name="Member", gender=Gender.MALE
@@ -104,7 +111,17 @@ class CareGroupTests(TestCase):
             is_new=True,
         )
         with self.assertRaises(MemberServiceError):
-            add_member_to_care_group(group=other, member=self.alice, user=self.secretary)
+            add_member_to_care_group(
+                group=other, member=self.alice, user=self.secretary, move=False
+            )
+        add_member_to_care_group(group=other, member=self.alice, user=self.secretary, move=True)
+        current = active_membership_for_member(self.alice)
+        self.assertEqual(current.group_id, other.pk)
+        self.assertFalse(
+            CareGroupMembership.objects.filter(
+                group=self.group, member=self.alice, left_at__isnull=True
+            ).exists()
+        )
 
     def test_cannot_pair_across_groups_or_twice(self):
         add_member_to_care_group(group=self.group, member=self.alice, user=self.secretary)
@@ -145,3 +162,37 @@ class CareGroupTests(TestCase):
         response = self.client.get(reverse("members:detail", kwargs={"member_id": self.alice.pk}))
         self.assertContains(response, "East Legon cell")
         self.assertContains(response, "Ben Boateng")
+
+    def test_leader_field_is_searchable_and_add_uses_picker(self):
+        self.client.login(username="care_sec", password="pass12345")
+        add_page = self.client.get(reverse("members:care_group_add"))
+        self.assertEqual(add_page.status_code, 200)
+        self.assertContains(add_page, "Search member by name or phone")
+        detail = self.client.get(reverse("members:care_group_detail", kwargs={"pk": self.group.pk}))
+        self.assertContains(detail, "Search member by name or phone")
+        self.assertContains(detail, "Cynthia Mensah")
+        response = self.client.post(
+            reverse("members:care_group_add_member", kwargs={"pk": self.group.pk}),
+            {"member": str(self.alice.pk), "role": "MEMBER", "move_if_needed": "on"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            CareGroupMembership.objects.filter(
+                group=self.group, member=self.alice, left_at__isnull=True
+            ).exists()
+        )
+
+    def test_deceased_member_leaves_care_group(self):
+        add_member_to_care_group(group=self.group, member=self.alice, user=self.secretary)
+        update_member(
+            self.alice,
+            performed_by=self.secretary,
+            membership_status=MembershipStatus.DECEASED,
+        )
+        self.assertIsNone(active_membership_for_member(self.alice))
+
+    def test_unpaired_desk_lists_ungrouped_member(self):
+        self.client.login(username="care_sec", password="pass12345")
+        response = self.client.get(reverse("members:care_group_desk"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alice Adu")

@@ -66,7 +66,9 @@ from .models import Member, RecordType
 from members.care_group_views import (  # re-exported for urls
     care_group_add,
     care_group_add_member,
+    care_group_awaiting,
     care_group_delete,
+    care_group_desk,
     care_group_detail,
     care_group_edit,
     care_group_list,

@@ -56,7 +56,7 @@ flowchart TB
 | `PermissionAuditLog` | permissions | MATRIX_UPDATE, MATRIX_RESET, OVERRIDE_CREATE/UPDATE/DELETE |
 | `FinancialAuditLog` | transactions | CREATE, UPDATE, APPROVE, REJECT, VOID, REMIT, BUDGET_* |
 | `AuditEvent` | audit | Dual-write from `FinancialAuditLog` (`journal.*`); scoped search at `/controls/` |
-| `MemberAuditLog` | members | CREATE, UPDATE, STATUS, TRANSFER_*, EXPORT, DEACTIVATE, ACTIVATE |
+| `MemberAuditLog` | members | CREATE, UPDATE, STATUS, TRANSFER_*, EXPORT, DEACTIVATE, ACTIVATE, LOCATION_*, GROUP_* |
 | `OrganizationAuditLog` | organization | CREATE, UPDATE, DEACTIVATE, ACTIVATE, TRANSFER |
 | `AnnouncementAuditLog` | announcements | CREATE, UPDATE, APPROVE, REJECT, ARCHIVE, PIN, UNPIN, EXPORT |
 | `AssetAuditLog` | assets | Service-written actions (SUBMIT, APPROVE, REJECT, DEPRECIATE, DISPOSE, …) |

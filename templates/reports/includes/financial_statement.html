@@ -1,0 +1,103 @@
+{% load humanize %}
+<article class="stmt" aria-label="{{ data.title }}">
+    <header class="stmt__masthead">
+        <p class="stmt__kicker">ChurchHub · Financial reports</p>
+        <h2 class="stmt__title">{{ data.title }}</h2>
+        <p class="stmt__period">{{ data.period_label }} · {{ data.start_date }} to {{ data.end_date }}</p>
+        {% if data.statement.balanced == True %}
+        <p class="stmt__badge stmt__badge--ok"><i class="bi bi-check-circle" aria-hidden="true"></i> In balance</p>
+        {% elif data.statement.balanced == False %}
+        <p class="stmt__badge stmt__badge--warn"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Out of balance</p>
+        {% endif %}
+    </header>
+
+    {% if data.statement.kpis %}
+    <div class="stmt__kpis" role="list">
+        {% for kpi in data.statement.kpis %}
+        <div class="stmt__kpi stmt__kpi--{{ kpi.tone|default:'primary' }}" role="listitem">
+            <span class="stmt__kpi-label">{{ kpi.label }}</span>
+            <span class="stmt__kpi-value text-currency">{{ kpi.value|floatformat:2|intcomma }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="stmt__toolbar">
+        <p class="stmt__hint mb-0"><i class="bi bi-hand-index" aria-hidden="true"></i> Click a section to view account detail.</p>
+        <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-outline-secondary" data-stmt-expand="1">Expand all</button>
+            <button type="button" class="btn btn-outline-secondary" data-stmt-expand="0">Collapse all</button>
+        </div>
+    </div>
+
+    {% for section in data.statement.sections %}
+    <details class="stmt__section"{% if forloop.first %} open{% endif %}>
+        <summary class="stmt__summary">
+            <span class="stmt__summary-title">
+                <i class="bi bi-chevron-right stmt__chevron" aria-hidden="true"></i>
+                {{ section.title }}
+                <span class="stmt__count">{{ section.lines|length }} account{{ section.lines|length|pluralize }}</span>
+            </span>
+            <span class="stmt__summary-total text-currency">
+                {% if section.layout == "trial_balance" %}
+                Dr {{ section.total|floatformat:2|intcomma }}
+                <span class="text-muted">·</span>
+                Cr {{ section.total_credit|floatformat:2|intcomma }}
+                {% else %}
+                {{ section.total|floatformat:2|intcomma }}
+                {% endif %}
+            </span>
+        </summary>
+        <div class="stmt__body">
+            {% if section.lines %}
+            <div class="table-responsive">
+                <table class="table table-sm stmt__table mb-0">
+                    <thead>
+                        {% if section.layout == "trial_balance" %}
+                        <tr>
+                            <th>Account</th>
+                            <th>Type</th>
+                            <th class="text-end">Debit</th>
+                            <th class="text-end">Credit</th>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <th>Account</th>
+                            <th>Church</th>
+                            <th class="text-end">Amount</th>
+                        </tr>
+                        {% endif %}
+                    </thead>
+                    <tbody>
+                        {% for line in section.lines %}
+                        <tr>
+                            <td>{{ line.label }}</td>
+                            <td class="text-muted">{{ line.church|default:"—" }}</td>
+                            {% if section.layout == "trial_balance" %}
+                            <td class="text-end text-currency">{% if line.debit %}{{ line.debit|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                            <td class="text-end text-currency">{% if line.credit %}{{ line.credit|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                            {% else %}
+                            <td class="text-end text-currency">{{ line.amount|floatformat:2|intcomma }}</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted small mb-0 px-3 py-3">{{ section.empty|default:"No detail for this section." }}</p>
+            {% endif %}
+        </div>
+    </details>
+    {% empty %}
+    <p class="text-muted">No statement sections for this period.</p>
+    {% endfor %}
+
+    {% if data.statement.notes %}
+    <footer class="stmt__notes">
+        {% for note in data.statement.notes %}
+        <p>{{ note }}</p>
+        {% endfor %}
+    </footer>
+    {% endif %}
+</article>

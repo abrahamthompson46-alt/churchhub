@@ -97,6 +97,10 @@ class ReportsTests(TestCase):
         self.assertEqual(data["title"], "Financial Summary")
         self.assertIn("rows", data)
         self.assertTrue(any("Operating net" in str(r[0]) for r in data["rows"]))
+        self.assertEqual(len(data["statement"]["sections"]), 4)
+        self.assertEqual(
+            data["statement"]["kpis"][0]["value"], data["summary"]["tithe"]
+        )
 
     def test_report_index_requires_login(self):
         self.assertEqual(self.client.get(reverse("reports:index")).status_code, 302)
@@ -190,6 +194,8 @@ class ReportsTests(TestCase):
         before = ReportAccessAuditLog.objects.count()
         response = self.client.get(reverse("reports:run", args=["financial_summary"]), {"period": "monthly"})
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="stmt"')
+        self.assertContains(response, "Click a section to view account detail")
         self.assertGreater(ReportAccessAuditLog.objects.count(), before)
         log = ReportAccessAuditLog.objects.latest("created_at")
         self.assertEqual(log.report_key, "financial_summary")

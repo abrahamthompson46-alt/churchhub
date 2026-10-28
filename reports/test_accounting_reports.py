@@ -53,16 +53,22 @@ class AccountingReportTests(TestCase):
         data = build_report("trial_balance", self._request(), period="monthly")
         self.assertEqual(data["title"], "Trial Balance")
         self.assertEqual(data["summary"]["total_debit"], data["summary"]["total_credit"])
+        self.assertTrue(data["statement"]["balanced"])
+        self.assertTrue(data["statement"]["sections"])
 
     def test_balance_sheet_builds(self):
         data = build_report("balance_sheet", self._request(), period="monthly")
         self.assertEqual(data["title"], "Balance Sheet")
         self.assertTrue(len(data["rows"]) >= 1)
+        titles = [section["title"] for section in data["statement"]["sections"]]
+        self.assertEqual(titles, ["Assets", "Liabilities", "Funds & Equity"])
 
     def test_income_statement_builds(self):
         data = build_report("income_statement", self._request(), period="monthly")
         self.assertEqual(data["title"], "Income Statement")
         self.assertIn("income", data["summary"])
+        self.assertEqual(len(data["statement"]["sections"]), 2)
+        self.assertEqual(data["statement"]["kpis"][0]["value"], data["summary"]["income"])
 
     def test_cash_position_builds(self):
         data = build_report("cash_position", self._request(), period="monthly")

@@ -3,6 +3,7 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from django.db.models import Sum
 from django.utils import timezone
 
 from church_system.church_scope import get_user_church
@@ -245,7 +246,62 @@ def _financial_summary(request, start, end, **hierarchy):
         ["Expenses (operating)", summary["expense"]],
         ["Operating net (Income − Expense)", operating_net],
     ]
-    return {"title": "Financial Summary", "summary": summary, "headers": headers, "rows": rows}
+    statement = _statement(
+        kpis=[
+            {"label": "Tithe", "value": summary["tithe"], "tone": "primary"},
+            {"label": "Combined offering", "value": summary["combined"], "tone": "accent"},
+            {"label": "Operating income", "value": summary["income"], "tone": "success"},
+            {"label": "Operating expense", "value": summary["expense"], "tone": "danger"},
+            {
+                "label": "Operating net",
+                "value": operating_net,
+                "tone": "success" if operating_net >= 0 else "danger",
+            },
+        ],
+        sections=[
+            {
+                "id": "fs-tithe",
+                "title": "Tithe",
+                "total": summary["tithe"],
+                "lines": _account_activity_lines(lines, ["TITHE"]),
+                "empty": "No tithe posted in this period.",
+            },
+            {
+                "id": "fs-combined",
+                "title": "Combined offering",
+                "total": summary["combined"],
+                "lines": _account_activity_lines(lines, ["COMBINED"]),
+                "empty": "No combined offering posted in this period.",
+            },
+            {
+                "id": "fs-income",
+                "title": "Church income (operating)",
+                "total": summary["income"],
+                "lines": _account_activity_lines(lines, ["INCOME"]),
+                "empty": "No operating income posted in this period.",
+            },
+            {
+                "id": "fs-expense",
+                "title": "Expenses (operating)",
+                "total": summary["expense"],
+                "lines": _account_activity_lines(lines, ["EXPENSE"]),
+                "empty": "No operating expenses posted in this period.",
+            },
+        ],
+        notes=[
+            "Giving subtotal (tithe + combined) is "
+            f"{giving_total}. Operating net is income minus expense and excludes "
+            "tithe and combined offering, which are remitted or restricted.",
+            f"{summary['transaction_count']} approved journal(s) in this period.",
+        ],
+    )
+    return {
+        "title": "Financial Summary",
+        "summary": summary,
+        "headers": headers,
+        "rows": rows,
+        "statement": statement,
+    }
 
 
 def _member_summary(request, start, end, **hierarchy):
@@ -427,6 +483,39 @@ def _quantize(value):
     return _quantize_currency(value or Decimal("0"))
 
 
+def _account_activity_lines(lines, account_types):
+    """Period lines grouped by account and church; amounts as positive activity."""
+    rows = (
+        lines.filter(account__account_type__in=account_types)
+        .values("account__name", "transaction__church__name")
+        .annotate(total=Sum("amount"))
+        .order_by("account__name", "transaction__church__name")
+    )
+    detail = []
+    for row in rows:
+        amount = abs(_quantize(row["total"] or Decimal("0")))
+        if amount == 0:
+            continue
+        detail.append(
+            {
+                "label": row["account__name"],
+                "church": row["transaction__church__name"] or "",
+                "amount": amount,
+            }
+        )
+    return detail
+
+
+def _statement(*, kpis, sections, notes=None, balanced=None, layout="amount"):
+    return {
+        "kpis": kpis,
+        "sections": sections,
+        "notes": notes or [],
+        "balanced": balanced,
+        "layout": layout,
+    }
+
+
 def _lines_for_churches(churches, end, start=None):
     return selectors.lines_for_churches(churches, end, start=start)
 
@@ -476,18 +565,67 @@ def _trial_balance(request, start, end, **hierarchy):
             credit,
         ])
     rows.append(["", "TOTAL", "", total_debit, total_credit])
+    churches = {}
+    for row in rows[:-1]:
+        church_name, account_name, acc_type, debit, credit = row
+        bucket = churches.setdefault(
+            church_name, {"lines": [], "debit": Decimal("0"), "credit": Decimal("0")}
+        )
+        bucket["lines"].append(
+            {
+                "label": account_name,
+                "church": acc_type,
+                "debit": debit,
+                "credit": credit,
+            }
+        )
+        bucket["debit"] += debit
+        bucket["credit"] += credit
+    sections = []
+    for index, (church_name, bucket) in enumerate(churches.items()):
+        sections.append(
+            {
+                "id": f"tb-{index}",
+                "title": church_name or "Church",
+                "total": bucket["debit"],
+                "total_credit": bucket["credit"],
+                "lines": bucket["lines"],
+                "empty": "No balances for this church.",
+                "layout": "trial_balance",
+            }
+        )
+    difference = _quantize(total_debit - total_credit)
+    statement = _statement(
+        kpis=[
+            {"label": "Total debit", "value": total_debit, "tone": "primary"},
+            {"label": "Total credit", "value": total_credit, "tone": "accent"},
+            {
+                "label": "Difference",
+                "value": difference,
+                "tone": "success" if difference == 0 else "danger",
+            },
+        ],
+        sections=sections,
+        notes=[
+            "Debits equal credits when the books are in balance. Click a church "
+            "to view account-level debit and credit balances as of period end.",
+        ],
+        balanced=difference == 0,
+        layout="trial_balance",
+    )
     return {
         "title": "Trial Balance",
         "headers": headers,
         "rows": rows,
         "summary": {"total_debit": total_debit, "total_credit": total_credit},
+        "statement": statement,
     }
 
 
 def _balance_sheet(request, start, end, **hierarchy):
     churches = _churches_in_scope(request, **hierarchy)
     balances = _account_balances(churches, end)
-    sections = [
+    section_defs = [
         ("Assets", ASSET_TYPES),
         ("Liabilities", LIABILITY_TYPES),
         ("Funds & Equity", FUND_TYPES),
@@ -495,7 +633,7 @@ def _balance_sheet(request, start, end, **hierarchy):
     headers = ["Section", "Account", "Church", "Balance"]
     rows = []
     section_totals = {}
-    for section_name, types in sections:
+    for section_name, types in section_defs:
         section_total = Decimal("0")
         for entry in sorted(balances.values(), key=lambda x: x["account"].name):
             if entry["account"].account_type not in types:
@@ -510,11 +648,57 @@ def _balance_sheet(request, start, end, **hierarchy):
             rows.append([section_name, entry["account"].name, entry["church_name"], display])
         section_totals[section_name] = section_total
         rows.append([section_name, f"Total {section_name}", "", section_total])
+    sections = []
+    for index, (section_name, _types) in enumerate(section_defs):
+        detail_lines = [
+            {
+                "label": row[1],
+                "church": row[2],
+                "amount": row[3],
+            }
+            for row in rows
+            if row[0] == section_name and not str(row[1]).startswith("Total ")
+        ]
+        sections.append(
+            {
+                "id": f"bs-{index}",
+                "title": section_name,
+                "total": section_totals.get(section_name, Decimal("0")),
+                "lines": detail_lines,
+                "empty": f"No {section_name.lower()} balances at period end.",
+            }
+        )
+    assets = section_totals.get("Assets", Decimal("0"))
+    claims = section_totals.get("Liabilities", Decimal("0")) + section_totals.get(
+        "Funds & Equity", Decimal("0")
+    )
+    statement = _statement(
+        kpis=[
+            {"label": "Assets", "value": assets, "tone": "primary"},
+            {
+                "label": "Liabilities",
+                "value": section_totals.get("Liabilities", Decimal("0")),
+                "tone": "warning",
+            },
+            {
+                "label": "Funds & equity",
+                "value": section_totals.get("Funds & Equity", Decimal("0")),
+                "tone": "accent",
+            },
+        ],
+        sections=sections,
+        notes=[
+            "Liability and fund balances are shown as positive amounts. "
+            "Click a section to view account and church detail as of period end.",
+            f"Assets {assets} versus liabilities plus funds {claims}.",
+        ],
+    )
     return {
         "title": "Balance Sheet",
         "headers": headers,
         "rows": rows,
         "summary": section_totals,
+        "statement": statement,
     }
 
 
@@ -547,11 +731,54 @@ def _income_statement(request, start, end, **hierarchy):
     rows.append(["", "Total Income", "", total_income])
     rows.append(["", "Total Expense", "", total_expense])
     rows.append(["", "Net Surplus / (Deficit)", "", net])
+    income_lines = [
+        {"label": row[1], "church": row[2], "amount": row[3]}
+        for row in rows
+        if row[0] == "Income"
+    ]
+    expense_lines = [
+        {"label": row[1], "church": row[2], "amount": row[3]}
+        for row in rows
+        if row[0] == "Expense"
+    ]
+    statement = _statement(
+        kpis=[
+            {"label": "Total income", "value": total_income, "tone": "success"},
+            {"label": "Total expense", "value": total_expense, "tone": "danger"},
+            {
+                "label": "Net surplus / (deficit)",
+                "value": net,
+                "tone": "success" if net >= 0 else "danger",
+            },
+        ],
+        sections=[
+            {
+                "id": "is-income",
+                "title": "Income",
+                "total": total_income,
+                "lines": income_lines,
+                "empty": "No income activity in this period.",
+            },
+            {
+                "id": "is-expense",
+                "title": "Expenses",
+                "total": total_expense,
+                "lines": expense_lines,
+                "empty": "No expense activity in this period.",
+            },
+        ],
+        notes=[
+            "Figures are period activity shown as positive amounts. Income accounts "
+            "are credit-normal; expense accounts are debit-normal. Click a section "
+            "to view account and church detail.",
+        ],
+    )
     return {
         "title": "Income Statement",
         "headers": headers,
         "rows": rows,
         "summary": {"income": total_income, "expense": total_expense, "net": net},
+        "statement": statement,
     }
 
 

@@ -445,6 +445,15 @@ class MemberFilterForm(forms.Form):
         choices=[("", "All age groups")] + list(AGE_GROUP_CHOICES),
         widget=forms.Select(attrs=_select()),
     )
+    care_status = forms.ChoiceField(
+        required=False,
+        choices=[
+            ("", "All care groups"),
+            ("ungrouped", "Not in a care group"),
+            ("unpaired", "In a group, unpaired"),
+        ],
+        widget=forms.Select(attrs=_select()),
+    )
 
     def __init__(self, *args, church=None, **kwargs):
         super().__init__(*args, **kwargs)

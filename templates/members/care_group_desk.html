@@ -19,14 +19,36 @@
                 <div class="px-3 pt-3 pb-2"><h2 class="h6 mb-0">Not in a care group</h2></div>
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
-                        <thead><tr><th>Member</th></tr></thead>
+                        <thead><tr><th>Member</th>{% if can_manage %}<th>Add to group</th>{% endif %}</tr></thead>
                         <tbody>
                             {% for member in ungrouped %}
                             <tr>
-                                <td><a href="{% url 'members:detail' member.id %}" class="table-link">{{ member.full_name }}</a></td>
+                                <td>
+                                    <a href="{% url 'members:detail' member.id %}" class="table-link">{{ member.full_name }}</a>
+                                    {% if member.phone %}<div class="text-muted small">{{ member.phone }}</div>{% endif %}
+                                </td>
+                                {% if can_manage %}
+                                <td>
+                                    {% if groups %}
+                                    <form method="post" action="{% url 'members:care_group_desk_add' %}" class="d-flex gap-2">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="member" value="{{ member.pk }}">
+                                        <select name="group" class="form-select form-select-sm" required>
+                                            <option value="">Choose group…</option>
+                                            {% for group in groups %}
+                                            <option value="{{ group.pk }}">{{ group.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                                    </form>
+                                    {% else %}
+                                    <span class="text-muted small">Create a group first.</span>
+                                    {% endif %}
+                                </td>
+                                {% endif %}
                             </tr>
                             {% empty %}
-                            <tr><td class="text-muted">Everyone in scope is already in a care group.</td></tr>
+                            <tr><td colspan="{% if can_manage %}2{% else %}1{% endif %}" class="text-muted">Everyone in scope is already in a care group.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -38,18 +60,38 @@
                 <div class="px-3 pt-3 pb-2"><h2 class="h6 mb-0">In a group, still unpaired</h2></div>
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
-                        <thead><tr><th>Member</th><th>Group</th></tr></thead>
+                        <thead><tr><th>Member</th><th>Group</th>{% if can_manage %}<th>Link with</th>{% endif %}</tr></thead>
                         <tbody>
                             {% for row in unpaired %}
                             <tr>
                                 <td>
                                     <a href="{% url 'members:detail' row.member.id %}" class="table-link">{{ row.member.full_name }}</a>
-                                    {% if row.awaiting_partner %}<span class="chip chip--muted ms-1">Waiting</span>{% endif %}
+                                    {% if row.member.phone %}<div class="text-muted small">{{ row.member.phone }}</div>{% endif %}
+                                    {% if row.awaiting_partner %}<span class="chip chip--muted">Waiting</span>{% endif %}
                                 </td>
                                 <td><a href="{% url 'members:care_group_detail' row.group_id %}" class="table-link">{{ row.group.name }}</a></td>
+                                {% if can_manage %}
+                                <td>
+                                    {% if row.link_choices %}
+                                    <form method="post" action="{% url 'members:care_group_desk_pair' %}" class="d-flex gap-2">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="first" value="{{ row.member_id }}">
+                                        <select name="second" class="form-select form-select-sm" required>
+                                            <option value="">Choose partner…</option>
+                                            {% for person in row.link_choices %}
+                                            <option value="{{ person.pk }}">{{ person.full_name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button type="submit" class="btn btn-sm btn-primary">Link</button>
+                                    </form>
+                                    {% else %}
+                                    <span class="text-muted small">Need another unpaired member in this group.</span>
+                                    {% endif %}
+                                </td>
+                                {% endif %}
                             </tr>
                             {% empty %}
-                            <tr><td colspan="2" class="text-muted">No unpaired members in a group.</td></tr>
+                            <tr><td colspan="{% if can_manage %}3{% else %}2{% endif %}" class="text-muted">No unpaired members in a group.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>

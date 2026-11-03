@@ -51,17 +51,19 @@
             <div class="data-card">
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
-                        <thead><tr><th>Group</th><th>Location</th><th>Leader</th><th>Members</th></tr></thead>
+                        <thead><tr><th>Group</th><th>Location</th><th>Leader</th><th>Members</th><th>Unpaired</th><th>Waiting</th></tr></thead>
                         <tbody>
                             {% for group in groups %}
                             <tr>
                                 <td><a href="{% url 'members:care_group_detail' group.pk %}" class="table-link">{{ group.name }}</a></td>
                                 <td>{{ group.location.name }}</td>
-                                <td>{{ group.leader.full_name|default:"—" }}</td>
+                                <td>{% if group.leader %}{{ group.leader.full_name }}{% else %}<span class="chip chip--muted">No leader</span>{% endif %}</td>
                                 <td>{{ group.members_total }}</td>
+                                <td>{{ group.unpaired_total }}</td>
+                                <td>{{ group.waiting_total }}</td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="4">
+                            <tr><td colspan="6">
                                 {% if can_manage %}
                                 {% url 'members:care_group_add' as add_url %}
                                 {% include "includes/empty_state.html" with icon="bi-people" message="No care groups yet." action_url=add_url action_label="Add care group" %}

@@ -121,6 +121,7 @@ def member_directory_qs(
     department="",
     gender="",
     age_group="",
+    care_status="",
 ):
     qs = members_directory_base_qs(request)
     if q:
@@ -138,6 +139,31 @@ def member_directory_qs(
         qs = qs.filter(gender=gender)
     if age_group:
         qs = apply_age_group_filter(qs, age_group)
+    if care_status == "ungrouped":
+        qs = qs.filter(
+            ~Exists(
+                CareGroupMembership.objects.filter(
+                    member_id=OuterRef("pk"), left_at__isnull=True
+                )
+            )
+        )
+    elif care_status == "unpaired":
+        qs = qs.filter(
+            Exists(
+                CareGroupMembership.objects.filter(
+                    member_id=OuterRef("pk"), left_at__isnull=True
+                )
+            )
+        ).exclude(
+            Exists(
+                CarePartnership.objects.filter(
+                    is_active=True,
+                    group__church_id=OuterRef("church_id"),
+                ).filter(
+                    Q(member_a_id=OuterRef("pk")) | Q(member_b_id=OuterRef("pk"))
+                )
+            )
+        )
     return qs.order_by("last_name", "first_name")
 
 
@@ -379,7 +405,21 @@ def care_groups_qs(request):
             members_total=Count(
                 "memberships",
                 filter=Q(memberships__left_at__isnull=True),
-            )
+                distinct=True,
+            ),
+            pairs_total=Count(
+                "partnerships",
+                filter=Q(partnerships__is_active=True),
+                distinct=True,
+            ),
+            waiting_total=Count(
+                "memberships",
+                filter=Q(
+                    memberships__left_at__isnull=True,
+                    memberships__awaiting_partner=True,
+                ),
+                distinct=True,
+            ),
         )
         .order_by("location__name", "name"),
         request,
@@ -483,7 +523,15 @@ def care_group_desk(request):
         .exclude(member_id__in=paired)
         .order_by("group__location__name", "group__name", "member__last_name")
     )
-    return {"ungrouped": ungrouped, "unpaired": unpaired}
+    partner_choices = {}
+    for row in unpaired:
+        partner_choices.setdefault(row.group_id, []).append(row.member)
+    return {
+        "ungrouped": ungrouped,
+        "unpaired": unpaired,
+        "groups": list(groups),
+        "partner_choices": partner_choices,
+    }
 
 
 def member_care_context(member):

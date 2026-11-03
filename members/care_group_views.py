@@ -25,17 +25,27 @@ from members.forms import (
     CarePartnershipForm,
     MemberLocationForm,
 )
+from members.models import CareGroupRole
 from members.services import MemberServiceError
 from members import selectors
 from permissions.checks import can_manage_care_groups
+
+
+def _after_group_change(request, group):
+    if request.POST.get("next") == "desk":
+        return redirect("members:care_group_desk")
+    return redirect("members:care_group_detail", pk=group.pk)
 
 
 @login_required
 def care_group_list(request):
     require_view_members(request)
     can_manage = can_manage_care_groups(request.user)
+    groups = list(selectors.care_groups_qs(request))
+    for group in groups:
+        group.unpaired_total = max((group.members_total or 0) - 2 * (group.pairs_total or 0), 0)
     return render(request, "members/care_group_list.html", {
-        "groups": selectors.care_groups_qs(request),
+        "groups": groups,
         "locations": selectors.member_locations_qs(request),
         "can_manage": can_manage,
         "can_manage_care_groups": can_manage,
@@ -150,6 +160,8 @@ def _detail_context(request, group):
     roster = list(selectors.care_group_roster(group))
     partnerships = list(selectors.care_group_partnerships(group))
     unpaired = selectors.unpaired_members_in_group(group)
+    unpaired_ids = {member.pk for member in unpaired}
+    unpaired_rows = [row for row in roster if row.member_id in unpaired_ids]
     roster_members = [row.member for row in roster]
     can_manage = can_manage_care_groups(request.user)
     return {
@@ -157,6 +169,7 @@ def _detail_context(request, group):
         "roster": roster,
         "partnerships": partnerships,
         "unpaired": unpaired,
+        "unpaired_rows": unpaired_rows,
         "suggestions": selectors.members_suggested_for_care_group(group),
         "can_manage": can_manage,
         "can_manage_care_groups": can_manage,
@@ -201,7 +214,7 @@ def care_group_add_member(request, pk):
         flash_success(request, f"{member.full_name} moved from {previous_name} to this group.")
     else:
         flash_success(request, f"{member.full_name} added to the group.")
-    return redirect("members:care_group_detail", pk=group.pk)
+    return _after_group_change(request, group)
 
 
 @login_required
@@ -244,7 +257,7 @@ def care_group_pair(request, pk):
         flash_exception(request, exc)
         return redirect("members:care_group_detail", pk=group.pk)
     flash_success(request, "Members linked one to one in this group.")
-    return redirect("members:care_group_detail", pk=group.pk)
+    return _after_group_change(request, group)
 
 
 @login_required
@@ -288,9 +301,68 @@ def care_group_desk(request):
     require_view_members(request)
     desk = selectors.care_group_desk(request)
     can_manage = can_manage_care_groups(request.user)
+    unpaired = list(desk["unpaired"][:50])
+    partner_choices = desk["partner_choices"]
+    for row in unpaired:
+        row.link_choices = [
+            person for person in partner_choices.get(row.group_id, []) if person.pk != row.member_id
+        ]
     return render(request, "members/care_group_desk.html", {
         "ungrouped": desk["ungrouped"][:50],
-        "unpaired": desk["unpaired"][:50],
+        "unpaired": unpaired,
+        "groups": desk["groups"],
         "can_manage": can_manage,
         "can_manage_care_groups": can_manage,
     })
+
+
+@login_required
+def care_group_desk_add(request):
+    require_manage_care_groups(request)
+    if request.method != "POST":
+        return redirect("members:care_group_desk")
+    group = selectors.care_group_for_request(request, request.POST.get("group"))
+    member = selectors.member_for_request(request, request.POST.get("member"))
+    try:
+        add_member_to_care_group(
+            group=group,
+            member=member,
+            user=request.user,
+            role=CareGroupRole.MEMBER,
+            move=True,
+        )
+    except MemberServiceError as exc:
+        flash_exception(request, exc)
+        return redirect("members:care_group_desk")
+    flash_success(request, f"{member.full_name} added to {group.name}.")
+    return redirect("members:care_group_desk")
+
+
+@login_required
+def care_group_desk_pair(request):
+    require_manage_care_groups(request)
+    if request.method != "POST":
+        return redirect("members:care_group_desk")
+    first = selectors.member_for_request(request, request.POST.get("first"))
+    second = selectors.member_for_request(request, request.POST.get("second"))
+    membership = active_membership_for_member(first)
+    if not membership:
+        flash_exception(request, MemberServiceError(f"{first.full_name} is not in a care group."))
+        return redirect("members:care_group_desk")
+    group = selectors.care_group_for_request(request, membership.group_id)
+    try:
+        pair_care_members(group=group, first=first, second=second, user=request.user)
+    except MemberServiceError as exc:
+        flash_exception(request, exc)
+        return redirect("members:care_group_desk")
+    flash_success(request, f"{first.full_name} linked with {second.full_name}.")
+    return redirect("members:care_group_desk")
+
+
+@login_required
+def care_group_sheet(request, pk):
+    require_view_members(request)
+    group = selectors.care_group_for_request(request, pk)
+    ctx = _detail_context(request, group)
+    ctx["title"] = f"{group.name} shepherding sheet"
+    return render(request, "members/care_group_sheet.html", ctx)

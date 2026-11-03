@@ -121,7 +121,7 @@ Management: `export_member_data`.
 | `add` / `edit` / `member_detail` / `member_timeline` | CRUD + timeline |
 | `member_export` | Per-member JSON download |
 | Record / department / family CRUD | Supporting entities |
-| Care group / location / pairing / desk | Location groups, searchable add/leader, one-to-one links, unpaired desk (`care_group_views`) |
+| Care group / location / pairing / desk / sheet | Location groups, searchable add/leader, one-to-one links, unpaired desk assign/link, printable sheet (`care_group_views`) |
 | `transfer_*` | Transfer list/create/detail (+ complete/reject) |
 | `baptism_register` | Baptism list/export; **Add baptism** when `manage_member_records` or `manage_baptisms` |
 | Leadership / spiritual gift views | Roles and gifts |
@@ -142,7 +142,7 @@ Management: `export_member_data`.
 | `records/…` | `record_*` |
 | `departments/…` | `department_*` (includes hard delete) |
 | `families/…` | `family_*` |
-| `care-groups/…` | `care_group_*`, `care_location_*`, `care_group_desk` |
+| `care-groups/…` | `care_group_*`, `care_location_*`, `care_group_desk`, `care_group_desk_add`, `care_group_desk_pair`, `care_group_sheet` |
 | `transfers/…` | `transfer_*` |
 | `baptisms/` | `baptism_register` |
 | `leadership/…` | `leadership_*` |
@@ -155,7 +155,7 @@ Management: `export_member_data`.
 
 ## 8. Templates (Current)
 
-`templates/members/`: list/add/edit/detail/timeline, records, departments, families, care_group_*, care_location_form, care_group_desk, transfers, baptism_register, leadership, spiritual gifts, assign_gift, confirm_delete, etc.
+`templates/members/`: list/add/edit/detail/timeline, records, departments, families, care_group_*, care_location_form, care_group_desk, care_group_sheet, transfers, baptism_register, leadership, spiritual gifts, assign_gift, confirm_delete, etc.
 
 ---
 
@@ -196,7 +196,7 @@ Church scoping: `filter_by_church` / `require_church` / manageable churches for 
 
 - Church-scoped locations and groups. Members join **one active** care group. Adding from the group screen uses a searchable picker and can move the member from another group.  
 - Leader is a searchable member picker. Address `icontains` the location name suggests nearby members.  
-- One-to-one partnerships only inside that group; both members must be on the roster; one active partner per member. The odd member out can be marked `awaiting_partner`. The unpaired desk lists ungrouped and unpaired people.  
+- One-to-one partnerships only inside that group; both members must be on the roster; one active partner per member. The odd member out can be marked `awaiting_partner`. The unpaired desk lists ungrouped and unpaired people and can add or link them. The group list shows members / unpaired / waiting / no leader. Directory `care_status` filters ungrouped or unpaired. Printable shepherding sheet includes phones.  
 - Leaving a group ends that member’s active partnership. Transfer completion, deceased/transferred/former status, and deactivation release care-group membership. Writes require `manage_care_groups`.
 
 ---

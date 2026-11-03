@@ -18,6 +18,11 @@
         <a href="{% url 'members:care_group_edit' group.pk %}" class="btn btn-outline-secondary btn-sm">Edit group</a>
         <a href="{% url 'members:care_group_delete' group.pk %}" class="btn btn-outline-danger btn-sm">Remove group</a>
         <a href="{% url 'members:care_group_desk' %}" class="btn btn-outline-secondary btn-sm">Unpaired desk</a>
+        <a href="{% url 'members:care_group_sheet' group.pk %}" class="btn btn-outline-secondary btn-sm">Print sheet</a>
+    </div>
+    {% else %}
+    <div class="d-flex gap-2 mb-4">
+        <a href="{% url 'members:care_group_sheet' group.pk %}" class="btn btn-outline-secondary btn-sm">Print sheet</a>
     </div>
     {% endif %}
 
@@ -40,6 +45,7 @@
                 <li class="d-flex justify-content-between align-items-center py-2 border-bottom gap-2">
                     <span>
                         <a href="{% url 'members:detail' row.member.id %}" class="table-link">{{ row.member.full_name }}</a>
+                        {% if row.member.phone %}<span class="text-muted small ms-1">{{ row.member.phone }}</span>{% endif %}
                         <span class="chip ms-1">{{ row.get_role_display }}</span>
                         {% if row.awaiting_partner %}<span class="chip chip--muted ms-1">Waiting for partner</span>{% endif %}
                     </span>

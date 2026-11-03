@@ -196,3 +196,55 @@ class CareGroupTests(TestCase):
         response = self.client.get(reverse("members:care_group_desk"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Alice Adu")
+
+    def test_desk_add_and_pair(self):
+        self.alice.phone = "0241111111"
+        self.alice.save(update_fields=["phone"])
+        self.client.login(username="care_sec", password="pass12345")
+        add = self.client.post(
+            reverse("members:care_group_desk_add"),
+            {"member": str(self.alice.pk), "group": str(self.group.pk)},
+        )
+        self.assertEqual(add.status_code, 302)
+        self.assertTrue(
+            CareGroupMembership.objects.filter(
+                group=self.group, member=self.alice, left_at__isnull=True
+            ).exists()
+        )
+        self.client.post(
+            reverse("members:care_group_desk_add"),
+            {"member": str(self.ben.pk), "group": str(self.group.pk)},
+        )
+        pair = self.client.post(
+            reverse("members:care_group_desk_pair"),
+            {"first": str(self.alice.pk), "second": str(self.ben.pk)},
+        )
+        self.assertEqual(pair.status_code, 302)
+        self.assertTrue(CarePartnership.objects.filter(group=self.group, is_active=True).exists())
+        listing = self.client.get(reverse("members:care_group_list"))
+        self.assertContains(listing, "Unpaired")
+        self.assertContains(listing, "Waiting")
+        detail = self.client.get(reverse("members:care_group_detail", kwargs={"pk": self.group.pk}))
+        self.assertContains(detail, "0241111111")
+        sheet = self.client.get(reverse("members:care_group_sheet", kwargs={"pk": self.group.pk}))
+        self.assertEqual(sheet.status_code, 200)
+        self.assertContains(sheet, "0241111111")
+        self.assertContains(sheet, "Ben Boateng")
+
+    def test_outsider_cannot_desk_add_foreign_member(self):
+        self.client.login(username="care_out", password="pass12345")
+        response = self.client.post(
+            reverse("members:care_group_desk_add"),
+            {"member": str(self.alice.pk), "group": str(self.group.pk)},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_directory_care_status_filter(self):
+        add_member_to_care_group(group=self.group, member=self.alice, user=self.secretary)
+        self.client.login(username="care_sec", password="pass12345")
+        ungrouped = self.client.get(reverse("members:list"), {"care_status": "ungrouped"})
+        self.assertContains(ungrouped, "Ben Boateng")
+        self.assertNotContains(ungrouped, "Alice Adu")
+        unpaired = self.client.get(reverse("members:list"), {"care_status": "unpaired"})
+        self.assertContains(unpaired, "Alice Adu")
+        self.assertNotContains(unpaired, "Ben Boateng")

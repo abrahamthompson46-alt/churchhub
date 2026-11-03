@@ -69,11 +69,14 @@ from members.care_group_views import (  # re-exported for urls
     care_group_awaiting,
     care_group_delete,
     care_group_desk,
+    care_group_desk_add,
+    care_group_desk_pair,
     care_group_detail,
     care_group_edit,
     care_group_list,
     care_group_pair,
     care_group_remove_member,
+    care_group_sheet,
     care_group_unpair,
     location_add,
     location_delete,
@@ -134,6 +137,7 @@ class MemberListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             department=self.request.GET.get("department", ""),
             gender=self.request.GET.get("gender", ""),
             age_group=self.request.GET.get("age_group", ""),
+            care_status=self.request.GET.get("care_status", ""),
         )
 
     def get(self, request, *args, **kwargs):

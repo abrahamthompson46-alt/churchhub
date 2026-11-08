@@ -234,6 +234,23 @@ def working_day_context(request):
     if not request.user.is_authenticated or getattr(request.user, "is_platform_user", False):
         return {}
 
+    match = getattr(request, "resolver_match", None)
+    namespace = getattr(match, "namespace", "") or ""
+    url_name = getattr(match, "url_name", "") or ""
+    posting_namespaces = {
+        "transactions",
+        "ledger",
+        "remittance",
+        "budgets",
+        "payroll",
+        "assets",
+        "giving",
+        "contributions",
+    }
+    show_workspace_status_bar = namespace in posting_namespaces or (
+        namespace == "dashboard" and url_name in ("home", "cutoff")
+    )
+
     scope = resolve_dashboard_scope(request)
     church = scope.primary_church if scope.level == "CHURCH" else None
     show_money = user_can_use_finance_kpis(request.user)
@@ -241,6 +258,7 @@ def working_day_context(request):
     if not church:
         return {
             "system_date": timezone.localdate(),
+            "show_workspace_status_bar": show_workspace_status_bar,
             "show_working_day_status": False,
             "show_cash_position": False,
             "cash_position": None,
@@ -266,6 +284,7 @@ def working_day_context(request):
         "active_working_day": status["active_working_day"],
         "working_date": status["working_date"],
         "working_day_is_open": status["is_open"],
+        "show_workspace_status_bar": show_workspace_status_bar,
         "show_working_day_status": show_money,
         "can_manage_working_day": can_manage_working_day(request.user),
         "show_cash_position": show_money,

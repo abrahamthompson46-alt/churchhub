@@ -26,7 +26,7 @@ from sitecontrol.services import church_has_feature
 
 
 def get_notification_inbox(user, *, limit=5):
-    notes = selectors.recent_notifications_for_user(user, limit=limit)
+    notes = selectors.recent_notifications_for_user(user, limit=limit, unread_only=True)
     unread = selectors.unread_notification_count(user)
     items = []
     for note in notes:
@@ -566,6 +566,8 @@ def get_portal_staff_alerts(request):
         request.user, request, kind=SpiritualSubmissionKind.PRAYER
     )
     praise_new = count_new_praise_submissions(request.user, request)
+    if not prayer_new and not praise_new:
+        return None
     return {
         "prayer_new": prayer_new,
         "praise_new": praise_new,

@@ -11,7 +11,7 @@ Optional CTA: action_url + action_label
     {% if es_message %}<p class="ch-empty-state__message text-muted mb-0">{{ es_message }}</p>{% endif %}
     {% if action_url and action_label %}
     <div class="ch-empty-state__actions mt-3">
-        <a href="{{ action_url }}" class="btn btn-primary btn-sm">{{ action_label }}</a>
+        <a href="{{ action_url }}" class="btn btn-link btn-sm px-0">{{ action_label }}</a>
     </div>
     {% endif %}
 </div>

@@ -38,7 +38,7 @@
                 {{ filter_form.date_to }}
             </div>
             <div class="col-md-auto d-flex gap-2">
-                <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Search</button>
                 <a href="{% url 'meetings:list' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
             </div>
         </div>
@@ -84,7 +84,7 @@
                     <tr><td colspan="7">
                         {% if can_manage_meetings %}
                         {% url 'meetings:create' as schedule_url %}
-                        {% include "includes/empty_state.html" with icon="bi-calendar-event" message="No meetings match your search." action_url=schedule_url action_label="Schedule meeting" %}
+                        {% include "includes/empty_state.html" with icon="bi-calendar-event" message="No meetings match your search." %}
                         {% else %}
                         {% include "includes/empty_state.html" with icon="bi-calendar-event" message="No meetings match your search." %}
                         {% endif %}

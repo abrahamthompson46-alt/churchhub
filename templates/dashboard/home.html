@@ -44,9 +44,6 @@
                     {% if org_health.new_portal_submissions %}
                     <a href="{% url 'portal:staff_submissions' %}?status=NEW" class="cc-health-stat cc-health-stat--link">{{ org_health.new_portal_submissions }} pastoral inbox</a>
                     {% endif %}
-                    {% if org_health.working_day_issues %}
-                    <a href="{% url 'transactions:period_list' %}" class="cc-health-stat cc-health-stat--link">{{ org_health.working_day_issues }} working day{{ org_health.working_day_issues|pluralize }} behind</a>
-                    {% endif %}
                 </div>
             </div>
             {% endif %}
@@ -264,7 +261,7 @@
             {% if not church_focused %}
             <p class="cc-kicker cc-kicker--section">Workbench</p>
             {% endif %}
-            {% if show_action_queue %}
+            {% if show_action_queue and action_queue %}
             <section class="cc-panel{% if primary_work == 'queue' %} cc-panel--priority{% endif %} mb-4">
                 <div class="cc-panel__header">
                     <h2 class="cc-panel__title"><i class="bi bi-lightning-charge"></i> {% if is_control_center %}Action queue{% else %}My tasks{% endif %}</h2>
@@ -395,7 +392,7 @@
             </section>
             {% endif %}
 
-            {% if hierarchy_rollup %}
+            {% if hierarchy_rollup|length > 1 %}
             <section class="cc-panel mb-4">
                 <div class="cc-panel__header">
                     <h2 class="cc-panel__title"><i class="bi bi-bar-chart-steps"></i> District Roll-up — {{ finance_as_of|default:current_time|date:"F Y" }}</h2>
@@ -493,7 +490,7 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if membership_analysis and membership_analysis.chart %}
+{% if membership_analysis and membership_analysis.chart and membership_analysis.totals.church_count > 1 %}
 <script>
 (function () {
     const el = document.getElementById('memberCompareChart');

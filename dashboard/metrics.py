@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-KPI_DELTA_MIN_PRIOR = Decimal("50")
+KPI_DELTA_MIN_PRIOR = Decimal("200")
+KPI_DELTA_MAX_PCT = 200.0
 
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
@@ -76,10 +77,13 @@ def aggregate_giving_calendar_month(finance_church_ids, month_start_date):
 
 
 def pct_change(current: Decimal, previous: Decimal):
-    """Hide % when prior is zero or too small to be a meaningful base."""
+    """Hide % when prior is zero, too small, or the swing is extreme."""
     if previous == 0 or abs(previous) < KPI_DELTA_MIN_PRIOR:
         return None
-    return float((current - previous) / previous * 100)
+    change = float((current - previous) / previous * 100)
+    if abs(change) > KPI_DELTA_MAX_PCT:
+        return None
+    return change
 
 
 def attach_finance_deltas(bundle, finance_church_ids, month_start_date):

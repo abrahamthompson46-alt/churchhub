@@ -764,10 +764,11 @@ def recent_financial_activity(church_ids, *, limit=8):
     return out
 
 
-def recent_notifications_for_user(user, *, limit=5):
-    return list(
-        Notification.objects.filter(user=user).order_by("-last_event_at", "-created_at")[:limit]
-    )
+def recent_notifications_for_user(user, *, limit=5, unread_only=False):
+    qs = Notification.objects.filter(user=user)
+    if unread_only:
+        qs = qs.filter(read=False)
+    return list(qs.order_by("-last_event_at", "-created_at")[:limit])
 
 
 def pending_transfers_preview_for_church(church, *, limit=5):

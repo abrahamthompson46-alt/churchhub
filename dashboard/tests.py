@@ -395,6 +395,48 @@ class NavigationDensityTests(DashboardTestMixin, TestCase):
         self.assertEqual(eyebrow["section"], "Finance")
         self.assertEqual(eyebrow["page"], "Pending")
 
+    def test_people_tabs_are_five_operational(self):
+        from church_system.navigation import get_module_tabs
+
+        pastor = User.objects.create_user(
+            username="tabpastor",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=self.church,
+        )
+        key, tabs = get_module_tabs(pastor, "members", "members:list", active_church=self.church)
+        self.assertEqual(key, "people")
+        names = [t["url_name"] for t in tabs]
+        self.assertEqual(
+            names,
+            [
+                "members:list",
+                "members:visitor_list",
+                "members:care_group_list",
+                "meetings:list",
+                "members:transfer_list",
+            ],
+        )
+
+    def test_home_menu_is_overview_inbox_remittance(self):
+        from church_system.navigation import get_main_navigation
+
+        admin = User.objects.create_user(
+            username="tabadmin",
+            password="pass12345",
+            role=UserRole.SUPER_ADMIN,
+            church=self.church,
+        )
+        nav = get_main_navigation(admin, active_church=self.church)
+        home = next(item for item in nav if item.get("id") == "home")
+        labels = [i["label"] for i in home["sections"][0]["items"]]
+        self.assertEqual(labels, ["Overview", "Work inbox", "Remittance desk"])
+        settings = next(item for item in nav if item.get("id") == "settings")
+        control_titles = [s["title"] for s in settings["sections"]]
+        self.assertIn("Controls", control_titles)
+        self.assertNotIn("Books setup", control_titles)
+        self.assertNotIn("Module policies", control_titles)
+
 
 class ViewTests(DashboardTestMixin, TestCase):
     @classmethod
@@ -872,7 +914,6 @@ class ViewTests(DashboardTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "District Roll-up")
         self.assertContains(response, "Mission Control")
-        self.assertContains(response, "Action queue")
 
     def test_executive_kpis_for_overseer(self):
         from sitecontrol.denomination_services import ensure_builtin_denominations
@@ -914,7 +955,8 @@ class ViewTests(DashboardTestMixin, TestCase):
         self.assertIsNone(pct_change(Decimal("0"), Decimal("0")))
         self.assertIsNone(pct_change(Decimal("10"), Decimal("0")))
         self.assertIsNone(pct_change(Decimal("20"), Decimal("10")))
-        self.assertAlmostEqual(pct_change(Decimal("150"), Decimal("100")), 50.0)
+        self.assertIsNone(pct_change(Decimal("2005"), Decimal("130")))
+        self.assertAlmostEqual(pct_change(Decimal("300"), Decimal("200")), 50.0)
 
     def test_control_center_filters_duplicate_queue_items(self):
         raw = [
@@ -1293,8 +1335,8 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertNotContains(response, "Tithe MTD")
         self.assertIsNotNone(response.context.get("membership_analysis"))
         self.assertContains(response, "Membership")
-        self.assertContains(response, "memberCompareChart")
-        self.assertContains(response, "By congregation")
+        self.assertNotContains(response, "memberCompareChart")
+        self.assertNotContains(response, "By congregation")
         self.assertNotContains(response, "Counts use membership status Active")
 
     def test_district_pastor_defaults_to_subtree_exception_board(self):

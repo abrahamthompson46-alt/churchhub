@@ -5,7 +5,7 @@ from . import views
 app_name = "assets"
 
 urlpatterns = [
-    path("", views.index, name="index"),
+    path("", views.asset_list, name="index"),
     path("assets/", views.asset_list, name="asset_list"),
     path("assets/new/", views.asset_create, name="asset_create"),
     path("assets/<uuid:pk>/", views.asset_detail, name="asset_detail"),

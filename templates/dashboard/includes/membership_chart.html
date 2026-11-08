@@ -1,5 +1,5 @@
 {% load humanize %}
-{% if membership_analysis and membership_analysis.chart %}
+{% if membership_analysis and membership_analysis.chart and membership_analysis.totals.church_count > 1 %}
 <section class="cc-panel cc-panel--chart mb-3" id="membership-compare" aria-label="Membership by congregation">
     <div class="cc-panel__header cc-member-chart__head">
         <div>

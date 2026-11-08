@@ -4,8 +4,8 @@
 {% block title %}Welfare Register — ChurchHub{% endblock %}
 
 {% block content %}
-<div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Welfare Register" page_description="Contributions, assistance cases, and fund control at {{ active_church.name }}." %}
+<div class="page-container page-shell">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Welfare Register" page_description="Contributions, assistance cases, and fund control." %}
 
     <form method="get" class="d-flex flex-wrap align-items-end gap-2 mb-3">
         <div>
@@ -198,7 +198,7 @@
                             <td class="text-end"><a href="{% url 'remittance:welfare_case_detail' case.pk %}" class="btn btn-sm btn-outline-secondary">Open</a></td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="7" class="text-muted text-center py-3">No assistance cases yet.</td></tr>
+                        <tr><td colspan="7">{% include "includes/empty_state.html" with icon="bi-heart-pulse" message="No assistance cases yet." compact=True %}</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

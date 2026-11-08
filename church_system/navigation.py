@@ -221,6 +221,8 @@ def _finance_sections(user, active_church=None):
         treasury_items.append(_item("Approval cases", "approvals:case_list", "bi-diagram-3"))
     if can_view_transactions(user):
         treasury_items.append(_item("Transactions", "transactions:transaction_list", "bi-list-check"))
+    if can_manage_working_day(user):
+        treasury_items.append(_item("Working day", "transactions:period_list", "bi-calendar2-week"))
     if treasury_items:
         sections.append(_section("Daily treasury", treasury_items, "treasury"))
 
@@ -293,10 +295,9 @@ def _finance_sections(user, active_church=None):
     if (
         can_view_assets(user) or can_manage_assets(user) or can_manage_asset_policy(user)
     ) and _church_feature(active_church, "assets", user):
-        asset_items = [_item("Register", "assets:index", "bi-box-seam")]
+        asset_items = [_item("Register", "assets:asset_list", "bi-box-seam")]
         if can_manage_assets(user):
             asset_items.extend([
-                _item("All Assets", "assets:asset_list", "bi-list-ul"),
                 _item("New Asset", "assets:asset_create", "bi-plus-circle"),
                 _item("Activity Log", "assets:activity_log", "bi-journal-text"),
             ])
@@ -441,18 +442,6 @@ def get_main_navigation(user, active_church=None):
     home_items.append(_item("Work inbox", "dashboard:work_inbox", "bi-inbox"))
     if can_run_cutoff(user) or can_view_dashboard_finance(user):
         home_items.append(_item("Remittance desk", "dashboard:cutoff", "bi-calendar-check"))
-    if can_view_enterprise_controls(user):
-        home_items.append(_item("Enterprise controls", "audit:controls_home", "bi-shield-check"))
-    if can_view_risk_alerts(user):
-        home_items.append(_item("Risk alerts", "intelligence:alert_list", "bi-exclamation-triangle"))
-    if can_manage_risk_policy(user):
-        home_items.append(_item("Risk policy", "intelligence:policy", "bi-sliders"))
-    if can_manage_approval_policy(user):
-        home_items.append(_item("Approval steps", "approvals:policy", "bi-list-ol"))
-    if can_manage_approval_delegations(user):
-        home_items.append(_item("Delegations", "approvals:delegations", "bi-person-check"))
-    if can_manage_working_day(user):
-        home_items.append(_item("Working day", "transactions:period_list", "bi-calendar2-week"))
     if len(home_items) == 1:
         nav.append(_link("home", "Home", "bi-house-door", "dashboard:home"))
     else:
@@ -597,28 +586,19 @@ def get_main_navigation(user, active_church=None):
     if institution_items:
         settings_sections.append(_section("Institution", institution_items, "institution"))
 
-    if can_manage_working_day(user):
-        settings_sections.append(_section("Treasury & calendar", [
-            _item("Working Days & Periods", "transactions:period_list", "bi-calendar-event"),
-        ], "calendar"))
-
-    policy_items = []
-    if can_manage_remittance_policy(user) and _church_feature(active_church, "remittance", user):
-        policy_items.append(_item("Remittance policies", "remittance:index", "bi-percent"))
-    if can_manage_payroll_policy(user) and _church_feature(active_church, "payroll", user):
-        policy_items.append(_item("Payroll policies", "payroll:policy_index", "bi-sliders"))
-    if can_manage_asset_policy(user) and _church_feature(active_church, "assets", user):
-        policy_items.append(_item("Asset depreciation policy", "assets:policy_edit", "bi-box-seam"))
-    if policy_items:
-        settings_sections.append(_section("Module policies", policy_items, "policies"))
-
-    books_items = []
-    if can_view_ledger(user) and _church_feature(active_church, "ledger", user):
-        books_items.append(_item("Chart of Accounts", "ledger:accounts", "bi-journal-bookmark"))
-    if can_manage_gl_categories(user) and _church_feature(active_church, "ledger", user):
-        books_items.append(_item("Posting Categories", "ledger:categories", "bi-tags"))
-    if books_items:
-        settings_sections.append(_section("Books setup", books_items, "books"))
+    control_items = []
+    if can_view_enterprise_controls(user):
+        control_items.append(_item("Enterprise controls", "audit:controls_home", "bi-shield-check"))
+    if can_view_risk_alerts(user):
+        control_items.append(_item("Risk alerts", "intelligence:alert_list", "bi-exclamation-triangle"))
+    if can_manage_risk_policy(user):
+        control_items.append(_item("Risk policy", "intelligence:policy", "bi-sliders"))
+    if can_manage_approval_policy(user):
+        control_items.append(_item("Approval steps", "approvals:policy", "bi-list-ol"))
+    if can_manage_approval_delegations(user):
+        control_items.append(_item("Delegations", "approvals:delegations", "bi-person-check"))
+    if control_items:
+        settings_sections.append(_section("Controls", control_items, "controls"))
 
     if settings_sections:
         nav.append(_dropdown("settings", "Administration", "bi-gear-wide-connected", sections=settings_sections))
@@ -665,7 +645,6 @@ def resolve_module_key(namespace, current_view=""):
     ):
         return "communications"
     if current_view in (
-        "transactions:period_list",
         "dashboard:cutoff",
         "dashboard:work_inbox",
         "members:configuration",
@@ -709,14 +688,9 @@ MODULE_TABS = {
     "people": [
         _item("Directory", "members:list", "bi-list-ul"),
         _item("Visitors", "members:visitor_list", "bi-person-heart"),
-        _item("Families", "members:family_list", "bi-house-heart"),
-        _item("Departments", "members:department_list", "bi-diagram-2"),
-        _item("Leadership", "members:leadership_list", "bi-award"),
-        _item("Gifts", "members:spiritual_gift_list", "bi-stars"),
-        _item("Baptisms", "members:baptism_register", "bi-droplet"),
+        _item("Care groups", "members:care_group_list", "bi-people"),
         _item("Meetings", "meetings:list", "bi-calendar-event"),
         _item("Transfers", "members:transfer_list", "bi-arrow-left-right"),
-        _item("Records", "members:record_list", "bi-journal-text"),
     ],
     "finance": [
         _item("Receipts", "transactions:record_receipt", "bi-plus-circle"),
@@ -760,7 +734,6 @@ MODULE_TABS = {
         _item("Matrix", "permissions:matrix", "bi-grid-3x3-gap"),
         _item("Overrides", "permissions:override_list", "bi-sliders2"),
         _item("Perm Audit", "permissions:audit_log", "bi-journal-check"),
-        _item("Working Days", "transactions:period_list", "bi-calendar-event"),
     ],
 }
 
@@ -796,13 +769,13 @@ def _prune_finance_tabs(user, tabs):
             "transactions:record_receipt",
             "transactions:pending_approvals",
             "transactions:transaction_list",
-            "ledger:entry",
-            "budgets:list",
             "remittance:index",
-            "transactions:reconciliation_list",
-            "ledger:index",
             "payroll:index",
             "assets:index",
+            "ledger:entry",
+            "budgets:list",
+            "transactions:reconciliation_list",
+            "ledger:index",
         ]
         by_name = {t.get("url_name"): t for t in tabs}
         return [by_name[name] for name in priority if name in by_name][:6]

@@ -29,7 +29,9 @@
         {% else %}
             {% include "includes/navbar.html" %}
             <div class="app-chrome-secondary">
+                {% if show_workspace_status_bar %}
                 {% include "includes/workspace_status_bar.html" %}
+                {% endif %}
                 {% if module_tabs %}
                 {% include "includes/module_tabs.html" %}
                 {% endif %}

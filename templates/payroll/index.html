@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Payroll" page_description="Employee compensation, statutory deductions, and payroll runs for {{ active_church.name }}." %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Payroll" page_description="Employees, stipend runs, and statutory deductions." %}
 
     <div class="dash-inline-stats mb-4">
         <div class="dash-inline-stat">
@@ -16,7 +16,7 @@
     <div class="d-flex flex-wrap gap-2 mb-4">
         <a href="{% url 'payroll:employee_list' %}" class="btn btn-outline-secondary btn-sm">Employees</a>
         {% if can_manage_payroll %}
-        <a href="{% url 'payroll:employee_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Add Employee</a>
+        <a href="{% url 'payroll:employee_create' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-person-plus me-1"></i>Add Employee</a>
         {% endif %}
         <a href="{% url 'payroll:run_list' %}" class="btn btn-outline-secondary btn-sm">Payroll Runs</a>
         {% if can_manage_payroll %}

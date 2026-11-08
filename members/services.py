@@ -1,13 +1,17 @@
 """Member management services."""
 
+import logging
+
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from permissions.checks import can_process_transfers
+from permissions.checks import can_process_transfers, can_transfer_members
 from permissions.org_scope import church_in_user_scope
 from permissions.scoping import get_manageable_churches
+
+logger = logging.getLogger("churchhub.members")
 
 from members import repositories as repo
 from members import selectors
@@ -42,9 +46,49 @@ def can_process_transfer(user, transfer):
     # can_process_transfers already includes manage_members implies + deny overrides.
     if not can_process_transfers(user):
         return False
+    if transfer.requested_by_id and transfer.requested_by_id == getattr(user, "pk", None):
+        return False
     if church_in_user_scope(user, transfer.to_church):
         return True
     return bool(user.church_id and user.church_id == transfer.to_church_id)
+
+
+def can_cancel_transfer(user, transfer):
+    """Sending-church clerk may withdraw a pending request."""
+    if transfer.status != TransferStatus.PENDING:
+        return False
+    if not can_transfer_members(user):
+        return False
+    if church_in_user_scope(user, transfer.from_church):
+        return True
+    return bool(user.church_id and user.church_id == transfer.from_church_id)
+
+
+def destination_member_conflicts(member, to_church):
+    """Phone or membership number already used at the receiving church."""
+    messages = []
+    phone = (member.phone or "").strip()
+    if phone and selectors.members_with_phone(to_church, phone, exclude_pk=member.pk).exists():
+        messages.append(
+            "A member at the receiving church already uses this phone number. "
+            "Change the number on this record before completing the transfer."
+        )
+    number = (member.membership_number or "").strip()
+    if number and selectors.members_with_membership_number(
+        to_church, number, exclude_pk=member.pk
+    ).exists():
+        messages.append(
+            "A member at the receiving church already uses this membership number. "
+            "Change the number on this record before completing the transfer."
+        )
+    return messages
+
+
+def _notify_transfer(callback, *args, **kwargs):
+    try:
+        callback(*args, **kwargs)
+    except Exception:
+        logger.exception("Member transfer notification failed.")
 
 
 def user_can_view_transfer(user, transfer):
@@ -185,12 +229,9 @@ def request_transfer(member, to_church, transfer_date, requested_by, reason=""):
             "transfer_id": str(transfer.pk),
         },
     )
-    try:
-        from members.notifications import notify_transfer_requested
+    from members.notifications import notify_transfer_requested
 
-        notify_transfer_requested(transfer)
-    except Exception:
-        pass
+    _notify_transfer(notify_transfer_requested, transfer)
     return transfer
 
 
@@ -203,6 +244,9 @@ def complete_transfer(transfer, processed_by, notes=""):
         raise PermissionDenied("You are not authorized to complete this transfer.")
 
     member = transfer.member
+    conflicts = destination_member_conflicts(member, transfer.to_church)
+    if conflicts:
+        raise ValueError(" ".join(conflicts))
     from_church = transfer.from_church
 
     # End active leadership at the outgoing church
@@ -274,12 +318,9 @@ def complete_transfer(transfer, processed_by, notes=""):
             "transfer_id": str(transfer.pk),
         },
     )
-    try:
-        from members.notifications import notify_transfer_resolved
+    from members.notifications import notify_transfer_resolved
 
-        notify_transfer_resolved(transfer, completed=True)
-    except Exception:
-        pass
+    _notify_transfer(notify_transfer_resolved, transfer, completed=True)
     return transfer
 
 
@@ -290,6 +331,9 @@ def reject_transfer(transfer, processed_by, notes=""):
         raise ValueError("Only pending transfers can be rejected.")
     if not can_process_transfer(processed_by, transfer):
         raise PermissionDenied("You are not authorized to reject this transfer.")
+    notes = (notes or "").strip()
+    if not notes:
+        raise ValueError("Enter a reason for rejecting this transfer.")
 
     transfer.status = TransferStatus.REJECTED
     transfer.processed_by = processed_by
@@ -306,12 +350,38 @@ def reject_transfer(transfer, processed_by, notes=""):
         member=transfer.member,
         details={"transfer_id": str(transfer.pk), "notes": notes},
     )
-    try:
-        from members.notifications import notify_transfer_resolved
+    from members.notifications import notify_transfer_resolved
 
-        notify_transfer_resolved(transfer, completed=False)
-    except Exception:
-        pass
+    _notify_transfer(notify_transfer_resolved, transfer, completed=False)
+    return transfer
+
+
+@transaction.atomic
+def cancel_transfer(transfer, cancelled_by, notes=""):
+    """Sending church withdraws a pending transfer."""
+    if transfer.status != TransferStatus.PENDING:
+        raise ValueError("Only pending transfers can be cancelled.")
+    if not can_cancel_transfer(cancelled_by, transfer):
+        raise PermissionDenied("You are not authorized to cancel this transfer.")
+
+    transfer.status = TransferStatus.CANCELLED
+    transfer.processed_by = cancelled_by
+    transfer.processed_at = timezone.now()
+    transfer.notes = (notes or "").strip()
+    repo.save_transfer(
+        transfer,
+        update_fields=["status", "processed_by", "processed_at", "notes", "updated_at"],
+    )
+    log_member_audit(
+        transfer.from_church,
+        "TRANSFER_CANCEL",
+        performed_by=cancelled_by,
+        member=transfer.member,
+        details={"transfer_id": str(transfer.pk), "notes": transfer.notes},
+    )
+    from members.notifications import notify_transfer_cancelled
+
+    _notify_transfer(notify_transfer_cancelled, transfer)
     return transfer
 
 

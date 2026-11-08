@@ -138,6 +138,7 @@ class TransferStatus(models.TextChoices):
     PENDING = "Pending", "Pending"
     COMPLETED = "Completed", "Completed"
     REJECTED = "Rejected", "Rejected"
+    CANCELLED = "Cancelled", "Cancelled"
 
 
 AGE_GROUP_CHOICES = [
@@ -997,6 +998,7 @@ class MemberAuditLog(models.Model):
         ("TRANSFER_REQUEST", "Transfer Request"),
         ("TRANSFER_COMPLETE", "Transfer Complete"),
         ("TRANSFER_REJECT", "Transfer Reject"),
+        ("TRANSFER_CANCEL", "Transfer Cancelled"),
         ("EXPORT", "Export"),
         ("DEACTIVATE", "Deactivate"),
         ("ACTIVATE", "Activate"),

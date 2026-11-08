@@ -19,6 +19,7 @@
         <div class="flex-grow-1">
             <h2 class="member-hero-name h4 mb-2">{{ member.full_name }}</h2>
             <span class="chip chip--{% if member.is_active %}success{% else %}warning{% endif %}">{{ member.membership_status }}</span>
+            {% if pending_transfer %}<span class="chip chip--warning ms-1">Transfer pending</span>{% endif %}
             {% if member.department %}<span class="chip ms-1">{{ member.department.name }}</span>{% endif %}
             {% if member.membership_number %}<span class="chip chip--muted ms-1">#{{ member.membership_number }}</span>{% endif %}
             <div class="member-hero-contacts mt-2">
@@ -177,8 +178,13 @@
             <div class="panel mb-4">
                 <div class="panel-header">Quick Links</div>
                 <div class="panel-body d-grid gap-2">
-                    {% if can_transfer_members %}
+                    {% if can_transfer_members and pending_transfer %}
+                    <a href="{% url 'members:transfer_detail' pending_transfer.pk %}" class="btn btn-outline-warning btn-sm text-start"><i class="bi bi-arrow-left-right me-2"></i>Pending transfer</a>
+                    {% elif can_transfer_members %}
                     <a href="{% url 'members:transfer_create' %}?member={{ member.id }}" class="btn btn-outline-secondary btn-sm text-start"><i class="bi bi-arrow-left-right me-2"></i>Request Transfer</a>
+                    {% endif %}
+                    {% if member.email %}
+                    <a href="{% url 'portal:password_reset' %}" class="btn btn-outline-secondary btn-sm text-start"><i class="bi bi-envelope me-2"></i>Portal password ({{ member.email }})</a>
                     {% endif %}
                     <a href="{% url 'giving:member_statement' member.id %}" class="btn btn-outline-secondary btn-sm text-start"><i class="bi bi-wallet2 me-2"></i>Giving Statement</a>
                     {% if can_view_welfare or show_welfare %}

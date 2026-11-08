@@ -47,6 +47,21 @@ def notify_transfer_requested(transfer):
     return recipients
 
 
+def notify_transfer_cancelled(transfer):
+    church = transfer.to_church
+    url = reverse("members:transfer_detail", args=[transfer.pk])
+    recipients = _users_for_church(church, can_process_transfers)
+    notify_users(
+        recipients,
+        f"Transfer cancelled — {transfer.member.full_name}",
+        f"{transfer.from_church.name} withdrew the transfer request to {church.name}.",
+        category="INFO",
+        action_url=url,
+        event_key=f"transfer.cancelled.{transfer.pk}",
+    )
+    return recipients
+
+
 def notify_transfer_resolved(transfer, *, completed):
     requester = transfer.requested_by
     if not requester or not requester.is_active:

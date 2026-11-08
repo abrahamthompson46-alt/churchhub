@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Letter of transfer — {{ transfer.member }} — ChurchHub{% endblock %}
+
+{% block extra_css %}
+<style>
+@media print {
+    .no-print, .app-breadcrumb, .page-header, .module-tabs, .navbar, .flash-messages { display: none !important; }
+}
+.transfer-letter { max-width: 40rem; }
+.transfer-letter h2 { font-size: 1.15rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container transfer-letter">
+    <nav aria-label="breadcrumb" class="app-breadcrumb no-print">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'members:transfer_list' %}">Transfers</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'members:transfer_detail' transfer.pk %}">{{ transfer.member }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Letter</li>
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle="Member Transfer" page_title="Letter of transfer" %}
+
+    <div class="d-flex gap-2 mb-4 no-print">
+        <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">Print</button>
+        <a href="{% url 'members:transfer_detail' transfer.pk %}" class="btn btn-outline-secondary btn-sm">Back</a>
+    </div>
+
+    <p class="text-muted mb-1">{{ transfer.from_church.name }}</p>
+    <p class="small text-muted">{{ transfer.from_church.district.zone.conference.name }} · {{ transfer.from_church.district.name }}</p>
+    <p class="small">Date: {{ transfer.transfer_date }}</p>
+    <p class="small">Status: {{ transfer.status }} · Ref: {{ transfer.pk }}</p>
+
+    <h2 class="mt-4">To the church clerk, {{ transfer.to_church.name }}</h2>
+    <p class="small text-muted">{{ transfer.to_church.district.zone.conference.name }} · {{ transfer.to_church.district.name }}</p>
+
+    <p>This letter introduces <strong>{{ transfer.member.full_name }}</strong>{% if transfer.member.membership_number %} (membership # {{ transfer.member.membership_number }}){% endif %} for membership transfer from {{ transfer.from_church.name }} to {{ transfer.to_church.name }}.</p>
+
+    {% if transfer.member.phone %}<p>Phone: {{ transfer.member.phone }}</p>{% endif %}
+    {% if transfer.reason %}<p>Reason: {{ transfer.reason|linebreaksbr }}</p>{% endif %}
+
+    <p>The sending church requests that the receiving church accept this member. Historical giving and journals remain with the church where they were recorded.</p>
+
+    <p class="mt-4">Requested by: {{ transfer.requested_by|default:"—" }}</p>
+    {% if transfer.processed_by %}
+    <p>Processed by: {{ transfer.processed_by }} on {{ transfer.processed_at|date:"M j, Y" }}</p>
+    {% endif %}
+</div>
+{% endblock %}

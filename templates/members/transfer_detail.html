@@ -14,6 +14,11 @@
     {% include "includes/page_header.html" with page_subtitle="Member Transfer" page_title=transfer.member %}
 
     <p class="page-lead mb-4">{{ transfer.from_church.name }} → {{ transfer.to_church.name }} · <span class="chip">{{ transfer.status }}</span></p>
+    <p class="small text-muted mb-4">
+        {{ transfer.from_church.district.zone.conference.name }} / {{ transfer.from_church.district.name }}
+        →
+        {{ transfer.to_church.district.zone.conference.name }} / {{ transfer.to_church.district.name }}
+    </p>
 
     <div class="detail-grid">
         <div class="panel">
@@ -28,8 +33,17 @@
                     <dt class="col-sm-4 text-muted">Notes</dt><dd class="col-sm-8">{{ transfer.notes|default:"—" }}</dd>
                     {% endif %}
                 </dl>
+                <div class="mt-3 no-print">
+                    <a href="{% url 'members:transfer_letter' transfer.pk %}" class="btn btn-outline-secondary btn-sm">Print letter</a>
+                </div>
             </div>
         </div>
+
+        {% if destination_conflicts %}
+        <div class="alert alert-warning">
+            {% for msg in destination_conflicts %}<p class="mb-1">{{ msg }}</p>{% endfor %}
+        </div>
+        {% endif %}
 
         {% if can_process %}
         <div class="panel">
@@ -38,13 +52,30 @@
                 <form method="post">
                     {% csrf_token %}
                     <div class="mb-3">
-                        <label class="form-label">Notes</label>
-                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                        <label class="form-label" for="id_process_notes">Notes</label>
+                        <textarea name="notes" id="id_process_notes" class="form-control" rows="3"></textarea>
+                        <div class="form-hint">Required when rejecting.</div>
                     </div>
                     <div class="d-grid gap-2">
-                        <button type="submit" name="action" value="complete" class="btn btn-success btn-sm">Complete Transfer</button>
-                        <button type="submit" name="action" value="reject" class="btn btn-outline-danger btn-sm">Reject</button>
+                        <button type="submit" name="action" value="complete" class="btn btn-success btn-sm"{% if destination_conflicts %} disabled{% endif %} onclick="return confirm('Complete this transfer? The member will move to {{ transfer.to_church.name }}.');">Complete Transfer</button>
+                        <button type="submit" name="action" value="reject" class="btn btn-outline-danger btn-sm" onclick="return confirm('Reject this transfer request?');">Reject</button>
                     </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if can_cancel %}
+        <div class="panel">
+            <div class="panel-header">Sending church</div>
+            <div class="panel-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label" for="id_cancel_notes">Cancel notes</label>
+                        <textarea name="notes" id="id_cancel_notes" class="form-control" rows="2"></textarea>
+                    </div>
+                    <button type="submit" name="action" value="cancel" class="btn btn-outline-secondary btn-sm" onclick="return confirm('Cancel this transfer request? The member will stay at {{ transfer.from_church.name }}.');">Cancel request</button>
                 </form>
             </div>
         </div>

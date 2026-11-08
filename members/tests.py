@@ -23,6 +23,7 @@ from members.models import (
     TransferStatus,
 )
 from members.services import (
+    cancel_transfer,
     complete_transfer,
     create_member,
     reject_transfer,
@@ -30,6 +31,7 @@ from members.services import (
     user_can_view_transfer,
 )
 from organization.models import Church, Conference, District, Zone
+from sitecontrol.models import Denomination
 from permissions.services import ensure_permission_matrix
 
 User = get_user_model()
@@ -103,6 +105,57 @@ class ServiceTests(MembersTestMixin, TestCase):
         self.assertTrue(
             MemberAuditLog.objects.filter(action="TRANSFER_COMPLETE", member=self.member).exists()
         )
+
+    def test_complete_transfer_blocked_when_phone_taken_at_destination(self):
+        Member.objects.create(
+            church=self.other_church,
+            first_name="Pat",
+            last_name="Taken",
+            gender=Gender.FEMALE,
+            phone=self.member.phone,
+        )
+        transfer = request_transfer(
+            member=self.member,
+            to_church=self.other_church,
+            transfer_date=date.today(),
+            requested_by=self.source_user,
+        )
+        with self.assertRaises(ValueError):
+            complete_transfer(transfer, self.user)
+
+    def test_requester_cannot_complete_own_transfer(self):
+        transfer = request_transfer(
+            member=self.member,
+            to_church=self.other_church,
+            transfer_date=date.today(),
+            requested_by=self.user,
+        )
+        with self.assertRaises(PermissionDenied):
+            complete_transfer(transfer, self.user)
+
+    def test_reject_transfer_requires_notes(self):
+        transfer = request_transfer(
+            member=self.member,
+            to_church=self.other_church,
+            transfer_date=date.today(),
+            requested_by=self.source_user,
+        )
+        with self.assertRaises(ValueError):
+            reject_transfer(transfer, self.user, notes="")
+        reject_transfer(transfer, self.user, notes="Not in good standing")
+        transfer.refresh_from_db()
+        self.assertEqual(transfer.status, TransferStatus.REJECTED)
+
+    def test_sending_church_can_cancel_pending_transfer(self):
+        transfer = request_transfer(
+            member=self.member,
+            to_church=self.other_church,
+            transfer_date=date.today(),
+            requested_by=self.source_user,
+        )
+        cancel_transfer(transfer, self.source_user, notes="Member stayed")
+        transfer.refresh_from_db()
+        self.assertEqual(transfer.status, TransferStatus.CANCELLED)
 
     def test_complete_transfer_requires_destination_permission(self):
         transfer = request_transfer(
@@ -265,6 +318,8 @@ class ViewTests(MembersTestMixin, TestCase):
             reverse("members:transfer_create"),
             {
                 "member": str(self.member.pk),
+                "dest_conference": str(self.conference.pk),
+                "dest_district": str(self.district.pk),
                 "to_church": str(self.other_church.pk),
                 "transfer_date": date.today().isoformat(),
                 "reason": "Moving",
@@ -272,6 +327,137 @@ class ViewTests(MembersTestMixin, TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertTrue(MemberTransfer.objects.filter(member=self.member).exists())
+
+    def test_transfer_form_cascades_conference_district_church(self):
+        self.client.login(username="secretary", password="pass12345")
+        page = self.client.get(reverse("members:transfer_create"))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, 'name="dest_conference"')
+        self.assertContains(page, 'name="dest_district"')
+        self.assertContains(page, 'data-dest-level="church"')
+
+        conferences = self.client.get(reverse("members:transfer_destinations"))
+        self.assertEqual(conferences.status_code, 200)
+        conf_ids = [row["id"] for row in conferences.json()["conferences"]]
+        self.assertIn(str(self.conference.pk), conf_ids)
+
+        districts = self.client.get(
+            reverse("members:transfer_destinations"),
+            {"conference": str(self.conference.pk)},
+        )
+        self.assertEqual(districts.status_code, 200)
+        dist_ids = [row["id"] for row in districts.json()["districts"]]
+        self.assertIn(str(self.district.pk), dist_ids)
+
+        churches = self.client.get(
+            reverse("members:transfer_destinations"),
+            {
+                "conference": str(self.conference.pk),
+                "district": str(self.district.pk),
+            },
+        )
+        self.assertEqual(churches.status_code, 200)
+        church_ids = [row["id"] for row in churches.json()["churches"]]
+        self.assertIn(str(self.other_church.pk), church_ids)
+        self.assertNotIn(str(self.church.pk), church_ids)
+
+    def test_transfer_create_rejects_church_outside_selected_district(self):
+        other_district = District.objects.create(
+            zone=self.zone, code="D9", name="Other District"
+        )
+        far_church = Church.objects.create(
+            district=other_district, code="C9", name="Far Church"
+        )
+        self.client.login(username="secretary", password="pass12345")
+        response = self.client.post(
+            reverse("members:transfer_create"),
+            {
+                "member": str(self.member.pk),
+                "dest_conference": str(self.conference.pk),
+                "dest_district": str(self.district.pk),
+                "to_church": str(far_church.pk),
+                "transfer_date": date.today().isoformat(),
+                "reason": "Wrong district",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(MemberTransfer.objects.filter(member=self.member).exists())
+
+    def test_transfer_destinations_include_other_conference_same_denomination(self):
+        denom = Denomination.objects.create(code="xfer-sda", name="Transfer SDA")
+        self.conference.denomination = denom
+        self.conference.save(update_fields=["denomination"])
+        other_conf = Conference.objects.create(
+            code="T2", name="Second Conference", denomination=denom
+        )
+        other_zone = Zone.objects.create(
+            conference=other_conf, code="Z2", name="Second Zone"
+        )
+        other_district = District.objects.create(
+            zone=other_zone, code="D2", name="Second District"
+        )
+        dest_church = Church.objects.create(
+            district=other_district, code="C3", name="Second Church"
+        )
+        self.client.login(username="secretary", password="pass12345")
+        conferences = self.client.get(reverse("members:transfer_destinations"))
+        conf_ids = [row["id"] for row in conferences.json()["conferences"]]
+        self.assertIn(str(other_conf.pk), conf_ids)
+        districts = self.client.get(
+            reverse("members:transfer_destinations"),
+            {"conference": str(other_conf.pk)},
+        )
+        dist_ids = [row["id"] for row in districts.json()["districts"]]
+        self.assertEqual(dist_ids, [str(other_district.pk)])
+        churches = self.client.get(
+            reverse("members:transfer_destinations"),
+            {
+                "conference": str(other_conf.pk),
+                "district": str(other_district.pk),
+            },
+        )
+        church_ids = [row["id"] for row in churches.json()["churches"]]
+        self.assertEqual(church_ids, [str(dest_church.pk)])
+
+    def test_transfer_list_filters_outgoing_pending(self):
+        request_transfer(
+            member=self.member,
+            to_church=self.other_church,
+            transfer_date=date.today(),
+            requested_by=self.secretary,
+        )
+        self.client.login(username="secretary", password="pass12345")
+        response = self.client.get(
+            reverse("members:transfer_list"),
+            {"direction": "out", "status": "Pending"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Jane")
+        self.assertContains(response, "Incoming (to this church)")
+
+    def test_transfer_letter_and_pending_profile_badge(self):
+        transfer = request_transfer(
+            member=self.member,
+            to_church=self.other_church,
+            transfer_date=date.today(),
+            requested_by=self.secretary,
+        )
+        self.client.login(username="secretary", password="pass12345")
+        letter = self.client.get(reverse("members:transfer_letter", kwargs={"pk": transfer.pk}))
+        self.assertEqual(letter.status_code, 200)
+        self.assertContains(letter, "Letter of transfer")
+        detail = self.client.get(
+            reverse("members:detail", kwargs={"member_id": self.member.pk})
+        )
+        self.assertContains(detail, "Transfer pending")
+        self.assertContains(detail, "Pending transfer")
+        add = self.client.get(reverse("members:transfer_create"), {"member": str(self.member.pk)})
+        self.assertEqual(add.status_code, 302)
+
+    def test_member_cannot_load_transfer_destinations(self):
+        self.client.login(username="member", password="pass12345")
+        response = self.client.get(reverse("members:transfer_destinations"))
+        self.assertEqual(response.status_code, 403)
 
     def test_transfer_detail_idor_denied(self):
         transfer = request_transfer(

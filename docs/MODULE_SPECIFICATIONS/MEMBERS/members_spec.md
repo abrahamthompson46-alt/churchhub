@@ -143,7 +143,7 @@ Management: `export_member_data`.
 | `departments/…` | `department_*` (includes hard delete) |
 | `families/…` | `family_*` |
 | `care-groups/…` | `care_group_*`, `care_location_*`, `care_group_desk`, `care_group_desk_add`, `care_group_desk_pair`, `care_group_sheet` |
-| `transfers/…` | `transfer_*` |
+| `transfers/…` | `transfer_*`, `transfer_destinations` (session JSON for Conference → District → Church) |
 | `baptisms/` | `baptism_register` |
 | `leadership/…` | `leadership_*` |
 | `spiritual-gifts/…`, assign/remove gift | gift routes |
@@ -210,15 +210,18 @@ stateDiagram-v2
   [*] --> Pending: request_transfer
   Pending --> Completed: complete_transfer
   Pending --> Rejected: reject_transfer
+  Pending --> Cancelled: cancel_transfer
 ```
 
 **Transfer rules (summary)**
 
 | Step | Rules |
 |------|-------|
-| Request | Not same church; not already Transferred; no existing Pending; block cross-denomination when both denoms set |
-| Complete | Pending only; process permission; end leadership at from-church; release care-group membership; TRANSFER records both sides; move church; set Active |
-| Reject | Pending → Rejected |
+| Request | Sending church selects **Conference → District → Church**. Destinations are other churches in the same denomination (other conferences/districts allowed). If denomination is unset, destinations stay in the sending conference. Not same church; not already Transferred; no existing Pending; block cross-denomination when both denoms set. Completing remains the receiving church. |
+| Desk | List filters Incoming/Outgoing and Pending/Completed/Rejected/Cancelled. Profile shows a pending badge and hides a second request. Printable letter at `transfer_letter`. |
+| Complete | Pending only; `process_transfers` + dest church in scope; **requester cannot complete**; dest phone/membership-number uniqueness; end leadership at from-church; release care-group membership; TRANSFER records both sides; move church; set Active |
+| Reject | Pending → Rejected; rejection notes required |
+| Cancel | Sending church with `transfer_members` withdraws Pending → Cancelled |
 
 Record add from **Baptism Register** (`?record_type=Baptism`) locks type to Baptism, shows a church-scoped member picker, and uses `manage_member_records` **or** `manage_baptisms`. From a member profile (`?member=`), the member field stays hidden. Saving a baptism still backfills empty member baptism fields.
 
@@ -294,9 +297,10 @@ Extend with isolation tests when changing detail/update URLs.
 
 | Topic | Current | Planned (AGENTS) | Recommended |
 |-------|---------|------------------|-------------|
-| Statuses | 4 values | Many (Visitor, Missing, Suspended, …) | Additive status migration only with product approval |
-| Soft-delete | Absent | Required | Introduce before any member purge tooling |
-| Visitors | Headcount only elsewhere | Full visitor domain | New app/models when approved |
+| Statuses | Active, Inactive, Transferred, Deceased, Missing, Suspended, Former | Broader AGENTS list | Additive only with product approval |
+| Transfers | Conference→District→Church request; dest completes; cancel; letter; uniqueness; SoD | District/union org people-moves | Dual sending+receiving vote if product asks |
+| Visitors | CRUD, convert, stale follow-up reminder | Full CRM app | Keep in `members` until volume requires a split |
+| Soft-delete | `SoftDeleteModel` on visitor and some entities; Member has delete fields | Universal `is_deleted` | Restore UI; no purge tooling |
 | Member ID | UUID + per-church membership_number | Globally unique Member ID | Clarify product rule before changing uniqueness |
 | Profile richness | Limited fields | Middle name, nationality, emergency contacts, multi-contact | Additive fields |
 | Managers/repos | None | Layered architecture | MemberQuerySet for directory filters |

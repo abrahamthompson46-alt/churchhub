@@ -13,6 +13,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from church_system.church_scope import filter_by_church
+from organization.models import Church, Conference, District
 from permissions.scoping import get_manageable_churches
 
 from .models import (
@@ -557,24 +558,92 @@ def member_care_context(member):
 # ---------------------------------------------------------------------------
 
 
-def transfers_for_user_qs(user, *, status=""):
+def transfer_destination_churches(from_church):
+    """Receiving churches for a transfer request (denomination wall, not org scope).
+
+    Same denomination may include other conferences and districts. If the
+    sending church has no denomination, destinations stay inside its conference.
+    """
+    dest = (
+        Church.objects.filter(is_active=True)
+        .exclude(pk=from_church.pk)
+        .select_related("district__zone__conference")
+    )
+    denom = from_church.denomination
+    if denom:
+        return dest.filter(district__zone__conference__denomination=denom)
+    if from_church.district_id:
+        return dest.filter(
+            district__zone__conference_id=from_church.district.zone.conference_id
+        )
+    return dest.none()
+
+
+def transfer_destination_conferences(from_church):
+    dest = transfer_destination_churches(from_church)
+    return (
+        Conference.objects.filter(zones__districts__churches__in=dest)
+        .distinct()
+        .order_by("name")
+    )
+
+
+def transfer_destination_districts(from_church, conference):
+    if conference is None:
+        return District.objects.none()
+    dest = transfer_destination_churches(from_church)
+    return (
+        District.objects.filter(zone__conference=conference, churches__in=dest)
+        .select_related("zone")
+        .distinct()
+        .order_by("name")
+    )
+
+
+def transfer_destination_churches_in_district(from_church, district):
+    if district is None:
+        return Church.objects.none()
+    return transfer_destination_churches(from_church).filter(district=district).order_by(
+        "name"
+    )
+
+
+def transfers_for_user_qs(user, *, status="", direction="", church=None):
     allowed_churches = get_manageable_churches(user)
     qs = (
         MemberTransfer.objects.select_related(
-            "member", "from_church", "to_church", "requested_by"
+            "member",
+            "from_church",
+            "to_church",
+            "requested_by",
+            "from_church__district__zone__conference",
+            "to_church__district__zone__conference",
         )
         .filter(Q(from_church__in=allowed_churches) | Q(to_church__in=allowed_churches))
         .order_by("-created_at")
     )
     if status:
         qs = qs.filter(status=status)
+    if church is not None:
+        if direction == "in":
+            qs = qs.filter(to_church=church)
+        elif direction == "out":
+            qs = qs.filter(from_church=church)
+    elif direction == "in":
+        qs = qs.filter(to_church__in=allowed_churches)
+    elif direction == "out":
+        qs = qs.filter(from_church__in=allowed_churches)
     return qs
 
 
 def transfer_for_user(user, pk):
     return get_object_or_404(
         MemberTransfer.objects.select_related(
-            "member", "from_church", "to_church", "requested_by", "processed_by"
+            "member",
+            "from_church__district__zone__conference",
+            "to_church__district__zone__conference",
+            "requested_by",
+            "processed_by",
         ),
         pk=pk,
     )

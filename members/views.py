@@ -62,7 +62,7 @@ from .forms import (
     VisitorFilterForm,
     VisitorForm,
 )
-from .models import Member, RecordType
+from .models import Member, RecordType, TransferStatus
 from members.care_group_views import (  # re-exported for urls
     care_group_add,
     care_group_add_member,
@@ -86,9 +86,12 @@ from .services import (
     MemberServiceError,
     assign_leadership_role,
     assign_spiritual_gift,
+    can_cancel_transfer,
     can_process_transfer,
+    cancel_transfer,
     capped_queryset,
     complete_transfer,
+    destination_member_conflicts,
     convert_visitor_to_member,
     create_member,
     create_spiritual_gift_catalog,
@@ -222,10 +225,16 @@ def member_detail(request, member_id):
     except ImportError:
         pass
     care = selectors.member_care_context(member)
+    pending_transfer = None
+    for row in transfers:
+        if row.status == TransferStatus.PENDING:
+            pending_transfer = row
+            break
     return render(request, "members/detail.html", {
         "member": member,
         "records": records,
         "transfers": transfers,
+        "pending_transfer": pending_transfer,
         "gifts": gifts,
         "roles": roles,
         "attendance_count": attendance_count,
@@ -651,13 +660,20 @@ def transfer_list(request):
     require_view_members(request)
     church = get_active_church(request)
     status = request.GET.get("status", "")
-    transfers = selectors.transfers_for_user_qs(request.user, status=status)
+    direction = request.GET.get("direction", "")
+    transfers = selectors.transfers_for_user_qs(
+        request.user,
+        status=status,
+        direction=direction,
+        church=church,
+    )
     paginator = Paginator(transfers, 50)
     page = paginator.get_page(request.GET.get("page"))
     return render(request, "members/transfer_list.html", {
         "transfers": page,
         "page_obj": page,
         "status_filter": status,
+        "direction_filter": direction,
         "church": church,
         "can_manage": can_manage_members(request.user),
         "filter_qs": _filter_querystring(request),
@@ -688,6 +704,11 @@ def transfer_create(request):
         )
     if selected_member:
         form.fields["member"].initial = selected_member
+        if selectors.pending_transfer_exists(selected_member):
+            flash_warning(request, "This member already has a pending transfer.")
+            pending = selected_member.transfers.filter(status=TransferStatus.PENDING).first()
+            if pending:
+                return redirect("members:transfer_detail", pk=pending.pk)
 
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
@@ -708,6 +729,37 @@ def transfer_create(request):
         "form": form,
         "title": "Request Transfer",
         "selected_member": selected_member,
+        "destinations_url": reverse("members:transfer_destinations"),
+    })
+
+
+@login_required
+def transfer_destination_options(request):
+    """JSON Conference → District → Church options for the transfer request form."""
+    require_transfer_members(request)
+    church = require_church(request)
+    district_id = (request.GET.get("district") or "").strip()
+    conference_id = (request.GET.get("conference") or "").strip()
+    if district_id:
+        churches = selectors.transfer_destination_churches(church).filter(
+            district_id=district_id
+        ).order_by("name")
+        if conference_id:
+            churches = churches.filter(district__zone__conference_id=conference_id)
+        return JsonResponse({
+            "churches": [{"id": str(row.pk), "name": row.name} for row in churches],
+        })
+    if conference_id:
+        conference = selectors.transfer_destination_conferences(church).filter(
+            pk=conference_id
+        ).first()
+        districts = selectors.transfer_destination_districts(church, conference)
+        return JsonResponse({
+            "districts": [{"id": str(row.pk), "name": row.name} for row in districts],
+        })
+    conferences = selectors.transfer_destination_conferences(church)
+    return JsonResponse({
+        "conferences": [{"id": str(row.pk), "name": row.name} for row in conferences],
     })
 
 
@@ -719,14 +771,25 @@ def transfer_detail(request, pk):
         raise PermissionDenied
 
     can_process = can_process_transfer(request.user, transfer)
+    can_cancel = can_cancel_transfer(request.user, transfer)
+    conflicts = (
+        destination_member_conflicts(transfer.member, transfer.to_church)
+        if transfer.status == TransferStatus.PENDING
+        else []
+    )
 
     if request.method == "POST":
-        require_process_transfers(request)
-        if not can_process:
-            raise PermissionDenied
         action = request.POST.get("action")
         notes = request.POST.get("notes", "")
         try:
+            if action == "cancel":
+                require_transfer_members(request)
+                cancel_transfer(transfer, request.user, notes=notes)
+                flash_warning(request, "Transfer request cancelled.")
+                return redirect("members:transfer_detail", pk=pk)
+            require_process_transfers(request)
+            if not can_process:
+                raise PermissionDenied
             if action == "complete":
                 complete_transfer(transfer, request.user, notes=notes)
                 flash_success(request, "Transfer completed.")
@@ -741,7 +804,18 @@ def transfer_detail(request, pk):
     return render(request, "members/transfer_detail.html", {
         "transfer": transfer,
         "can_process": can_process,
+        "can_cancel": can_cancel,
+        "destination_conflicts": conflicts,
     })
+
+
+@login_required
+def transfer_letter(request, pk):
+    require_view_members(request)
+    transfer = selectors.transfer_for_user(request.user, pk)
+    if not user_can_view_transfer(request.user, transfer):
+        raise PermissionDenied
+    return render(request, "members/transfer_letter.html", {"transfer": transfer})
 
 
 @login_required

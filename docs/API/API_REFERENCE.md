@@ -258,6 +258,30 @@ flowchart LR
 
 ---
 
+### 2.5b `GET /members/transfers/destinations/`
+
+| Item | Detail |
+|------|--------|
+| **Purpose** | Cascade Conference → District → Church options on the transfer request form |
+| **URL name** | `members:transfer_destinations` |
+| **View** | `members.views.transfer_destination_options` |
+| **Method** | GET |
+| **Auth** | Session |
+| **Permissions** | `transfer_members` (`require_transfer_members`) |
+| **Tenant context** | Sending `require_church`; destinations are denomination-scoped (not the user's org tree). Sending church is omitted from church options. |
+
+**Parameters**
+
+| Query | Behavior |
+|-------|----------|
+| (none) | `{"conferences": [{"id", "name"}, …]}` |
+| `conference` | Districts in that conference that still have a destination church |
+| `district` | Churches in that district (optional `conference` further restricts) |
+
+**Security:** IDs outside the denomination wall return empty lists, not 404. Not a public directory API.
+
+---
+
 ### 2.6 `GET /ledger/api/categories/`
 
 | Item | Detail |

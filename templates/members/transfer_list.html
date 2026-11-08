@@ -11,6 +11,33 @@
     {% include "includes/page_header.html" with page_subtitle="Members" page_title="Member Transfers" %}
     {% endif %}
 
+    <div class="filter-bar filter-bar--sticky mb-3">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
+                <label class="form-label" for="id_direction">Direction</label>
+                <select name="direction" id="id_direction" class="form-select form-control-sm">
+                    <option value="">Incoming and outgoing</option>
+                    <option value="in"{% if direction_filter == "in" %} selected{% endif %}>Incoming (to this church)</option>
+                    <option value="out"{% if direction_filter == "out" %} selected{% endif %}>Outgoing (from this church)</option>
+                </select>
+            </div>
+            <div class="filter-field">
+                <label class="form-label" for="id_status">Status</label>
+                <select name="status" id="id_status" class="form-select form-control-sm">
+                    <option value="">All statuses</option>
+                    <option value="Pending"{% if status_filter == "Pending" %} selected{% endif %}>Pending</option>
+                    <option value="Completed"{% if status_filter == "Completed" %} selected{% endif %}>Completed</option>
+                    <option value="Rejected"{% if status_filter == "Rejected" %} selected{% endif %}>Rejected</option>
+                    <option value="Cancelled"{% if status_filter == "Cancelled" %} selected{% endif %}>Cancelled</option>
+                </select>
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Filter</button>
+                <a href="{% url 'members:transfer_list' %}" class="btn btn-link btn-sm">Clear</a>
+            </div>
+        </form>
+    </div>
+
     <div class="data-card">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
@@ -22,7 +49,7 @@
                         <td class="text-muted small">{{ t.from_church.name }}</td>
                         <td class="text-muted small">{{ t.to_church.name }}</td>
                         <td>{{ t.transfer_date }}</td>
-                        <td>{{ t.status }}</td>
+                        <td><span class="chip">{{ t.status }}</span></td>
                         <td class="text-end"><a href="{% url 'members:transfer_detail' t.pk %}" class="table-link">View</a></td>
                     </tr>
                     {% empty %}

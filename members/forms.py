@@ -1,6 +1,6 @@
 from django import forms
 
-from organization.models import Church
+from organization.models import Conference, District
 
 from .models import (
     AGE_GROUP_CHOICES,
@@ -18,6 +18,7 @@ from .models import (
     Visitor,
     VisitorFollowUpStatus,
 )
+from . import selectors
 from .services import find_duplicate_members
 
 from church_system.widgets import input_attrs, search_attrs, select_attrs
@@ -388,36 +389,107 @@ class RecordForm(forms.ModelForm):
 
 
 class MemberTransferForm(forms.ModelForm):
+    dest_conference = forms.ModelChoiceField(
+        queryset=Conference.objects.none(),
+        required=True,
+        empty_label="Select conference",
+        label="Conference",
+        widget=forms.Select(attrs=_select({"data-dest-level": "conference"})),
+    )
+    dest_district = forms.ModelChoiceField(
+        queryset=District.objects.none(),
+        required=True,
+        empty_label="Select district",
+        label="District",
+        widget=forms.Select(attrs=_select({"data-dest-level": "district"})),
+    )
+
     class Meta:
         model = MemberTransfer
         fields = ("member", "to_church", "transfer_date", "reason")
         widgets = {
             "member": forms.HiddenInput(),
-            "to_church": forms.Select(attrs=_select()),
+            "to_church": forms.Select(attrs=_select({"data-dest-level": "church"})),
             "transfer_date": forms.DateInput(attrs={**_text(), "type": "date"}),
             "reason": forms.Textarea(attrs={**_text(), "rows": 3}),
         }
+        labels = {"to_church": "Church"}
 
     def __init__(self, *args, church=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if church:
-            self.fields["member"].queryset = Member.objects.filter(
-                church=church, is_active=True,
-            ).exclude(membership_status=MembershipStatus.TRANSFERRED).order_by(
-                "last_name", "first_name"
-            )
-            # Same denomination wall; allow cross-conference destinations.
-            dest = Church.objects.filter(is_active=True).exclude(pk=church.pk)
-            denom = church.denomination
-            if denom:
-                dest = dest.filter(district__zone__conference__denomination=denom)
-            elif church.district_id:
-                dest = dest.filter(
-                    district__zone__conference_id=church.district.zone.conference_id,
-                )
-            self.fields["to_church"].queryset = dest.select_related(
-                "district__zone__conference"
-            ).order_by("name")
+        self.from_church = church
+        self.fields["to_church"].empty_label = "Select church"
+        self.fields["to_church"].label_from_instance = lambda obj: obj.name
+        self.fields["dest_district"].label_from_instance = lambda obj: obj.name
+        if not church:
+            return
+        self.fields["member"].queryset = Member.objects.filter(
+            church=church, is_active=True,
+        ).exclude(membership_status=MembershipStatus.TRANSFERRED).order_by(
+            "last_name", "first_name"
+        )
+        self.fields["dest_conference"].queryset = selectors.transfer_destination_conferences(
+            church
+        )
+        conference = self._selected_conference()
+        self.fields["dest_district"].queryset = selectors.transfer_destination_districts(
+            church, conference
+        )
+        district = self._selected_district()
+        self.fields["to_church"].queryset = (
+            selectors.transfer_destination_churches_in_district(church, district)
+        )
+        self.order_fields(
+            [
+                "member",
+                "dest_conference",
+                "dest_district",
+                "to_church",
+                "transfer_date",
+                "reason",
+            ]
+        )
+
+    def _posted_pk(self, name):
+        if self.is_bound:
+            return (self.data.get(name) or "").strip()
+        value = self.initial.get(name)
+        if value is None:
+            return ""
+        return str(getattr(value, "pk", value))
+
+    def _selected_conference(self):
+        pk = self._posted_pk("dest_conference")
+        if not pk or not self.from_church:
+            return None
+        return selectors.transfer_destination_conferences(self.from_church).filter(pk=pk).first()
+
+    def _selected_district(self):
+        pk = self._posted_pk("dest_district")
+        conference = self._selected_conference()
+        if not pk or not self.from_church or conference is None:
+            return None
+        return selectors.transfer_destination_districts(
+            self.from_church, conference
+        ).filter(pk=pk).first()
+
+    def clean(self):
+        cleaned = super().clean()
+        conference = cleaned.get("dest_conference")
+        district = cleaned.get("dest_district")
+        dest = cleaned.get("to_church")
+        from_church = self.from_church
+        if not from_church or not dest:
+            return cleaned
+        allowed = selectors.transfer_destination_churches(from_church)
+        if not allowed.filter(pk=dest.pk).exists():
+            self.add_error("to_church", "Choose a church in the same denomination.")
+            return cleaned
+        if conference and district and district.zone.conference_id != conference.pk:
+            self.add_error("dest_district", "This district is not in the selected conference.")
+        if district and dest.district_id != district.pk:
+            self.add_error("to_church", "This church is not in the selected district.")
+        return cleaned
 
 
 class MemberFilterForm(forms.Form):

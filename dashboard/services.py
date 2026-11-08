@@ -648,9 +648,27 @@ def _budget_gap_notice(user):
     extra = f" and {len(missing) - 4} more" if len(missing) > 4 else ""
     message = f"{len(missing)} church(es) have no {year} church budget: {names}{extra}."
     url = reverse("budgets:list") + f"?year={year}&level=CHURCH"
+    event_key = f"budget.gap.{year}"
+    unread = Notification.objects.filter(
+        user=user, title=_BUDGET_GAP_TITLE, read=False
+    ).order_by("-last_event_at", "-pk")
+    keep = unread.filter(event_key=event_key).first() or unread.first()
     if already:
+        if keep:
+            unread.exclude(pk=keep.pk).update(read=True)
         return None
-    notify_user(user, _BUDGET_GAP_TITLE, message, category="FINANCE", action_url=url)
+    note = notify_user(
+        user,
+        _BUDGET_GAP_TITLE,
+        message,
+        category="FINANCE",
+        action_url=url,
+        event_key=event_key,
+    )
+    if note:
+        Notification.objects.filter(
+            user=user, title=_BUDGET_GAP_TITLE, read=False
+        ).exclude(pk=note.pk).update(read=True)
     return {"level": "info", "text": message, "url": url}
 
 
@@ -823,10 +841,7 @@ def get_compliance_snapshot(request, user, *, church_ids=None, manageable=None):
 
     locked_periods = selectors.locked_periods_count(church_ids, now.year, now.month)
 
-    working_day_issues = 0
-    if can_manage_finances(user):
-        open_ids = selectors.open_working_day_church_ids(church_ids)
-        working_day_issues = sum(1 for cid in church_ids if cid not in open_ids)
+    working_day_issues = selectors.working_day_issue_count(church_ids)
 
     return {
         "overdue_remittances": [
@@ -1227,7 +1242,10 @@ def get_organization_health(request, user, *, compliance=None, kpis=None, pastor
     if overdue > 0:
         overall = "critical"
         label = "Attention required"
-    elif pending > 5 or working > 0 or visitor_stale > 3:
+    elif working > 0:
+        overall = "warning"
+        label = "Working day behind"
+    elif pending > 5 or visitor_stale > 3:
         overall = "warning"
         label = "Items pending"
     elif attendance_delta is not None and attendance_delta < -5:
@@ -1613,6 +1631,10 @@ def build_home_context(request):
     elif church_focused and role == "district_treasury":
         kpi_role = "treasury"
 
+    care_group_count = 0
+    if show_members and scope.church_ids:
+        care_group_count = selectors.care_group_count_for_churches(scope.church_ids)
+
     context["dashboard_kpi_widgets"] = build_kpi_widgets(
         user=user,
         dashboard_role=kpi_role,
@@ -1622,6 +1644,7 @@ def build_home_context(request):
         member_home_kpis=context.get("member_home_kpis"),
         is_control_center=is_control_center and scope.level == "SUBTREE",
         remittance_enabled=remittance_enabled,
+        care_group_count=care_group_count,
     )
 
     if show_finance_charts and scope.finance_church_ids:
@@ -1727,9 +1750,7 @@ def build_home_context(request):
     else:
         context["member_role_extras"] = None
     context["dashboard_coaching"] = home_panels.get_dashboard_coaching_hints(context)
-    context["do_next_steps"] = home_panels.get_do_next_steps(
-        request, role, context.get("action_queue") or []
-    )
+    context["do_next_steps"] = []
     context["portal_staff_alerts"] = home_panels.get_portal_staff_alerts(request)
     if role in ("member", "members"):
         context["member_portal_banner"] = home_panels.get_member_portal_banner(user)

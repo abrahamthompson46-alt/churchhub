@@ -131,7 +131,7 @@
                     {% else %}
                     <li class="nav-item dropdown dropdown-mega position-static hover-dropdown">
                         <a class="nav-link dropdown-toggle{% if menu.id == module_key %} active{% endif %}"
-                           href="#" role="button" data-bs-toggle="dropdown" data-bs-auto-close="true"
+                           href="{% if menu.url_name %}{% url menu.url_name %}{% else %}#{% endif %}" role="button" data-bs-toggle="dropdown" data-bs-auto-close="true"
                            aria-expanded="false" id="nav-{{ menu.id }}" aria-haspopup="true">
                             <i class="bi {{ menu.icon }}"></i>
                             <span>{{ menu.label }}</span>

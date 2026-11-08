@@ -75,6 +75,15 @@
                 node.addEventListener('focusout', scheduleHide);
             });
 
+            toggle.addEventListener('click', function (evt) {
+                const href = toggle.getAttribute('href') || '';
+                if (!href || href === '#' || href.charAt(0) === '#') return;
+                if (!isDesktop()) return;
+                evt.preventDefault();
+                evt.stopImmediatePropagation();
+                window.location.assign(href);
+            }, true);
+
             document.addEventListener('click', function (evt) {
                 if (!isDesktop()) return;
                 if (el.contains(evt.target)) return;

@@ -9,6 +9,7 @@ from decimal import Decimal, InvalidOperation
 from permissions.roles import UserRole
 from permissions.checks import (
     can_approve_transactions,
+    can_manage_care_groups,
     can_manage_finances,
     can_manage_members,
     can_manage_receipts,
@@ -35,6 +36,8 @@ WIDGET_ORDER = {
     "executive": (
         "churches",
         "action_items",
+        "active_members",
+        "care_groups",
         "mtd_net",
         "expense_mtd",
         "mtd_combined",
@@ -44,6 +47,8 @@ WIDGET_ORDER = {
     "district": (
         "churches",
         "action_items",
+        "active_members",
+        "care_groups",
         "mtd_net",
         "expense_mtd",
         "mtd_combined",
@@ -63,6 +68,7 @@ WIDGET_ORDER = {
         "pending_approvals",
         "pending_transfers",
         "active_members",
+        "care_groups",
         "income_mtd",
         "mtd_net",
         "expense_mtd",
@@ -80,6 +86,7 @@ WIDGET_ORDER = {
     ),
     "secretary": (
         "active_members",
+        "care_groups",
         "pending_transfers",
         "pending_approvals",
     ),
@@ -136,7 +143,9 @@ def _money_widget(
     }
 
 
-def _count_widget(widget_id, label, value, hint, url_name, card_class="", report_key=""):
+def _count_widget(
+    widget_id, label, value, hint, url_name, card_class="", report_key="", url_query=""
+):
     return {
         "id": widget_id,
         "type": "kpi",
@@ -146,7 +155,7 @@ def _count_widget(widget_id, label, value, hint, url_name, card_class="", report
         "hint": hint,
         "url_name": url_name,
         "report_key": report_key,
-        "url_query": "",
+        "url_query": url_query,
         "card_class": card_class,
         "empty_cta": "",
     }
@@ -182,6 +191,7 @@ def build_kpi_widgets(
     member_home_kpis=None,
     is_control_center=False,
     remittance_enabled=True,
+    care_group_count=0,
 ):
     """Permission- and scope-filtered KPI cards with operational destinations."""
     widgets = {}
@@ -217,7 +227,17 @@ def build_kpi_widgets(
             finance_bundle.get("member_count", 0),
             member_hint,
             "members:list",
+            url_query="?status=Active",
         )
+        if can_view_members(user) or can_manage_care_groups(user):
+            group_hint = f"Across {hint_scope}" if subtree else "This church"
+            widgets["care_groups"] = _count_widget(
+                "care_groups",
+                "Care groups",
+                care_group_count,
+                group_hint,
+                "members:care_group_list",
+            )
 
     if show_members and pending_transfers:
         widgets["pending_transfers"] = _count_widget(

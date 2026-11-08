@@ -44,6 +44,9 @@
                     {% if org_health.new_portal_submissions %}
                     <a href="{% url 'portal:staff_submissions' %}?status=NEW" class="cc-health-stat cc-health-stat--link">{{ org_health.new_portal_submissions }} pastoral inbox</a>
                     {% endif %}
+                    {% if org_health.working_day_issues %}
+                    <a href="{% url 'transactions:period_list' %}" class="cc-health-stat cc-health-stat--link">{{ org_health.working_day_issues }} working day{{ org_health.working_day_issues|pluralize }} behind</a>
+                    {% endif %}
                 </div>
             </div>
             {% endif %}
@@ -90,7 +93,6 @@
     {% include "includes/alert_banners.html" %}
     {% endif %}
 
-    {% include "dashboard/includes/do_next.html" %}
 
     {% if show_this_week_pulse and this_week_pulse %}
     <section class="cc-week-strip" aria-label="This week">
@@ -396,7 +398,7 @@
             {% if hierarchy_rollup %}
             <section class="cc-panel mb-4">
                 <div class="cc-panel__header">
-                    <h2 class="cc-panel__title"><i class="bi bi-bar-chart-steps"></i> District Roll-up — {{ current_time|date:"F Y" }}</h2>
+                    <h2 class="cc-panel__title"><i class="bi bi-bar-chart-steps"></i> District Roll-up — {{ finance_as_of|default:current_time|date:"F Y" }}</h2>
                     <a href="{% url 'reports:run' 'hierarchy_rollup' %}" class="dash-section__link">Full report →</a>
                 </div>
                 <div class="table-responsive table-in-card">
@@ -616,7 +618,7 @@
         const payload = {
             labels: labels,
             datasets: [{
-                label: 'Active members',
+                label: 'Members',
                 data: values,
                 backgroundColor: palette(values.length),
                 borderSkipped: false,

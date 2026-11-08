@@ -8,6 +8,7 @@ Notification writes stay in repositories.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db.models import Count, F, Q, Sum
@@ -236,6 +237,17 @@ def pending_transfers_for_church_ids(church_ids):
 
 def active_member_count_for_churches(church_ids):
     return Member.objects.filter(church_id__in=church_ids, is_active=True).count()
+
+
+def care_group_count_for_churches(church_ids):
+    from members.models import CareGroup
+
+    if not church_ids:
+        return 0
+    return CareGroup.objects.filter(
+        church_id__in=list(church_ids),
+        is_active=True,
+    ).count()
 
 
 def active_status_counts_by_church(church_ids):
@@ -535,6 +547,30 @@ def open_working_day_church_ids(church_ids):
             status=WorkingDay.STATUS_OPEN,
         ).values_list("church_id", flat=True)
     )
+
+
+def working_day_issue_count(church_ids, today=None, stale_after_days=7):
+    """Churches with no open working day, or an open day older than stale_after_days."""
+    from transactions.models import WorkingDay
+
+    if not church_ids:
+        return 0
+    today = today or timezone.localdate()
+    threshold = today - timedelta(days=stale_after_days)
+    open_map = {}
+    for church_id, work_date in WorkingDay.objects.filter(
+        church_id__in=list(church_ids),
+        status=WorkingDay.STATUS_OPEN,
+    ).values_list("church_id", "date"):
+        previous = open_map.get(church_id)
+        if previous is None or work_date > previous:
+            open_map[church_id] = work_date
+    issues = 0
+    for church_id in church_ids:
+        work_date = open_map.get(church_id)
+        if work_date is None or work_date < threshold:
+            issues += 1
+    return issues
 
 
 def open_visitors_for_church(church, *, limit=8):

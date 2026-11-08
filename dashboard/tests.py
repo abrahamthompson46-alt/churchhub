@@ -272,6 +272,48 @@ class ServiceTests(DashboardTestMixin, TestCase):
             1,
         )
 
+    def test_budget_gap_collapses_duplicate_unread(self):
+        from unittest.mock import patch
+
+        from dashboard.models import Notification
+        from permissions.org_scope import apply_org_scope
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        admin = User.objects.create_user(
+            username="budget_dup",
+            password="pass12345",
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+        )
+        apply_org_scope(
+            admin,
+            role=UserRole.DISTRICT_PASTOR,
+            church=self.church,
+            district=self.district,
+        )
+        admin.save()
+        for _ in range(3):
+            Notification.objects.create(
+                user=admin,
+                title="Churches without annual budgets",
+                message="old copy",
+                category="FINANCE",
+                read=False,
+            )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = admin
+        request.session = {}
+        with patch("sitecontrol.services.church_has_feature", return_value=True):
+            get_alerts(request, admin)
+        self.assertEqual(
+            Notification.objects.filter(
+                user=admin, title="Churches without annual budgets", read=False
+            ).count(),
+            1,
+        )
+
 
 class HierarchyScopeTests(TestCase):
     @classmethod
@@ -505,7 +547,7 @@ class ViewTests(DashboardTestMixin, TestCase):
         response = self.client.get(reverse("dashboard:work_inbox"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Work inbox")
-        self.assertContains(response, "Do next")
+        self.assertContains(response, "When the queue is clear")
 
     def test_work_inbox_forbidden_for_member(self):
         member = User.objects.create_user(
@@ -518,11 +560,12 @@ class ViewTests(DashboardTestMixin, TestCase):
         response = self.client.get(reverse("dashboard:work_inbox"))
         self.assertEqual(response.status_code, 403)
 
-    def test_home_shows_do_next_and_skip_link(self):
+    def test_home_omits_do_next_and_keeps_skip_link(self):
         self._login("treasury")
         response = self.client.get(reverse("dashboard:home"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Do next")
+        self.assertNotContains(response, "Do next")
+        self.assertNotContains(response, "When the queue is clear")
         self.assertContains(response, "Skip to content")
         self.assertContains(response, 'id="main-content"')
 
@@ -869,7 +912,9 @@ class ViewTests(DashboardTestMixin, TestCase):
 
     def test_pct_change_handles_zero_prior(self):
         self.assertIsNone(pct_change(Decimal("0"), Decimal("0")))
-        self.assertEqual(pct_change(Decimal("10"), Decimal("0")), 100.0)
+        self.assertIsNone(pct_change(Decimal("10"), Decimal("0")))
+        self.assertIsNone(pct_change(Decimal("20"), Decimal("10")))
+        self.assertAlmostEqual(pct_change(Decimal("150"), Decimal("100")), 50.0)
 
     def test_control_center_filters_duplicate_queue_items(self):
         raw = [
@@ -1056,6 +1101,130 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertNotIn("churches", ids)
         self.assertNotIn("action_items", ids)
         self.assertLess(ids.index("pending_transfers"), ids.index("active_members"))
+        by_id = {w["id"]: w for w in widgets}
+        self.assertEqual(by_id["active_members"]["url_name"], "members:list")
+        self.assertIn("status=Active", by_id["active_members"]["url_query"])
+
+    def test_build_kpi_widgets_executive_includes_clickable_active_members(self):
+        from dashboard.scope import DashboardScope
+        from dashboard.widgets import build_kpi_widgets
+
+        scope = DashboardScope(
+            level="SUBTREE",
+            church_ids=(self.church.pk,),
+            primary_church=self.church,
+            label="District",
+            finance_church_ids=(self.church.pk,),
+            finance_scope_label="District",
+        )
+        user = User.objects.create_user(
+            username="exec_widgets",
+            password="pass12345",
+            role=UserRole.SUPER_ADMIN,
+            church=self.church,
+        )
+        widgets = build_kpi_widgets(
+            user=user,
+            dashboard_role="admin",
+            scope=scope,
+            finance_bundle={
+                "member_count": 2,
+                "church_count": 1,
+                "district_count": 1,
+                "action_items": 0,
+                "pending_transactions": 0,
+                "overdue_remittances": 0,
+            },
+            is_control_center=True,
+        )
+        ids = [w["id"] for w in widgets]
+        self.assertEqual(ids.count("active_members"), 1)
+        card = next(w for w in widgets if w["id"] == "active_members")
+        self.assertEqual(card["url_name"], "members:list")
+        self.assertEqual(card["url_query"], "?status=Active")
+
+    def test_build_kpi_widgets_includes_clickable_care_groups(self):
+        from dashboard.scope import DashboardScope
+        from dashboard.widgets import build_kpi_widgets
+
+        scope = DashboardScope(
+            level="CHURCH",
+            church_ids=(self.church.pk,),
+            primary_church=self.church,
+            label=self.church.name,
+            finance_church_ids=(self.church.pk,),
+            finance_scope_label=self.church.name,
+        )
+        user = User.objects.create_user(
+            username="care_kpi",
+            password="pass12345",
+            role=UserRole.SECRETARY,
+            church=self.church,
+        )
+        widgets = build_kpi_widgets(
+            user=user,
+            dashboard_role="secretary",
+            scope=scope,
+            finance_bundle={"member_count": 2},
+            care_group_count=4,
+        )
+        card = next(w for w in widgets if w["id"] == "care_groups")
+        self.assertEqual(card["value"], 4)
+        self.assertEqual(card["url_name"], "members:care_group_list")
+
+    def test_home_care_groups_card_opens_list(self):
+        from accounts.mfa import SESSION_MFA_VERIFIED
+        from members.models import CareGroup, MemberLocation
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        location = MemberLocation.objects.create(church=self.church, name="East Legon")
+        CareGroup.objects.create(
+            church=self.church, location=location, name="East Legon cell"
+        )
+        User.objects.create_user(
+            username="care_home",
+            password="pass12345",
+            role=UserRole.SECRETARY,
+            church=self.church,
+        )
+        client = Client()
+        client.login(username="care_home", password="pass12345")
+        session = client.session
+        session["current_church_id"] = str(self.church.id)
+        session[SESSION_MFA_VERIFIED] = True
+        session.save()
+        response = client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        by_id = {w["id"]: w for w in (response.context.get("dashboard_kpi_widgets") or [])}
+        self.assertEqual(by_id["care_groups"]["value"], 1)
+        self.assertEqual(by_id["care_groups"]["url_name"], "members:care_group_list")
+        self.assertContains(response, reverse("members:care_group_list"))
+
+    def test_stale_open_working_day_warns_health(self):
+        from dashboard.services import get_compliance_snapshot, get_organization_health
+
+        church = Church.objects.create(
+            district=self.district, code="C-STALE", name="Stale Day Church"
+        )
+        pastor = User.objects.create_user(
+            username="stale_wd_pastor",
+            password="pass12345",
+            role=UserRole.LOCAL_PASTOR,
+            church=church,
+        )
+        open_working_day(church, timezone.localdate() - timedelta(days=40), pastor)
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = pastor
+        request.session = {"current_church_id": str(church.id)}
+        compliance = get_compliance_snapshot(request, pastor)
+        self.assertGreaterEqual(compliance["working_day_issues"], 1)
+        health = get_organization_health(
+            request, pastor, compliance=compliance, kpis={"pending_transactions": 0}
+        )
+        self.assertEqual(health["status"], "warning")
+        self.assertEqual(health["label"], "Working day behind")
 
     def test_pastor_home_renders_unified_kpi_strip(self):
         from permissions.services import ensure_permission_matrix
@@ -1080,7 +1249,8 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         widgets = response.context.get("dashboard_kpi_widgets") or []
         self.assertTrue(widgets)
-        self.assertContains(response, "Active members")
+        self.assertContains(response, "Active members", count=1)
+        self.assertContains(response, reverse("members:list") + "?status=Active")
         self.assertTrue(response.context.get("show_finance_charts"))
         ids = [w["id"] for w in widgets]
         self.assertIn("income_mtd", ids)
@@ -1119,13 +1289,13 @@ class DashboardScopeAndWidgetTests(DashboardTestMixin, TestCase):
         self.assertNotIn("mtd_tithe", ids)
         self.assertNotIn("income_mtd", ids)
         self.assertFalse(response.context.get("show_teller_console"))
-        self.assertContains(response, "Active members")
+        self.assertContains(response, "Active members", count=1)
         self.assertNotContains(response, "Tithe MTD")
         self.assertIsNotNone(response.context.get("membership_analysis"))
         self.assertContains(response, "Membership")
         self.assertContains(response, "memberCompareChart")
+        self.assertContains(response, "By congregation")
         self.assertNotContains(response, "Counts use membership status Active")
-        self.assertContains(response, "Active members")
 
     def test_district_pastor_defaults_to_subtree_exception_board(self):
         from permissions.org_scope import apply_org_scope

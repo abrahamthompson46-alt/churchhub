@@ -123,7 +123,9 @@ def work_inbox(request):
     role = get_dashboard_role(user)
     return render(request, "dashboard/inbox.html", {
         "action_queue": queue,
-        "do_next_steps": get_do_next_steps(request, role, queue),
+        "do_next_steps": get_do_next_steps(
+            request, role, queue, include_idle=not queue
+        ),
         "dashboard_role": role,
     })
 

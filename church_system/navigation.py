@@ -115,12 +115,14 @@ def _link(menu_id, label, icon, url_name):
     return {"type": "link", "id": menu_id, "label": label, "icon": icon, "url_name": url_name}
 
 
-def _dropdown(menu_id, label, icon, sections=None, items=None):
+def _dropdown(menu_id, label, icon, sections=None, items=None, url_name=""):
     entry = {"type": "dropdown", "id": menu_id, "label": label, "icon": icon}
     if sections:
         entry["sections"] = sections
     if items:
         entry["items"] = items
+    if url_name:
+        entry["url_name"] = url_name
     return entry
 
 
@@ -462,7 +464,14 @@ def get_main_navigation(user, active_church=None):
     if _can_access_people(user):
         people_sections = _people_sections(user)
         if people_sections:
-            nav.append(_dropdown("people", "Members", "bi-people", sections=people_sections))
+            people_url = "members:list" if (
+                can_view_members(user) or can_manage_members(user)
+            ) else ""
+            nav.append(_dropdown(
+                "people", "Members", "bi-people",
+                sections=people_sections,
+                url_name=people_url,
+            ))
 
     if _can_access_finance(user):
         finance_sections = _finance_sections(user, active_church)

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+KPI_DELTA_MIN_PRIOR = Decimal("50")
+
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 
@@ -74,10 +76,9 @@ def aggregate_giving_calendar_month(finance_church_ids, month_start_date):
 
 
 def pct_change(current: Decimal, previous: Decimal):
-    if previous == 0:
-        if current == 0:
-            return None
-        return 100.0
+    """Hide % when prior is zero or too small to be a meaningful base."""
+    if previous == 0 or abs(previous) < KPI_DELTA_MIN_PRIOR:
+        return None
     return float((current - previous) / previous * 100)
 
 

@@ -492,8 +492,8 @@ def get_dashboard_coaching_hints(context):
     return hints[:3]
 
 
-def get_do_next_steps(request, dashboard_role, action_queue):
-    """Role-ordered next jobs: pending queue first, then the idle next duty."""
+def get_do_next_steps(request, dashboard_role, action_queue, *, include_idle=True):
+    """Inbox suggestions: pending queue first, then idle duties when the queue is empty."""
     steps = []
     seen = set()
     for item in action_queue or []:
@@ -511,6 +511,9 @@ def get_do_next_steps(request, dashboard_role, action_queue):
         })
         if len(steps) >= 4:
             return steps
+
+    if not include_idle or steps:
+        return steps
 
     user = request.user
     church = get_active_church(request)

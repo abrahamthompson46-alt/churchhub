@@ -11,7 +11,7 @@ from church_system.flash import (
     flash_success,
     flash_validation_errors,
 )
-from church_system.templatetags.churchhub_tags import message_body, message_title
+from church_system.templatetags.churchhub_tags import as_tel, message_body, message_title
 
 User = get_user_model()
 
@@ -60,3 +60,8 @@ class FlashTemplateTagTests(TestCase):
     def test_plain_message_uses_tag_label_as_title(self):
         self.assertEqual(message_title("Budget line added.", "success"), "Success")
         self.assertEqual(message_body("Budget line added."), "Budget line added.")
+
+    def test_as_tel_keeps_digits_and_leading_plus(self):
+        self.assertEqual(as_tel("024 411 1000"), "tel:0244111000")
+        self.assertEqual(as_tel("+233 24 411 1000"), "tel:+233244111000")
+        self.assertEqual(as_tel(""), "")

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load humanize permission_tags %}
+{% load humanize permission_tags churchhub_tags %}
 
 {% block title %}Members — ChurchHub{% endblock %}
 
@@ -102,7 +102,11 @@
                         <td class="text-muted">{{ member.department|default:"—" }}</td>
                         <td>{{ member.gender }}</td>
                         <td>{{ member.membership_status }}</td>
-                        <td class="text-muted">{{ member.phone|default:"—" }}</td>
+                        <td class="text-muted">
+                            {% if member.phone %}
+                            <a href="{{ member.phone|as_tel }}" class="table-link">{{ member.phone }}</a>
+                            {% else %}—{% endif %}
+                        </td>
                         <td class="text-end text-nowrap">
                             <a href="{% url 'members:timeline' member.id %}" class="btn btn-sm btn-outline-secondary">Timeline</a>
                             {% if can_edit_members %}

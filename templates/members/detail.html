@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load humanize churchhub_tags %}
 
 {% block title %}{{ member.full_name }} — ChurchHub{% endblock %}
 
@@ -22,11 +22,23 @@
             {% if member.department %}<span class="chip ms-1">{{ member.department.name }}</span>{% endif %}
             {% if member.membership_number %}<span class="chip chip--muted ms-1">#{{ member.membership_number }}</span>{% endif %}
             <div class="member-hero-contacts mt-2">
-                {% if member.phone %}<span><i class="bi bi-telephone me-1"></i>{{ member.phone }}</span>{% endif %}
+                {% if member.phone %}
+                <a href="{{ member.phone|as_tel }}" class="member-contact-call" aria-label="Call {{ member.full_name }}">
+                    <i class="bi bi-telephone-fill me-1"></i>{{ member.phone }}
+                </a>
+                {% endif %}
+                {% if member.email %}
+                <a href="mailto:{{ member.email }}" class="member-contact-call member-contact-call--mail">
+                    <i class="bi bi-envelope me-1"></i>{{ member.email }}
+                </a>
+                {% endif %}
                 <span><i class="bi bi-geo-alt me-1"></i>{{ member.church.name }}</span>
             </div>
         </div>
         <div class="d-flex flex-wrap gap-2">
+            {% if member.phone %}
+            <a href="{{ member.phone|as_tel }}" class="btn btn-primary btn-sm"><i class="bi bi-telephone-fill me-1"></i>Call</a>
+            {% endif %}
             {% if can_edit_members %}
             <a href="{{ edit_url }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil me-1"></i>Edit</a>
             {% endif %}
@@ -59,6 +71,27 @@
                         <dt class="col-sm-4">Date Joined</dt><dd class="col-sm-8">{{ member.date_joined|default:"—" }}</dd>
                         <dt class="col-sm-4">Baptism</dt><dd class="col-sm-8">{% if member.baptism_date %}{{ member.baptism_date }}{% if member.baptism_place %} — {{ member.baptism_place }}{% endif %}{% else %}—{% endif %}</dd>
                         <dt class="col-sm-4">Attendance</dt><dd class="col-sm-8">{{ attendance_count }} meetings present</dd>
+                        <dt class="col-sm-4">Phone</dt>
+                        <dd class="col-sm-8">
+                            {% if member.phone %}
+                            <a href="{{ member.phone|as_tel }}" class="table-link">{{ member.phone }}</a>
+                            <a href="{{ member.phone|as_tel }}" class="btn btn-sm btn-outline-primary ms-2">Call</a>
+                            {% else %}—{% endif %}
+                        </dd>
+                        <dt class="col-sm-4">Email</dt>
+                        <dd class="col-sm-8">
+                            {% if member.email %}<a href="mailto:{{ member.email }}" class="table-link">{{ member.email }}</a>{% else %}—{% endif %}
+                        </dd>
+                        <dt class="col-sm-4">Emergency</dt>
+                        <dd class="col-sm-8">
+                            {% if member.emergency_contact_name or member.emergency_contact_phone %}
+                            {{ member.emergency_contact_name|default:"—" }}{% if member.emergency_contact_relation %} ({{ member.emergency_contact_relation }}){% endif %}
+                            {% if member.emergency_contact_phone %}
+                            · <a href="{{ member.emergency_contact_phone|as_tel }}" class="table-link">{{ member.emergency_contact_phone }}</a>
+                            <a href="{{ member.emergency_contact_phone|as_tel }}" class="btn btn-sm btn-outline-primary ms-1">Call</a>
+                            {% endif %}
+                            {% else %}—{% endif %}
+                        </dd>
                         <dt class="col-sm-4">Address</dt><dd class="col-sm-8">{{ member.address|default:"—" }}</dd>
                         <dt class="col-sm-4">Family</dt>
                         <dd class="col-sm-8">

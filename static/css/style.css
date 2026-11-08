@@ -2105,9 +2105,24 @@ body.app-body.auth-page {
 .member-hero-contacts {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.75rem 1.1rem;
     font-size: 0.82rem;
     color: var(--ch-muted);
+}
+.member-contact-call {
+    display: inline-flex;
+    align-items: center;
+    color: var(--ch-primary);
+    font-weight: 600;
+    text-decoration: none;
+}
+.member-contact-call:hover,
+.member-contact-call:focus {
+    text-decoration: underline;
+}
+.member-contact-call--mail {
+    font-weight: 500;
 }
 .member-list-thumb {
     width: 32px;

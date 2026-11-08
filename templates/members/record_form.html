@@ -13,11 +13,23 @@
     <p class="small text-muted mb-3">This entry is saved on the baptism register.</p>
     {% endif %}
     <div class="row g-3">
-        {% for field in form %}
-        <div class="col-md-6{% if 'notes' in field.name or 'description' in field.name or field.field.widget.input_type == 'textarea' %} col-12{% endif %}">
-            {% include "includes/form_field.html" with field=field %}
-        </div>
-        {% endfor %}
+        {% if form.member.is_hidden %}
+        {% include "includes/form_field.html" with field=form.member %}
+        {% else %}
+        <div class="col-12">{% include "includes/form_field.html" with field=form.member %}</div>
+        {% endif %}
+        {% if form.record_type.is_hidden %}
+        {% include "includes/form_field.html" with field=form.record_type %}
+        {% else %}
+        <div class="col-6 col-md-3">{% include "includes/form_field.html" with field=form.record_type %}</div>
+        {% endif %}
+        <div class="col-6 col-md-3">{% include "includes/form_field.html" with field=form.status %}</div>
+        <div class="col-6 col-md-3">{% include "includes/form_field.html" with field=form.event_date %}</div>
+        <div class="col-md-6">{% include "includes/form_field.html" with field=form.certificate_number %}</div>
+        <div class="col-12 col-md-8">{% include "includes/form_field.html" with field=form.title %}</div>
+        <div class="col-md-6">{% include "includes/form_field.html" with field=form.place %}</div>
+        <div class="col-md-6">{% include "includes/form_field.html" with field=form.officiant %}</div>
+        <div class="col-12">{% include "includes/form_field.html" with field=form.description %}</div>
     </div>
     <div class="d-flex gap-2 pt-3">
         <button type="submit" class="btn btn-primary">Save Record</button>

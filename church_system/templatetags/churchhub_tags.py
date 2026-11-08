@@ -1,5 +1,7 @@
 """Template tags for ChurchHub UI helpers."""
 
+import re
+
 from django import template
 
 register = template.Library()
@@ -32,6 +34,22 @@ TAG_ICONS = {
 }
 
 TITLE_SEP = " || "
+
+
+@register.filter
+def as_tel(value):
+    """Build a tel: href from a stored phone number. Empty if nothing dialable remains."""
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    kept = re.sub(r"[^\d+]", "", raw)
+    if not kept:
+        return ""
+    plus = kept.startswith("+")
+    digits = re.sub(r"\D", "", kept)
+    if not digits:
+        return ""
+    return f"tel:+{digits}" if plus else f"tel:{digits}"
 
 
 @register.filter

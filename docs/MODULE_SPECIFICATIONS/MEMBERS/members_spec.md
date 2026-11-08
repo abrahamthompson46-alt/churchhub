@@ -155,7 +155,9 @@ Management: `export_member_data`.
 
 ## 8. Templates (Current)
 
-`templates/members/`: list/add/edit/detail/timeline, records, departments, families, care_group_*, care_location_form, care_group_desk, care_group_sheet, transfers, baptism_register, leadership, spiritual gifts, assign_gift, confirm_delete, etc.
+`templates/members/`: list/add/edit/detail/timeline, `_member_form_fields` (shared compact add/edit grid), records, departments, families, care_group_*, care_location_form, care_group_desk, care_group_sheet, transfers, baptism_register, leadership, spiritual gifts, assign_gift, confirm_delete, etc.
+
+Profile and directory phones use `tel:` links (`as_tel` filter) so Call opens the device dialer. Add/edit member and add-record forms size fields by purpose (short codes/dates/status, medium names/phones, wide address/notes).
 
 ---
 

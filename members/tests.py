@@ -171,6 +171,22 @@ class ViewTests(MembersTestMixin, TestCase):
         response = self.client.get(reverse("members:detail", kwargs={"member_id": self.member.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Youth")
+        self.assertContains(response, 'href="tel:0244111000"')
+        self.assertContains(response, ">Call</a>")
+
+    def test_add_member_uses_compact_field_grid(self):
+        self.client.login(username="secretary", password="pass12345")
+        response = self.client.get(reverse("members:add"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "col-6 col-md-4")
+        self.assertContains(response, "col-md-8")
+
+    def test_record_add_uses_short_purpose_columns(self):
+        self.client.login(username="secretary", password="pass12345")
+        response = self.client.get(reverse("members:record_add"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "col-6 col-md-3")
+        self.assertContains(response, 'name="certificate_number"')
 
     def test_member_cannot_add(self):
         self.client.login(username="member", password="pass12345")

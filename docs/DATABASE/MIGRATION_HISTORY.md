@@ -114,6 +114,7 @@
 |-----------|----------------|
 | Church is_active / financials_provisioned; code uniqueness; OrganizationAuditLog | `organization.0004_organization_enterprise` |
 | Backfill financials_provisioned | `organization.0005_backfill_financials_provisioned` |
+| GeneralConference denomination FK + backfill | `organization.0007_generalconference_denomination` |
 | Department budgets + conditional unique constraints | `transactions.0012_budget_enterprise` |
 | Meeting minutes workflow | `meetings.0002_meeting_workflow` |
 | Member constraints, baptism fields, MemberAuditLog | `members.0004_members_enterprise` |

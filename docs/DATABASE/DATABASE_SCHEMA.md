@@ -117,7 +117,7 @@ Tenant: **global** catalog (not church-scoped). Authorization scope is applied a
 
 | Model | PK | FKs / constraints |
 |-------|-----|-------------------|
-| `GeneralConference` | UUID | `name` unique, `code` unique |
+| `GeneralConference` | UUID | `name` unique, `code` unique; FK `denomination` PROTECT nullable |
 | `Union` | UUID | FK → GC CASCADE; **unique_together** `(name, general_conference)` |
 | `Conference` | UUID | `name`/`code` unique; FK `denomination` PROTECT nullable; FK `union` SET_NULL nullable |
 | `Zone` | UUID | FK → Conference; unique `(name, conference)`; **UniqueConstraint** `uniq_zone_code_per_conference` `(conference, code)`; index `org_zone_conf_code_idx` |

@@ -46,7 +46,7 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 | CH-SEC-L3 | MEDIUM | LIKELY | FIXED (Phase 3) | Settlement/district remittance races | No | Staff |
 | CH-SEC-L4 | LOW | LIKELY | FIXED | Password-reset paths skip trusted-device revoke | No | Yes |
 | CH-SEC-P1 | LOW | POTENTIAL | FIXED | Health token compared without `compare_digest` | N/A | No |
-| CH-SEC-P2 | INFO | POTENTIAL | OPEN | Nginx template hostnames vs `mychurch.zreta.com` | N/A | N/A |
+| CH-SEC-P2 | INFO | POTENTIAL | FIXED | Nginx template hostnames vs `mychurch.zreta.com` | N/A | N/A |
 
 ---
 
@@ -163,7 +163,7 @@ This register does **not** replace `docs/SECURITY_AND_DEPLOYMENT_AUDIT.md`.
 15. **Crosses tenant boundaries:** No  
 16. **Confidence:** High  
 
-**Remediation (Phase 3):** **FIXED.** Depreciation/disposal/acquisition assert working day + period; CAPITIAL journals use `approve_module_journal`; register/DISPOSED only after APPROVED; Celery/`user=None` leaves PENDING without register mutation. Tests: Phase3AssetJournalTests + assets tests.
+**Remediation (Phase 3 / CH-ENT-003A):** **FIXED.** Depreciation/disposal/acquisition assert working day + period; CAPITAL journals use `approve_module_journal`; register/DISPOSED only after APPROVED. New depreciation without an authorized checker does not keep a PENDING journal; Celery/`user=None` never invents a checker. Tests: Phase3AssetJournalTests + assets tests.
 
 ---
 
@@ -371,6 +371,6 @@ Failed logins lock **IP first** at `login_max_attempts`. Identifier lock only af
 ## POTENTIAL
 
 **CH-SEC-P1:** **FIXED.** `health_check_authorized` compares HMAC-SHA256 digests with `hmac.compare_digest`.  
-**CH-SEC-P2:** Repo Nginx `server_name` is `zreta.com`; live app is `mychurch.zreta.com` — verify live vhost.  
+**CH-SEC-P2:** **FIXED.** Live `/etc/nginx/sites-enabled/churchhub` uses `server_name mychurch.zreta.com`. Repo template `deploy/nginx/churchhub.conf` lists `mychurch.zreta.com` plus `zreta.com` / `www.zreta.com`.  
 **CH-SEC-P3:** `|safe` removed from page header/table/form action slots. Remaining `|safe`: hex-validated `institution_branding_css` only. Member summary charts use `json_script`.  
 **CH-SEC-P4:** `CHURCHHUB_BACKUP_POST_HOOK` executes a configured binary (`backup_ops.py`).

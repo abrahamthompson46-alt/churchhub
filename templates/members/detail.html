@@ -42,6 +42,7 @@
             {% endif %}
             {% if can_edit_members %}
             <a href="{{ edit_url }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil me-1"></i>Edit</a>
+            <a href="{% url 'members:merge' member.id %}" class="btn btn-outline-secondary btn-sm">Merge</a>
             {% endif %}
             {% if can_manage_member_records %}
             <a href="{% url 'members:record_add' %}?member={{ member.id }}" class="btn btn-outline-secondary btn-sm">Record</a>

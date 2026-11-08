@@ -62,7 +62,7 @@ Agents must check the model before writing FK types.
 
 | Model | Key fields / relationships |
 |-------|----------------------------|
-| `GeneralConference` | UUID; `name` unique; `code` unique |
+| `GeneralConference` | UUID; `name` unique; `code` unique; FK `denomination` (nullable PROTECT) |
 | `Union` | UUID; `name`; `code`; FK → `GeneralConference`; unique `(name, general_conference)` |
 | `Conference` | UUID; `name` unique; `code` unique; FK → `Union` (nullable); FK → `sitecontrol.Denomination` (nullable, PROTECT) |
 | `Zone` | UUID; FK → `Conference`; unique name/code per conference |

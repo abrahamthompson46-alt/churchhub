@@ -10,6 +10,13 @@ class GeneralConference(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, unique=True)
     code = models.CharField(max_length=20, unique=True)
+    denomination = models.ForeignKey(
+        "sitecontrol.Denomination",
+        on_delete=models.PROTECT,
+        related_name="general_conferences",
+        null=True,
+        blank=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

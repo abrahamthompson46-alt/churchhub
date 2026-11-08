@@ -100,6 +100,7 @@ Views no longer call `Member.objects` / `filter_by_church` directly for list/det
 |----------|------|
 | `log_member_audit` | Audit writer |
 | `find_duplicate_members` | Soft duplicate warning |
+| `merge_members` | Same-church merge: keeper kept, duplicate Former; records/gifts/leadership/care reassigned; journals not rewritten |
 | `create_member` / `update_member` | Hard uniqueness + audit |
 | `request_transfer` / `complete_transfer` / `reject_transfer` | Transfer lifecycle |
 | `can_process_transfer` / `user_can_view_transfer` | Transfer authz helpers |
@@ -123,6 +124,7 @@ Management: `export_member_data`.
 | Record / department / family CRUD | Supporting entities |
 | Care group / location / pairing / desk / sheet | Location groups, searchable add/leader, one-to-one links, unpaired desk assign/link, printable sheet (`care_group_views`) |
 | `transfer_*` | Transfer list/create/detail (+ complete/reject) |
+| `member_merge` | Same-church duplicate merge (`edit_members`) |
 | `baptism_register` | Baptism list/export; **Add baptism** when `manage_member_records` or `manage_baptisms` |
 | Leadership / spiritual gift views | Roles and gifts |
 | `configuration_hub` / `occupation_*` / `member_lookup_*` | Administration → Configuration (occupations + form lists) |
@@ -298,7 +300,7 @@ Extend with isolation tests when changing detail/update URLs.
 | Topic | Current | Planned (AGENTS) | Recommended |
 |-------|---------|------------------|-------------|
 | Statuses | Active, Inactive, Transferred, Deceased, Missing, Suspended, Former | Broader AGENTS list | Additive only with product approval |
-| Transfers | Conference→District→Church request; dest completes; cancel; letter; uniqueness; SoD | District/union org people-moves | Dual sending+receiving vote if product asks |
+| Transfers | Conference→District→Church request (sending church); dest completes (receiving church); requester cannot complete; cancel; letter; uniqueness | District/union org people-moves | Extra countersign step only if product asks |
 | Visitors | CRUD, convert, stale follow-up reminder | Full CRM app | Keep in `members` until volume requires a split |
 | Soft-delete | `SoftDeleteModel` on visitor and some entities; Member has delete fields | Universal `is_deleted` | Restore UI; no purge tooling |
 | Member ID | UUID + per-church membership_number | Globally unique Member ID | Clarify product rule before changing uniqueness |

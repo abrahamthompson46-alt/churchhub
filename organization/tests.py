@@ -396,6 +396,7 @@ class ViewTests(OrganizationTestMixin, TestCase):
         )
         self.assertEqual(response.status_code, 302)
         gc = GeneralConference.objects.get(code="NGC1")
+        self.assertEqual(gc.denomination_id, self.denomination.pk)
         self.assertRedirects(
             response,
             reverse("organization:general_conference_detail", kwargs={"pk": gc.pk}),
@@ -408,7 +409,11 @@ class ViewTests(OrganizationTestMixin, TestCase):
 
     def test_union_create_on_empty_general_conference(self):
         self._login("admin")
-        gc = GeneralConference.objects.create(name="Bare GC", code="BGC1")
+        gc = GeneralConference.objects.create(
+            name="Bare GC",
+            code="BGC1",
+            denomination=self.denomination,
+        )
         add = self.client.get(
             reverse("organization:union_create") + f"?general_conference={gc.pk}"
         )
@@ -436,6 +441,18 @@ class ViewTests(OrganizationTestMixin, TestCase):
         response = self.client.get("/organization/general-conferences/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Add General Conference")
+
+    def test_empty_gc_hidden_from_other_denomination(self):
+        self._login("admin")
+        other_gc = GeneralConference.objects.create(
+            name="Foreign GC",
+            code="FGC1",
+            denomination=self.other_denomination,
+        )
+        response = self.client.get(
+            reverse("organization:general_conference_detail", kwargs={"pk": other_gc.pk})
+        )
+        self.assertEqual(response.status_code, 404)
 
     def test_church_transfer_by_super_admin(self):
         self._login("admin")

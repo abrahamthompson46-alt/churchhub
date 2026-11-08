@@ -122,6 +122,101 @@ def find_duplicate_members(church, first_name, last_name, date_of_birth=None, ph
     return unique
 
 
+def _repoint_fk(model, keeper, duplicate, field="member"):
+    model.objects.filter(**{field: duplicate}).update(**{field: keeper})
+
+
+@transaction.atomic
+def merge_members(keeper, duplicate, *, performed_by):
+    """Keep `keeper`, retire `duplicate` in the same church. Journals are not rewritten."""
+    from accounts.models import User
+    from members.models import (
+        CareGroup,
+        CareGroupMembership,
+        CarePartnership,
+        History,
+        LeadershipRole,
+        MemberSpiritualGift,
+        Record,
+        Visitor,
+    )
+
+    if keeper.pk == duplicate.pk:
+        raise ValidationError("Choose a different member to merge.")
+    if keeper.church_id != duplicate.church_id:
+        raise ValidationError("Both members must belong to the same church.")
+    church = keeper.church
+
+    now = timezone.now()
+    for row in CareGroupMembership.objects.filter(member=duplicate, left_at__isnull=True):
+        if CareGroupMembership.objects.filter(
+            group_id=row.group_id, member=keeper, left_at__isnull=True
+        ).exists():
+            row.left_at = now
+            row.save(update_fields=["left_at"])
+        else:
+            row.member = keeper
+            row.save(update_fields=["member"])
+    CarePartnership.objects.filter(is_active=True).filter(
+        Q(member_a=duplicate) | Q(member_b=duplicate)
+    ).update(is_active=False, ended_at=now)
+    CareGroup.objects.filter(leader=duplicate).update(leader=keeper)
+
+    keeper_gifts = set(
+        MemberSpiritualGift.objects.filter(member=keeper).values_list("gift_id", flat=True)
+    )
+    for row in MemberSpiritualGift.objects.filter(member=duplicate):
+        if row.gift_id in keeper_gifts:
+            row.delete()
+        else:
+            row.member = keeper
+            row.save(update_fields=["member"])
+
+    _repoint_fk(Record, keeper, duplicate)
+    _repoint_fk(History, keeper, duplicate)
+    _repoint_fk(LeadershipRole, keeper, duplicate)
+    MemberTransfer.objects.filter(member=duplicate, status=TransferStatus.PENDING).update(
+        status=TransferStatus.CANCELLED,
+        notes="Cancelled because the member was merged.",
+    )
+    _repoint_fk(MemberTransfer, keeper, duplicate)
+    Visitor.objects.filter(converted_member=duplicate).update(converted_member=keeper)
+
+    dup_user = User.objects.filter(member=duplicate).first()
+    keep_user = User.objects.filter(member=keeper).first()
+    if dup_user and not keep_user:
+        dup_user.member = keeper
+        dup_user.save(update_fields=["member"])
+    elif dup_user:
+        dup_user.member = None
+        dup_user.save(update_fields=["member"])
+
+    if not keeper.family_id and duplicate.family_id:
+        keeper.family_id = duplicate.family_id
+    if not keeper.profile_picture and duplicate.profile_picture:
+        keeper.profile_picture = duplicate.profile_picture
+    keeper.save()
+
+    duplicate.phone = ""
+    duplicate.email = ""
+    duplicate.membership_number = ""
+    duplicate.membership_status = MembershipStatus.FORMER
+    duplicate.save()
+
+    details = {"duplicate_id": str(duplicate.pk), "duplicate_name": str(duplicate)}
+    log_member_audit(
+        church, "MEMBER_MERGE", performed_by=performed_by, member=keeper, details=details
+    )
+    log_member_audit(
+        church,
+        "MEMBER_MERGE",
+        performed_by=performed_by,
+        member=duplicate,
+        details={"keeper_id": str(keeper.pk)},
+    )
+    return keeper
+
+
 @transaction.atomic
 def create_member(church, performed_by=None, **fields):
     """Create a member with validation, duplicate checks, and audit."""

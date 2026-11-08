@@ -47,7 +47,7 @@ erDiagram
 
 | Model | Highlights |
 |-------|------------|
-| `GeneralConference` | UUID; unique name/code |
+| `GeneralConference` | UUID; unique name/code; FK `denomination` (nullable PROTECT) |
 | `Union` | FK GC; unique `(name, general_conference)` |
 | `Conference` | Unique name/code; FK `denomination` (nullable PROTECT); FK `union` (nullable) |
 | `Zone` | FK conference; unique name; unique code per conference |
@@ -173,7 +173,7 @@ No app-local `permissions.py`. Uses:
 - Conference code reuse blocked across denominations when resolving/creating.
 - Hierarchy UI respects denomination `level_enabled` where configured.
 - Financial provisioning sets `financials_provisioned`.
-- Denomination-scoped admins (`SUPER_ADMIN` / `GENERAL_OVERSEER`) can see General Conferences and Unions that do not yet have conferences, so a newly created GC or Union is visible on its detail page and the hierarchy. Conference-and-below scopes still only see units linked through conferences in scope. These rows have no denomination FK (**Recommended:** attach denomination at GC/Union).
+- Denomination-scoped admins (`SUPER_ADMIN` / `GENERAL_OVERSEER`) can see General Conferences and Unions that do not yet have conferences **in their denomination**. New GCs are stamped with the active denomination. Empty GCs belonging to another denomination stay hidden. Conference-and-below scopes still only see units linked through conferences in scope.
 
 ---
 

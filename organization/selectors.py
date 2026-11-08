@@ -118,12 +118,15 @@ def scoped_unions(request):
     linked = Union.objects.filter(conferences__in=scoped_conferences(request))
     if not _include_unattached_org_roots(request.user):
         return linked.distinct()
-    empty_ids = (
-        Union.objects.annotate(n=Count("conferences", distinct=True))
-        .filter(n=0)
-        .values("pk")
-    )
-    return Union.objects.filter(Q(pk__in=linked.values("pk")) | Q(pk__in=empty_ids)).distinct()
+    denomination = get_active_denomination(request)
+    empty = Union.objects.annotate(n=Count("conferences", distinct=True)).filter(n=0)
+    if denomination:
+        empty = empty.filter(general_conference__denomination=denomination)
+    else:
+        empty = empty.none()
+    return Union.objects.filter(
+        Q(pk__in=linked.values("pk")) | Q(pk__in=empty.values("pk"))
+    ).distinct()
 
 
 def scoped_general_conferences(request):
@@ -141,15 +144,16 @@ def scoped_general_conferences(request):
     )
     if not _include_unattached_org_roots(request.user):
         return linked.distinct()
-    empty_ids = (
-        GeneralConference.objects.annotate(
-            n=Count("unions__conferences", distinct=True)
-        )
-        .filter(n=0)
-        .values("pk")
-    )
+    denomination = get_active_denomination(request)
+    empty = GeneralConference.objects.annotate(
+        n=Count("unions__conferences", distinct=True)
+    ).filter(n=0)
+    if denomination:
+        empty = empty.filter(denomination=denomination)
+    else:
+        empty = empty.none()
     return GeneralConference.objects.filter(
-        Q(pk__in=linked.values("pk")) | Q(pk__in=empty_ids)
+        Q(pk__in=linked.values("pk")) | Q(pk__in=empty.values("pk"))
     ).distinct()
 
 

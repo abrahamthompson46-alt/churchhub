@@ -54,6 +54,7 @@ from .forms import (
     MemberForm,
     MemberGiftForm,
     MemberLookupOptionForm,
+    MemberMergeForm,
     MemberTransferForm,
     OccupationForm,
     RecordFilterForm,
@@ -102,6 +103,7 @@ from .services import (
     export_directory_rows,
     get_member_directory_stats,
     log_member_audit,
+    merge_members,
     reject_transfer,
     request_transfer,
     save_department,
@@ -243,6 +245,7 @@ def member_detail(request, member_id):
         "welfare_summary": welfare_summary,
         "show_welfare": show_welfare,
         "can_manage": can_manage_members(request.user),
+        "can_edit_members": can_edit_members(request.user),
         "breadcrumbs": [
             {"label": "Members", "url": "/members/"},
             {"label": member.full_name},
@@ -396,6 +399,36 @@ def edit(request, member_id):
                 {"label": member.full_name, "url": f"/members/{member.pk}/"},
                 {"label": "Edit"},
             ],
+        },
+    )
+
+
+@login_required
+def member_merge(request, member_id):
+    require_edit_members(request)
+    church = require_church(request)
+    keeper = selectors.member_for_request(request, member_id)
+    if keeper.church_id != church.pk:
+        raise PermissionDenied
+    form = MemberMergeForm(request.POST or None, keeper=keeper)
+    if request.method == "POST" and form.is_valid():
+        try:
+            merge_members(
+                keeper,
+                form.cleaned_data["duplicate"],
+                performed_by=request.user,
+            )
+            flash_success(request, f"Merged into {keeper.full_name}. The duplicate is now a former member.")
+            return redirect("members:detail", member_id=keeper.pk)
+        except ValidationError as exc:
+            flash_exception(request, exc)
+    return render(
+        request,
+        "members/merge_form.html",
+        {
+            "form": form,
+            "member": keeper,
+            "title": f"Merge into {keeper.full_name}",
         },
     )
 

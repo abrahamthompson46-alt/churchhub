@@ -795,3 +795,29 @@ class LeadershipRoleForm(forms.ModelForm):
         if self.church and department and department.church_id != self.church.pk:
             raise forms.ValidationError("Department must belong to this church.")
         return cleaned
+
+
+class MemberMergeForm(forms.Form):
+    duplicate = forms.ModelChoiceField(
+        queryset=Member.objects.none(),
+        label="Duplicate to retire",
+        widget=forms.Select(attrs=select_attrs()),
+    )
+
+    def __init__(self, *args, keeper=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.keeper = keeper
+        if not keeper:
+            return
+        self.fields["duplicate"].queryset = (
+            Member.objects.filter(church_id=keeper.church_id)
+            .exclude(pk=keeper.pk)
+            .exclude(membership_status=MembershipStatus.FORMER)
+            .order_by("last_name", "first_name")
+        )
+
+    def clean_duplicate(self):
+        duplicate = self.cleaned_data["duplicate"]
+        if self.keeper and duplicate.church_id != self.keeper.church_id:
+            raise forms.ValidationError("Both members must belong to the same church.")
+        return duplicate

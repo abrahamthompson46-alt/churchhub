@@ -26,6 +26,7 @@ from members.services import (
     cancel_transfer,
     complete_transfer,
     create_member,
+    merge_members,
     reject_transfer,
     request_transfer,
     user_can_view_transfer,
@@ -167,6 +168,42 @@ class ServiceTests(MembersTestMixin, TestCase):
         with self.assertRaises(PermissionDenied):
             complete_transfer(transfer, self.source_user)
 
+    def test_merge_members_retires_duplicate_in_same_church(self):
+        duplicate = Member.objects.create(
+            church=self.church,
+            first_name="Jane",
+            last_name="Duplicate",
+            gender=Gender.FEMALE,
+            phone="0244999000",
+        )
+        Record.objects.create(
+            church=self.church,
+            member=duplicate,
+            record_type=RecordType.OTHER,
+            title="Note",
+            event_date=date.today(),
+        )
+        merge_members(self.member, duplicate, performed_by=self.source_user)
+        duplicate.refresh_from_db()
+        self.assertEqual(duplicate.membership_status, MembershipStatus.FORMER)
+        self.assertEqual(duplicate.phone, "")
+        self.assertTrue(Record.objects.filter(member=self.member, title="Note").exists())
+        self.assertTrue(
+            MemberAuditLog.objects.filter(
+                member=self.member, action="MEMBER_MERGE"
+            ).exists()
+        )
+
+    def test_merge_members_rejects_cross_church(self):
+        other = Member.objects.create(
+            church=self.other_church,
+            first_name="Other",
+            last_name="Person",
+            gender=Gender.MALE,
+        )
+        with self.assertRaises(ValidationError):
+            merge_members(self.member, other, performed_by=self.source_user)
+
     def test_create_member_rejects_duplicate_phone(self):
         with self.assertRaises(ValidationError):
             create_member(
@@ -226,6 +263,23 @@ class ViewTests(MembersTestMixin, TestCase):
         self.assertContains(response, "Youth")
         self.assertContains(response, 'href="tel:0244111000"')
         self.assertContains(response, ">Call</a>")
+        self.assertContains(response, reverse("members:merge", kwargs={"member_id": self.member.pk}))
+
+    def test_merge_view_retires_duplicate(self):
+        self.client.login(username="secretary", password="pass12345")
+        duplicate = Member.objects.create(
+            church=self.church,
+            first_name="Ann",
+            last_name="Twin",
+            gender=Gender.FEMALE,
+        )
+        response = self.client.post(
+            reverse("members:merge", kwargs={"member_id": self.member.pk}),
+            {"duplicate": str(duplicate.pk)},
+        )
+        self.assertEqual(response.status_code, 302)
+        duplicate.refresh_from_db()
+        self.assertEqual(duplicate.membership_status, MembershipStatus.FORMER)
 
     def test_add_member_uses_compact_field_grid(self):
         self.client.login(username="secretary", password="pass12345")

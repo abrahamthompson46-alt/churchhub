@@ -666,6 +666,11 @@ def general_conference_create(request):
     form = GeneralConferenceForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         gc = form.save(commit=False)
+        from church_system.denomination_scope import get_active_denomination
+
+        denomination = get_active_denomination(request)
+        if denomination and not gc.denomination_id:
+            gc.denomination = denomination
         repo.save_general_conference(gc)
         log_org_audit("CREATE", gc, performed_by=request.user, ip_address=get_client_ip(request))
         flash_success(request, f"General Conference “{gc.name}” created.")

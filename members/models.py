@@ -1034,6 +1034,7 @@ class MemberAuditLog(models.Model):
         ("GROUP_LEAVE", "Care Group Member Removed"),
         ("GROUP_PAIR", "Care Partnership Created"),
         ("GROUP_UNPAIR", "Care Partnership Ended"),
+        ("MEMBER_MERGE", "Member Merged"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

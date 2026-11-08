@@ -41,6 +41,7 @@ class ConferenceForm(DenominationScopedFormMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         if request:
             self.apply_denomination_scope(request)
+            self.fields["union"].queryset = selectors.scoped_unions(request)
             from church_system.denomination_scope import get_active_denomination
 
             denomination = get_active_denomination(request)

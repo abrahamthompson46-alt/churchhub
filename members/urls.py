@@ -14,6 +14,7 @@ urlpatterns = [
     path("visitors/<uuid:pk>/convert/", views.visitor_convert, name="visitor_convert"),
     path("<uuid:member_id>/", views.member_detail, name="detail"),
     path("<uuid:member_id>/export/", views.member_export, name="member_export"),
+    path("<uuid:member_id>/merge/", views.member_merge, name="merge"),
     path("edit/<uuid:member_id>/", views.edit, name="edit"),
     path("timeline/<uuid:member_id>/", views.member_timeline, name="timeline"),
     path("records/", views.record_list, name="record_list"),

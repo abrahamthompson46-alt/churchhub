@@ -1,4 +1,4 @@
-"""Full-version activation requests from expired churches (in-app, no email)."""
+"""Full-version activation requests from expired churches."""
 
 from __future__ import annotations
 
@@ -318,4 +318,7 @@ def submit_activation_request(*, church, subscription, user, cleaned_data, reque
             )
 
     _notify_platform_operators(activation_request)
+    from sitecontrol.commercial_notifications import schedule_payment_request_notification
+
+    schedule_payment_request_notification(activation_request)
     return activation_request

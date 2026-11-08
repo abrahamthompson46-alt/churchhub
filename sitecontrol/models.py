@@ -496,6 +496,7 @@ class PlatformAuditLog(models.Model):
         ("MARKETING_LEAD_EXPORT", "Marketing Leads Exported"),
         ("MARKETING_LEAD_ANONYMIZE", "Marketing Lead Anonymized"),
         ("ACTIVATION_REQUEST", "Full Version Activation Requested"),
+        ("COMMERCIAL_NOTIFY", "Owner Demo or Payment Email"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

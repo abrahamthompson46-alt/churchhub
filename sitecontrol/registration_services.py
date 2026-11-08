@@ -347,7 +347,9 @@ def submit_tenant_application(data, ip_address=None):
 
     if public_demo_auto_provision_enabled():
         application, _church, _user, _sub = auto_provision_public_demo(application, password)
-        return application
+    from sitecontrol.commercial_notifications import schedule_demo_request_notification
+
+    schedule_demo_request_notification(application)
     return application
 
 

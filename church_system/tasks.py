@@ -52,6 +52,22 @@ def send_invitation_email_task(self, invitation_id):
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_commercial_notification_task(self, kind, record_id):
+    from sitecontrol.commercial_notifications import deliver_commercial_notification
+
+    try:
+        sent = deliver_commercial_notification(kind, record_id, raise_on_error=True)
+    except Exception as exc:
+        logger.warning(
+            "Commercial notification task failed for %s %s; retrying.",
+            kind,
+            record_id,
+        )
+        raise self.retry(exc=exc)
+    return {"status": "sent" if sent else "skipped", "kind": kind, "record_id": str(record_id)}
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_marketing_lead_notification_task(self, lead_id):
     from sitecontrol.marketing_services import deliver_lead_notification
 

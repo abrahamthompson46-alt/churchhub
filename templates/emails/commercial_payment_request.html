@@ -1,0 +1,15 @@
+{% extends "emails/base_email.html" %}
+
+{% block email_title %}Payment reported — {{ site_name }}{% endblock %}
+
+{% block email_content %}
+<h1 style="margin:0 0 16px;font-size:22px;color:#1e293b;">Tenant payment reported</h1>
+<p style="margin:0 0 16px;color:#334155;">A church submitted a payment reference for a paid plan. Activate only after you confirm the funds.</p>
+<table role="presentation" width="100%" style="font-size:14px;color:#334155;">
+  <tr><td style="padding:6px 0;font-weight:600;width:130px;">Church</td><td>{{ activation.church_name }}</td></tr>
+  <tr><td style="padding:6px 0;font-weight:600;">Contact</td><td>{{ activation.contact_name }} · {{ activation.contact_email }}</td></tr>
+  <tr><td style="padding:6px 0;font-weight:600;">Plan</td><td>{{ activation.plan_name|default:"—" }}{% if activation.amount is not None %} · {{ activation.currency }} {{ activation.amount }} / {{ activation.get_billing_interval_display }}{% endif %}</td></tr>
+  <tr><td style="padding:6px 0;font-weight:600;">Reference</td><td>{{ activation.payment_reference }}</td></tr>
+</table>
+{% include "emails/partials/primary_button.html" with button_url=detail_url button_label="Review payment request" %}
+{% endblock %}

@@ -123,7 +123,7 @@ Critical for reconstructing why a user could (or could not) perform an action. S
 
 **Model:** `sitecontrol.PlatformAuditLog` — **immutable**
 
-Covers (non-exhaustive): settings/plan/subscription/tenant lifecycle, operator changes, maintenance, registration applications, provisioning, payment methods, denomination admin, owner marketing settings/campaigns/leads/assets, audit export, email tests, **IMPERSONATE_START/END**, **BREAKGLASS_GRANT**.
+Covers (non-exhaustive): settings/plan/subscription/tenant lifecycle, operator changes, maintenance, registration applications, provisioning, payment methods, denomination admin, owner marketing settings/campaigns/leads/assets, owner demo/payment email (`COMMERCIAL_NOTIFY`), audit export, email tests, **IMPERSONATE_START/END**, **BREAKGLASS_GRANT**.
 
 Writer: `sitecontrol.services.log_platform_action` (and related services).
 

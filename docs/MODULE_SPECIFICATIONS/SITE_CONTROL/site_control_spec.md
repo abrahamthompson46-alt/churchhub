@@ -48,7 +48,7 @@ erDiagram
 - **PlatformAuditLog** — immutable-style platform actions  
 - **PlatformAnnouncement** — platform banner content  
 - **TenantApplication** — public apply workflow
-- **SubscriptionActivationRequest** — in-app full-version request (choose active plan with catalog prices, pay confirmation, monthly/yearly amount, optional receipt, duplicate payment-reference block; notifies platform operators). **Record payment** applies `requested_plan` and billing interval onto `TenantSubscription`.  
+- **SubscriptionActivationRequest** — in-app full-version request (choose active plan with catalog prices, pay confirmation, monthly/yearly amount, optional receipt, duplicate payment-reference block; notifies platform operators in-app and emails the owner inbox). **Record payment** applies `requested_plan` and billing interval onto `TenantSubscription`.  
 - **Denomination** — SaaS isolation wall, terminology, branding/seeds; `allow_institution_branding` (default True) gates Super Admin self-service identity branding  
 - **MarketingSettings** — singleton inquiry, consent, privacy, retention, and sales-notification controls
 - **MarketingCampaign** — owner-created attribution campaigns and tracked inquiry URLs
@@ -76,6 +76,7 @@ erDiagram
 13. Only closed leads may be anonymized. Retention runs anonymize closed leads older than the configured period; lead CSV exports and anonymization are owner-only and audited.
 14. Marketing assets are HTTPS metadata links only; ChurchHub does not expose uploaded collateral through private media.
 15. Platform owners control `Denomination.allow_institution_branding` (default True). When enabled, institution Super Admins may update logo, display name, tagline, and colors via `/accounts/settings/branding/` for their own denomination only.
+16. Demo `/apply/` submissions and tenant “I have paid” activation requests email the owner after commit (`sitecontrol.commercial_notifications`). Inbox: `MarketingSettings.sales_notification_email`, else non-placeholder `SiteSettings.support_email`, else active platform operator emails. SMTP via `send_platform_email`. Signup is not blocked if mail fails.
 
 ---
 
@@ -96,6 +97,7 @@ erDiagram
 | `marketing_selectors.py` | Campaign/lead/asset reads and dashboard aggregates |
 | `marketing_repositories.py` | Marketing persistence helpers |
 | `marketing_services.py` | Attribution, inquiry submission, throttling, URLs and notifications |
+| `commercial_notifications.py` | Owner email for demo applications and tenant payment reports |
 
 **Layering (P1-2):** Views → services → selectors/repositories → models. Views/forms handle HTTP and forms only; ModelForm CRUD uses `commit=False` + repositories. Platform vs institution lanes, denomination wall, maintenance, middleware, and public `/apply/` are unchanged.
 

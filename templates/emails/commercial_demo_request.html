@@ -1,0 +1,18 @@
+{% extends "emails/base_email.html" %}
+
+{% block email_title %}Demo request — {{ site_name }}{% endblock %}
+
+{% block email_content %}
+<h1 style="margin:0 0 16px;font-size:22px;color:#1e293b;">Demo account request</h1>
+<p style="margin:0 0 16px;color:#334155;">
+  {% if auto_provisioned %}A church started a public demo.{% else %}A church asked for a demo workspace (awaiting review).{% endif %}
+</p>
+<table role="presentation" width="100%" style="font-size:14px;color:#334155;">
+  <tr><td style="padding:6px 0;font-weight:600;width:130px;">Church</td><td>{{ application.church_name }} ({{ application.church_code }})</td></tr>
+  <tr><td style="padding:6px 0;font-weight:600;">Contact</td><td>{{ application.contact_name }}</td></tr>
+  <tr><td style="padding:6px 0;font-weight:600;">Email</td><td>{{ application.contact_email }}</td></tr>
+  <tr><td style="padding:6px 0;font-weight:600;">Phone</td><td>{{ application.contact_phone|default:"—" }}</td></tr>
+  <tr><td style="padding:6px 0;font-weight:600;">Status</td><td>{{ application.get_status_display }}</td></tr>
+</table>
+{% include "emails/partials/primary_button.html" with button_url=detail_url button_label="Open application" %}
+{% endblock %}

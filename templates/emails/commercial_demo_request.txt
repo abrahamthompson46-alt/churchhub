@@ -1,0 +1,11 @@
+Demo account request — {{ site_name }}
+
+{% if auto_provisioned %}A church started a public demo.{% else %}A church asked for a demo workspace (awaiting review).{% endif %}
+
+Church: {{ application.church_name }} ({{ application.church_code }})
+Contact: {{ application.contact_name }}
+Email: {{ application.contact_email }}
+Phone: {{ application.contact_phone|default:"—" }}
+Status: {{ application.get_status_display }}
+
+Open: {{ detail_url }}

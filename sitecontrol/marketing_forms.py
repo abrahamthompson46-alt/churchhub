@@ -44,6 +44,13 @@ class MarketingSettingsForm(forms.ModelForm):
             ),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["sales_notification_email"].help_text = (
+            "Also used for demo-account requests and tenant payment reports. "
+            "If empty, ChurchHub uses Platform → Settings support email, then operator emails."
+        )
+
     def clean_marketing_site_url(self):
         return _require_https(self.cleaned_data.get("marketing_site_url"))
 

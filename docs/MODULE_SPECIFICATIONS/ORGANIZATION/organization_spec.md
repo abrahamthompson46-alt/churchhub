@@ -173,6 +173,7 @@ No app-local `permissions.py`. Uses:
 - Conference code reuse blocked across denominations when resolving/creating.
 - Hierarchy UI respects denomination `level_enabled` where configured.
 - Financial provisioning sets `financials_provisioned`.
+- Denomination-scoped admins (`SUPER_ADMIN` / `GENERAL_OVERSEER`) can see General Conferences and Unions that do not yet have conferences, so a newly created GC or Union is visible on its detail page and the hierarchy. Conference-and-below scopes still only see units linked through conferences in scope. These rows have no denomination FK (**Recommended:** attach denomination at GC/Union).
 
 ---
 

@@ -98,6 +98,13 @@ def scoped_churches(request, active_only=False):
     return qs.order_by("name")
 
 
+def _include_unattached_org_roots(user):
+    """Denomination-wide admins may see GC/Union rows that have no conferences yet."""
+    from permissions.org_scope import OrgScopeLevel, infer_scope_level
+
+    return infer_scope_level(user) == OrgScopeLevel.DENOMINATION
+
+
 def scoped_unions(request):
     from permissions.org_scope import OrgScopeLevel, infer_scope_level
 
@@ -108,7 +115,15 @@ def scoped_unions(request):
         )
     if level == OrgScopeLevel.UNION and request.user.scope_union_id:
         return Union.objects.filter(pk=request.user.scope_union_id)
-    return Union.objects.filter(conferences__in=scoped_conferences(request)).distinct()
+    linked = Union.objects.filter(conferences__in=scoped_conferences(request))
+    if not _include_unattached_org_roots(request.user):
+        return linked.distinct()
+    empty_ids = (
+        Union.objects.annotate(n=Count("conferences", distinct=True))
+        .filter(n=0)
+        .values("pk")
+    )
+    return Union.objects.filter(Q(pk__in=linked.values("pk")) | Q(pk__in=empty_ids)).distinct()
 
 
 def scoped_general_conferences(request):
@@ -121,8 +136,20 @@ def scoped_general_conferences(request):
         return GeneralConference.objects.filter(
             unions__pk=request.user.scope_union_id
         ).distinct()
-    return GeneralConference.objects.filter(
+    linked = GeneralConference.objects.filter(
         unions__conferences__in=scoped_conferences(request)
+    )
+    if not _include_unattached_org_roots(request.user):
+        return linked.distinct()
+    empty_ids = (
+        GeneralConference.objects.annotate(
+            n=Count("unions__conferences", distinct=True)
+        )
+        .filter(n=0)
+        .values("pk")
+    )
+    return GeneralConference.objects.filter(
+        Q(pk__in=linked.values("pk")) | Q(pk__in=empty_ids)
     ).distinct()
 
 
@@ -155,15 +182,31 @@ def hierarchy_tree_prefetch(conf_base):
 
 
 def hierarchy_general_conferences(request, conf_base):
-    unions = Union.objects.filter(conferences__in=conf_base).distinct().prefetch_related(
+    union_ids = set(
+        Union.objects.filter(conferences__in=conf_base).values_list("pk", flat=True)
+    )
+    gcs = scoped_general_conferences(request)
+    if _include_unattached_org_roots(request.user):
+        union_ids.update(
+            Union.objects.annotate(n=Count("conferences", distinct=True))
+            .filter(n=0, general_conference__in=gcs)
+            .values_list("pk", flat=True)
+        )
+        gc_ids = set(gcs.filter(unions__in=union_ids).values_list("pk", flat=True))
+        gc_ids.update(
+            GeneralConference.objects.filter(pk__in=gcs.values("pk"))
+            .annotate(n=Count("unions__conferences", distinct=True))
+            .filter(n=0)
+            .values_list("pk", flat=True)
+        )
+        gcs = GeneralConference.objects.filter(pk__in=gc_ids)
+    else:
+        gcs = gcs.filter(unions__in=union_ids).distinct()
+    unions = Union.objects.filter(pk__in=union_ids).prefetch_related(
         Prefetch("conferences", queryset=hierarchy_tree_prefetch(conf_base))
     )
-    return (
-        scoped_general_conferences(request)
-        .filter(unions__in=unions)
-        .distinct()
-        .prefetch_related(Prefetch("unions", queryset=unions))
-        .order_by("name")
+    return gcs.distinct().prefetch_related(Prefetch("unions", queryset=unions)).order_by(
+        "name"
     )
 
 

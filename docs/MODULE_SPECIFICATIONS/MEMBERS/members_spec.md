@@ -217,7 +217,7 @@ stateDiagram-v2
 
 | Step | Rules |
 |------|-------|
-| Request | Sending church selects **Conference → District → Church**. Destinations are other churches in the same denomination (other conferences/districts allowed). If denomination is unset, destinations stay in the sending conference. Not same church; not already Transferred; no existing Pending; block cross-denomination when both denoms set. Completing remains the receiving church. |
+| Request | Sending church selects **Conference → District → Church**. Destinations are other churches in the same denomination (other conferences/districts allowed). If denomination is unset, destinations stay in the sending conference. Not same church; not already Transferred; no existing Pending; block cross-denomination when both denoms set. Completing remains the receiving church. Transfer form uses the default compact shell (not `form-shell--wide`); destination and reason controls stay short/medium, not full-page width. |
 | Desk | List filters Incoming/Outgoing and Pending/Completed/Rejected/Cancelled. Profile shows a pending badge and hides a second request. Printable letter at `transfer_letter`. |
 | Complete | Pending only; `process_transfers` + dest church in scope; **requester cannot complete**; dest phone/membership-number uniqueness; end leadership at from-church; release care-group membership; TRANSFER records both sides; move church; set Active |
 | Reject | Pending → Rejected; rejection notes required |

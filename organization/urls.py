@@ -7,9 +7,11 @@ app_name = "organization"
 urlpatterns = [
     path("", views.hierarchy_overview, name="hierarchy"),
     path("directory/", views.unit_directory, name="directory"),
+    path("general-conferences/", views.general_conference_create),
     path("general-conferences/add/", views.general_conference_create, name="general_conference_create"),
     path("general-conferences/<uuid:pk>/", views.general_conference_detail, name="general_conference_detail"),
     path("general-conferences/<uuid:pk>/edit/", views.general_conference_edit, name="general_conference_edit"),
+    path("unions/", views.union_create),
     path("unions/add/", views.union_create, name="union_create"),
     path("unions/<uuid:pk>/", views.union_detail, name="union_detail"),
     path("unions/<uuid:pk>/edit/", views.union_edit, name="union_edit"),

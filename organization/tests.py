@@ -10,7 +10,9 @@ from organization.models import (
     Church,
     Conference,
     District,
+    GeneralConference,
     OrganizationAuditLog,
+    Union,
     Zone,
 )
 from organization.services import (
@@ -383,6 +385,57 @@ class ViewTests(OrganizationTestMixin, TestCase):
             reverse("organization:church_transfer", kwargs={"pk": self.church.pk})
         )
         self.assertEqual(response.status_code, 403)
+
+    def test_general_conference_create_then_detail(self):
+        self._login("admin")
+        add = self.client.get(reverse("organization:general_conference_create"))
+        self.assertEqual(add.status_code, 200)
+        response = self.client.post(
+            reverse("organization:general_conference_create"),
+            {"name": "New GC", "code": "NGC1"},
+        )
+        self.assertEqual(response.status_code, 302)
+        gc = GeneralConference.objects.get(code="NGC1")
+        self.assertRedirects(
+            response,
+            reverse("organization:general_conference_detail", kwargs={"pk": gc.pk}),
+        )
+        detail = self.client.get(response.url)
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, "New GC")
+        tree = self.client.get(reverse("organization:hierarchy"))
+        self.assertContains(tree, "New GC")
+
+    def test_union_create_on_empty_general_conference(self):
+        self._login("admin")
+        gc = GeneralConference.objects.create(name="Bare GC", code="BGC1")
+        add = self.client.get(
+            reverse("organization:union_create") + f"?general_conference={gc.pk}"
+        )
+        self.assertEqual(add.status_code, 200)
+        response = self.client.post(
+            reverse("organization:union_create"),
+            {
+                "general_conference": str(gc.pk),
+                "name": "New Union",
+                "code": "NU1",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        union = Union.objects.get(code="NU1")
+        self.assertRedirects(
+            response,
+            reverse("organization:union_detail", kwargs={"pk": union.pk}),
+        )
+        detail = self.client.get(response.url)
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, "New Union")
+
+    def test_general_conferences_index_renders_add_form(self):
+        self._login("admin")
+        response = self.client.get("/organization/general-conferences/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Add General Conference")
 
     def test_church_transfer_by_super_admin(self):
         self._login("admin")

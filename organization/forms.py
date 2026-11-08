@@ -73,6 +73,10 @@ class UnionForm(forms.ModelForm):
 
     def __init__(self, *args, general_conference=None, request=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if request:
+            self.fields["general_conference"].queryset = selectors.scoped_general_conferences(
+                request
+            )
         if general_conference:
             self.fields["general_conference"].queryset = selectors.general_conference_by_pk(
                 general_conference.pk

@@ -1645,11 +1645,11 @@ body.app-body.auth-page {
     max-width: 100%;
 }
 
-/* Multi-column forms: group can fill the cell; short/medium controls stay content-sized */
+/* Multi-column forms: never stretch controls across the full page */
 .row > [class*="col"] > .form-group,
 .row > [class*="col"] .form-group {
     width: 100%;
-    max-width: 100%;
+    max-width: 18rem;
 }
 
 .row > [class*="col"] .form-control,
@@ -1667,9 +1667,12 @@ body.app-body.auth-page {
 }
 
 .row > [class*="col"] .form-group--wide,
-.row > [class*="col"] .form-group--full,
 .row > [class*="col"] .form-group:has(textarea) {
-    max-width: 100%;
+    max-width: 28rem;
+}
+
+.row > [class*="col"] .form-group--full {
+    max-width: 32rem;
 }
 
 .row > [class*="col"] textarea.form-control {
@@ -3542,7 +3545,7 @@ main .page-container,
 .compact-form form:not(.filter-form):not(.row):not(:has(> .row)),
 .card-body > form:not(.filter-form):not(.row):not(.d-inline):not(:has(> .row)) {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 18rem));
     column-gap: 1.25rem;
     row-gap: 0;
     align-items: start;
@@ -3584,7 +3587,33 @@ main .page-container,
 .card-body > form:not(.filter-form) > .alert,
 .card-body > form:not(.filter-form) > .mb-3:has(textarea) {
     grid-column: 1 / -1;
+}
+
+.form-card-inner form > .form-actions,
+.form-card-inner form > .d-flex,
+.form-card-inner form > .row,
+.compact-form form > .form-actions,
+.compact-form form > .d-flex,
+.compact-form form > .row,
+.card-body > form:not(.filter-form) > .form-actions,
+.card-body > form:not(.filter-form) > .d-flex.gap-2,
+.card-body > form:not(.filter-form) > .d-flex.gap-3,
+.card-body > form:not(.filter-form) > .row,
+.card-body > form:not(.filter-form) > hr,
+.card-body > form:not(.filter-form) > .alert {
     max-width: 100%;
+    width: 100%;
+}
+
+.form-group--wide,
+.form-group:has(textarea),
+.card-body > form:not(.filter-form) > .mb-3:has(textarea) {
+    max-width: 28rem;
+    width: 100%;
+}
+
+.form-group--full {
+    max-width: 32rem;
     width: 100%;
 }
 

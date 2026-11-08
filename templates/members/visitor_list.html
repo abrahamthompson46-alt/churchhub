@@ -6,11 +6,12 @@
 <div class="page-container page-shell">
     {% if can_manage %}
     {% url 'members:visitor_add' as add_url %}
-    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Visitors" page_description="Track guests and follow-up status." action_url=add_url action_label="Add Visitor" action_icon="bi-person-plus" %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Visitors" action_url=add_url action_label="Add Visitor" action_icon="bi-person-plus" %}
     {% else %}
-    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Visitors" page_description="Track guests and follow-up status." %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Visitors" %}
     {% endif %}
 
+    {% include "includes/filter_disclosure_start.html" with filter_open=visitors %}
     <div class="filter-bar filter-bar--sticky">
         <form method="get" class="filter-form">
             <div class="filter-field">
@@ -34,6 +35,7 @@
             </div>
         </form>
     </div>
+    {% include "includes/filter_disclosure_end.html" %}
 
     <div class="data-card">
         <div class="table-responsive">
@@ -69,12 +71,7 @@
                     </tr>
                     {% empty %}
                     <tr><td colspan="6">
-                        {% if can_manage %}
-                        {% url 'members:visitor_add' as add_url %}
-                        {% include "includes/empty_state.html" with icon="bi-person-heart" message="No visitors recorded yet." action_url=add_url action_label="Add visitor" %}
-                        {% else %}
                         {% include "includes/empty_state.html" with icon="bi-person-heart" message="No visitors recorded yet." %}
-                        {% endif %}
                     </td></tr>
                     {% endfor %}
                 </tbody>

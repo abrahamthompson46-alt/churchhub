@@ -141,11 +141,7 @@
                     </tr>
                     {% empty %}
                     <tr><td colspan="8">
-                        {% if can_manage_budgets %}
-                        {% include "includes/empty_state.html" with icon="bi-calculator" message="No budget lines for this year and scope." action_url=create_url action_label="Add budget line" %}
-                        {% else %}
                         {% include "includes/empty_state.html" with icon="bi-calculator" message="No budget lines for this year and scope." %}
-                        {% endif %}
                     </td></tr>
                     {% endfor %}
                 </tbody>
@@ -183,7 +179,7 @@
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="6">{% if can_manage_budgets %}{% include "includes/empty_state.html" with icon="bi-clipboard-data" message="No budget lines for this year and level." action_url=create_url action_label="Add Line" compact=True %}{% else %}{% include "includes/empty_state.html" with icon="bi-clipboard-data" message="No budget lines for this year and level." compact=True %}{% endif %}</td></tr>
+                    <tr><td colspan="6">{% include "includes/empty_state.html" with icon="bi-clipboard-data" message="No budget lines for this year and level." compact=True %}</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

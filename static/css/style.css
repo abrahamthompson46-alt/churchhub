@@ -1283,6 +1283,35 @@ body.app-body.auth-page {
     box-shadow: var(--ch-shadow-sm);
 }
 
+.filter-disclosure {
+    margin-bottom: 1rem;
+}
+
+.filter-disclosure__summary {
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ch-muted);
+    padding: 0.35rem 0;
+    list-style: none;
+}
+
+.filter-disclosure__summary::-webkit-details-marker {
+    display: none;
+}
+
+.filter-disclosure .filter-bar {
+    margin-bottom: 0;
+}
+
+.filter-disclosure--pinned {
+    margin-bottom: 0;
+}
+
+.filter-disclosure--pinned > .filter-disclosure__summary {
+    display: none;
+}
+
 .filter-form,
 .filter-bar form:not(.row):not(.d-inline) {
     display: flex;

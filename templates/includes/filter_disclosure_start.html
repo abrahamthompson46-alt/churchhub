@@ -1,0 +1,3 @@
+{% comment %}Open and pin filters when the list has rows or an active query.{% endcomment %}
+<details class="filter-disclosure{% if filter_open or request.GET %} filter-disclosure--pinned{% endif %}"{% if filter_open or request.GET %} open{% endif %}>
+<summary class="filter-disclosure__summary">Filters</summary>

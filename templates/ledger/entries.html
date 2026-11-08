@@ -8,9 +8,9 @@
     {% url 'ledger:entry' as new_entry_url %}
     {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
     {% if can_manage_ledger_entries %}
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Journals" page_description="Transactions posted through the category-driven ledger workflow." action_url=new_entry_url action_label="Journal Entry" action_icon="bi-journal-plus" %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Journals" action_url=new_entry_url action_label="Journal Entry" action_icon="bi-journal-plus" %}
     {% else %}
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Ledger Entries" page_description="Transactions posted through the category-driven ledger workflow." %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Ledger Entries" %}
     {% endif %}
 
     <div class="filter-bar">
@@ -106,11 +106,7 @@
                 </tr>
                 {% empty %}
                 <tr><td colspan="8">
-                    {% if can_manage_ledger_entries %}
-                    {% include "includes/empty_state.html" with icon="bi-journal" message="No ledger entries match your filters." action_url=new_entry_url action_label="New entry" %}
-                    {% else %}
                     {% include "includes/empty_state.html" with icon="bi-journal" message="No ledger entries match your filters." %}
-                    {% endif %}
                 </td></tr>
                 {% endfor %}
             </tbody>

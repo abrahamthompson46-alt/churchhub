@@ -25,12 +25,7 @@
                     </tr>
                     {% empty %}
                     <tr><td colspan="4">
-                        {% if can_manage_families %}
-                        {% url 'members:family_add' as family_url %}
-                        {% include "includes/empty_state.html" with icon="bi-house-heart" message="No families yet." action_url=family_url action_label="Add family" %}
-                        {% else %}
                         {% include "includes/empty_state.html" with icon="bi-house-heart" message="No families yet." %}
-                        {% endif %}
                     </td></tr>
                     {% endfor %}
                 </tbody>

@@ -192,3 +192,11 @@ class MeetingsTests(TestCase):
         )
         self.assertFalse(form.is_valid())
         self.assertIn("join_url", form.errors)
+
+    def test_legacy_create_urls_redirect_to_add(self):
+        response = self.client.get("/meetings/create/")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("meetings:create"))
+        response = self.client.get("/meetings/attendance/create/")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("meetings:attendance_create"))

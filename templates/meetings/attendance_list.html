@@ -6,9 +6,9 @@
 <div class="page-container page-shell">
     {% if can_manage_attendance %}
     {% url 'meetings:attendance_create' as event_url %}
-    {% include "includes/page_header.html" with page_subtitle="Operations" page_title="Attendance Events" page_description="Worship and event roll call." action_url=event_url action_label="New Event" %}
+    {% include "includes/page_header.html" with page_subtitle="Operations" page_title="Attendance Events" action_url=event_url action_label="New Event" %}
     {% else %}
-    {% include "includes/page_header.html" with page_subtitle="Operations" page_title="Attendance Events" page_description="Worship and event roll call." %}
+    {% include "includes/page_header.html" with page_subtitle="Operations" page_title="Attendance Events" %}
     {% endif %}
 
     <div class="data-card">
@@ -26,12 +26,7 @@
                     </tr>
                     {% empty %}
                     <tr><td colspan="5">
-                        {% if can_manage_attendance %}
-                        {% url 'meetings:attendance_create' as event_url %}
-                        {% include "includes/empty_state.html" with icon="bi-clipboard-check" message="No attendance events yet." action_url=event_url action_label="New event" %}
-                        {% else %}
                         {% include "includes/empty_state.html" with icon="bi-clipboard-check" message="No attendance events yet." %}
-                        {% endif %}
                     </td></tr>
                     {% endfor %}
                 </tbody>

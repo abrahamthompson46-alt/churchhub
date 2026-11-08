@@ -6,11 +6,12 @@
 <div class="page-container">
     {% if can_manage_meetings %}
     {% url 'meetings:create' as schedule_url %}
-    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Members" page_title="Meetings" page_description="Search board and church meetings, minutes, and decisions." action_url=schedule_url action_label="Schedule" action_icon="bi-plus-lg" %}
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Members" page_title="Meetings" action_url=schedule_url action_label="Schedule" action_icon="bi-plus-lg" %}
     {% else %}
-    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Members" page_title="Meetings" page_description="Search board and church meetings, minutes, and decisions." %}
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Members" page_title="Meetings" %}
     {% endif %}
 
+    {% include "includes/filter_disclosure_start.html" with filter_open=meetings %}
     <form method="get" class="filter-bar mb-3">
         <div class="row g-2 align-items-end">
             <div class="col-md-3">
@@ -43,6 +44,7 @@
             </div>
         </div>
     </form>
+    {% include "includes/filter_disclosure_end.html" %}
 
     {% if pending_count %}
     <div class="alert alert-warning py-2 small mb-3 d-flex justify-content-between align-items-center">
@@ -82,12 +84,7 @@
                     </tr>
                     {% empty %}
                     <tr><td colspan="7">
-                        {% if can_manage_meetings %}
-                        {% url 'meetings:create' as schedule_url %}
                         {% include "includes/empty_state.html" with icon="bi-calendar-event" message="No meetings match your search." %}
-                        {% else %}
-                        {% include "includes/empty_state.html" with icon="bi-calendar-event" message="No meetings match your search." %}
-                        {% endif %}
                     </td></tr>
                     {% endfor %}
                 </tbody>

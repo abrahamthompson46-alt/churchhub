@@ -33,6 +33,7 @@
         <div class="metric-card metric-card--warning"><span class="metric-label">Transferred Out</span><span class="metric-value">{{ stats.transferred }}</span></div>
     </div>
 
+    {% include "includes/filter_disclosure_start.html" with filter_open=members %}
     <div class="filter-bar filter-bar--sticky">
         <form method="get" class="filter-form">
             <div class="filter-field">
@@ -71,6 +72,7 @@
         </div>
         {% endif %}
     </div>
+    {% include "includes/filter_disclosure_end.html" %}
 
     <div class="data-card">
         <div class="table-responsive">
@@ -117,12 +119,7 @@
                     {% empty %}
                     <tr>
                         <td colspan="6">
-                            {% if can_add_members %}
-                            {% url 'members:add' as add_url %}
-                            {% include "includes/empty_state.html" with icon="bi-people" message="No members found." action_url=add_url action_label="Add member" %}
-                            {% else %}
                             {% include "includes/empty_state.html" with icon="bi-people" message="No members found." %}
-                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

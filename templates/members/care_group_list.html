@@ -6,12 +6,12 @@
 <div class="page-container">
     {% if can_manage %}
     {% url 'members:care_group_add' as add_url %}
-    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Care groups" page_description="Location groups for shepherding. Search and add members, then pair them one to one inside the same group." action_url=add_url action_label="Add care group" %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Care groups" action_url=add_url action_label="Add care group" %}
     <div class="d-flex gap-2 mb-3">
         <a href="{% url 'members:care_group_desk' %}" class="btn btn-outline-secondary btn-sm">Unpaired desk</a>
     </div>
     {% else %}
-    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Care groups" page_description="Location groups for shepherding." %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Care groups" %}
     {% endif %}
 
     <div class="row g-4">
@@ -64,12 +64,7 @@
                             </tr>
                             {% empty %}
                             <tr><td colspan="6">
-                                {% if can_manage %}
-                                {% url 'members:care_group_add' as add_url %}
-                                {% include "includes/empty_state.html" with icon="bi-people" message="No care groups yet." action_url=add_url action_label="Add care group" %}
-                                {% else %}
                                 {% include "includes/empty_state.html" with icon="bi-people" message="No care groups yet." %}
-                                {% endif %}
                             </td></tr>
                             {% endfor %}
                         </tbody>

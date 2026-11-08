@@ -6,11 +6,12 @@
 <div class="page-container">
     {% if can_manage_member_records %}
     {% url 'members:record_add' as record_url %}
-    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Member Records" page_description="Baptism, marriage, transfers, and other spiritual records." action_url=record_url action_label="Add Record" %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Member Records" action_url=record_url action_label="Add Record" %}
     {% else %}
-    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Member Records" page_description="Baptism, marriage, transfers, and other spiritual records." %}
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Member Records" %}
     {% endif %}
 
+    {% include "includes/filter_disclosure_start.html" with filter_open=records %}
     <div class="filter-bar filter-bar--sticky mb-3">
         <form method="get" class="filter-form">
             <div class="filter-field">
@@ -39,6 +40,7 @@
             </div>
         </form>
     </div>
+    {% include "includes/filter_disclosure_end.html" %}
 
     <div class="data-card">
         <div class="table-responsive">
@@ -55,12 +57,7 @@
                     </tr>
                     {% empty %}
                     <tr><td colspan="5">
-                        {% if can_manage_member_records %}
-                        {% url 'members:record_add' as record_url %}
-                        {% include "includes/empty_state.html" with icon="bi-journal-text" message="No records match these filters." action_url=record_url action_label="Add record" %}
-                        {% else %}
                         {% include "includes/empty_state.html" with icon="bi-journal-text" message="No records match these filters." %}
-                        {% endif %}
                     </td></tr>
                     {% endfor %}
                 </tbody>

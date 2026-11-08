@@ -30,12 +30,7 @@
                     </tr>
                     {% empty %}
                     <tr><td colspan="4">
-                        {% if can_manage_departments %}
-                        {% url 'members:department_add' as dept_url %}
-                        {% include "includes/empty_state.html" with icon="bi-diagram-2" message="No departments yet." action_url=dept_url action_label="Add department" %}
-                        {% else %}
                         {% include "includes/empty_state.html" with icon="bi-diagram-2" message="No departments yet." %}
-                        {% endif %}
                     </td></tr>
                     {% endfor %}
                 </tbody>

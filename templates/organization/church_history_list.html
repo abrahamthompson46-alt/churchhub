@@ -6,9 +6,9 @@
 <div class="page-container">
     {% if can_manage_church_history %}
     {% url 'organization:church_history_create' as create_url %}
-    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="Church History" page_description="Institutional milestones and events preserved for future reference." action_url=create_url action_label="Add Entry" action_icon="bi-plus-lg" %}
+    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="Church History" action_url=create_url action_label="Add Entry" action_icon="bi-plus-lg" %}
     {% else %}
-    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="Church History" page_description="Institutional milestones and events preserved for future reference." %}
+    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="Church History" %}
     {% endif %}
 
     <form method="get" class="filter-bar mb-3" role="search" aria-label="Search church history">
@@ -98,12 +98,7 @@
                     {% empty %}
                     <tr>
                         <td colspan="6">
-                            {% if can_manage_church_history %}
-                            {% url 'organization:church_history_create' as create_url %}
-                            {% include "includes/empty_state.html" with icon="bi-journal-richtext" message="No church history matches this search." action_url=create_url action_label="Add history entry" %}
-                            {% else %}
                             {% include "includes/empty_state.html" with icon="bi-journal-richtext" message="No church history matches this search." %}
-                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

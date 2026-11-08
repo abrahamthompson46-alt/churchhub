@@ -7,11 +7,12 @@
 <div class="page-container">
     {% if can_create_announcements %}
     {% url 'announcements:create_announcement' as create_url %}
-    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="Announcements" page_description="Approved announcements for your church and hierarchy." action_url=create_url action_label="Create Announcement" %}
+    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="Announcements" action_url=create_url action_label="Create Announcement" %}
     {% else %}
-    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="Announcements" page_description="Approved announcements for your church and hierarchy." %}
+    {% include "includes/page_header.html" with page_subtitle="Church Life" page_title="Announcements" %}
     {% endif %}
 
+    {% include "includes/filter_disclosure_start.html" with filter_open=announcements %}
     <div class="filter-bar">
         <form method="get" class="filter-form">
             <div class="filter-field">
@@ -34,6 +35,7 @@
             </div>
         </form>
     </div>
+    {% include "includes/filter_disclosure_end.html" %}
 
     <div class="announcement-container">
         {% for a in announcements %}
@@ -59,12 +61,7 @@
             {% endif %}
         </article>
         {% empty %}
-        {% if can_create_announcements %}
-        {% url 'announcements:create_announcement' as create_url %}
-        {% include "includes/empty_state.html" with icon="bi-megaphone" message="No announcements yet." action_url=create_url action_label="Create announcement" %}
-        {% else %}
         {% include "includes/empty_state.html" with icon="bi-megaphone" message="No announcements yet." %}
-        {% endif %}
         {% endfor %}
     </div>
 

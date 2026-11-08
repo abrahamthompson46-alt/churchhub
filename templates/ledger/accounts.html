@@ -7,9 +7,9 @@
     {% include "ledger/includes/breadcrumbs.html" with crumbs=breadcrumbs %}
     {% if can_manage_accounts %}
     {% url 'ledger:account_add' as account_add_url %}
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Chart of Accounts" page_description="GL accounts used by posting categories and journal entries." action_url=account_add_url action_label="Add Account" action_icon="bi-plus-lg" %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Chart of Accounts" action_url=account_add_url action_label="Add Account" action_icon="bi-plus-lg" %}
     {% else %}
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Chart of Accounts" page_description="GL accounts used by posting categories and journal entries." %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Chart of Accounts" %}
     {% endif %}
 
     <div class="filter-bar filter-bar--tabs mb-4">
@@ -63,12 +63,7 @@
                 {% empty %}
                 <tr>
                     <td colspan="{% if can_manage_accounts %}5{% else %}4{% endif %}">
-                        {% if can_manage_accounts %}
-                        {% url 'ledger:account_add' as account_add_url %}
-                        {% include "includes/empty_state.html" with icon="bi-journal-bookmark" message="No accounts yet. Seed the ledger or add an account." action_url=account_add_url action_label="Add account" %}
-                        {% else %}
-                        {% include "includes/empty_state.html" with icon="bi-journal-bookmark" message="No accounts configured." %}
-                        {% endif %}
+                        {% include "includes/empty_state.html" with icon="bi-journal-bookmark" message="No accounts yet. Seed the ledger or add an account." %}
                     </td>
                 </tr>
                 {% endfor %}

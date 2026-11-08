@@ -11,6 +11,7 @@
     {% include "includes/page_header.html" with page_subtitle="Fixed Assets" page_title="Asset Register" %}
     {% endif %}
 
+    {% include "includes/filter_disclosure_start.html" with filter_open=assets %}
     <div class="filter-bar filter-bar--sticky">
         <form method="get" class="filter-form">
             <div class="filter-field filter-field--grow">
@@ -27,14 +28,14 @@
                 </select>
             </div>
             <div class="filter-actions">
-                <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+                <button type="submit" class="btn btn-sm btn-outline-secondary">Filter</button>
                 {% if can_export %}
                 <a href="{% url 'assets:asset_export_csv' %}" class="btn btn-sm btn-outline-secondary">Export CSV</a>
                 {% endif %}
-                <a href="{% url 'assets:index' %}" class="btn btn-sm btn-outline-secondary">Dashboard</a>
             </div>
         </form>
     </div>
+    {% include "includes/filter_disclosure_end.html" %}
 
     <div class="data-card">
         <div class="table-responsive">
@@ -64,12 +65,7 @@
                     {% empty %}
                     <tr>
                         <td colspan="7">
-                            {% if can_manage %}
-                            {% url 'assets:asset_create' as create_url %}
-                            {% include "includes/empty_state.html" with icon="bi-box-seam" message="No assets yet." action_url=create_url action_label="Register first asset" %}
-                            {% else %}
                             {% include "includes/empty_state.html" with icon="bi-box-seam" message="No assets yet." %}
-                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

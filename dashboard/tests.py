@@ -437,6 +437,25 @@ class NavigationDensityTests(DashboardTestMixin, TestCase):
         self.assertNotIn("Books setup", control_titles)
         self.assertNotIn("Module policies", control_titles)
 
+    def test_approval_cases_live_under_administration_not_finance(self):
+        from church_system.navigation import get_main_navigation
+
+        admin = User.objects.create_user(
+            username="tabcases",
+            password="pass12345",
+            role=UserRole.SUPER_ADMIN,
+            church=self.church,
+        )
+        nav = get_main_navigation(admin, active_church=self.church)
+        finance = next(item for item in nav if item.get("id") == "finance")
+        finance_labels = [i["label"] for s in finance["sections"] for i in s["items"]]
+        self.assertIn("Pending Approvals", finance_labels)
+        self.assertNotIn("Approval cases", finance_labels)
+        settings = next(item for item in nav if item.get("id") == "settings")
+        control = next(s for s in settings["sections"] if s["title"] == "Controls")
+        control_labels = [i["label"] for i in control["items"]]
+        self.assertIn("Approval cases", control_labels)
+
 
 class ViewTests(DashboardTestMixin, TestCase):
     @classmethod

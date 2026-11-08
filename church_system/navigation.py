@@ -217,8 +217,6 @@ def _finance_sections(user, active_church=None):
         treasury_items.append(_item("Record Expense", "transactions:record_expense", "bi-dash-circle"))
     if can_view_pending_approvals(user):
         treasury_items.append(_item("Pending Approvals", "transactions:pending_approvals", "bi-hourglass-split"))
-    if can_view_approval_cases(user):
-        treasury_items.append(_item("Approval cases", "approvals:case_list", "bi-diagram-3"))
     if can_view_transactions(user):
         treasury_items.append(_item("Transactions", "transactions:transaction_list", "bi-list-check"))
     if can_manage_working_day(user):
@@ -593,6 +591,8 @@ def get_main_navigation(user, active_church=None):
         control_items.append(_item("Risk alerts", "intelligence:alert_list", "bi-exclamation-triangle"))
     if can_manage_risk_policy(user):
         control_items.append(_item("Risk policy", "intelligence:policy", "bi-sliders"))
+    if can_view_approval_cases(user):
+        control_items.append(_item("Approval cases", "approvals:case_list", "bi-diagram-3"))
     if can_manage_approval_policy(user):
         control_items.append(_item("Approval steps", "approvals:policy", "bi-list-ol"))
     if can_manage_approval_delegations(user):

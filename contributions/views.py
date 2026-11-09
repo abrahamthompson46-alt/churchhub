@@ -29,6 +29,7 @@ from .forms import (
     CampaignImportForm,
     ContributionCampaignForm,
     RecordContributionForm,
+    RemitCampaignForm,
 )
 from .import_services import commit_campaign_import, preview_campaign_import
 from . import selectors
@@ -42,6 +43,7 @@ from .services import (
     open_campaign,
     record_bulk_contributions,
     record_member_contribution,
+    remit_district_funeral_campaign,
     save_member_targets,
     update_campaign,
 )
@@ -89,8 +91,12 @@ def _record_required(view_func):
 def campaign_list(request):
     church = require_church(request)
     filter_form = CampaignFilterForm(request.GET or None)
-    status = filter_form.data.get("status") if filter_form.is_valid() else None
-    campaigns = selectors.campaigns_for_church(church, status=status or None)
+    status = None
+    kind = None
+    if filter_form.is_valid():
+        status = filter_form.cleaned_data.get("status") or None
+        kind = filter_form.cleaned_data.get("kind") or None
+    campaigns = selectors.campaigns_for_church(church, status=status, kind=kind)
     rows = []
     for campaign in campaigns:
         summary = build_campaign_summary(campaign)
@@ -111,7 +117,11 @@ def campaign_list(request):
 @_campaign_manage_required
 def campaign_create(request):
     church = require_church(request)
-    form = ContributionCampaignForm(request.POST or None, church=church)
+    form = ContributionCampaignForm(
+        request.POST or None,
+        church=church,
+        initial={"kind": request.GET.get("kind") or None},
+    )
     if request.method == "POST" and form.is_valid():
         try:
             campaign = create_campaign(
@@ -127,6 +137,7 @@ def campaign_create(request):
                 portal_visible=form.cleaned_data["portal_visible"],
                 show_church_progress=form.cleaned_data["show_church_progress"],
                 send_email_reminders=form.cleaned_data["send_email_reminders"],
+                kind=form.cleaned_data["kind"],
             )
             flash_success(request, f"Campaign “{campaign.name}” saved as draft.")
             return redirect("contributions:campaign_detail", pk=campaign.pk)
@@ -210,6 +221,15 @@ def campaign_detail(request, pk):
         return export_table_excel(headers, rows, f"{slug}.xlsx", campaign.name[:31])
 
     recent = selectors.contributions_for_campaign(campaign)[:25]
+    remittances = list(selectors.remittances_for_campaign(campaign)[:20])
+    remit_form = None
+    if campaign.is_district_funeral and can_manage and summary["outstanding_to_district"] > 0:
+        remit_form = RemitCampaignForm(
+            initial={
+                "amount": summary["outstanding_to_district"],
+                "idempotency_key": str(uuid.uuid4()),
+            }
+        )
     return render(
         request,
         "contributions/campaign_detail.html",
@@ -219,12 +239,40 @@ def campaign_detail(request, pk):
             "member_totals": member_totals,
             "non_contributors": non_contributors,
             "recent_contributions": recent,
+            "remittances": remittances,
+            "remit_form": remit_form,
             "record_form": record_form,
             "can_record": can_record,
             "can_manage": can_manage,
             "church": church,
         },
     )
+
+
+@_campaign_manage_required
+@require_POST
+def campaign_remit(request, pk):
+    campaign = selectors.get_campaign_or_404(request, pk)
+    form = RemitCampaignForm(request.POST)
+    if not form.is_valid():
+        flash_error(request, "Could not remit. Check the amount and try again.")
+        return redirect("contributions:campaign_detail", pk=campaign.pk)
+    try:
+        remit_district_funeral_campaign(
+            campaign,
+            performed_by=request.user,
+            amount=form.cleaned_data["amount"],
+            payment_account_type=form.cleaned_data["payment_account_type"],
+            notes=form.cleaned_data.get("notes") or "",
+            idempotency_key=form.cleaned_data["idempotency_key"],
+        )
+        flash_success(
+            request,
+            "Funeral remittance journal posted and awaiting checker approval.",
+        )
+    except ContributionServiceError as exc:
+        flash_exception(request, exc)
+    return redirect("contributions:campaign_detail", pk=campaign.pk)
 
 
 @_record_required

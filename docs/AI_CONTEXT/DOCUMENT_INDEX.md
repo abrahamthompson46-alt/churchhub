@@ -125,6 +125,7 @@ These are the 14 August 2026 audit pack. They do **not** replace `SECURITY/*.md`
 | [LEDGER/ledger_spec.md](../MODULE_SPECIFICATIONS/LEDGER/ledger_spec.md) | `ledger` | Templates + post UI (not a second GL) |
 | [GIVING/giving_spec.md](../MODULE_SPECIFICATIONS/GIVING/giving_spec.md) | `giving` | Read-only; empty models |
 | [REMITTANCE/remittance_spec.md](../MODULE_SPECIFICATIONS/REMITTANCE/remittance_spec.md) | `remittance` | Policies, settlements, welfare |
+| [CONTRIBUTIONS/contributions_spec.md](../MODULE_SPECIFICATIONS/CONTRIBUTIONS/contributions_spec.md) | `contributions` | Campaigns + district funeral holding remits |
 | [PAYROLL/payroll_spec.md](../MODULE_SPECIFICATIONS/PAYROLL/payroll_spec.md) | `payroll` | Runs → PAYROLL journals |
 | [ASSETS/assets_spec.md](../MODULE_SPECIFICATIONS/ASSETS/assets_spec.md) | `assets` | Fixed assets / depreciation |
 | [EVENTS/events_spec.md](../MODULE_SPECIFICATIONS/EVENTS/events_spec.md) | **`meetings`** | No `events` app |

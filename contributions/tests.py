@@ -4,17 +4,21 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import UserRole
-from contributions.models import CampaignStatus, ContributionCampaign, MemberContribution
+from contributions.forms import ContributionCampaignForm
+from contributions.models import CampaignKind, CampaignStatus, ContributionCampaign, MemberContribution
 from contributions.services import (
+    ContributionServiceError,
     close_campaign,
     create_campaign,
     open_campaign,
     record_member_contribution,
+    remit_district_funeral_campaign,
 )
 from members.models import Gender, Member
 from organization.models import Church, Conference, District, Zone
@@ -230,3 +234,143 @@ class ContributionPhase2Tests(ContributionCampaignTests):
         result = preview_campaign_import(self.campaign, upload)
         self.assertEqual(result.failed, 0)
         self.assertEqual(result.succeeded, 1)
+
+
+class DistrictFuneralCampaignTests(ContributionCampaignTests):
+    def setUp(self):
+        super().setUp()
+        from transactions.services import ensure_district_funeral_offering_category
+
+        self.funeral_category = ensure_district_funeral_offering_category(self.church)
+        self.funeral = create_campaign(
+            self.church,
+            performed_by=self.treasurer,
+            name="Sister Mensah funeral",
+            code="FUN2026-01",
+            purpose="District funeral collection.",
+            deadline=timezone.localdate() + timedelta(days=14),
+            offering_category=self.funeral_category,
+            kind=CampaignKind.DISTRICT_FUNERAL,
+        )
+        open_campaign(self.funeral, performed_by=self.treasurer)
+
+    def test_cannot_use_welfare_category(self):
+        welfare = OfferingCategory.objects.get(church=self.church, code="WELFARE")
+        with self.assertRaises(ValidationError):
+            create_campaign(
+                self.church,
+                performed_by=self.treasurer,
+                name="Bad funeral",
+                code="FUN-BAD",
+                purpose="Should fail.",
+                deadline=timezone.localdate() + timedelta(days=7),
+                offering_category=welfare,
+                kind=CampaignKind.DISTRICT_FUNERAL,
+            )
+
+    def test_form_rewrites_welfare_to_funeral_holding(self):
+        welfare = OfferingCategory.objects.get(church=self.church, code="WELFARE")
+        form = ContributionCampaignForm(
+            data={
+                "kind": CampaignKind.DISTRICT_FUNERAL,
+                "name": "Form funeral",
+                "code": "FUN-FORM-1",
+                "purpose": "District funeral",
+                "deadline": (timezone.localdate() + timedelta(days=10)).isoformat(),
+                "offering_category": str(welfare.pk),
+                "portal_visible": "on",
+                "show_church_progress": "on",
+                "send_email_reminders": "on",
+            },
+            church=self.church,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["offering_category"].code, "DISTRICT_FUNERAL")
+
+    def test_gift_and_remit_posts_pending_transfer(self):
+        from contributions.services import build_campaign_summary
+
+        gift = record_member_contribution(
+            self.funeral,
+            member=self.member,
+            amount=Decimal("80.00"),
+            performed_by=self.treasurer,
+            idempotency_key="funeral-gift-1",
+        )
+        self.assertEqual(gift.transaction.transaction_type, "RECEIPT")
+        row = remit_district_funeral_campaign(
+            self.funeral,
+            performed_by=self.treasurer,
+            amount=Decimal("80.00"),
+            payment_account_type="BANK",
+            idempotency_key="funeral-remit-1",
+        )
+        self.assertEqual(row.transaction.transaction_type, "TRANSFER")
+        self.assertEqual(row.transaction.approval_status, "PENDING")
+        summary = build_campaign_summary(self.funeral)
+        self.assertEqual(summary["total_raised"], Decimal("80.00"))
+        self.assertEqual(summary["outstanding_to_district"], Decimal("0.00"))
+        self.assertTrue(summary["has_pending_remittance"])
+
+    def test_general_campaign_cannot_remit(self):
+        with self.assertRaises(ContributionServiceError):
+            remit_district_funeral_campaign(
+                self.campaign,
+                performed_by=self.treasurer,
+                amount=Decimal("10.00"),
+                idempotency_key="funeral-remit-general",
+            )
+
+    def test_staff_list_has_funeral_cta(self):
+        client = Client()
+        client.login(username="treasury_cc", password="pass12345")
+        session = client.session
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        response = client.get(reverse("contributions:campaign_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "New district funeral")
+        self.assertContains(response, "Sister Mensah funeral")
+
+    def test_other_church_cannot_open_funeral_campaign(self):
+        other = Church.objects.create(name="Other Church", code="CH2", district=self.church.district)
+        User.objects.create_user(
+            username="treasury_other",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=other,
+        )
+        client = Client()
+        client.login(username="treasury_other", password="pass12345")
+        session = client.session
+        session["current_church_id"] = str(other.id)
+        session.save()
+        response = client.get(reverse("contributions:campaign_detail", args=[self.funeral.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_remit_view_posts_journal(self):
+        record_member_contribution(
+            self.funeral,
+            member=self.member,
+            amount=Decimal("40.00"),
+            performed_by=self.treasurer,
+            idempotency_key="funeral-gift-view-1",
+        )
+        client = Client()
+        client.login(username="treasury_cc", password="pass12345")
+        session = client.session
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        response = client.post(
+            reverse("contributions:campaign_remit", args=[self.funeral.pk]),
+            {
+                "amount": "40.00",
+                "payment_account_type": "BANK",
+                "notes": "Send to district",
+                "idempotency_key": "funeral-remit-view-1",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        from contributions.models import CampaignRemittance
+
+        self.assertEqual(CampaignRemittance.objects.filter(campaign=self.funeral).count(), 1)

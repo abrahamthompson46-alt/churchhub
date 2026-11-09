@@ -17,6 +17,11 @@ class CampaignStatus(models.TextChoices):
     ARCHIVED = "ARCHIVED", "Archived"
 
 
+class CampaignKind(models.TextChoices):
+    GENERAL = "GENERAL", "Church campaign"
+    DISTRICT_FUNERAL = "DISTRICT_FUNERAL", "District funeral collection"
+
+
 class ContributionCampaign(models.Model):
     """Time-bound church giving drive (harvest, rent, building, etc.)."""
 
@@ -56,6 +61,13 @@ class ContributionCampaign(models.Model):
     send_email_reminders = models.BooleanField(
         default=True,
         help_text="Send deadline reminder emails to portal members when SMTP is configured.",
+    )
+    kind = models.CharField(
+        max_length=24,
+        choices=CampaignKind.choices,
+        default=CampaignKind.GENERAL,
+        db_index=True,
+        help_text="District funeral collections are held separately from welfare and remitted to district.",
     )
     offering_category = models.ForeignKey(
         "transactions.OfferingCategory",
@@ -126,6 +138,10 @@ class ContributionCampaign(models.Model):
     def is_past_deadline(self) -> bool:
         days = self.days_until_deadline
         return days is not None and days < 0
+
+    @property
+    def is_district_funeral(self) -> bool:
+        return self.kind == CampaignKind.DISTRICT_FUNERAL
 
 
 class MemberContribution(models.Model):
@@ -211,6 +227,39 @@ class MemberCampaignTarget(models.Model):
             raise ValidationError({"member": "Member must belong to the campaign church."})
         if self.target_amount is not None and self.target_amount <= 0:
             raise ValidationError({"target_amount": "Target must be greater than zero."})
+
+
+class CampaignRemittance(models.Model):
+    """Church-to-district send of designated campaign holdings (funeral collections)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    campaign = models.ForeignKey(
+        ContributionCampaign,
+        on_delete=models.CASCADE,
+        related_name="remittances",
+    )
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+    transaction = models.ForeignKey(
+        "transactions.Transaction",
+        on_delete=models.PROTECT,
+        related_name="campaign_remittances",
+    )
+    remitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="campaign_remittances_recorded",
+    )
+    notes = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["campaign", "created_at"])]
+
+    def __str__(self):
+        return f"{self.campaign.code} remit {self.amount}"
 
 
 class CampaignDeadlineReminder(models.Model):

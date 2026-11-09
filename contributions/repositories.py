@@ -1,6 +1,11 @@
 """Persistence helpers for contribution campaigns."""
 
-from contributions.models import ContributionCampaign, MemberCampaignTarget, MemberContribution
+from contributions.models import (
+    CampaignRemittance,
+    ContributionCampaign,
+    MemberCampaignTarget,
+    MemberContribution,
+)
 
 
 def save_campaign(campaign, *, update_fields=None):
@@ -19,6 +24,10 @@ def save_contribution(contribution, *, update_fields=None):
         contribution.save(update_fields=update_fields)
     else:
         contribution.save()
+
+
+def create_campaign_remittance(**fields):
+    return CampaignRemittance.objects.create(**fields)
 
 
 def upsert_member_target(campaign, member, target_amount, *, updated_by=None):

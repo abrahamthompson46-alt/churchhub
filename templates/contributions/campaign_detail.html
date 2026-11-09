@@ -49,7 +49,75 @@
             <span class="metric-value">{% if summary.progress_pct %}{{ summary.progress_pct|floatformat:0 }}%{% else %}—{% endif %}</span>
         </div>
         {% endif %}
+        {% if campaign.is_district_funeral %}
+        <div class="metric-card">
+            <span class="metric-label">Remitted to district</span>
+            <span class="metric-value text-currency">{{ summary.remitted_total|floatformat:2|intcomma }}</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Still to remit</span>
+            <span class="metric-value text-currency">{{ summary.outstanding_to_district|floatformat:2|intcomma }}</span>
+        </div>
+        {% endif %}
     </div>
+
+    {% if campaign.is_district_funeral %}
+    <p class="small text-muted mb-3">This is a district funeral collection. Gifts sit in District Funeral Holding, not the welfare fund. Remit the outstanding total to district when ready; the journal needs checker approval.</p>
+    {% endif %}
+
+    {% if campaign.is_district_funeral and can_manage %}
+    {% if remit_form or summary.has_pending_remittance %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold">Remit to district</div>
+        <div class="card-body">
+            {% if summary.has_pending_remittance %}
+            <p class="small text-muted mb-0">A remittance journal is pending approval. Approve it before sending another.</p>
+            {% elif remit_form %}
+            <form method="post" action="{% url 'contributions:campaign_remit' campaign.pk %}" class="row g-2 align-items-end">
+                {% csrf_token %}
+                {{ remit_form.idempotency_key }}
+                <div class="col-auto">
+                    <label class="form-label small text-muted mb-1">Amount</label>
+                    {{ remit_form.amount }}
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small text-muted mb-1">From</label>
+                    {{ remit_form.payment_account_type }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small text-muted mb-1">Notes</label>
+                    {{ remit_form.notes }}
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary btn-sm">Post remittance journal</button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if remittances %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold">Remittance record</div>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Date</th><th>Journal</th><th>Status</th><th class="text-end">Amount</th></tr></thead>
+                <tbody>
+                    {% for row in remittances %}
+                    <tr>
+                        <td>{{ row.created_at|date:"M j, Y" }}</td>
+                        <td>{{ row.transaction.reference }}</td>
+                        <td>{{ row.transaction.get_approval_status_display }}{% if row.transaction.is_voided %} · voided{% endif %}</td>
+                        <td class="text-end text-currency">{{ row.amount|floatformat:2|intcomma }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
 
     {% if can_record %}
     <div class="card shadow-sm mb-4">

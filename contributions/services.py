@@ -10,7 +10,12 @@ from django.utils import timezone
 
 from contributions import repositories as repo
 from contributions import selectors
-from contributions.models import CampaignStatus, ContributionCampaign, MemberContribution
+from contributions.models import (
+    CampaignKind,
+    CampaignStatus,
+    ContributionCampaign,
+    MemberContribution,
+)
 from church_system.money import quantize_money
 from sitecontrol.services import church_has_feature
 
@@ -51,8 +56,14 @@ def create_campaign(
     portal_visible=True,
     show_church_progress=True,
     send_email_reminders=True,
+    kind=CampaignKind.GENERAL,
 ) -> ContributionCampaign:
     _validate_category_for_church(church, offering_category)
+    kind = kind or CampaignKind.GENERAL
+    if kind == CampaignKind.DISTRICT_FUNERAL and offering_category.code == "WELFARE":
+        raise ValidationError(
+            {"offering_category": "District funeral collections cannot use the Welfare Fund."}
+        )
     code = (code or "").strip().upper()
     if ContributionCampaign.objects.filter(church=church, code=code).exists():
         raise ValidationError({"code": "A campaign with this code already exists in this church."})
@@ -70,6 +81,7 @@ def create_campaign(
         portal_visible=portal_visible,
         show_church_progress=show_church_progress,
         send_email_reminders=send_email_reminders,
+        kind=kind or CampaignKind.GENERAL,
         status=CampaignStatus.DRAFT,
         created_by=performed_by,
         updated_by=performed_by,
@@ -83,6 +95,12 @@ def create_campaign(
 def update_campaign(campaign, *, performed_by, **fields) -> ContributionCampaign:
     if campaign.status == CampaignStatus.ARCHIVED:
         raise ContributionServiceError("Archived campaigns cannot be edited.")
+    next_kind = fields.get("kind", campaign.kind)
+    next_category = fields.get("offering_category", campaign.offering_category)
+    if next_kind == CampaignKind.DISTRICT_FUNERAL and next_category and next_category.code == "WELFARE":
+        raise ValidationError(
+            {"offering_category": "District funeral collections cannot use the Welfare Fund."}
+        )
     if "offering_category" in fields and fields["offering_category"] is not None:
         _validate_category_for_church(campaign.church, fields["offering_category"])
     if "code" in fields and fields["code"]:
@@ -145,6 +163,8 @@ def build_campaign_summary(campaign) -> dict:
     progress_pct = None
     if target and target > 0:
         progress_pct = min(100, float((total / target) * 100))
+    remitted = selectors.campaign_remitted_total(campaign)
+    outstanding = max(Decimal("0.00"), total - remitted)
     return {
         "total_raised": total,
         "contributor_count": contributors,
@@ -154,6 +174,9 @@ def build_campaign_summary(campaign) -> dict:
         "progress_pct": progress_pct,
         "days_until_deadline": campaign.days_until_deadline,
         "is_past_deadline": campaign.is_past_deadline,
+        "remitted_total": remitted,
+        "outstanding_to_district": outstanding,
+        "has_pending_remittance": selectors.campaign_has_pending_remittance(campaign),
     }
 
 
@@ -187,7 +210,7 @@ def record_member_contribution(
         claim_financial_idempotency,
         complete_financial_idempotency,
     )
-    from transactions.services import record_receipt
+    from transactions.services import record_receipt, resolve_transaction_date
 
     if campaign.status != CampaignStatus.OPEN:
         raise ContributionServiceError("Contributions can only be recorded while the campaign is open.")
@@ -196,7 +219,7 @@ def record_member_contribution(
     amount = _quantize(amount)
     if amount <= 0:
         raise ValidationError({"amount": "Amount must be greater than zero."})
-    contribution_date = contribution_date or timezone.localdate()
+    contribution_date = contribution_date or resolve_transaction_date(campaign.church)
 
     try:
         idem_record = claim_financial_idempotency(
@@ -219,15 +242,18 @@ def record_member_contribution(
 
     category_code = campaign.offering_category.code
     description = notes.strip() or f"{campaign.name} — {member.full_name}"
-    trx = record_receipt(
-        church=campaign.church,
-        created_by=performed_by,
-        special_offerings={category_code: amount},
-        member=member,
-        payment_account_type=payment_account_type,
-        date=contribution_date,
-        description=description[:200],
-    )
+    try:
+        trx = record_receipt(
+            church=campaign.church,
+            created_by=performed_by,
+            special_offerings={category_code: amount},
+            member=member,
+            payment_account_type=payment_account_type,
+            date=contribution_date,
+            description=description[:200],
+        )
+    except ValueError as exc:
+        raise ContributionServiceError(str(exc)) from exc
     contribution = repo.create_contribution(
         campaign=campaign,
         member=member,
@@ -400,6 +426,84 @@ def portal_open_campaign_cards(member) -> list[dict]:
             }
         )
     return cards
+
+
+@db_transaction.atomic
+def remit_district_funeral_campaign(
+    campaign,
+    *,
+    performed_by,
+    amount=None,
+    payment_account_type="BANK",
+    notes="",
+    idempotency_key=None,
+):
+    """Send designated funeral holdings to cash/bank for district (not welfare)."""
+    from transactions.idempotency import (
+        IdempotencyReplay,
+        claim_financial_idempotency,
+        complete_financial_idempotency,
+    )
+    from transactions.services import record_designated_holding_remittance
+
+    if campaign.kind != CampaignKind.DISTRICT_FUNERAL:
+        raise ContributionServiceError(
+            "Only district funeral collections can be remitted this way."
+        )
+    if campaign.status == CampaignStatus.ARCHIVED:
+        raise ContributionServiceError("Archived campaigns cannot be remitted.")
+    if selectors.campaign_has_pending_remittance(campaign):
+        raise ContributionServiceError(
+            "A funeral remittance journal is already pending approval."
+        )
+    summary = build_campaign_summary(campaign)
+    outstanding = summary["outstanding_to_district"]
+    if outstanding <= 0:
+        raise ContributionServiceError("There is nothing outstanding to remit.")
+    amount = _quantize(amount if amount is not None else outstanding)
+    if amount <= 0 or amount > outstanding:
+        raise ContributionServiceError(
+            f"Remit amount must be between 0.01 and {outstanding}."
+        )
+    holding = campaign.offering_category.account
+    key = idempotency_key or contribution_idempotency_key(
+        "funeral-remit", campaign.pk, amount, payment_account_type
+    )
+    try:
+        idem_record = claim_financial_idempotency(
+            campaign.church,
+            performed_by,
+            "CONTRIBUTION",
+            key,
+        )
+    except IdempotencyReplay as replay:
+        existing = selectors.remittance_for_transaction(replay.existing_transaction)
+        if existing:
+            return existing
+        raise ContributionServiceError(
+            "This remittance was already recorded; refresh and continue."
+        ) from replay
+    narration = notes.strip() or f"District funeral remittance — {campaign.name}"
+    try:
+        trx = record_designated_holding_remittance(
+            campaign.church,
+            performed_by,
+            holding,
+            amount,
+            payment_account_type=payment_account_type,
+            description=narration[:200],
+        )
+    except ValueError as exc:
+        raise ContributionServiceError(str(exc)) from exc
+    row = repo.create_campaign_remittance(
+        campaign=campaign,
+        amount=amount,
+        transaction=trx,
+        remitted_by=performed_by,
+        notes=notes.strip()[:255],
+    )
+    complete_financial_idempotency(idem_record, trx)
+    return row
 
 
 def build_portal_campaign_page(member, campaign) -> dict:

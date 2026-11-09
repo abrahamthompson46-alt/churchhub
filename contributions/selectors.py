@@ -10,15 +10,22 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 
 from church_system.church_scope import filter_by_church
-from contributions.models import CampaignStatus, ContributionCampaign, MemberContribution
+from contributions.models import (
+    CampaignRemittance,
+    CampaignStatus,
+    ContributionCampaign,
+    MemberContribution,
+)
 from members.models import Member, MembershipStatus
 
 
-def campaigns_for_church(church, *, status=None):
+def campaigns_for_church(church, *, status=None, kind=None):
     qs = ContributionCampaign.objects.filter(church=church).select_related(
         "offering_category",
         "created_by",
     )
+    if kind:
+        qs = qs.filter(kind=kind)
     if status:
         if isinstance(status, (list, tuple, set)):
             qs = qs.filter(status__in=status)
@@ -133,6 +140,36 @@ def member_target_for(campaign, member):
     if override:
         return override.target_amount
     return campaign.default_member_target
+
+
+def remittances_for_campaign(campaign):
+    return CampaignRemittance.objects.filter(campaign=campaign).select_related(
+        "transaction",
+        "remitted_by",
+    )
+
+
+def remittance_for_transaction(transaction):
+    if transaction is None:
+        return None
+    return CampaignRemittance.objects.filter(transaction=transaction).first()
+
+
+def campaign_has_pending_remittance(campaign) -> bool:
+    return remittances_for_campaign(campaign).filter(
+        transaction__approval_status="PENDING",
+        transaction__is_voided=False,
+    ).exists()
+
+
+def campaign_remitted_total(campaign) -> Decimal:
+    total = (
+        remittances_for_campaign(campaign)
+        .filter(transaction__is_voided=False)
+        .exclude(transaction__approval_status="REJECTED")
+        .aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
+    )
+    return Decimal(str(total or "0")).quantize(Decimal("0.01"))
 
 
 def open_campaigns_for_reminders():

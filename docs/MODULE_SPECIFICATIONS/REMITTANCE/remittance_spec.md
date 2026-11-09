@@ -89,6 +89,7 @@ Views no longer call remittance model managers / `filter_by_church` directly; jo
 6. Feature gate: `remittance` (and welfare UI checks `welfare_module_enabled`).  
 7. **Period pack (Current):** Settlement Desk `settlements/pack/` and Report Center `settlement_register` show posted batches (by `posted_at` date), linked TRANSFER journals, and remittance payment journals. Scoped to manageable churches / desk. File export requires `export_reports_*` and writes `ReportAccessAuditLog`. HTML print is a view (`view_remittance` / settlement desk GET). Union/GC drafts are omitted.  
 8. Manual welfare contribution posts a WELFARE receipt on the **open working day**. The register date field defaults to that day. Working-day or period refusals raise `RemittancePolicyError` and flash; they must not 500.
+9. **District funeral collections** are **not** welfare. Record them as `contributions` campaigns (`DISTRICT_FUNERAL` holding). Do not use the Welfare Register. Settlement Desk does not auto-push those gifts.
 
 ---
 

@@ -354,6 +354,13 @@ def create_default_offering_categories(church):
         ("BUILDING", "Building Fund", "Building Fund", "INCOME", False),
         ("MISSION", "Mission Offering", "Mission Offering", "INCOME", False),
         ("WELFARE", "Welfare Fund", "Welfare Fund", "WELFARE_FUND", False),
+        (
+            "DISTRICT_FUNERAL",
+            "District Funeral",
+            "District Funeral Holding",
+            "INCOME",
+            False,
+        ),
     ]
     for code, label, account_name, acc_type, remit in categories:
         if acc_type in ("TITHE", "COMBINED"):
@@ -381,6 +388,14 @@ def create_default_offering_categories(church):
                 "remit_to_district": remit,
             },
         )
+
+
+def ensure_district_funeral_offering_category(church):
+    """Idempotent seed of the designated district-funeral holding category."""
+    from .models import OfferingCategory
+
+    create_default_offering_categories(church)
+    return OfferingCategory.objects.get(church=church, code="DISTRICT_FUNERAL")
 
 
 # ==========================================
@@ -681,6 +696,50 @@ def record_expense(
         created_by,
         transaction=trx,
         details={"type": "EXPENSE", "amount": str(amount)},
+    )
+    _notify_pending_journal(trx)
+    return trx
+
+
+def record_designated_holding_remittance(
+    church,
+    created_by,
+    holding_account,
+    amount,
+    payment_account_type="BANK",
+    description="",
+    date=None,
+):
+    """
+    Send designated holdings (e.g. district funeral) to cash/bank.
+
+    DR holding account, CR Cash/Bank. Journal stays PENDING for a checker.
+    """
+    amount = Decimal(str(amount))
+    if amount <= 0:
+        raise ValueError("Remittance amount must be greater than zero.")
+    if holding_account is None or holding_account.church_id != church.pk:
+        raise ValueError("Holding account must belong to this church.")
+    txn_date = resolve_transaction_date(church, date)
+    assert_period_open(church, txn_date)
+    assert_working_day_allows_posting(church, txn_date)
+
+    trx = repo.create_transaction(
+        transaction_type="TRANSFER",
+        church=church,
+        created_by=created_by,
+        description=description or "District funeral remittance",
+        date=txn_date,
+    )
+    _post_line(trx, holding_account, amount)
+    _post_line(trx, _get_account(church, payment_account_type), -amount)
+    validate_transaction_balance(trx)
+    _log_audit(
+        church,
+        "CREATE",
+        created_by,
+        transaction=trx,
+        details={"type": "CAMPAIGN_REMIT", "amount": str(amount)},
     )
     _notify_pending_journal(trx)
     return trx

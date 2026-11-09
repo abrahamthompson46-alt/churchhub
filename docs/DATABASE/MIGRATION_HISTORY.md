@@ -39,6 +39,7 @@
 | **audit** (1) | `0001_initial` (`AuditEvent`) |
 | **approvals** (1) | `0001_initial` (policy, case, step, delegation, escalation) |
 | **intelligence** (1) | `0001_initial` (RiskPolicy, RiskAlert) |
+| **contributions** | `0001_initial` → `0002_contributioncampaign_default_member_target_and_more` → `0003_campaign_kind_and_remittance` |
 
 ---
 

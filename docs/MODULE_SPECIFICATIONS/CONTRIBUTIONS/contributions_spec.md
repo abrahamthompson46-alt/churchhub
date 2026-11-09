@@ -48,6 +48,22 @@ Churches open **contribution campaigns** (harvest, rent, building, etc.) with a 
 - Optional **default member target** plus per-member overrides (`MemberCampaignTarget`).
 - **Bulk entry** and **Excel import** post receipts in atomic batches (all-or-nothing on import).
 - **Deadline reminders** at 7/3/1/0 days and overdue via in-app notifications; email when SMTP configured (`send_email_reminders`).
+- **District funeral collections** use `CampaignKind.DISTRICT_FUNERAL` and offering category `DISTRICT_FUNERAL` (GL **District Funeral Holding**, `INCOME`). They are **not** welfare cases or `WELFARE` receipts.
+- Funeral gifts post via `record_receipt` `special_offerings={"DISTRICT_FUNERAL": amount}` (no remittance split).
+- Church treasurers **manually remit** outstanding holdings: TRANSFER DR holding CR cash/bank (`record_designated_holding_remittance`), journal **PENDING** for a checker. `CampaignRemittance` stores the send. Settlement Desk does **not** auto-push this; district does **not** receive a GL entry.
+- Idempotency action for gifts and funeral remits: `CONTRIBUTION`.
+
+## District funeral workflow (Current)
+
+1. New campaign → type **District funeral collection** (list CTA `?kind=DISTRICT_FUNERAL`).
+2. Open campaign; record member gifts like any campaign.
+3. On the campaign page, **Remit to district** posts the holding transfer (amount ≤ outstanding; blocked while a remit journal is pending).
+4. Approve the journal under the usual maker-checker path.
+5. Keep the campaign as the church’s record of who gave and what was sent.
+
+**Recommended later:** district-side funeral case with automatic payable. Not implemented.
+
+**Not this path:** Welfare Register, Union/GC settlement GL.
 
 ## Phase 2 operations
 
@@ -67,5 +83,6 @@ Add `--no-email` to skip email and send in-app notifications only.
 | `/contributions/` | `contributions:campaign_list` |
 | `/contributions/add/` | `contributions:campaign_create` |
 | `/contributions/<uuid>/` | `contributions:campaign_detail` |
+| `/contributions/<uuid>/remit/` | `contributions:campaign_remit` (POST) |
 | `/portal/contributions/` | `portal:contributions` |
 | `/portal/contributions/<uuid>/` | `portal:contribution_campaign` |

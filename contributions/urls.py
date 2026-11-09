@@ -13,6 +13,7 @@ urlpatterns = [
     path("<uuid:pk>/close/", views.campaign_close, name="campaign_close"),
     path("<uuid:pk>/archive/", views.campaign_archive, name="campaign_archive"),
     path("<uuid:pk>/record/", views.campaign_record_contribution, name="campaign_record"),
+    path("<uuid:pk>/remit/", views.campaign_remit, name="campaign_remit"),
     path("<uuid:pk>/bulk/", views.campaign_bulk_entry, name="campaign_bulk"),
     path("<uuid:pk>/import/", views.campaign_import, name="campaign_import"),
     path("<uuid:pk>/import/template/", views.campaign_import_template, name="campaign_import_template"),

@@ -60,6 +60,7 @@ ACCOUNT_CODE_BY_NAME = {
     "Sabbath School Offering": "SABBATH_SCHOOL",
     "Women's Ministries Offering": "WOMENS_MINISTRIES",
     "Pledge Income": "PLEDGE_INCOME",
+    "District Funeral Holding": "DISTRICT_FUNERAL",
     "Accrued Expenses": "ACCRUED_EXPENSE",
 }
 

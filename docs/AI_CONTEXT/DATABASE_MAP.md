@@ -282,6 +282,22 @@ Constraint: debit account ≠ credit account. Unique `(church, code)`.
 
 ---
 
+## 12a. App: `contributions`
+
+**File:** `contributions/models.py`
+
+| Model | Key fields |
+|-------|------------|
+| `ContributionCampaign` | UUID; church; `kind` GENERAL / DISTRICT_FUNERAL; offering category; deadline; status; targets; portal flags |
+| `MemberContribution` | Gift row; FK receipt `Transaction` PROTECT |
+| `MemberCampaignTarget` | Per-member target override |
+| `CampaignRemittance` | Church send of funeral holdings; FK TRANSFER journal PROTECT |
+| `CampaignDeadlineReminder` | Reminder send log |
+
+District funeral collections credit **District Funeral Holding** (`INCOME`), not `WELFARE_FUND`.
+
+---
+
 ## 13. App: `payroll`
 
 **File:** `payroll/models.py`

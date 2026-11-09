@@ -7,7 +7,7 @@
 <div class="page-container">
     {% if can_manage %}
     {% url 'contributions:campaign_create' as create_url %}
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Contribution Campaigns" page_description="Time-bound giving drives with member tracking and portal visibility." action_url=create_url action_label="New Campaign" action_icon="bi-plus-lg" %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Contribution Campaigns" page_description="Church drives and district funeral collections. Do not use Welfare for district funerals." action_url=create_url action_label="New Campaign" action_icon="bi-plus-lg" %}
     {% else %}
     {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Contribution Campaigns" page_description="Time-bound giving drives with member tracking." %}
     {% endif %}
@@ -18,7 +18,14 @@
                 <label class="form-label">Status</label>
                 {{ filter_form.status }}
             </div>
+            <div class="filter-field">
+                <label class="form-label">Type</label>
+                {{ filter_form.kind }}
+            </div>
             <button type="submit" class="btn btn-outline-primary btn-sm">Filter</button>
+            {% if can_manage %}
+            <a href="{% url 'contributions:campaign_create' %}?kind=DISTRICT_FUNERAL" class="btn btn-outline-primary btn-sm">New district funeral</a>
+            {% endif %}
         </form>
     </div>
 
@@ -39,7 +46,11 @@
                 <tr>
                     <td>
                         <strong>{{ row.campaign.name }}</strong>
-                        <div class="small text-muted">{{ row.campaign.code }}</div>
+                        <div class="small text-muted">{{ row.campaign.code }}
+                            {% if row.campaign.is_district_funeral %}
+                            · District funeral
+                            {% endif %}
+                        </div>
                     </td>
                     <td>
                         {{ row.campaign.deadline|date:"M j, Y" }}

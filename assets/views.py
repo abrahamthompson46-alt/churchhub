@@ -9,9 +9,15 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from church_system.church_scope import get_active_church, require_church
-from church_system.flash import flash_exception, flash_success, flash_warning
+from church_system.flash import (
+    flash_exception,
+    flash_success,
+    flash_validation_errors,
+    flash_warning,
+)
 from permissions.checks import (
     can_approve_assets,
+    can_approve_transactions,
     can_export_assets,
     can_manage_asset_policy,
     can_manage_assets,
@@ -42,6 +48,7 @@ from .services import (
     hierarchy_asset_rollup,
     insurance_warranty_alerts,
     log_policy_change,
+    format_depreciation_run_summary,
     preview_monthly_depreciation,
     register_dashboard_kpis,
     reject_asset,
@@ -67,6 +74,20 @@ def _policy_access(view_func):
         if not can_manage_asset_policy(request.user):
             raise PermissionDenied
         return view_func(request, *args, **kwargs)
+    return _wrapped
+
+
+def _depreciation_run_access(view_func):
+    """Policy managers prepare; journal checkers may authenticate an approval run."""
+
+    @login_required
+    @require_feature("assets")
+    def _wrapped(request, *args, **kwargs):
+        user = request.user
+        if can_manage_asset_policy(user) or can_approve_transactions(user):
+            return view_func(request, *args, **kwargs)
+        raise PermissionDenied
+
     return _wrapped
 
 
@@ -350,7 +371,7 @@ def category_edit(request, pk):
     return render(request, "assets/category_form.html", {"form": form, "title": category.name})
 
 
-@_policy_access
+@_depreciation_run_access
 def run_depreciation(request):
     church = require_church(request)
     now = timezone.now()
@@ -383,18 +404,36 @@ def run_depreciation(request):
                 if not active or active.pk != church.pk:
                     raise PermissionDenied
                 run_church_depreciation_task.delay(
-                    str(church.pk), year, month, str(request.user.pk)
+                    str(church.pk),
+                    year,
+                    month,
+                    str(request.user.pk),
                 )
-                flash_success(request, "Depreciation run queued in the background.")
+                flash_success(
+                    request,
+                    "Depreciation run queued in the background. "
+                    "Journals are prepared as pending; they are not approved "
+                    "until an authenticated eligible checker runs depreciation.",
+                )
                 return redirect("assets:run_depreciation")
-            result = run_monthly_depreciation(church, year, month, request.user)
-            flash_success(
-                request,
-                f"Depreciation run complete: {result['posted']} posted, {result['skipped']} skipped.",
+            result = run_monthly_depreciation(
+                church,
+                year,
+                month,
+                request.user,
+                allow_approval=True,
             )
+            summary = format_depreciation_run_summary(result)
+            incomplete = result.get("pending", 0) or result.get("failed", 0)
+            message = f"Depreciation run: {summary}."
+            if incomplete:
+                flash_warning(request, message)
+            else:
+                flash_success(request, message)
             if result["errors"]:
                 flash_warning(request, "; ".join(result["errors"][:5]))
             return redirect("assets:run_depreciation")
+        flash_validation_errors(request, form)
     else:
         form = RunDepreciationForm(initial={"year": year, "month": month})
 

@@ -57,11 +57,33 @@ class JournalNotificationTests(TestCase):
             Decimal("12.00"),
             description="Travel",
         )
-        approve_transaction(trx, self.pastor)
+        with self.captureOnCommitCallbacks(execute=True):
+            approve_transaction(trx, self.pastor)
         approved = Notification.objects.filter(
             user=self.treasurer, event_key=f"txn.approved.{trx.pk}"
         )
         self.assertEqual(approved.count(), 1)
+
+    def test_refused_approval_sends_no_success_notification(self):
+        trx = record_expense(
+            self.church,
+            self.treasurer,
+            Decimal("12.00"),
+            description="Travel",
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            from django.core.exceptions import PermissionDenied
+
+            with self.assertRaises(PermissionDenied):
+                approve_transaction(trx, self.treasurer)
+        trx.refresh_from_db()
+        self.assertEqual(trx.approval_status, "PENDING")
+        self.assertEqual(
+            Notification.objects.filter(
+                event_key=f"txn.approved.{trx.pk}"
+            ).count(),
+            0,
+        )
 
     def test_reject_notifies_maker(self):
         trx = record_expense(

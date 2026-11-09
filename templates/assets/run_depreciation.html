@@ -5,7 +5,7 @@
 {% block content %}
 <div class="page-container">
     {% include "includes/page_header.html" with page_subtitle="Fixed Assets" page_title="Run Monthly Depreciation" %}
-    <p class="text-muted">Post depreciation for all active assets for the selected month.</p>
+    <p class="text-muted">Prepare depreciation for the selected month as the signed-in user. Approval uses the authenticated checker on a later run and cannot be nominated in this form. Pending journals are not treated as posted.</p>
     <form method="post" class="card border-0 shadow-sm mb-4" style="max-width:420px">
         <div class="card-body">
             {% csrf_token %}

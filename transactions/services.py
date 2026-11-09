@@ -975,32 +975,121 @@ def resolve_authorized_journal_checker(transaction, *candidates):
     return None
 
 
-@db_transaction.atomic
-def approve_module_journal(transaction, *checker_candidates):
+DEPRECIATION_GENERIC_APPROVAL_REFUSED = (
+    "This journal is linked to a depreciation register entry and cannot be "
+    "approved from the generic approval queue. Approve it only through the "
+    "depreciation posting workflow so the asset register is updated with the "
+    "journal."
+)
+
+UNLINKED_CAPITAL_GENERIC_APPROVAL_REFUSED = (
+    "This CAPITAL journal is not linked to a depreciation register entry. "
+    "Generic approval is refused because source module cannot be established "
+    "from durable relationships. Approve depreciation only through the "
+    "depreciation workflow. Acquisition and disposal journals must use those "
+    "module workflows after linking the asset acquisition or disposal FK."
+)
+
+UNLINKED_CAPITAL_MODULE_APPROVAL_REFUSED = (
+    "This CAPITAL journal is not linked to an asset acquisition or disposal "
+    "record. Module approval is refused because the journal cannot be "
+    "distinguished from unresolved historical CAPITAL. Link "
+    "acquisition_transaction or disposal_transaction before calling "
+    "approve_module_journal. Depreciation journals must use the depreciation "
+    "workflow."
+)
+
+
+def transaction_links_depreciation_entry(transaction) -> bool:
+    """True when an AssetDepreciationEntry.transaction FK points at this journal."""
+    from assets.models import AssetDepreciationEntry
+
+    pk = getattr(transaction, "pk", None)
+    if pk is None:
+        return False
+    return AssetDepreciationEntry.objects.filter(transaction_id=pk).exists()
+
+
+def transaction_links_asset_acquisition_or_disposal(transaction) -> bool:
+    """True when a same-church FixedAsset acquisition or disposal FK points here.
+
+    Church must match the journal. Does not prove the journal was created by
+    acquisition/disposal posting; ORM/SQL can still attach a same-church
+    CAPITAL row. Description, amount, date, and asset code are not used.
     """
-    Approve a module-created PENDING journal through approve_transaction when an
-    authorized checker distinct from created_by is available.
+    from django.db.models import Q
 
-    Candidates are evaluated with ``actor_may_decide`` for this journal.
-    Module posting permission is not GL approval authority.
+    from assets.models import FixedAsset
 
-    Returns the transaction (still PENDING when no eligible checker is found).
-    Callers inside an atomic block must not mark module registers posted unless
-    the journal is APPROVED.
+    pk = getattr(transaction, "pk", None)
+    church_id = getattr(transaction, "church_id", None)
+    if pk is None or church_id is None:
+        return False
+    return FixedAsset.objects.filter(
+        Q(acquisition_transaction_id=pk) | Q(disposal_transaction_id=pk),
+        church_id=church_id,
+    ).exists()
+
+
+def _refuse_module_capital_or_depreciation(locked):
+    """Refuse linked depreciation and unlinked CAPITAL on the module path.
+
+    CAPITAL is allowed only when an asset already points at the journal via
+    acquisition_transaction or disposal_transaction. Identity is not inferred
+    from description, amount, date, or asset code.
     """
-    checker = resolve_authorized_journal_checker(transaction, *checker_candidates)
-    if checker is None:
-        return transaction
-    return approve_transaction(transaction, checker)
+    if transaction_links_depreciation_entry(locked):
+        raise ValueError(DEPRECIATION_GENERIC_APPROVAL_REFUSED)
+    if getattr(locked, "transaction_type", None) != "CAPITAL":
+        return
+    if not transaction_links_asset_acquisition_or_disposal(locked):
+        raise ValueError(UNLINKED_CAPITAL_MODULE_APPROVAL_REFUSED)
 
 
-@db_transaction.atomic
-def approve_transaction(transaction, user):
-    locked = (
+def _refuse_generic_capital_or_depreciation(locked):
+    """Fail closed for generic queue/admin/service approval of CAPITAL.
+
+    Linked depreciation journals stay on the depreciation workflow.
+    Unlinked CAPITAL (including ordinary capital and unresolved historical
+    candidates) cannot be distinguished without a source-module FK, so generic
+    approval is refused. Linked acquisition/disposal CAPITAL is also refused
+    here; those journals use approve_module_journal after the asset FK is set.
+    """
+    if transaction_links_depreciation_entry(locked):
+        raise ValueError(DEPRECIATION_GENERIC_APPROVAL_REFUSED)
+    if getattr(locked, "transaction_type", None) == "CAPITAL":
+        raise ValueError(UNLINKED_CAPITAL_GENERIC_APPROVAL_REFUSED)
+
+
+def _lock_transaction_for_approval(transaction):
+    return (
         Transaction.objects.select_for_update()
         .select_related("church")
         .get(pk=transaction.pk)
     )
+
+
+@db_transaction.atomic
+def _commit_journal_approval(transaction, user):
+    """Apply APPROVED/locked for a linked depreciation journal.
+
+    Caller must be the authenticated actor (the only candidate). The journal
+    must already have an AssetDepreciationEntry.transaction FK. Generic queue
+    callers must use approve_transaction, which refuses that FK.
+    """
+    locked = _lock_transaction_for_approval(transaction)
+    if not transaction_links_depreciation_entry(locked):
+        raise ValueError(DEPRECIATION_GENERIC_APPROVAL_REFUSED)
+    resolved = resolve_authorized_journal_checker(locked, user)
+    if resolved is None or resolved.pk != getattr(user, "pk", None):
+        raise ValueError(
+            "Only an authenticated authorized checker other than the maker "
+            "may approve a linked depreciation journal."
+        )
+    return _apply_journal_approval(locked, resolved)
+
+
+def _apply_journal_approval(locked, user):
     if locked.approval_status == "APPROVED" and locked.locked:
         return locked
     if locked.locked:
@@ -1033,12 +1122,6 @@ def approve_transaction(transaction, user):
     )
     _mark_cutoff_transferred_for_remittance(locked)
     try:
-        from remittance.notifications import notify_district_remittance_payment_approved
-
-        notify_district_remittance_payment_approved(locked, approved_by=user)
-    except Exception:
-        pass
-    try:
         from church_system.perf_cache import invalidate_church_finance_caches
 
         invalidate_church_finance_caches(
@@ -1048,8 +1131,58 @@ def approve_transaction(transaction, user):
         )
     except Exception:
         pass
-    _notify_journal_outcome(locked, approved=True, actor=user)
+
+    approved_actor = user
+    approved_trx = locked
+
+    def _notify_after_commit():
+        try:
+            from remittance.notifications import notify_district_remittance_payment_approved
+
+            notify_district_remittance_payment_approved(
+                approved_trx, approved_by=approved_actor
+            )
+        except Exception:
+            pass
+        _notify_journal_outcome(approved_trx, approved=True, actor=approved_actor)
+
+    db_transaction.on_commit(_notify_after_commit)
     return locked
+
+
+@db_transaction.atomic
+def approve_module_journal(transaction, *checker_candidates):
+    """
+    Approve a module-created PENDING journal when an authorized checker
+    distinct from created_by is available.
+
+    Candidates are evaluated with ``actor_may_decide`` for this journal.
+    Module posting permission is not GL approval authority.
+
+    Returns the transaction (still PENDING when no eligible checker is found).
+    Callers inside an atomic block must not mark module registers posted unless
+    the journal is APPROVED. Journals linked to AssetDepreciationEntry are
+    refused. Unlinked CAPITAL is refused (cannot be distinguished from
+    unresolved historical depreciation). Acquisition/disposal must persist
+    the asset FK before calling this helper.
+    """
+    locked = _lock_transaction_for_approval(transaction)
+    if locked.approval_status == "APPROVED" and locked.locked:
+        return locked
+    _refuse_module_capital_or_depreciation(locked)
+    checker = resolve_authorized_journal_checker(locked, *checker_candidates)
+    if checker is None:
+        return locked
+    return _apply_journal_approval(locked, checker)
+
+
+@db_transaction.atomic
+def approve_transaction(transaction, user):
+    locked = _lock_transaction_for_approval(transaction)
+    if locked.approval_status == "APPROVED" and locked.locked:
+        return locked
+    _refuse_generic_capital_or_depreciation(locked)
+    return _apply_journal_approval(locked, user)
 
 
 def _mark_cutoff_transferred_for_remittance(transaction):

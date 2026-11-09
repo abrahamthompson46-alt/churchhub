@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -406,33 +406,54 @@ class Phase3AssetJournalTests(TestCase):
         from transactions.services import WorkingDayClosedError
 
         with self.assertRaises(WorkingDayClosedError):
-            post_depreciation_entry(self.asset, 2024, 1, self.maker, checker=self.checker)
+            post_depreciation_entry(self.asset, 2024, 1, self.maker)
 
-    def test_background_creates_pending_without_register(self):
+    def test_background_without_checker_creates_nothing(self):
         open_working_day(self.church, date(2024, 1, 28), self.checker)
-        result = post_depreciation_entry(self.asset, 2024, 1, None)
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result["pending_journal"].approval_status, "PENDING")
+        from assets.services import AssetError
+
+        with self.assertRaises(AssetError):
+            post_depreciation_entry(self.asset, 2024, 1, None)
         self.asset.refresh_from_db()
         self.assertEqual(self.asset.accumulated_depreciation, Decimal("0.00"))
+        self.assertFalse(
+            Transaction.objects.filter(
+                church=self.church,
+                transaction_type="CAPITAL",
+                description__startswith="Depreciation",
+            ).exists()
+        )
 
     def test_checker_updates_register(self):
         open_working_day(self.church, date(2024, 1, 28), self.checker)
+        post_depreciation_entry(self.asset, 2024, 1, self.maker, allow_approval=False)
         entry = post_depreciation_entry(
-            self.asset, 2024, 1, self.maker, checker=self.checker
+            self.asset, 2024, 1, self.checker, allow_approval=True
         )
         self.assertFalse(isinstance(entry, dict))
         self.asset.refresh_from_db()
         self.assertEqual(self.asset.accumulated_depreciation, Decimal("100.00"))
 
-    def test_maker_only_leaves_register_unchanged(self):
+    def test_maker_only_fails_closed_then_checker_posts(self):
+        from assets.models import AssetDepreciationEntry
+
         open_working_day(self.church, date(2024, 2, 28), self.checker)
-        pending = post_depreciation_entry(self.asset, 2024, 2, self.maker)
-        self.assertIsInstance(pending, dict)
+        prepared = post_depreciation_entry(self.asset, 2024, 2, self.maker)
         self.asset.refresh_from_db()
         self.assertEqual(self.asset.accumulated_depreciation, Decimal("0.00"))
-        with self.assertRaises(Exception):
-            post_depreciation_entry(self.asset, 2024, 2, self.maker, checker=self.checker)
+        self.assertFalse(prepared.register_applied)
+        self.assertEqual(
+            AssetDepreciationEntry.objects.filter(
+                asset=self.asset, period_year=2024, period_month=2
+            ).count(),
+            1,
+        )
+        entry = post_depreciation_entry(
+            self.asset, 2024, 2, self.checker, allow_approval=True
+        )
+        self.assertFalse(isinstance(entry, dict))
+        self.asset.refresh_from_db()
+        self.assertEqual(self.asset.accumulated_depreciation, Decimal("100.00"))
 
 
 class Phase3VoidConcurrencyTests(TransactionTestCase):
@@ -566,7 +587,7 @@ class Phase3MakerCheckerExpenseTests(TestCase):
             amount=Decimal("15.00"),
             description="Office supplies",
         )
-        with self.assertRaises(ValueError):
+        with self.assertRaises(PermissionDenied):
             approve_transaction(trx, self.maker)
         approve_transaction(trx, self.checker)
         trx.refresh_from_db()

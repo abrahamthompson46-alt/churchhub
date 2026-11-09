@@ -282,7 +282,25 @@ class FixedAsset(models.Model):
 
 
 class AssetDepreciationEntry(models.Model):
-    """Monthly depreciation posted for an asset."""
+    """Monthly depreciation period row for an asset.
+
+    Historical rows are treated as posted register lines. New workflow rows may
+    exist before a journal is approved; only ``register_applied=True`` amounts
+    contribute to accumulated depreciation / NBV.
+    """
+
+    WORKFLOW_AWAITING_APPROVAL = "AWAITING_APPROVAL"
+    WORKFLOW_POSTED = "POSTED"
+    WORKFLOW_REJECTED = "REJECTED"
+    WORKFLOW_FAILED = "FAILED"
+    WORKFLOW_RECOVERY_REQUIRED = "RECOVERY_REQUIRED"
+    WORKFLOW_STATUS_CHOICES = [
+        (WORKFLOW_AWAITING_APPROVAL, "Awaiting approval"),
+        (WORKFLOW_POSTED, "Posted"),
+        (WORKFLOW_REJECTED, "Rejected"),
+        (WORKFLOW_FAILED, "Failed"),
+        (WORKFLOW_RECOVERY_REQUIRED, "Recovery required"),
+    ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     asset = models.ForeignKey(
@@ -307,7 +325,20 @@ class AssetDepreciationEntry(models.Model):
         null=True,
         blank=True,
     )
-    posted_at = models.DateTimeField(auto_now_add=True)
+    posted_at = models.DateTimeField(null=True, blank=True)
+    workflow_status = models.CharField(
+        max_length=32,
+        choices=WORKFLOW_STATUS_CHOICES,
+        default=WORKFLOW_POSTED,
+    )
+    register_applied = models.BooleanField(default=True)
+    initiated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="depreciation_entries_initiated",
+    )
 
     class Meta:
         unique_together = ("asset", "period_year", "period_month")

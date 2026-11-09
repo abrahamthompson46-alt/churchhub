@@ -12,6 +12,7 @@ from transactions.services import (
     PeriodLockedError,
     UnbalancedTransactionError,
     WorkingDayClosedError,
+    _commit_journal_approval,
     _get_account,
     _log_audit,
     _post_line,
@@ -19,6 +20,7 @@ from transactions.services import (
     approve_module_journal,
     assert_period_open,
     assert_working_day_allows_posting,
+    resolve_authorized_journal_checker,
     validate_transaction_balance,
 )
 from transactions import repositories as txn_repo
@@ -298,6 +300,8 @@ def post_acquisition_to_ledger(asset, user):
     _post_line(trx, ppe, amount)
     _post_line(trx, payment, -amount)
     validate_transaction_balance(trx)
+    asset.acquisition_transaction = trx
+    repo.save_asset(asset, update_fields=["acquisition_transaction", "updated_at"])
     trx = approve_module_journal(trx, user)
     if trx.approval_status != "APPROVED":
         raise AssetError(
@@ -313,8 +317,6 @@ def post_acquisition_to_ledger(asset, user):
         transaction=trx,
         details={"type": "ASSET_ACQUISITION", "asset_id": str(asset.pk), "amount": str(amount)},
     )
-    asset.acquisition_transaction = trx
-    repo.save_asset(asset, update_fields=["acquisition_transaction", "updated_at"])
     return trx
 
 
@@ -362,17 +364,146 @@ def reject_asset(asset, user, reason=""):
     return asset
 
 
-@db_transaction.atomic
-def post_depreciation_entry(asset, period_year, period_month, user, *, force=False, checker=None):
-    """
-    Post monthly depreciation.
+def _depreciation_journal_description(asset, period_year, period_month):
+    return f"Depreciation {asset.asset_code} {period_year}-{period_month:02d}"
 
-    CH-SEC-005 / INV-SOD-01 / INV-DATE-01:
-    - Require open period + working day.
-    - Create CAPITAL journal; approve via maker-checker when a distinct checker exists.
-    - Update the asset register ONLY after the journal is APPROVED.
-    - Background/Celery callers with no independent checker leave journal PENDING
-      and do not mutate accumulated depreciation.
+
+def _checker_required_error():
+    return AssetError(
+        "An authenticated user is required to prepare or approve depreciation. "
+        "Depreciation was not posted; no journal or period entry was created."
+    )
+
+
+def _journal_is_approved(trx):
+    return bool(
+        trx
+        and trx.approval_status == "APPROVED"
+        and trx.locked
+        and not getattr(trx, "is_voided", False)
+    )
+
+
+REGISTER_RECONCILE_REQUIRED = (
+    "Depreciation register reconciliation is required before further "
+    "depreciation can be posted for this asset. Stored accumulated "
+    "depreciation was not changed."
+)
+
+
+def assert_depreciation_register_recompute_safe(asset):
+    """Fail closed before any selector-sum rewrite of stored accum.
+
+    APPROVED journals are not proof the amount is in stored NBV. Block when
+    contributing totals disagree with stored accum, or when FK-linked recovery/
+    voided/reversed rows exist. Null-FK rows are not treated as recovery; they
+    only block when their contributing amounts disagree with stored accum.
+    """
+    if selectors.asset_has_unresolved_register_history(asset):
+        raise AssetError(REGISTER_RECONCILE_REQUIRED)
+    stored = _quantize(asset.accumulated_depreciation)
+    contributing = _quantize(selectors.asset_depreciation_total(asset))
+    if stored != contributing:
+        raise AssetError(REGISTER_RECONCILE_REQUIRED)
+
+
+def _finalize_depreciation_register(asset, period_year, period_month, amount, user, trx):
+    """Write an applied period row and recompute stored accum from contributing rows.
+
+    Totals exclude PENDING/REJECTED-linked entries (FK). Do not use this to
+    backfill historical APPROVED-but-stale NBV; that needs a reconciliation report.
+    """
+    assert_depreciation_register_recompute_safe(asset)
+    entry, _ = repo.update_or_create_depreciation_entry(
+        asset=asset,
+        period_year=period_year,
+        period_month=period_month,
+        defaults={
+            "amount": amount,
+            "method_used": asset.depreciation_method,
+            "transaction": trx,
+            "posted_by": user,
+            "posted_at": timezone.now(),
+            "workflow_status": "POSTED",
+            "register_applied": True,
+        },
+    )
+    asset.accumulated_depreciation = _quantize(selectors.asset_depreciation_total(asset))
+    repo.save_asset(asset, update_fields=["accumulated_depreciation", "updated_at"])
+    _asset_log(asset, "DEPRECIATE", user, notes=f"{period_year}-{period_month:02d}: {amount}")
+    return entry
+
+
+def _record_unapplied_depreciation_entry(asset, period_year, period_month, amount, user, trx):
+    entry, _ = repo.update_or_create_depreciation_entry(
+        asset=asset,
+        period_year=period_year,
+        period_month=period_month,
+        defaults={
+            "amount": amount,
+            "method_used": asset.depreciation_method,
+            "transaction": trx,
+            "posted_by": None,
+            "posted_at": None,
+            "workflow_status": "AWAITING_APPROVAL",
+            "register_applied": False,
+            "initiated_by": user,
+        },
+    )
+    return entry
+
+
+def _recover_pending_depreciation(
+    asset, pending_trx, user, amount, period_year, period_month, *, allow_approval
+):
+    entry = selectors.depreciation_entry_for_period(asset, period_year, period_month)
+    if not allow_approval:
+        return entry
+    if user is None:
+        return entry
+    resolved = resolve_authorized_journal_checker(pending_trx, user)
+    if resolved is None:
+        if getattr(user, "pk", None) == getattr(pending_trx, "created_by_id", None):
+            return entry
+        raise AssetError(
+            "The authenticated user is not authorized to approve this depreciation "
+            "journal. The register was not updated and no duplicate journal was created."
+        )
+    assert_depreciation_register_recompute_safe(asset)
+    trx = _commit_journal_approval(pending_trx, resolved)
+    return _finalize_depreciation_register(
+        asset, period_year, period_month, amount, user, trx
+    )
+
+
+def _assert_no_unlinked_pending_depreciation_journal(asset, period_year, period_month, linked_pk=None):
+    """Fail closed on description-matched PENDING journals that have no register FK.
+
+    Description matching is not identity for approval. It is only used to refuse
+    a duplicate prepare when an unlinked historical journal already exists.
+    """
+    qs = selectors.pending_depreciation_journals(asset, period_year, period_month)
+    if linked_pk:
+        qs = qs.exclude(pk=linked_pk)
+    if qs.exists():
+        raise AssetError(
+            "An unlinked pending depreciation journal exists for this period. "
+            "Reconciliation is required; no duplicate journal was created and "
+            "the register was not updated."
+        )
+
+
+@db_transaction.atomic
+def post_depreciation_entry(
+    asset, period_year, period_month, user, *, force=False, allow_approval=False
+):
+    """
+    Prepare or approve monthly depreciation.
+
+    Ledger path: create a CAPITAL journal, link an unapplied register row, then
+    approve only when ``allow_approval`` is True and ``user`` is the authenticated
+    eligible checker (not the maker). Background callers must leave the journal
+    PENDING. Approval and register finalization share this atomic block.
     """
     asset = (
         type(asset)
@@ -383,9 +514,21 @@ def post_depreciation_entry(asset, period_year, period_month, user, *, force=Fal
     if asset.status != "ACTIVE":
         raise AssetError("Depreciation applies only to active assets.")
     validate_depreciation_period(period_year, period_month)
-    if selectors.depreciation_entry_exists(asset, period_year, period_month):
-        if not force:
-            raise AssetError("Depreciation already posted for this period.")
+
+    existing = selectors.depreciation_entry_for_period(asset, period_year, period_month)
+    existing_trx = getattr(existing, "transaction", None) if existing else None
+    if existing and _journal_is_approved(existing_trx) and not force:
+        raise AssetError("Depreciation already posted for this period.")
+
+    pending_trx = None
+    if (
+        existing_trx
+        and existing_trx.approval_status == "PENDING"
+        and not existing_trx.is_voided
+    ):
+        pending_trx = existing_trx
+    if existing and not pending_trx and not force:
+        raise AssetError("Depreciation already posted for this period.")
 
     amount = calculate_monthly_depreciation(asset, period_year, period_month)
     if amount <= 0:
@@ -396,73 +539,72 @@ def post_depreciation_entry(asset, period_year, period_month, user, *, force=Fal
     assert_period_open(asset.church, period_date)
     assert_working_day_allows_posting(asset.church, period_date)
 
-    trx = None
-    if policy.post_depreciation_to_ledger:
-        trx = txn_repo.create_transaction(
-            transaction_type="CAPITAL",
-            church=asset.church,
-            created_by=user,
-            description=f"Depreciation {asset.asset_code} {period_year}-{period_month:02d}",
-            date=period_date,
-        )
-        dep_expense = _get_account(asset.church, "DEPRECIATION_EXPENSE")
-        accum = _get_account(asset.church, "ACCUMULATED_DEPRECIATION")
-        _post_line(trx, dep_expense, amount)
-        _post_line(trx, accum, -amount)
-        validate_transaction_balance(trx)
-        _log_audit(
-            asset.church,
-            "CREATE",
-            user,
-            transaction=trx,
-            details={
-                "type": "ASSET_DEPRECIATION",
-                "asset_id": str(asset.pk),
-                "period": f"{period_year}-{period_month:02d}",
-                "amount": str(amount),
-                "pending_register": True,
-            },
-        )
-        # Authorized checker only; never fall back to the poster.
-        trx = approve_module_journal(trx, checker)
-        if trx.approval_status != "APPROVED":
-            entry, _ = repo.update_or_create_depreciation_entry(
-                asset=asset,
-                period_year=period_year,
-                period_month=period_month,
-                defaults={
-                    "amount": amount,
-                    "method_used": asset.depreciation_method,
-                    "transaction": trx,
-                    "posted_by": user,
-                },
-            )
-            _asset_log(
-                asset,
-                "DEPRECIATE",
-                user,
-                notes=(
-                    f"{period_year}-{period_month:02d}: journal {trx.reference} "
-                    "PENDING — register not updated until independent approval."
-                ),
-            )
-            return {"pending_journal": trx, "entry": entry, "amount": amount}
+    assert_depreciation_register_recompute_safe(asset)
 
-    entry, _ = repo.update_or_create_depreciation_entry(
-        asset=asset,
-        period_year=period_year,
-        period_month=period_month,
-        defaults={
-            "amount": amount,
-            "method_used": asset.depreciation_method,
-            "transaction": trx,
-            "posted_by": user,
+    if not policy.post_depreciation_to_ledger:
+        if existing and not force:
+            raise AssetError("Depreciation already posted for this period.")
+        return _finalize_depreciation_register(
+            asset, period_year, period_month, amount, user, None
+        )
+
+    linked_pk = getattr(pending_trx, "pk", None)
+    _assert_no_unlinked_pending_depreciation_journal(
+        asset, period_year, period_month, linked_pk=linked_pk
+    )
+
+    if pending_trx is not None:
+        return _recover_pending_depreciation(
+            asset,
+            pending_trx,
+            user,
+            amount,
+            period_year,
+            period_month,
+            allow_approval=allow_approval,
+        )
+
+    if user is None:
+        raise _checker_required_error()
+
+    trx = txn_repo.create_transaction(
+        transaction_type="CAPITAL",
+        church=asset.church,
+        created_by=user,
+        description=_depreciation_journal_description(asset, period_year, period_month),
+        date=period_date,
+    )
+    dep_expense = _get_account(asset.church, "DEPRECIATION_EXPENSE")
+    accum = _get_account(asset.church, "ACCUMULATED_DEPRECIATION")
+    _post_line(trx, dep_expense, amount)
+    _post_line(trx, accum, -amount)
+    validate_transaction_balance(trx)
+    _record_unapplied_depreciation_entry(
+        asset, period_year, period_month, amount, user, trx
+    )
+    _log_audit(
+        asset.church,
+        "CREATE",
+        user,
+        transaction=trx,
+        details={
+            "type": "ASSET_DEPRECIATION",
+            "asset_id": str(asset.pk),
+            "period": f"{period_year}-{period_month:02d}",
+            "amount": str(amount),
         },
     )
-    asset.accumulated_depreciation = _quantize(selectors.asset_depreciation_total(asset))
-    repo.save_asset(asset, update_fields=["accumulated_depreciation", "updated_at"])
-    _asset_log(asset, "DEPRECIATE", user, notes=f"{period_year}-{period_month:02d}: {amount}")
-    return entry
+    if not allow_approval:
+        return selectors.depreciation_entry_for_period(asset, period_year, period_month)
+
+    resolved = resolve_authorized_journal_checker(trx, user)
+    if resolved is None:
+        return selectors.depreciation_entry_for_period(asset, period_year, period_month)
+
+    trx = _commit_journal_approval(trx, resolved)
+    return _finalize_depreciation_register(
+        asset, period_year, period_month, amount, user, trx
+    )
 
 
 def preview_monthly_depreciation(church, year, month):
@@ -487,30 +629,57 @@ def preview_monthly_depreciation(church, year, month):
     }
 
 
-def run_monthly_depreciation(church, year, month, user):
-    """Post depreciation for all active assets in a church for one month."""
+def run_monthly_depreciation(church, year, month, user, *, allow_approval=False):
+    """Prepare (and optionally approve) depreciation for active assets."""
     validate_depreciation_period(year, month)
     posted = 0
     skipped = 0
     pending = 0
+    failed = 0
     errors = []
     for asset in selectors.active_assets_for_church(church):
         try:
-            result = post_depreciation_entry(asset, year, month, user)
+            result = post_depreciation_entry(
+                asset, year, month, user, allow_approval=allow_approval
+            )
             if result is None:
                 skipped += 1
-            elif isinstance(result, dict) and result.get("pending_journal"):
+            elif getattr(result, "register_applied", False):
+                posted += 1
+            else:
+                pending += 1
+        except (AssetError, PeriodLockedError, WorkingDayClosedError, UnbalancedTransactionError) as exc:
+            text = str(exc).lower()
+            if "already posted" in text:
+                skipped += 1
+                continue
+            errors.append(f"{asset.asset_code}: {exc}")
+            if "already pending" in text:
                 pending += 1
             else:
-                posted += 1
-        except (AssetError, PeriodLockedError, WorkingDayClosedError, UnbalancedTransactionError) as exc:
-            errors.append(f"{asset.asset_code}: {exc}")
-    return {"posted": posted, "skipped": skipped, "pending": pending, "errors": errors}
+                failed += 1
+    return {
+        "posted": posted,
+        "skipped": skipped,
+        "pending": pending,
+        "failed": failed,
+        "errors": errors,
+    }
+
+
+def format_depreciation_run_summary(result):
+    """User-facing counts. Do not describe pending/failed work as posted."""
+    return (
+        f"{result.get('posted', 0)} completed, "
+        f"{result.get('skipped', 0)} skipped, "
+        f"{result.get('pending', 0)} pending, "
+        f"{result.get('failed', 0)} failed"
+    )
 
 
 @db_transaction.atomic
 def post_disposal_to_ledger(asset, user, disposal_date=None, *, checker=None):
-    """Write off remaining book value on disposal — register link only after approve."""
+    """Write off remaining book value on disposal — link the asset FK before approve."""
     policy = ensure_depreciation_policy(asset.church)
     if not policy.post_disposal_to_ledger:
         return None
@@ -558,6 +727,8 @@ def post_disposal_to_ledger(asset, user, disposal_date=None, *, checker=None):
             "nbv": str(nbv),
         },
     )
+    asset.disposal_transaction = trx
+    repo.save_asset(asset, update_fields=["disposal_transaction", "updated_at"])
     trx = approve_module_journal(trx, checker)
     if trx.approval_status != "APPROVED":
         raise AssetError(
@@ -567,8 +738,6 @@ def post_disposal_to_ledger(asset, user, disposal_date=None, *, checker=None):
             "approval authority. "
             f"Journal {trx.reference} is pending; asset not marked disposed."
         )
-    asset.disposal_transaction = trx
-    repo.save_asset(asset, update_fields=["disposal_transaction", "updated_at"])
     return trx
 
 
@@ -640,7 +809,9 @@ def asset_register_csv(church):
 
 def depreciation_schedule_rows(asset):
     rows = []
-    for entry in asset.depreciation_entries.order_by("period_year", "period_month"):
+    for entry in asset.depreciation_entries.filter(
+        selectors.register_contributing_q()
+    ).order_by("period_year", "period_month"):
         rows.append({
             "period": f"{entry.period_year}-{entry.period_month:02d}",
             "amount": entry.amount,
@@ -783,7 +954,9 @@ def report_depreciation_schedule(request, start, end, **hierarchy):
     churches = _churches_in_scope(request, **hierarchy)
     headers = ["Church", "Asset", "Period", "Amount (GHS)", "Method"]
     rows = []
-    entries = selectors.depreciation_entries_for_churches(churches)
+    entries = selectors.depreciation_entries_for_churches(
+        churches, register_applied=True
+    )
     if start:
         entries = entries.filter(
             period_year__gte=start.year,

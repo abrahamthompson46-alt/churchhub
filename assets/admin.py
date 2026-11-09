@@ -50,6 +50,22 @@ class FixedAssetAdmin(ChurchScopedAssetAdmin):
     list_display = ("asset_code", "name", "church", "status", "acquisition_cost")
     list_filter = ("status",)
     search_fields = ("asset_code", "name", "church__name")
+    readonly_fields = (
+        "accumulated_depreciation",
+        "acquisition_transaction",
+        "disposal_transaction",
+    )
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj) or ())
+        for name in (
+            "accumulated_depreciation",
+            "acquisition_transaction",
+            "disposal_transaction",
+        ):
+            if name not in fields:
+                fields.append(name)
+        return tuple(fields)
 
 
 @admin.register(AssetDepreciationEntry)
@@ -57,6 +73,14 @@ class AssetDepreciationEntryAdmin(ChurchScopedAssetAdmin):
     church_field = "asset__church"
     list_display = ("asset", "period_year", "period_month", "amount")
     list_filter = ("period_year",)
+    readonly_fields = ("workflow_status", "register_applied")
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj) or ())
+        for name in ("workflow_status", "register_applied"):
+            if name not in fields:
+                fields.append(name)
+        return tuple(fields)
 
 
 @admin.register(AssetMaintenanceLog)

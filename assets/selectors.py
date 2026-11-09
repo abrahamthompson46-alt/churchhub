@@ -143,15 +143,84 @@ def depreciation_entry_exists(asset, period_year, period_month):
     ).exists()
 
 
+def depreciation_entry_for_period(asset, period_year, period_month):
+    return (
+        AssetDepreciationEntry.objects.filter(
+            asset=asset, period_year=period_year, period_month=period_month
+        )
+        .select_related("transaction")
+        .first()
+    )
+
+
+def pending_depreciation_journals(asset, period_year, period_month):
+    from transactions.models import Transaction
+
+    description = (
+        f"Depreciation {asset.asset_code} {period_year}-{period_month:02d}"
+    )
+    return Transaction.objects.filter(
+        church_id=asset.church_id,
+        transaction_type="CAPITAL",
+        description=description,
+        approval_status="PENDING",
+        is_voided=False,
+    ).order_by("created_at")
+
+
+def register_contributing_q():
+    """Rows that may contribute to stored NBV / schedule totals.
+
+    ``register_applied`` is required. Linked PENDING or REJECTED journals are
+    excluded via the existing transaction FK (HEAD wrote those rows without
+    updating accumulated depreciation). Voided/REVERSED journals stay in the
+    total so NBV is not silently unwound.
+    """
+    return Q(register_applied=True) & ~Q(
+        transaction__approval_status__in=("PENDING", "REJECTED")
+    )
+
+
+def unresolved_register_history_q():
+    """FK-only rows that must not be absorbed by a full-sum register rewrite.
+
+    Includes explicit recovery/failed workflow and linked voided/REVERSED
+    journals. Does not match description, amount, date, or church.
+
+    Null-FK legacy rows are intentionally omitted here. HEAD no-ledger posts
+    wrote ``accumulated_depreciation`` in the same operation as the period row;
+    migration 0007 left those POSTED/applied. They keep contributing. They only
+    fail the recompute guard when the contributing sum disagrees with stored
+    accum (checked separately in services).
+    """
+    return (
+        Q(workflow_status__in=("RECOVERY_REQUIRED", "FAILED"))
+        | Q(transaction__is_voided=True)
+        | Q(transaction__approval_status="REVERSED")
+    )
+
+
+def asset_has_unresolved_register_history(asset) -> bool:
+    return asset.depreciation_entries.filter(unresolved_register_history_q()).exists()
+
+
 def asset_depreciation_total(asset) -> Decimal:
-    total = asset.depreciation_entries.aggregate(t=Sum("amount"))["t"]
+    """Sum of amounts that contribute to the posted depreciation register."""
+    total = asset.depreciation_entries.filter(register_contributing_q()).aggregate(
+        t=Sum("amount")
+    )["t"]
     return total or Decimal("0")
 
 
-def depreciation_entries_for_churches(churches):
-    return AssetDepreciationEntry.objects.filter(
+def depreciation_entries_for_churches(churches, *, register_applied=None):
+    qs = AssetDepreciationEntry.objects.filter(
         asset__church__in=churches,
     ).select_related("asset__church", "asset")
+    if register_applied is True:
+        qs = qs.filter(register_contributing_q())
+    elif register_applied is not None:
+        qs = qs.filter(register_applied=register_applied)
+    return qs
 
 
 # ---------------------------------------------------------------------------

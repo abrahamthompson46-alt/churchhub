@@ -83,7 +83,7 @@ def send_marketing_lead_notification_task(self, lead_id):
 
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=120)
-def run_church_depreciation_task(self, church_id, year, month, user_id=None):
+def run_church_depreciation_task(self, church_id, year, month, user_id=None, *_ignored):
     from assets.services import run_monthly_depreciation
     from organization.models import Church
     from permissions.checks import can_manage_asset_policy

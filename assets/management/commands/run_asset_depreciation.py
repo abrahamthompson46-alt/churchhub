@@ -32,5 +32,10 @@ class Command(BaseCommand):
             church = policy.church
             result = run_monthly_depreciation(church, year, month, user=None)
             self.stdout.write(
-                f"{church.code}: posted={result['posted']} skipped={result['skipped']} errors={len(result['errors'])}"
+                f"{church.code}: completed={result['posted']} skipped={result['skipped']} "
+                f"pending={result.get('pending', 0)} failed={result.get('failed', 0)} "
+                f"errors={len(result['errors'])}"
             )
+            if result["errors"]:
+                for line in result["errors"][:20]:
+                    self.stderr.write(line)

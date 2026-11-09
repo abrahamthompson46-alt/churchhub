@@ -51,7 +51,8 @@ Churches open **contribution campaigns** (harvest, rent, building, etc.) with a 
 - **Deadline reminders** at 7/3/1/0 days and overdue via in-app notifications; email when SMTP configured (`send_email_reminders`).
 - **District funeral collections** use `CampaignKind.DISTRICT_FUNERAL` and offering category `DISTRICT_FUNERAL` (GL **District Funeral Holding**, `INCOME`). They are **not** welfare cases or `WELFARE` receipts.
 - Funeral gifts post via `record_receipt` `special_offerings={"DISTRICT_FUNERAL": amount}` (no remittance split).
-- Church treasurers **manually remit** outstanding holdings: TRANSFER DR holding CR cash/bank (`record_designated_holding_remittance`), journal **PENDING** for a checker. `CampaignRemittance` stores the send. Settlement Desk does **not** auto-push this; district does **not** receive a GL entry.
+- Church treasurers **manually remit** outstanding holdings: TRANSFER DR holding CR cash/bank (`record_designated_holding_remittance`), journal **PENDING** for a checker. Remit **defaults to Cash**. `CampaignRemittance` stores the send. Settlement Desk does **not** auto-push this; district does **not** receive a GL entry.
+- Campaign list and **Campaign Register** (`campaign_register`) are scoped to manageable churches so district/conference officers can compare raised vs remitted by church.
 - Idempotency action for gifts and funeral remits: `CONTRIBUTION`.
 
 ## District funeral workflow (Current)

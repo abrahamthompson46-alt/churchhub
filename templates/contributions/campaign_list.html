@@ -14,6 +14,14 @@
 
     <div class="filter-bar mb-3">
         <form method="get" class="filter-form d-flex align-items-end gap-3 flex-wrap">
+            {% if not filter_form.church.is_hidden %}
+            <div class="filter-field">
+                <label class="form-label">Church</label>
+                {{ filter_form.church }}
+            </div>
+            {% else %}
+            {{ filter_form.church }}
+            {% endif %}
             <div class="filter-field">
                 <label class="form-label">Status</label>
                 {{ filter_form.status }}
@@ -23,6 +31,9 @@
                 {{ filter_form.kind }}
             </div>
             <button type="submit" class="btn btn-outline-primary btn-sm">Filter</button>
+            {% if can_export %}
+            <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}export=excel" class="btn btn-outline-primary btn-sm">Export</a>
+            {% endif %}
             {% if can_manage %}
             <a href="{% url 'contributions:campaign_create' %}?kind=DISTRICT_FUNERAL" class="btn btn-outline-primary btn-sm">New district funeral</a>
             {% endif %}
@@ -33,10 +44,12 @@
         <table class="table table-hover align-middle">
             <thead>
                 <tr>
+                    {% if show_church %}<th>Church</th>{% endif %}
                     <th>Campaign</th>
                     <th>Deadline</th>
                     <th>Status</th>
                     <th class="text-end">Raised</th>
+                    <th class="text-end">Remitted</th>
                     <th>Contributors</th>
                     <th></th>
                 </tr>
@@ -44,6 +57,7 @@
             <tbody>
                 {% for row in rows %}
                 <tr>
+                    {% if show_church %}<td>{{ row.campaign.church.name }}</td>{% endif %}
                     <td>
                         <strong>{{ row.campaign.name }}</strong>
                         <div class="small text-muted">{{ row.campaign.code }}
@@ -62,12 +76,13 @@
                     </td>
                     <td><span class="badge text-bg-secondary">{{ row.campaign.get_status_display }}</span></td>
                     <td class="text-end text-currency">{{ row.summary.total_raised|floatformat:2|intcomma }}</td>
+                    <td class="text-end text-currency">{% if row.campaign.is_district_funeral %}{{ row.summary.remitted_total|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
                     <td>{{ row.summary.contributor_count }} / {{ row.summary.active_member_count }}</td>
                     <td class="text-end"><a href="{% url 'contributions:campaign_detail' row.campaign.pk %}" class="btn btn-sm btn-outline-primary">Open</a></td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="text-muted text-center py-4">
+                    <td colspan="8" class="text-muted text-center py-4">
                         No campaigns yet.
                         {% if can_manage %}
                         <div class="mt-2">

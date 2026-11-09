@@ -10,7 +10,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from church_system.church_scope import require_church
+from church_system.church_scope import get_active_church, get_available_churches, require_church
 from church_system.flash import flash_error, flash_exception, flash_success, flash_warning
 from church_system.spreadsheet_io import build_template_xlsx
 from permissions.checks import (
@@ -89,18 +89,76 @@ def _record_required(view_func):
 
 @_campaign_view_required
 def campaign_list(request):
-    church = require_church(request)
-    filter_form = CampaignFilterForm(request.GET or None)
+    church = get_active_church(request)
+    churches = get_available_churches(request.user)
+    filter_form = CampaignFilterForm(request.GET or None, churches=churches)
     status = None
     kind = None
+    church_filter = None
     if filter_form.is_valid():
         status = filter_form.cleaned_data.get("status") or None
         kind = filter_form.cleaned_data.get("kind") or None
-    campaigns = selectors.campaigns_for_church(church, status=status, kind=kind)
+        church_filter = filter_form.cleaned_data.get("church")
+    campaigns = selectors.campaigns_for_request(
+        request,
+        status=status,
+        kind=kind,
+        church=church_filter,
+    )
     rows = []
     for campaign in campaigns:
         summary = build_campaign_summary(campaign)
         rows.append({"campaign": campaign, "summary": summary})
+    can_manage = (
+        can_manage_contribution_campaigns(request.user) or can_manage_finances(request.user)
+    ) and church is not None
+    export_fmt = request.GET.get("export", "")
+    if export_fmt in ("csv", "excel"):
+        if not (can_view_contribution_reports(request.user) or can_manage_finances(request.user)):
+            raise PermissionDenied
+        headers = [
+            "Church",
+            "District",
+            "Campaign",
+            "Code",
+            "Type",
+            "Status",
+            "Deadline",
+            "Raised",
+            "Remitted",
+            "Outstanding",
+            "Contributors",
+        ]
+        export_rows = [
+            [
+                row["campaign"].church.name,
+                row["campaign"].church.district.name if row["campaign"].church.district_id else "",
+                row["campaign"].name,
+                row["campaign"].code,
+                row["campaign"].get_kind_display(),
+                row["campaign"].get_status_display(),
+                row["campaign"].deadline,
+                row["summary"]["total_raised"],
+                row["summary"]["remitted_total"],
+                row["summary"]["outstanding_to_district"],
+                row["summary"]["contributor_count"],
+            ]
+            for row in rows
+        ]
+        from reports.services import audit_export
+
+        audit_export(
+            user=request.user,
+            report_key="campaign_register",
+            export_format=export_fmt,
+            row_count=len(export_rows),
+            church=church,
+            params={"status": status or "", "kind": kind or ""},
+        )
+        if export_fmt == "csv":
+            return export_table_csv(headers, export_rows, "campaign-register.csv")
+        return export_table_excel(headers, export_rows, "campaign-register.xlsx", "Campaigns")
+    show_church = len({row["campaign"].church_id for row in rows}) > 1
     return render(
         request,
         "contributions/campaign_list.html",
@@ -108,7 +166,9 @@ def campaign_list(request):
             "rows": rows,
             "filter_form": filter_form,
             "church": church,
-            "can_manage": can_manage_contribution_campaigns(request.user)
+            "can_manage": can_manage,
+            "show_church": show_church,
+            "can_export": can_view_contribution_reports(request.user)
             or can_manage_finances(request.user),
         },
     )

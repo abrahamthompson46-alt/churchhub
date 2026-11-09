@@ -113,6 +113,13 @@ REPORT_CATALOG = {
         "permission": "finance",
         "requires_feature": "remittance",
     },
+    "campaign_register": {
+        "label": "Campaign Register",
+        "description": "Contribution campaigns and district funeral remits by church in your scope.",
+        "icon": "bi-bullseye",
+        "permission": "finance",
+        "requires_feature": "contribution_campaigns",
+    },
     "budget_vs_actual": {
         "label": "Budget vs Actual",
         "description": "Annual budget performance by account with favorable variance indicators.",

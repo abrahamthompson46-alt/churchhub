@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import UserRole
-from contributions.forms import ContributionCampaignForm
+from contributions.forms import ContributionCampaignForm, RemitCampaignForm
 from contributions.models import CampaignKind, CampaignStatus, ContributionCampaign, MemberContribution
 from contributions.services import (
     ContributionServiceError,
@@ -415,3 +415,65 @@ class DistrictFuneralCampaignTests(ContributionCampaignTests):
         from contributions.models import CampaignRemittance
 
         self.assertEqual(CampaignRemittance.objects.filter(campaign=self.funeral).count(), 1)
+
+    def test_remit_defaults_to_cash(self):
+        form = RemitCampaignForm()
+        self.assertEqual(form.fields["payment_account_type"].initial, "CASH")
+        record_member_contribution(
+            self.funeral,
+            member=self.member,
+            amount=Decimal("25.00"),
+            performed_by=self.treasurer,
+            idempotency_key="funeral-gift-cash-default",
+        )
+        row = remit_district_funeral_campaign(
+            self.funeral,
+            performed_by=self.treasurer,
+            amount=Decimal("25.00"),
+            idempotency_key="funeral-remit-cash-default",
+        )
+        credit = row.transaction.lines.get(amount__lt=0)
+        self.assertEqual(credit.account.account_type, "CASH")
+
+    def test_district_treasury_lists_campaigns_by_church(self):
+        from permissions.org_scope import apply_org_scope
+        from transactions.services import ensure_district_funeral_offering_category
+
+        other = Church.objects.create(
+            name="Sister Church",
+            code="CH2",
+            district=self.church.district,
+        )
+        other_cat = ensure_district_funeral_offering_category(other)
+        create_campaign(
+            other,
+            performed_by=self.treasurer,
+            name="Other church funeral",
+            purpose="District funeral collection.",
+            deadline=timezone.localdate() + timedelta(days=14),
+            offering_category=other_cat,
+            kind=CampaignKind.DISTRICT_FUNERAL,
+        )
+        officer = User.objects.create_user(
+            username="district_treas_cc",
+            password="pass12345",
+            role=UserRole.DISTRICT_TREASURY,
+            church=self.church,
+        )
+        apply_org_scope(
+            officer,
+            role=UserRole.DISTRICT_TREASURY,
+            church=self.church,
+            district=self.church.district,
+        )
+        officer.save()
+        client = Client()
+        client.login(username="district_treas_cc", password="pass12345")
+        response = client.get(reverse("contributions:campaign_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sister Mensah funeral")
+        self.assertContains(response, "Other church funeral")
+        self.assertContains(response, "Sister Church")
+        export = client.get(reverse("contributions:campaign_list"), {"export": "csv"})
+        self.assertEqual(export.status_code, 200)
+        self.assertContains(export, "Other church funeral")

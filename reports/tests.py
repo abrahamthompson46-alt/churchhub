@@ -244,6 +244,16 @@ class ReportsTests(TestCase):
         self.assertEqual(data["title"], "Settlement Register")
         self.assertIn("settlement_pack", data)
 
+    def test_campaign_register_available_with_contribution_feature(self):
+        self.assertTrue(
+            user_may_access_report(
+                self.treasury, "campaign_register", active_church=self.church
+            )
+        )
+        data = build_report("campaign_register", self._request(), period="monthly")
+        self.assertEqual(data["title"], "Campaign Register")
+        self.assertIn("Church", data["headers"])
+
     def test_member_without_view_reports_denied_index(self):
         # MEMBER is outside report catalog defaults; finance implies do not grant it.
         user = User.objects.create_user(

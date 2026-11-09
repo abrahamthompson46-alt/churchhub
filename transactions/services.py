@@ -706,7 +706,7 @@ def record_designated_holding_remittance(
     created_by,
     holding_account,
     amount,
-    payment_account_type="BANK",
+    payment_account_type="CASH",
     description="",
     date=None,
 ):

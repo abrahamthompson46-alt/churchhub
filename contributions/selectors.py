@@ -21,9 +21,34 @@ from members.models import Member, MembershipStatus
 
 def campaigns_for_church(church, *, status=None, kind=None):
     qs = ContributionCampaign.objects.filter(church=church).select_related(
+        "church",
+        "church__district",
         "offering_category",
         "created_by",
     )
+    if kind:
+        qs = qs.filter(kind=kind)
+    if status:
+        if isinstance(status, (list, tuple, set)):
+            qs = qs.filter(status__in=status)
+        else:
+            qs = qs.filter(status=status)
+    return qs
+
+
+def campaigns_for_request(request, *, status=None, kind=None, church=None):
+    qs = filter_by_church(
+        ContributionCampaign.objects.select_related(
+            "church",
+            "church__district",
+            "offering_category",
+            "created_by",
+        ),
+        request,
+        field="church",
+    )
+    if church is not None:
+        qs = qs.filter(church=church)
     if kind:
         qs = qs.filter(kind=kind)
     if status:

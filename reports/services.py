@@ -210,6 +210,7 @@ def build_report(report_key, request, period="monthly", start_date=None, end_dat
         "asset_hierarchy_rollup": _asset_hierarchy_rollup_report,
         "welfare_register": _welfare_register_report,
         "settlement_register": _settlement_register_report,
+        "campaign_register": _campaign_register_report,
         "budget_vs_actual": _budget_vs_actual_report,
     }
     builder = builders.get(report_key)
@@ -1040,6 +1041,13 @@ def _settlement_register_report(request, start, end, **hierarchy):
     )
     pack["title"] = "Settlement Register"
     return pack
+
+
+def _campaign_register_report(request, start, end, **hierarchy):
+    from contributions.services import build_campaign_register
+
+    churches = _churches_in_scope(request, **hierarchy).select_related("district")
+    return build_campaign_register(churches, start, end)
 
 
 def _budget_vs_actual_report(request, start, end, **hierarchy):

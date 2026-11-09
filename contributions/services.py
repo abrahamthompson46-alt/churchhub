@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction as db_transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from contributions import repositories as repo
@@ -456,7 +457,7 @@ def remit_district_funeral_campaign(
     *,
     performed_by,
     amount=None,
-    payment_account_type="BANK",
+    payment_account_type="CASH",
     notes="",
     idempotency_key=None,
 ):
@@ -526,6 +527,97 @@ def remit_district_funeral_campaign(
     )
     complete_financial_idempotency(idem_record, trx)
     return row
+
+
+CAMPAIGN_REGISTER_ROW_LIMIT = 500
+
+
+def build_campaign_register(churches, start, end) -> dict:
+    """Hierarchy-aware campaign snapshot for Report Center (read-only)."""
+    from contributions.models import CampaignRemittance, MemberContribution
+
+    church_list = list(churches)
+    headers = [
+        "Church",
+        "District",
+        "Campaign",
+        "Code",
+        "Type",
+        "Status",
+        "Deadline",
+        "Raised",
+        "Remitted",
+        "Outstanding",
+    ]
+    if not church_list:
+        return {
+            "title": "Campaign Register",
+            "headers": headers,
+            "rows": [],
+            "summary": {"church_count": 0, "campaign_count": 0, "raised": Decimal("0.00"), "remitted": Decimal("0.00")},
+            "truncated": False,
+        }
+    gift_ids = MemberContribution.objects.filter(
+        campaign__church__in=church_list,
+        contribution_date__gte=start,
+        contribution_date__lte=end,
+        transaction__approval_status="APPROVED",
+        transaction__is_voided=False,
+    ).values_list("campaign_id", flat=True)
+    remit_ids = CampaignRemittance.objects.filter(
+        campaign__church__in=church_list,
+        transaction__date__gte=start,
+        transaction__date__lte=end,
+        transaction__is_voided=False,
+    ).exclude(transaction__approval_status="REJECTED").values_list("campaign_id", flat=True)
+    qs = (
+        ContributionCampaign.objects.filter(church__in=church_list)
+        .filter(
+            Q(deadline__gte=start, deadline__lte=end)
+            | Q(pk__in=gift_ids)
+            | Q(pk__in=remit_ids)
+        )
+        .select_related("church", "church__district")
+        .order_by("church__name", "deadline", "name")
+        .distinct()
+    )
+    total = qs.count()
+    truncated = total > CAMPAIGN_REGISTER_ROW_LIMIT
+    raised_total = Decimal("0.00")
+    remitted_total = Decimal("0.00")
+    rows = []
+    for campaign in qs[:CAMPAIGN_REGISTER_ROW_LIMIT]:
+        summary = build_campaign_summary(campaign)
+        raised_total += summary["total_raised"]
+        remitted_total += summary["remitted_total"]
+        rows.append(
+            [
+                campaign.church.name,
+                campaign.church.district.name if campaign.church.district_id else "",
+                campaign.name,
+                campaign.code,
+                campaign.get_kind_display(),
+                campaign.get_status_display(),
+                campaign.deadline,
+                summary["total_raised"],
+                summary["remitted_total"],
+                summary["outstanding_to_district"],
+            ]
+        )
+    if truncated:
+        rows.append(["", "", "… truncated", f"Showing {CAMPAIGN_REGISTER_ROW_LIMIT} of {total}", "", "", "", "", "", ""])
+    return {
+        "title": "Campaign Register",
+        "headers": headers,
+        "rows": rows,
+        "truncated": truncated,
+        "summary": {
+            "church_count": len(church_list),
+            "campaign_count": total,
+            "raised": raised_total,
+            "remitted": remitted_total,
+        },
+    }
 
 
 def build_portal_campaign_page(member, campaign) -> dict:

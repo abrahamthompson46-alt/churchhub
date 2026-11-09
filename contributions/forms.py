@@ -6,6 +6,7 @@ from django.utils import timezone
 from church_system.uploads import document_upload_validator
 from contributions.models import CampaignKind, CampaignStatus, ContributionCampaign
 from members.models import Member
+from organization.models import Church
 from transactions.models import OfferingCategory
 
 
@@ -152,8 +153,8 @@ class RemitCampaignForm(forms.Form):
         widget=forms.NumberInput(attrs={"class": "form-control form-control-sm", "style": "max-width:10rem"}),
     )
     payment_account_type = forms.ChoiceField(
-        choices=[("BANK", "Bank"), ("CASH", "Cash")],
-        initial="BANK",
+        choices=[("CASH", "Cash"), ("BANK", "Bank")],
+        initial="CASH",
         widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
     )
     notes = forms.CharField(
@@ -186,6 +187,11 @@ class CampaignImportForm(forms.Form):
 
 
 class CampaignFilterForm(forms.Form):
+    church = forms.ModelChoiceField(
+        required=False,
+        queryset=Church.objects.none(),
+        empty_label="All churches",
+    )
     status = forms.ChoiceField(
         required=False,
         choices=[("", "All statuses")] + list(CampaignStatus.choices),
@@ -194,3 +200,11 @@ class CampaignFilterForm(forms.Form):
         required=False,
         choices=[("", "All types")] + list(CampaignKind.choices),
     )
+
+    def __init__(self, *args, churches=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if churches is None:
+            churches = Church.objects.none()
+        self.fields["church"].queryset = churches
+        if churches.count() <= 1:
+            self.fields["church"].widget = forms.HiddenInput()

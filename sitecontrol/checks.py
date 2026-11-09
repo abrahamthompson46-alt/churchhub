@@ -5,7 +5,7 @@ from functools import wraps
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
 
-from church_system.church_scope import get_active_church
+from church_system.church_scope import get_active_church, get_user_church
 from permissions.superadmin import is_superadmin
 from sitecontrol.rbac import operator_has_capability, require_platform_capability
 from sitecontrol.services import church_has_feature
@@ -48,7 +48,7 @@ def require_feature(feature):
         def _wrapped(request, *args, **kwargs):
             if is_superadmin(request.user):
                 return view_func(request, *args, **kwargs)
-            church = get_active_church(request)
+            church = get_active_church(request) or get_user_church(request.user)
             if not church_has_feature(church, feature):
                 raise PermissionDenied(
                     f"The {feature.replace('_', ' ')} module is not enabled for this church. "

@@ -532,7 +532,74 @@ def remit_district_funeral_campaign(
 CAMPAIGN_REGISTER_ROW_LIMIT = 500
 
 
-def build_campaign_register(churches, start, end) -> dict:
+def resolve_campaign_register_kind(raw=None):
+    """Report Center defaults to district funerals; ALL/blank means every type."""
+    if raw in ("ALL", ""):
+        return None
+    if raw is None:
+        return CampaignKind.DISTRICT_FUNERAL
+    if raw in CampaignKind.values:
+        return raw
+    return CampaignKind.DISTRICT_FUNERAL
+
+
+def remittance_payment_label(transaction) -> str:
+    if transaction is None:
+        return ""
+    line = next((row for row in transaction.lines.all() if row.amount < 0), None)
+    if line is None:
+        return ""
+    account_type = getattr(line.account, "account_type", "")
+    if account_type == "CASH":
+        return "Cash"
+    if account_type == "BANK":
+        return "Bank"
+    return line.account.name
+
+
+def build_funeral_collection_pack(campaign) -> dict:
+    """Printable collection sheet: who gave, totals, remitted vs still to send."""
+    summary = build_campaign_summary(campaign)
+    remittances = []
+    for row in selectors.remittances_for_campaign(campaign):
+        trx = row.transaction
+        remittances.append(
+            {
+                "row": row,
+                "payment_label": remittance_payment_label(trx),
+                "reference": trx.reference if trx else "",
+                "status": trx.get_approval_status_display() if trx else "",
+                "working_day": trx.date if trx else None,
+                "is_voided": bool(trx and trx.is_voided),
+            }
+        )
+    return {
+        "campaign": campaign,
+        "church": campaign.church,
+        "summary": summary,
+        "member_totals": list(selectors.campaign_member_totals(campaign)),
+        "remittances": remittances,
+    }
+
+
+def build_campaign_remit_slip(campaign, remittance) -> dict:
+    trx = remittance.transaction
+    pending = bool(trx and trx.approval_status == "PENDING" and not trx.is_voided)
+    approved = bool(trx and trx.approval_status == "APPROVED" and not trx.is_voided)
+    return {
+        "campaign": campaign,
+        "church": campaign.church,
+        "remittance": remittance,
+        "transaction": trx,
+        "payment_label": remittance_payment_label(trx),
+        "working_day": trx.date if trx else None,
+        "posted_by": remittance.remitted_by,
+        "is_pending": pending,
+        "is_approved": approved,
+    }
+
+
+def build_campaign_register(churches, start, end, *, kind=None) -> dict:
     """Hierarchy-aware campaign snapshot for Report Center (read-only)."""
     from contributions.models import CampaignRemittance, MemberContribution
 
@@ -581,6 +648,8 @@ def build_campaign_register(churches, start, end) -> dict:
         .order_by("church__name", "deadline", "name")
         .distinct()
     )
+    if kind:
+        qs = qs.filter(kind=kind)
     total = qs.count()
     truncated = total > CAMPAIGN_REGISTER_ROW_LIMIT
     raised_total = Decimal("0.00")

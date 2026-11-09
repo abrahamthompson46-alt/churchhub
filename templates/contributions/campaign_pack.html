@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Collection pack — {{ campaign.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+@media print {
+    .no-print, .app-breadcrumb, .page-header, .module-tabs, .navbar, .flash-messages { display: none !important; }
+}
+.collection-pack h2 { font-size: 1rem; margin-top: 1.25rem; }
+.collection-pack .meta p { margin-bottom: 0.25rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container collection-pack">
+    <div class="d-flex gap-2 mb-3 no-print">
+        <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">Print</button>
+        <a href="{% url 'contributions:campaign_detail' campaign.pk %}" class="btn btn-outline-secondary btn-sm">Back to campaign</a>
+    </div>
+
+    <h1 class="h4 mb-2">{{ campaign.name }}</h1>
+    <div class="meta mb-3">
+        <p><strong>Church:</strong> {{ church.name }}{% if church.district %} · {{ church.district.name }}{% endif %}</p>
+        <p><strong>Type:</strong> {{ campaign.get_kind_display }} · <strong>Code:</strong> {{ campaign.code }} · <strong>Deadline:</strong> {{ campaign.deadline }}</p>
+        <p><strong>Raised:</strong> {{ summary.total_raised|floatformat:2|intcomma }} · <strong>Remitted:</strong> {{ summary.remitted_total|floatformat:2|intcomma }} · <strong>Still to send:</strong> {{ summary.outstanding_to_district|floatformat:2|intcomma }}</p>
+    </div>
+
+    <h2>Who gave</h2>
+    <table class="table table-sm">
+        <thead><tr><th>Member</th><th>Member ID</th><th class="text-end">Gifts</th><th class="text-end">Total</th></tr></thead>
+        <tbody>
+            {% for row in member_totals %}
+            <tr>
+                <td>{{ row.member__first_name }} {{ row.member__last_name }}</td>
+                <td>{{ row.member__membership_number|default:"—" }}</td>
+                <td class="text-end">{{ row.gift_count }}</td>
+                <td class="text-end text-currency">{{ row.total|floatformat:2|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-muted">No approved gifts yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Remitted vs still to send</h2>
+    <table class="table table-sm">
+        <thead><tr><th>Working day</th><th>Journal</th><th>Status</th><th>Cash / Bank</th><th class="text-end">Amount</th></tr></thead>
+        <tbody>
+            {% for item in remittances %}
+            <tr>
+                <td>{{ item.working_day }}</td>
+                <td>{{ item.reference }}</td>
+                <td>{{ item.status }}{% if item.is_voided %} · voided{% endif %}</td>
+                <td>{{ item.payment_label|default:"—" }}</td>
+                <td class="text-end text-currency">{{ item.row.amount|floatformat:2|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-muted">Nothing remitted yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p class="small text-muted mb-0">Pending remits are listed here but cash does not move until a checker approves the journal. Physical send to district is outside ChurchHub.</p>
+</div>
+{% endblock %}

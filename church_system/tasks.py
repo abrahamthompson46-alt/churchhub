@@ -125,6 +125,8 @@ def generate_report_export_task(self, job_id):
         request.session = {}
         params = job.params or {}
         hierarchy = {k: v for k, v in params.items() if k.endswith("_id")}
+        if "campaign_kind" in params:
+            hierarchy["campaign_kind"] = params["campaign_kind"]
         start_date = parse_report_date(params.get("start_date"))
         end_date = parse_report_date(params.get("end_date"))
         data = build_report(

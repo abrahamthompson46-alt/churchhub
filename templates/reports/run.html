@@ -40,6 +40,16 @@
                 {{ form.church }}
             </div>
             {% endif %}
+            {% if report_key == 'campaign_register' %}
+            <div class="filter-field">
+                <label class="form-label" for="id_campaign_kind">Type</label>
+                <select name="campaign_kind" id="id_campaign_kind" class="form-select form-select-sm">
+                    <option value="DISTRICT_FUNERAL"{% if campaign_kind == 'DISTRICT_FUNERAL' %} selected{% endif %}>District funeral collections</option>
+                    <option value="GENERAL"{% if campaign_kind == 'GENERAL' %} selected{% endif %}>Church campaigns</option>
+                    <option value="ALL"{% if campaign_kind == 'ALL' %} selected{% endif %}>All types</option>
+                </select>
+            </div>
+            {% endif %}
             <div class="filter-actions">
                 <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-play-fill me-1"></i>Generate</button>
             </div>

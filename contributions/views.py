@@ -37,7 +37,9 @@ from .services import (
     ContributionServiceError,
     archive_campaign,
     build_bulk_entry_rows,
+    build_campaign_remit_slip,
     build_campaign_summary,
+    build_funeral_collection_pack,
     close_campaign,
     create_campaign,
     open_campaign,
@@ -317,7 +319,7 @@ def campaign_remit(request, pk):
         flash_error(request, "Could not remit. Check the amount and try again.")
         return redirect("contributions:campaign_detail", pk=campaign.pk)
     try:
-        remit_district_funeral_campaign(
+        row = remit_district_funeral_campaign(
             campaign,
             performed_by=request.user,
             amount=form.cleaned_data["amount"],
@@ -329,9 +331,31 @@ def campaign_remit(request, pk):
             request,
             "Funeral remittance journal posted and awaiting checker approval.",
         )
+        return redirect(
+            "contributions:campaign_remit_slip",
+            pk=campaign.pk,
+            remit_pk=row.pk,
+        )
     except ContributionServiceError as exc:
         flash_exception(request, exc)
     return redirect("contributions:campaign_detail", pk=campaign.pk)
+
+
+@_campaign_view_required
+def campaign_pack(request, pk):
+    campaign = selectors.get_campaign_or_404(request, pk)
+    return render(request, "contributions/campaign_pack.html", build_funeral_collection_pack(campaign))
+
+
+@_campaign_view_required
+def campaign_remit_slip(request, pk, remit_pk):
+    campaign = selectors.get_campaign_or_404(request, pk)
+    remittance = selectors.get_campaign_remittance_or_404(campaign, remit_pk)
+    return render(
+        request,
+        "contributions/remit_slip.html",
+        build_campaign_remit_slip(campaign, remittance),
+    )
 
 
 @_record_required

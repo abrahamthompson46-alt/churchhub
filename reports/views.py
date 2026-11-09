@@ -55,6 +55,17 @@ def report_index(request):
     })
 
 
+def _campaign_register_kind(request):
+    raw = request.GET.get("campaign_kind", "DISTRICT_FUNERAL")
+    if raw in ("ALL", ""):
+        return "ALL"
+    from contributions.models import CampaignKind
+
+    if raw in CampaignKind.values:
+        return raw
+    return "DISTRICT_FUNERAL"
+
+
 def _export_params_from_form(cleaned):
     params = {
         "period": cleaned.get("period", "monthly"),
@@ -65,6 +76,13 @@ def _export_params_from_form(cleaned):
         val = cleaned.get(key)
         if val:
             params[f"{key}_id"] = str(val.pk)
+    return params
+
+
+def _report_export_params(request, report_key, cleaned):
+    params = _export_params_from_form(cleaned)
+    if report_key == "campaign_register":
+        params["campaign_kind"] = _campaign_register_kind(request)
     return params
 
 
@@ -113,9 +131,11 @@ def run_report(request, report_key):
     export_fmt = request.GET.get("export")
     want_async = export_fmt in ("csv", "excel", "pdf") and request.GET.get("async") == "1"
 
+    campaign_kind = _campaign_register_kind(request) if report_key == "campaign_register" else ""
+
     if form.is_valid() and want_async:
         # Skip sync build_report — Celery rebuilds the export (avoids double work)
-        params = _export_params_from_form(form.cleaned_data)
+        params = _report_export_params(request, report_key, form.cleaned_data)
         job = _queue_async_export(
             request.user,
             report_key,
@@ -136,6 +156,9 @@ def run_report(request, report_key):
 
     if form.is_valid():
         cleaned = form.cleaned_data
+        extra = {}
+        if report_key == "campaign_register":
+            extra["campaign_kind"] = campaign_kind
         data = build_report(
             report_key,
             request,
@@ -143,10 +166,11 @@ def run_report(request, report_key):
             start_date=cleaned.get("start_date"),
             end_date=cleaned.get("end_date"),
             **_hierarchy_kwargs(cleaned),
+            **extra,
         )
 
     if data and export_fmt in ("csv", "excel", "pdf"):
-        params = _export_params_from_form(form.cleaned_data)
+        params = _report_export_params(request, report_key, form.cleaned_data)
         row_count = len(data.get("rows") or [])
         log_report_access(
             user=request.user,
@@ -170,7 +194,7 @@ def run_report(request, report_key):
             user=request.user,
             report_key=report_key,
             action=ReportAccessAuditLog.ACTION_RUN,
-            params=_export_params_from_form(form.cleaned_data) if form.is_valid() else {},
+            params=_report_export_params(request, report_key, form.cleaned_data) if form.is_valid() else {},
             row_count=len(data.get("rows") or []),
             church=active,
         )
@@ -188,6 +212,7 @@ def run_report(request, report_key):
         "data": data,
         "export_links": export_links,
         "show_hierarchy": form.show_hierarchy_filters,
+        "campaign_kind": campaign_kind,
         "breadcrumbs": [
             {"label": "Reports", "url": "/reports/"},
             {"label": meta["label"]},

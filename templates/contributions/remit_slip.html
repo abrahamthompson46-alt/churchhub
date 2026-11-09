@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Remit slip — {{ campaign.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+@media print {
+    .no-print, .app-breadcrumb, .page-header, .module-tabs, .navbar, .flash-messages { display: none !important; }
+}
+.remit-slip dt { font-weight: 600; }
+.remit-slip dd { margin-bottom: 0.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container remit-slip">
+    <div class="d-flex gap-2 mb-3 no-print">
+        <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">Print</button>
+        <a href="{% url 'contributions:campaign_detail' campaign.pk %}" class="btn btn-outline-secondary btn-sm">Back to campaign</a>
+        <a href="{% url 'contributions:campaign_pack' campaign.pk %}" class="btn btn-outline-secondary btn-sm">Collection pack</a>
+    </div>
+
+    <h1 class="h4 mb-2">Campaign remit slip</h1>
+    {% if is_pending %}
+    <p class="text-warning">Journal is pending checker approval. Cash/Bank has not moved yet. Print after approval for the physical send.</p>
+    {% elif is_approved %}
+    <p>Journal approved. Present this slip with the cash or bank transfer to district.</p>
+    {% endif %}
+
+    <dl>
+        <dt>Church</dt>
+        <dd>{{ church.name }}{% if church.district %} · {{ church.district.name }}{% endif %}</dd>
+        <dt>Campaign</dt>
+        <dd>{{ campaign.name }} ({{ campaign.code }})</dd>
+        <dt>Amount</dt>
+        <dd class="text-currency">{{ remittance.amount|floatformat:2|intcomma }}</dd>
+        <dt>Cash / Bank</dt>
+        <dd>{{ payment_label|default:"—" }}</dd>
+        <dt>Working day</dt>
+        <dd>{{ working_day }}</dd>
+        <dt>Posted by</dt>
+        <dd>{% if posted_by %}{{ posted_by.get_full_name|default:posted_by.username }}{% else %}—{% endif %}</dd>
+        <dt>Journal</dt>
+        <dd>{{ transaction.reference }} · {{ transaction.get_approval_status_display }}{% if transaction.is_voided %} · voided{% endif %}</dd>
+        {% if remittance.notes %}
+        <dt>Notes</dt>
+        <dd>{{ remittance.notes }}</dd>
+        {% endif %}
+    </dl>
+</div>
+{% endblock %}

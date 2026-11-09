@@ -61,7 +61,10 @@ def campaigns_for_request(request, *, status=None, kind=None, church=None):
 
 def get_campaign_or_404(request, pk):
     qs = filter_by_church(ContributionCampaign.objects.all(), request, field="church")
-    return get_object_or_404(qs.select_related("offering_category", "church"), pk=pk)
+    return get_object_or_404(
+        qs.select_related("offering_category", "church", "church__district"),
+        pk=pk,
+    )
 
 
 def open_portal_campaigns(church):
@@ -168,10 +171,16 @@ def member_target_for(campaign, member):
 
 
 def remittances_for_campaign(campaign):
-    return CampaignRemittance.objects.filter(campaign=campaign).select_related(
-        "transaction",
-        "remitted_by",
+    return (
+        CampaignRemittance.objects.filter(campaign=campaign)
+        .select_related("transaction", "remitted_by")
+        .prefetch_related("transaction__lines__account")
+        .order_by("created_at")
     )
+
+
+def get_campaign_remittance_or_404(campaign, remit_pk):
+    return get_object_or_404(remittances_for_campaign(campaign), pk=remit_pk)
 
 
 def remittance_for_transaction(transaction):

@@ -115,7 +115,7 @@ REPORT_CATALOG = {
     },
     "campaign_register": {
         "label": "Campaign Register",
-        "description": "Contribution campaigns and district funeral remits by church in your scope.",
+        "description": "Campaigns by church. Defaults to district funeral collections; choose All types for every campaign.",
         "icon": "bi-bullseye",
         "permission": "finance",
         "requires_feature": "contribution_campaigns",

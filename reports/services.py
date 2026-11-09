@@ -216,7 +216,10 @@ def build_report(report_key, request, period="monthly", start_date=None, end_dat
     builder = builders.get(report_key)
     if not builder:
         raise ValueError(f"Unknown report: {report_key}")
-    data = builder(request, start, end, **hierarchy)
+    extra = {}
+    if report_key == "campaign_register":
+        extra["campaign_kind"] = hierarchy.pop("campaign_kind", "DISTRICT_FUNERAL")
+    data = builder(request, start, end, **extra, **hierarchy)
     data["period_label"] = dict(PERIOD_CHOICES).get(period, period)
     data["start_date"] = start
     data["end_date"] = end
@@ -1043,11 +1046,16 @@ def _settlement_register_report(request, start, end, **hierarchy):
     return pack
 
 
-def _campaign_register_report(request, start, end, **hierarchy):
-    from contributions.services import build_campaign_register
+def _campaign_register_report(request, start, end, campaign_kind="DISTRICT_FUNERAL", **hierarchy):
+    from contributions.services import build_campaign_register, resolve_campaign_register_kind
 
     churches = _churches_in_scope(request, **hierarchy).select_related("district")
-    return build_campaign_register(churches, start, end)
+    return build_campaign_register(
+        churches,
+        start,
+        end,
+        kind=resolve_campaign_register_kind(campaign_kind),
+    )
 
 
 def _budget_vs_actual_report(request, start, end, **hierarchy):

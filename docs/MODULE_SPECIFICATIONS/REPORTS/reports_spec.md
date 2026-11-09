@@ -64,7 +64,7 @@ erDiagram
 | asset_hierarchy_rollup | overseer | feature `assets` |
 | welfare_register | finance | feature `remittance` |
 | settlement_register | finance | feature `remittance` |
-| campaign_register | finance | feature `contribution_campaigns` |
+| campaign_register | finance | feature `contribution_campaigns`; type filter defaults to district funerals (`campaign_kind`) |
 | budget_vs_actual | finance | feature `budgets` |
 | member_summary, transfer_report, attendance_summary | members | — |
 | hierarchy_rollup | overseer | — |

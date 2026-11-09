@@ -414,7 +414,17 @@ class DistrictFuneralCampaignTests(ContributionCampaignTests):
         self.assertEqual(response.status_code, 302)
         from contributions.models import CampaignRemittance
 
-        self.assertEqual(CampaignRemittance.objects.filter(campaign=self.funeral).count(), 1)
+        row = CampaignRemittance.objects.get(campaign=self.funeral)
+        self.assertEqual(
+            response.url,
+            reverse("contributions:campaign_remit_slip", args=[self.funeral.pk, row.pk]),
+        )
+        slip = client.get(response.url)
+        self.assertEqual(slip.status_code, 200)
+        self.assertContains(slip, "40.00")
+        self.assertContains(slip, "Bank")
+        self.assertContains(slip, row.transaction.reference)
+        self.assertContains(slip, "pending")
 
     def test_remit_defaults_to_cash(self):
         form = RemitCampaignForm()
@@ -434,6 +444,59 @@ class DistrictFuneralCampaignTests(ContributionCampaignTests):
         )
         credit = row.transaction.lines.get(amount__lt=0)
         self.assertEqual(credit.account.account_type, "CASH")
+
+    def test_collection_pack_lists_givers_and_journals(self):
+        record_member_contribution(
+            self.funeral,
+            member=self.member,
+            amount=Decimal("80.00"),
+            performed_by=self.treasurer,
+            idempotency_key="funeral-pack-gift-1",
+        )
+        client = Client()
+        client.login(username="treasury_cc", password="pass12345")
+        session = client.session
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        response = client.get(reverse("contributions:campaign_pack", args=[self.funeral.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Campaign Member")
+        self.assertContains(response, "80.00")
+        self.assertContains(response, self.church.name)
+
+    def test_other_church_cannot_open_funeral_pack(self):
+        other = Church.objects.create(name="Pack Church", code="CHP", district=self.church.district)
+        User.objects.create_user(
+            username="treasury_pack_other",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=other,
+        )
+        client = Client()
+        client.login(username="treasury_pack_other", password="pass12345")
+        session = client.session
+        session["current_church_id"] = str(other.id)
+        session.save()
+        response = client.get(reverse("contributions:campaign_pack", args=[self.funeral.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_campaign_register_defaults_to_district_funerals(self):
+        from contributions.services import build_campaign_register
+
+        start = timezone.localdate()
+        end = start + timedelta(days=30)
+        funerals = build_campaign_register(
+            [self.church],
+            start,
+            end,
+            kind=CampaignKind.DISTRICT_FUNERAL,
+        )
+        all_types = build_campaign_register([self.church], start, end, kind=None)
+        names = [row[2] for row in funerals["rows"]]
+        self.assertEqual(funerals["summary"]["campaign_count"], 1)
+        self.assertIn("Sister Mensah funeral", names)
+        self.assertNotIn("Annual Harvest", names)
+        self.assertGreaterEqual(all_types["summary"]["campaign_count"], 2)
 
     def test_district_treasury_lists_campaigns_by_church(self):
         from permissions.org_scope import apply_org_scope

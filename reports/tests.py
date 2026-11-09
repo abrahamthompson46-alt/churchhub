@@ -253,6 +253,13 @@ class ReportsTests(TestCase):
         data = build_report("campaign_register", self._request(), period="monthly")
         self.assertEqual(data["title"], "Campaign Register")
         self.assertIn("Church", data["headers"])
+        all_types = build_report(
+            "campaign_register",
+            self._request(),
+            period="monthly",
+            campaign_kind="ALL",
+        )
+        self.assertEqual(all_types["title"], "Campaign Register")
 
     def test_member_without_view_reports_denied_index(self):
         # MEMBER is outside report catalog defaults; finance implies do not grant it.

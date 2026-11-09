@@ -77,7 +77,9 @@ class AutoApproveRegressionTests(TestCase):
             tithe_amount=Decimal("25.00"),
         )
         self.assertEqual(txn.approval_status, "PENDING")
-        with self.assertRaises(ValueError):
+        from django.core.exceptions import PermissionDenied
+
+        with self.assertRaises(PermissionDenied):
             approve_transaction(txn, self.treasurer)
 
     def test_maker_cannot_reject_own_transaction(self):
@@ -498,7 +500,13 @@ class AuthorizedModuleJournalCheckerTests(TestCase):
         sa_result = approve_module_journal(sa_txn, self.superadmin)
         self.assertEqual(sa_result.approval_status, "PENDING")
         self.assertFalse(sa_result.locked)
-        with self.assertRaises(ValueError):
+        from django.core.exceptions import PermissionDenied
+
+        with self.assertRaises(PermissionDenied):
             approve_transaction(txn, self.treasurer)
+        with self.assertRaises(PermissionDenied):
+            approve_transaction(txn, self.district_pastor)
         approved = approve_transaction(sa_txn, self.superadmin)
         self.assertEqual(approved.approval_status, "APPROVED")
+        still_pending = approve_transaction(txn, self.pastor)
+        self.assertEqual(still_pending.approval_status, "APPROVED")

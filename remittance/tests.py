@@ -363,11 +363,11 @@ class RemittancePolicyTests(TestCase):
         today = timezone.now().date()
         remit = record_district_remittance(
             church=self.church,
-            created_by=self.pastor,
+            created_by=self.treasurer,
             amount=Decimal("0.00"),
             month_date=today,
         )
-        approve_transaction(remit, self.treasurer)
+        approve_transaction(remit, self.pastor)
         with self.assertRaises(RemittancePolicyError) as ctx:
             create_settlement_draft(
                 from_unit_type="CHURCH",
@@ -404,12 +404,12 @@ class RemittancePolicyTests(TestCase):
         bank_before = get_cash_position(self.church)["bank"]
         remit = record_district_remittance(
             church=self.church,
-            created_by=self.pastor,
+            created_by=self.treasurer,
             amount=Decimal("0.00"),
             payment_account_type="BANK",
             month_date=today,
         )
-        approve_transaction(remit, self.treasurer)
+        approve_transaction(remit, self.pastor)
         bank_after = get_cash_position(self.church)["bank"]
         self.assertEqual(bank_before - bank_after, Decimal("80.00"))
         clearing = Account.objects.get(church=self.church, code="DISTRICT_TITHE_REMIT")
@@ -439,12 +439,12 @@ class RemittancePolicyTests(TestCase):
         today = timezone.now().date()
         remit = record_district_remittance(
             church=self.church,
-            created_by=self.pastor,
+            created_by=self.treasurer,
             amount=Decimal("0.00"),
             payment_account_type="BANK",
             month_date=today,
         )
-        approve_transaction(remit, self.treasurer)
+        approve_transaction(remit, self.pastor)
         self.assertTrue(
             Notification.objects.filter(
                 user=district_officer,

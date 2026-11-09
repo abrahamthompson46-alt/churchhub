@@ -192,7 +192,7 @@ class TransactionAdmin(admin.ModelAdmin):
             try:
                 svc_approve(obj, request.user)
                 updated += 1
-            except ValueError:
+            except (ValueError, PermissionDenied):
                 continue
         self.message_user(request, f"{updated} transaction(s) approved.")
     approve_selected.short_description = "Approve selected transactions"

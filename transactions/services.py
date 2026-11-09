@@ -7,6 +7,7 @@ import logging
 
 from decimal import Decimal
 
+from django.core.exceptions import PermissionDenied
 from django.db import transaction as db_transaction
 from django.db.models import Sum
 from django.utils import timezone
@@ -1004,6 +1005,13 @@ def approve_transaction(transaction, user):
         return locked
     if locked.locked:
         raise ValueError("Transaction is already locked.")
+    from approvals.services import actor_may_decide
+
+    if not actor_may_decide(user, locked):
+        raise PermissionDenied(
+            "Not authorized to approve this journal. Requires approve_transactions "
+            "or a valid in-scope delegation; District Administrator cannot decide."
+        )
     _assert_not_self_maker(locked, user, "approve")
 
     assert_period_open(locked.church, locked.date)

@@ -214,7 +214,9 @@ class FinancialServicesTests(TestCase):
             created_by=self.treasurer,
             amount=Decimal("10.00"),
         )
-        with self.assertRaises(ValueError):
+        from django.core.exceptions import PermissionDenied
+
+        with self.assertRaises(PermissionDenied):
             approve_transaction(txn, self.treasurer)
 
     def test_approver_can_approve_transaction(self):
@@ -254,12 +256,12 @@ class FinancialServicesTests(TestCase):
 
         remit = record_district_remittance(
             church=self.church,
-            created_by=self.pastor,
+            created_by=self.treasurer,
             amount=cutoff.total_payable,
             month_date=month,
         )
         validate_transaction_balance(remit)
-        approve_transaction(remit, self.treasurer)
+        approve_transaction(remit, self.pastor)
         cutoff.refresh_from_db()
         self.assertTrue(cutoff.transferred)
 
@@ -774,11 +776,11 @@ class SecurityAndIntegrityTests(FinancialServicesTests):
         cutoff = generate_monthly_cutoff(self.church, month)
         remit = record_district_remittance(
             church=self.church,
-            created_by=self.pastor,
+            created_by=self.treasurer,
             amount=cutoff.total_payable,
             month_date=month,
         )
-        approve_transaction(remit, self.treasurer)
+        approve_transaction(remit, self.pastor)
         cutoff.refresh_from_db()
         self.assertTrue(cutoff.transferred)
         with self.assertRaises(ValueError):

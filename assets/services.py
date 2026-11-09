@@ -684,8 +684,12 @@ def post_disposal_to_ledger(asset, user, disposal_date=None, *, checker=None):
     if not policy.post_disposal_to_ledger:
         return None
 
-    if asset.disposal_transaction_id:
-        return asset.disposal_transaction
+    decision_user = checker if checker is not None else user
+    existing = asset.disposal_transaction
+    if existing is not None:
+        if _journal_is_approved(existing):
+            return existing
+        return approve_module_journal(existing, decision_user)
 
     disposal_date = disposal_date or asset.disposed_at or timezone.now().date()
     assert_period_open(asset.church, disposal_date)
@@ -729,16 +733,7 @@ def post_disposal_to_ledger(asset, user, disposal_date=None, *, checker=None):
     )
     asset.disposal_transaction = trx
     repo.save_asset(asset, update_fields=["disposal_transaction", "updated_at"])
-    trx = approve_module_journal(trx, checker)
-    if trx.approval_status != "APPROVED":
-        raise AssetError(
-            "Asset disposal journal requires an authorized checker other than "
-            "the disposer (approve_transactions or a valid in-scope "
-            "delegation). Asset posting permission is not general-ledger "
-            "approval authority. "
-            f"Journal {trx.reference} is pending; asset not marked disposed."
-        )
-    return trx
+    return approve_module_journal(trx, decision_user)
 
 
 @db_transaction.atomic
@@ -759,8 +754,12 @@ def dispose_asset(asset, user, disposal_date=None, notes="", *, checker=None):
             asset, user, disposal_date=disposal_date, checker=checker
         )
         asset.refresh_from_db()
-        if not asset.disposal_transaction_id:
-            raise AssetError("Disposal journal was not approved; asset not disposed.")
+        trx = asset.disposal_transaction
+        if not _journal_is_approved(trx):
+            if notes:
+                asset.disposal_notes = notes
+                repo.save_asset(asset, update_fields=["disposal_notes", "updated_at"])
+            return asset
     asset.status = "DISPOSED"
     asset.disposed_at = disposal_date
     asset.disposal_notes = notes

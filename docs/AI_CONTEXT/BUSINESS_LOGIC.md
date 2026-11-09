@@ -276,6 +276,8 @@ Editable when DRAFT or REJECTED. Approval / capitalize / depreciate paths post i
 
 **Depreciation (Current):** HTTP `run_monthly_depreciation(..., allow_approval=True)` prepares a CAPITAL journal, links an unapplied `AssetDepreciationEntry`, then approves only when `resolve_authorized_journal_checker` returns the signed-in user (not the maker). Management-command / Celery runs use `allow_approval=False` and leave journals PENDING. Generic `approve_transaction` refuses journals linked by that FK (and unlinked CAPITAL). Stored NBV updates only in the same atomic block as journal approval. `0006` adds workflow fields with historical rows defaulted POSTED/applied; `0007` reclassifies from the journal FK only (PENDING/REJECTED/voided). `0007` reverse is a no-op.
 
+**Disposal (Current):** HTTP dispose uses the signed-in user as the only checker candidate. The disposer cannot post their own CAPITAL journal. The first submit links a PENDING disposal journal and leaves the asset ACTIVE; an eligible other user submits dispose again to approve via `approve_module_journal` and mark DISPOSED. Generic ledger approval still refuses that CAPITAL row. Acquisition still posts in the same atomic as asset approve (submitter vs approver).
+
 ---
 
 ## 8. Meetings and attendance

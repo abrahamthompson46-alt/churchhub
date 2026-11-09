@@ -42,7 +42,11 @@ def assets_for_church(church, *, status="", q=""):
 
 
 def asset_for_church(church, pk):
-    return get_object_or_404(FixedAsset, pk=pk, church=church)
+    return get_object_or_404(
+        FixedAsset.objects.select_related("disposal_transaction", "acquisition_transaction"),
+        pk=pk,
+        church=church,
+    )
 
 
 def active_assets_for_church(church, *, with_category=False):

@@ -280,6 +280,84 @@ class AssetServicesTests(TestCase):
         self.assertEqual(trx.approved_by_id, self.approver.id)
         self.assertNotEqual(trx.created_by_id, trx.approved_by_id)
 
+    def test_dispose_maker_leaves_pending_then_checker_posts(self):
+        category = self.church.asset_categories.first()
+        asset = FixedAsset.objects.create(
+            church=self.church,
+            category=category,
+            asset_code="TC01-FA-0018",
+            name="Old Pew",
+            purchase_date=date(2024, 1, 1),
+            acquisition_cost=Decimal("800.00"),
+            salvage_value=Decimal("0.00"),
+            useful_life_months=12,
+            depreciation_method="STRAIGHT_LINE",
+            status="ACTIVE",
+            accumulated_depreciation=Decimal("100.00"),
+        )
+        open_working_day(self.church, timezone.localdate(), self.approver)
+        prepared = dispose_asset(asset, self.user, notes="Worn out")
+        prepared.refresh_from_db()
+        self.assertEqual(prepared.status, "ACTIVE")
+        self.assertIsNotNone(prepared.disposal_transaction_id)
+        trx = prepared.disposal_transaction
+        self.assertEqual(trx.approval_status, "PENDING")
+        self.assertEqual(trx.created_by_id, self.user.id)
+        completed = dispose_asset(prepared, self.approver, notes="Worn out")
+        completed.refresh_from_db()
+        self.assertEqual(completed.status, "DISPOSED")
+        trx.refresh_from_db()
+        self.assertEqual(trx.approval_status, "APPROVED")
+        self.assertEqual(trx.approved_by_id, self.approver.id)
+
+    def test_http_dispose_uses_authenticated_actor_not_generic_queue(self):
+        from accounts.mfa import SESSION_MFA_VERIFIED, enable_mfa_for_user, generate_totp_secret
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        category = self.church.asset_categories.first()
+        asset = FixedAsset.objects.create(
+            church=self.church,
+            category=category,
+            asset_code="TC01-FA-0019",
+            name="Old Amp",
+            purchase_date=date(2024, 1, 1),
+            acquisition_cost=Decimal("400.00"),
+            salvage_value=Decimal("0.00"),
+            useful_life_months=12,
+            depreciation_method="STRAIGHT_LINE",
+            status="ACTIVE",
+            accumulated_depreciation=Decimal("50.00"),
+        )
+        open_working_day(self.church, timezone.localdate(), self.approver)
+        for actor in (self.user, self.approver):
+            if not getattr(actor, "mfa_enabled", False):
+                enable_mfa_for_user(actor, generate_totp_secret(), [])
+                actor.refresh_from_db()
+
+        def _client(actor):
+            client = Client()
+            client.login(username=actor.username, password="test12345")
+            session = client.session
+            session["current_church_id"] = str(self.church.pk)
+            session[SESSION_MFA_VERIFIED] = True
+            session.save()
+            return client
+
+        url = reverse("assets:asset_dispose", kwargs={"pk": asset.pk})
+        first = _client(self.user).post(url, {"notes": "Broken"})
+        self.assertEqual(first.status_code, 302)
+        asset.refresh_from_db()
+        self.assertEqual(asset.status, "ACTIVE")
+        self.assertEqual(asset.disposal_transaction.approval_status, "PENDING")
+        second = _client(self.approver).post(url, {"notes": "Broken"})
+        self.assertEqual(second.status_code, 302)
+        asset.refresh_from_db()
+        self.assertEqual(asset.status, "DISPOSED")
+        asset.disposal_transaction.refresh_from_db()
+        self.assertEqual(asset.disposal_transaction.approval_status, "APPROVED")
+        self.assertEqual(asset.disposal_transaction.approved_by_id, self.approver.id)
+
     def test_reject_pending_asset(self):
         category = self.church.asset_categories.first()
         asset = FixedAsset.objects.create(

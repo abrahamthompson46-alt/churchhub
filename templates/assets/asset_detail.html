@@ -83,10 +83,13 @@
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white fw-semibold">Dispose Asset</div>
         <div class="card-body">
+            {% if asset.disposal_transaction and asset.disposal_transaction.approval_status == 'PENDING' %}
+            <p class="text-warning small">Disposal journal {{ asset.disposal_transaction.reference }} is pending. An authorized checker other than the disposer must confirm below. This journal cannot be approved from the generic ledger queue.</p>
+            {% endif %}
             <form method="post" action="{% url 'assets:asset_dispose' asset.pk %}">
                 {% csrf_token %}
                 <textarea name="notes" class="form-control mb-2" rows="2" placeholder="Disposal notes"></textarea>
-                <button type="submit" class="btn btn-sm btn-outline-danger">Mark Disposed</button>
+                <button type="submit" class="btn btn-sm btn-outline-danger">{% if asset.disposal_transaction and asset.disposal_transaction.approval_status == 'PENDING' %}Confirm disposal journal{% else %}Mark Disposed{% endif %}</button>
             </form>
         </div>
     </div>

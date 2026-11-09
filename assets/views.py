@@ -20,6 +20,7 @@ from permissions.checks import (
     can_approve_transactions,
     can_export_assets,
     can_manage_asset_policy,
+    can_dispose_assets,
     can_manage_assets,
     can_view_all_churches,
 )
@@ -170,6 +171,7 @@ def asset_detail(request, pk):
         "reject_form": reject_form,
         "can_manage": can_manage_assets(request.user),
         "can_approve": can_approve_assets(request.user),
+        "can_dispose_assets": can_dispose_assets(request.user),
         "depreciation_entries": selectors.asset_depreciation_entries(asset, limit=24),
         "audit_logs": selectors.asset_audit_logs(asset, limit=20),
         "maintenance_logs": selectors.asset_maintenance_logs(asset, limit=20),
@@ -243,15 +245,32 @@ def asset_reject(request, pk):
     return redirect("assets:asset_detail", pk=asset.pk)
 
 
-@_assets_access
+@login_required
+@require_feature("assets")
 @require_POST
 def asset_dispose(request, pk):
+    if not (
+        can_manage_assets(request.user)
+        or can_dispose_assets(request.user)
+        or can_approve_transactions(request.user)
+    ):
+        raise PermissionDenied
     church = require_church(request)
     asset = selectors.asset_for_church(church, pk)
     notes = request.POST.get("notes", "")
     try:
         dispose_asset(asset, request.user, notes=notes)
-        flash_success(request, "Asset marked as disposed.")
+        asset.refresh_from_db()
+        if asset.status == "DISPOSED":
+            flash_success(request, "Asset marked as disposed.")
+        else:
+            flash_warning(
+                request,
+                "Disposal journal is pending. An authorized checker other than "
+                "the disposer must submit dispose again to post the journal "
+                "and mark the asset disposed. Generic ledger approval cannot "
+                "complete this journal.",
+            )
     except AssetError as exc:
         flash_exception(request, exc)
     return redirect("assets:asset_detail", pk=asset.pk)

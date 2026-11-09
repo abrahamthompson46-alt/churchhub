@@ -178,7 +178,10 @@ def settlement_desk_batches(
         qs = qs.filter(status=status)
     if offering_type:
         qs = qs.filter(offering_type=offering_type)
-    return qs.order_by("-period_end", "-created_at").distinct()[:limit]
+    qs = qs.order_by("-period_end", "-created_at").distinct()
+    if limit:
+        return qs[:limit]
+    return qs
 
 
 def settlement_desk_summary(desk_type, desk_id, church_ids):

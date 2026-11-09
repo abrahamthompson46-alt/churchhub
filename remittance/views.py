@@ -14,6 +14,9 @@ from reports.exporters import export_table_csv, export_table_excel, export_table
 from permissions.checks import (
     can_approve_welfare,
     can_disburse_welfare,
+    can_export_reports_csv,
+    can_export_reports_excel,
+    can_export_reports_pdf,
     can_manage_finances,
     can_manage_remittance_policy,
     can_manage_settlements,
@@ -426,6 +429,122 @@ def settlement_list(request):
         "offering_filter": offering_filter or "",
         "show_local_church": show_local_church,
         "can_manage_remittance_policy": can_manage_remittance_policy(request.user),
+        "pack_start": period_defaults["period_start"],
+        "pack_end": period_defaults["period_end"],
+    })
+
+
+def _assert_pack_export(user, export_fmt):
+    checkers = {
+        "csv": can_export_reports_csv,
+        "excel": can_export_reports_excel,
+        "pdf": can_export_reports_pdf,
+    }
+    checker = checkers.get(export_fmt)
+    if checker and not checker(user):
+        raise PermissionDenied
+
+
+@_settlement_access
+def settlement_period_pack(request):
+    church = get_active_church(request)
+    desk = resolve_settlement_desk(request.user, request, church=church)
+    hierarchy_mode = desk is not None and (
+        can_manage_settlements(request.user)
+        or infer_scope_above_church(request.user)
+    )
+    if church and not hierarchy_mode:
+        from sitecontrol.services import church_has_feature
+
+        if not church_has_feature(church, "remittance"):
+            raise PermissionDenied
+
+    today = timezone.now().date()
+    from remittance.period_pack import build_settlement_period_pack, parse_pack_date
+
+    start = parse_pack_date(request.GET.get("start"), today.replace(day=1))
+    end = parse_pack_date(request.GET.get("end"), today)
+    if end < start:
+        start, end = end, start
+    offering = (request.GET.get("offering") or "").upper() or None
+    if offering not in ("TITHE", "COMBINED"):
+        offering = None
+
+    church_qs = get_manageable_churches(request.user).select_related(
+        "district__zone__conference__union__general_conference"
+    )
+    if hierarchy_mode and desk:
+        churches = list(church_qs)
+        pack_desk = desk
+    elif church:
+        churches = list(church_qs.filter(pk=church.pk))
+        pack_desk = None
+    else:
+        raise PermissionDenied
+
+    data = build_settlement_period_pack(
+        start=start,
+        end=end,
+        churches=churches,
+        offering_type=offering,
+        desk=pack_desk,
+    )
+    data["period_label"] = "Custom range"
+    export_fmt = request.GET.get("export")
+    params = {
+        "start": str(start),
+        "end": str(end),
+        "offering": offering or "",
+        "desk": f"{desk.unit_type}:{desk.unit_id}" if desk else "",
+    }
+    if export_fmt in ("csv", "excel", "pdf"):
+        _assert_pack_export(request.user, export_fmt)
+        from reports.services import audit_export
+
+        audit_export(
+            user=request.user,
+            report_key="settlement_register",
+            export_format=export_fmt,
+            row_count=len(data.get("rows") or []),
+            church=church,
+            params=params,
+        )
+        slug = f"settlement-register-{start}-to-{end}"
+        subtitle = f"{start} to {end}"
+        if export_fmt == "csv":
+            return export_table_csv(data["headers"], data["rows"], f"{slug}.csv")
+        if export_fmt == "excel":
+            return export_table_excel(
+                data["headers"], data["rows"], f"{slug}.xlsx", data["title"]
+            )
+        return export_table_pdf(
+            data["headers"], data["rows"], data["title"], subtitle, f"{slug}.pdf"
+        )
+
+    from reports.models import ReportAccessAuditLog
+    from reports.services import log_report_access
+
+    log_report_access(
+        user=request.user,
+        report_key="settlement_register",
+        action=ReportAccessAuditLog.ACTION_RUN,
+        params=params,
+        row_count=len(data.get("rows") or []),
+        church=church,
+    )
+    export_query = request.GET.copy()
+    export_links = {}
+    for fmt in ("csv", "excel", "pdf"):
+        export_query["export"] = fmt
+        export_links[fmt] = f"?{export_query.urlencode()}"
+    return render(request, "remittance/settlement_pack.html", {
+        "data": data,
+        "start": start,
+        "end": end,
+        "offering": offering or "",
+        "desk": desk,
+        "hierarchy_mode": hierarchy_mode,
+        "export_links": export_links,
     })
 
 

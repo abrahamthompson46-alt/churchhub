@@ -86,13 +86,16 @@ Views no longer call remittance model managers / `filter_by_church` directly; jo
 3. **Cross-path (Current):** settlement reclassifies payable → district clearing; bank remittance may follow for the same month and debits clearing first, then payable. The **Remittance desk** (`dashboard:cutoff`) shows this as a numbered path: open working day → confirm due → optional settlement → **remittance payment screen** (`transactions:record_remittance`) → checker approval. The desk links to the payment screen (it does not POST the journal itself). Double cash payout is blocked while a **PENDING** remittance journal exists for the cutoff, or when `transferred` is true **and** outstanding payable+clearing is zero. A stale `transferred` flag with remaining GL does not block a remainder payment. Recording payment requires an **open working day**. Hierarchy **district → conference** drafts can be **Posted** from the Settlement Desk (`post_settlements`); union/GC drafts stay review-only.  
 4. Welfare disbursement requires sufficient WELFARE_FUND balance; posts via unlocked journal lines then `approve_module_journal` (case row locked with `select_for_update`); links `disbursement_transaction`; rejects duplicate disbursements with audit. The GL checker is the disburser and MUST pass `actor_may_decide` for that journal and MUST NOT be the case approver (`created_by`). `disburse_welfare` is not GL approval authority — a church treasurer typically cannot complete disbursement unless they hold a valid in-scope `approve_transactions` delegation. Fail closed: case stays APPROVED, no DISBURSED journal. Next action: a second in-scope officer with `approve_transactions` (or valid delegation), who is not the case approver and is not District Administrator, must disburse.
 5. Voiding a transaction can call `void_welfare_for_transaction`.  
-6. Feature gate: `remittance` (and welfare UI checks `welfare_module_enabled`).
+6. Feature gate: `remittance` (and welfare UI checks `welfare_module_enabled`).  
+7. **Period pack (Current):** Settlement Desk `settlements/pack/` and Report Center `settlement_register` show posted batches (by `posted_at` date), linked TRANSFER journals, and remittance payment journals. Scoped to manageable churches / desk. File export requires `export_reports_*` and writes `ReportAccessAuditLog`. HTML print is a view (`view_remittance` / settlement desk GET). Union/GC drafts are omitted.
 
 ---
 
 ## 4. Services (Current)
 
 **`remittance/services.py`:** `calculate_split`, `get_active_policy`, `get_church_collection_policy`, `post_offering_credit_lines`, `ensure_default_policies_for_church`, settlement draft/post, fund balances, policy save/audit, **scoped** `get_unit_choices` / `unit_in_user_scope`.
+
+**`remittance/period_pack.py`:** `build_settlement_period_pack` (posted batches + linked journals + REMIT payments).
 
 **`remittance/welfare_services.py`:** contribution/ledger, case lifecycle (create, review, approve, reject, cancel, disburse), manual contribution, statements, dashboard KPIs, `can_view_member_welfare`.
 
@@ -108,6 +111,7 @@ Note: thin wrappers of some welfare functions also exist on `services.py` for co
 | `manage_remittance_policy` | `can_manage_remittance_policy` |
 | `manage_settlements` | `can_manage_settlements` |
 | `post_settlements` | `can_post_settlements` — settlement post gate |
+| `export_reports_csv` / `excel` / `pdf` | desk period-pack file download |
 | `view_welfare` | `can_view_welfare` |
 | `manage_welfare_cases` | `can_manage_welfare_cases` |
 | `approve_welfare` | `can_approve_welfare` |
@@ -127,7 +131,7 @@ Views also accept `manage_finances` on some finance/policy gates.
 |------|------|
 | `` | `index` (policies) |
 | `policies/add/`, `policies/<uuid>/edit/` | policy CRUD |
-| `settlements/`, `settlements/<uuid>/post/` | settlements + hierarchy Settlement Desk |
+| `settlements/`, `settlements/pack/`, `settlements/<uuid>/post/` | settlements + hierarchy Settlement Desk + period pack |
 | `welfare/`, `welfare/member/<uuid>/` | welfare index / member statement |
 | `welfare/cases/<uuid>/`, `…/action/` | case detail / actions |
 
@@ -139,7 +143,7 @@ Views also accept `manage_finances` on some finance/policy gates.
 
 **Views:** policy index/create/edit; settlement list/post (`remittance/settlement_desk.py` org scope); welfare views.
 
-**Templates:** `templates/remittance/` (`settlements.html` — desk KPIs, tabs, filters).
+**Templates:** `templates/remittance/` (`settlements.html` — desk KPIs, tabs, filters, period-pack entry; `settlement_pack.html` — printable register).
 
 ---
 
@@ -168,7 +172,9 @@ flowchart LR
   WEL[disburse_welfare_case] --> TXN
   TXN -->|void| VW[void_welfare_for_transaction]
   GIV[giving] -->|read welfare summary| WELSVC[welfare_services]
-  REP[reports welfare_register] --> WEL
+  REP[reports welfare_register / settlement_register] --> WEL
+  PACK[settlement period pack] --> SET
+  PACK --> TXN
 ```
 
 ---

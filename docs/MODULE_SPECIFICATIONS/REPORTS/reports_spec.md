@@ -50,7 +50,8 @@ erDiagram
 2. Feature gates fail closed without church (`advanced_reports`, `payroll`, `assets`, `remittance`, `budgets`).  
 3. Hierarchy filters resolve manageable churches only.  
 4. Detail rows soft-capped (`REPORT_ROW_LIMIT = 500`). The Detailed Financial Report (`general_ledger`) lists approved journal lines with narration and stops at whole journals when the cap is reached.  
-5. Builders are read-only ORM aggregates — must not post journals.
+5. Builders are read-only ORM aggregates — must not post journals.  
+6. **Settlement Register** (`settlement_register`) lists posted `SettlementBatch` rows by **posted date**, linked `SettlementLine.source_transaction` journals, and district remittance payment journals (`FinancialAuditLog.action=REMIT`). Union/GC drafts that stay unposted are omitted. The same pack is available from Settlement Desk (`remittance:settlement_pack`) for users with settlement view rights who may lack Report Center access.
 
 ### Catalog keys (Current)
 
@@ -62,6 +63,7 @@ erDiagram
 | asset_register, depreciation_schedule | finance | feature `assets` |
 | asset_hierarchy_rollup | overseer | feature `assets` |
 | welfare_register | finance | feature `remittance` |
+| settlement_register | finance | feature `remittance` |
 | budget_vs_actual | finance | feature `budgets` |
 | member_summary, transfer_report, attendance_summary | members | — |
 | hierarchy_rollup | overseer | — |
@@ -83,7 +85,7 @@ Views → Services → Selectors → Repositories → Models
 | Services | `reports/services.py` | Access gates, period resolution, builders/formatting, `audit_export` / `log_report_access` |
 | Exporters | `reports/exporters.py` | CSV / Excel / PDF bytes (unchanged) |
 
-**`reports/services.py`:** `user_may_access_report`, `reports_for_user`, date range resolve, `build_report`, per-report builders, hierarchy context, `log_report_access`, `audit_export` (domain CSV/Excel/PDF downloads → `ReportAccessAuditLog` via repository).
+**`reports/services.py`:** `user_may_access_report`, `reports_for_user`, date range resolve, `build_report`, per-report builders (including `_settlement_register_report` → `remittance.period_pack`), hierarchy context, `log_report_access`, `audit_export` (domain CSV/Excel/PDF downloads → `ReportAccessAuditLog` via repository).
 
 **`reports/exporters.py`:** CSV / Excel / PDF table exporters; `build_export_bytes`.
 

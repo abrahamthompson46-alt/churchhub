@@ -1,0 +1,142 @@
+{% load humanize %}
+<article class="stmt" aria-label="{{ data.title }}">
+    <header class="stmt__masthead">
+        <p class="stmt__kicker">ChurchHub · Settlement records</p>
+        <h2 class="stmt__title">{{ data.title }}</h2>
+        <p class="stmt__period">{{ data.period_label }} · {{ data.start_date }} to {{ data.end_date }}</p>
+    </header>
+
+    {% if data.summary %}
+    <div class="stmt__kpis" role="list">
+        <div class="stmt__kpi" role="listitem">
+            <span class="stmt__kpi-label">Posted batches</span>
+            <span class="stmt__kpi-value">{{ data.summary.posted_batches }}</span>
+        </div>
+        <div class="stmt__kpi" role="listitem">
+            <span class="stmt__kpi-label">Linked journals</span>
+            <span class="stmt__kpi-value">{{ data.summary.linked_journals }}</span>
+        </div>
+        <div class="stmt__kpi" role="listitem">
+            <span class="stmt__kpi-label">Remittance payments</span>
+            <span class="stmt__kpi-value">{{ data.summary.remittance_payments }}</span>
+        </div>
+        <div class="stmt__kpi" role="listitem">
+            <span class="stmt__kpi-label">Payable posted</span>
+            <span class="stmt__kpi-value text-currency">{{ data.summary.payable|floatformat:2|intcomma }}</span>
+        </div>
+        <div class="stmt__kpi" role="listitem">
+            <span class="stmt__kpi-label">Cash remitted</span>
+            <span class="stmt__kpi-value text-currency">{{ data.summary.payments|floatformat:2|intcomma }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {% include "includes/table_open.html" with table_title="Posted batches" table_icon="bi-check2-circle" %}
+    <div class="table-responsive table-in-card">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Posted</th>
+                    <th>Period</th>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>Offering</th>
+                    <th class="text-end">Gross</th>
+                    <th class="text-end">Retention</th>
+                    <th class="text-end">Payable</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for batch in data.settlement_pack.batches %}
+                <tr>
+                    <td>{{ batch.posted }}</td>
+                    <td>{{ batch.period }}</td>
+                    <td>{{ batch.from_label }}</td>
+                    <td>{{ batch.to_label }}</td>
+                    <td>{{ batch.offering }}</td>
+                    <td class="text-end text-currency">{{ batch.gross|floatformat:2 }}</td>
+                    <td class="text-end text-currency">{{ batch.retention|floatformat:2 }}</td>
+                    <td class="text-end text-currency">{{ batch.payable|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8">{% include "includes/empty_state.html" with icon="bi-inbox" message="No posted settlements in this period." compact=True %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "includes/table_close.html" %}
+
+    <div class="mt-4">
+    {% include "includes/table_open.html" with table_title="Linked journals" table_icon="bi-journal-text" %}
+    <div class="table-responsive table-in-card">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Church</th>
+                    <th>Journal</th>
+                    <th>Narration</th>
+                    <th>Status</th>
+                    <th class="text-end">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for journal in data.settlement_pack.journals %}
+                <tr>
+                    <td>{{ journal.date }}</td>
+                    <td>{{ journal.church }}</td>
+                    <td>{{ journal.reference }}</td>
+                    <td>{{ journal.narration }}</td>
+                    <td>{{ journal.status }}</td>
+                    <td class="text-end text-currency">{{ journal.amount|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6">{% include "includes/empty_state.html" with icon="bi-journal" message="No linked settlement journals." compact=True %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "includes/table_close.html" %}
+    </div>
+
+    <div class="mt-4">
+    {% include "includes/table_open.html" with table_title="Remittance payments" table_icon="bi-bank" %}
+    <div class="table-responsive table-in-card">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Church</th>
+                    <th>Journal</th>
+                    <th>Narration</th>
+                    <th>Status</th>
+                    <th class="text-end">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in data.settlement_pack.payments %}
+                <tr>
+                    <td>{{ payment.date }}</td>
+                    <td>{{ payment.church }}</td>
+                    <td>{{ payment.reference }}</td>
+                    <td>{{ payment.narration }}</td>
+                    <td>{{ payment.status }}</td>
+                    <td class="text-end text-currency">{{ payment.amount|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6">{% include "includes/empty_state.html" with icon="bi-bank" message="No remittance payments in this period." compact=True %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "includes/table_close.html" %}
+    </div>
+
+    {% if data.notes %}
+    <ul class="small text-muted mt-3 mb-0">
+        {% for note in data.notes %}
+        <li>{{ note }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+</article>

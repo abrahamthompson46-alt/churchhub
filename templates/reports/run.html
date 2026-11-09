@@ -69,6 +69,8 @@
     </div>
     {% if data.ledger %}
     {% include "reports/includes/general_ledger.html" %}
+    {% elif data.settlement_pack %}
+    {% include "reports/includes/settlement_register.html" %}
     {% elif data.statement %}
     {% include "reports/includes/financial_statement.html" %}
     {% else %}

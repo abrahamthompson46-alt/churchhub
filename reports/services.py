@@ -209,6 +209,7 @@ def build_report(report_key, request, period="monthly", start_date=None, end_dat
         "depreciation_schedule": _depreciation_schedule_report,
         "asset_hierarchy_rollup": _asset_hierarchy_rollup_report,
         "welfare_register": _welfare_register_report,
+        "settlement_register": _settlement_register_report,
         "budget_vs_actual": _budget_vs_actual_report,
     }
     builder = builders.get(report_key)
@@ -1022,6 +1023,23 @@ def _welfare_register_report(request, start, end, **hierarchy):
         "rows": rows,
         "truncated": truncated,
     }
+
+
+def _settlement_register_report(request, start, end, **hierarchy):
+    from remittance.period_pack import build_settlement_period_pack
+
+    churches = list(
+        _churches_in_scope(request, **hierarchy).select_related(
+            "district__zone__conference__union__general_conference"
+        )
+    )
+    pack = build_settlement_period_pack(
+        start=start,
+        end=end,
+        churches=churches,
+    )
+    pack["title"] = "Settlement Register"
+    return pack
 
 
 def _budget_vs_actual_report(request, start, end, **hierarchy):

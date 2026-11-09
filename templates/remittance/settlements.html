@@ -148,6 +148,34 @@
     </details>
     {% endif %}
 
+    <details class="mb-4">
+        <summary class="small text-muted" style="cursor:pointer">Period pack</summary>
+        <form method="get" action="{% url 'remittance:settlement_pack' %}" class="row g-2 align-items-end mt-2">
+            {% if desk %}
+            <input type="hidden" name="desk" value="{{ desk.unit_type }}:{{ desk.unit_id }}">
+            {% endif %}
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1" for="desk-pack-start">From</label>
+                <input id="desk-pack-start" type="date" name="start" class="form-control form-control-sm" value="{{ pack_start|date:'Y-m-d' }}">
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1" for="desk-pack-end">To</label>
+                <input id="desk-pack-end" type="date" name="end" class="form-control form-control-sm" value="{{ pack_end|date:'Y-m-d' }}">
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1" for="desk-pack-offering">Offering</label>
+                <select id="desk-pack-offering" name="offering" class="form-select form-select-sm">
+                    <option value="">Any</option>
+                    <option value="TITHE">Tithe</option>
+                    <option value="COMBINED">Combined</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Open register</button>
+            </div>
+        </form>
+    </details>
+
     {% if incoming_rows %}
     <div class="table-wrap table-wrap--center table-wrap--compact mb-4" id="incoming-settlements">
         {% include "includes/table_open.html" with table_title="Incoming" table_icon="bi-inbox" %}

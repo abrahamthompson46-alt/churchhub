@@ -523,3 +523,143 @@ class RemittancePolicyTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.url.startswith(reverse("remittance:index")))
 
+    def test_settlement_period_pack_scoped_and_exportable(self):
+        from accounts.mfa import SESSION_MFA_VERIFIED
+        from django.test import Client
+        from permissions.services import ensure_permission_matrix
+        from remittance.period_pack import build_settlement_period_pack
+        from reports.models import ReportAccessAuditLog
+        from reports.registry import REPORT_CATALOG
+        from reports.services import user_may_access_report
+
+        ensure_permission_matrix()
+        txn = record_receipt(
+            church=self.church,
+            created_by=self.treasurer,
+            combined_amount=Decimal("100.00"),
+        )
+        approve_transaction(txn, self.pastor)
+        today = timezone.now().date()
+        batch = create_settlement_draft(
+            from_unit_type="CHURCH",
+            from_unit_id=self.church.pk,
+            offering_type="COMBINED",
+            period_start=today.replace(day=1),
+            period_end=today,
+            user=self.treasurer,
+            church=self.church,
+        )
+        post_settlement_batch(batch, self.pastor)
+        remit = record_district_remittance(
+            church=self.church,
+            created_by=self.treasurer,
+            amount=Decimal("0.00"),
+            month_date=today,
+        )
+        approve_transaction(remit, self.pastor)
+
+        other_conf = Conference.objects.create(name="Other Conf Pack", code="OCP")
+        other_zone = Zone.objects.create(name="Other Zone Pack", code="OZP", conference=other_conf)
+        other_dist = District.objects.create(name="Other Dist Pack", code="ODP", zone=other_zone)
+        other_church = Church.objects.create(name="Other Church Pack", code="OHP", district=other_dist)
+        other_treasurer = User.objects.create_user(
+            username="other_pack_treasury",
+            password="pass12345",
+            role="TREASURY",
+            church=other_church,
+        )
+        other_pastor = User.objects.create_user(
+            username="other_pack_pastor",
+            password="pass12345",
+            role="LOCAL_PASTOR",
+            church=other_church,
+        )
+        open_working_day(other_church, timezone.localdate(), other_pastor)
+        other_txn = record_receipt(
+            church=other_church,
+            created_by=other_treasurer,
+            combined_amount=Decimal("80.00"),
+        )
+        approve_transaction(other_txn, other_pastor)
+        other_batch = create_settlement_draft(
+            from_unit_type="CHURCH",
+            from_unit_id=other_church.pk,
+            offering_type="COMBINED",
+            period_start=today.replace(day=1),
+            period_end=today,
+            user=other_treasurer,
+            church=other_church,
+        )
+        post_settlement_batch(other_batch, other_pastor)
+
+        pack = build_settlement_period_pack(
+            start=today.replace(day=1),
+            end=today,
+            churches=[self.church],
+        )
+        self.assertEqual(pack["summary"]["posted_batches"], 1)
+        self.assertGreaterEqual(pack["summary"]["linked_journals"], 1)
+        self.assertGreaterEqual(pack["summary"]["remittance_payments"], 1)
+        blob = " ".join(str(cell) for row in pack["rows"] for cell in row)
+        self.assertNotIn(other_church.name, blob)
+        self.assertIn("settlement_register", REPORT_CATALOG)
+        self.assertTrue(
+            user_may_access_report(self.treasurer, "settlement_register", active_church=self.church)
+        )
+
+        client = Client()
+        self.assertTrue(client.login(username="treasury", password="pass12345"))
+        session = client.session
+        session["current_church_id"] = str(self.church.id)
+        session[SESSION_MFA_VERIFIED] = True
+        session.save()
+        html = client.get(
+            reverse("remittance:settlement_pack"),
+            {"start": today.replace(day=1).isoformat(), "end": today.isoformat()},
+        )
+        self.assertEqual(html.status_code, 200)
+        self.assertContains(html, "Settlement Register")
+        self.assertContains(html, "Posted batches")
+        desk = client.get(reverse("remittance:settlements"))
+        self.assertEqual(desk.status_code, 200)
+        self.assertContains(desk, "Period pack")
+        before = ReportAccessAuditLog.objects.filter(
+            report_key="settlement_register",
+            action=ReportAccessAuditLog.ACTION_EXPORT,
+        ).count()
+        csv = client.get(
+            reverse("remittance:settlement_pack"),
+            {
+                "start": today.replace(day=1).isoformat(),
+                "end": today.isoformat(),
+                "export": "csv",
+            },
+        )
+        self.assertEqual(csv.status_code, 200)
+        self.assertEqual(
+            ReportAccessAuditLog.objects.filter(
+                report_key="settlement_register",
+                action=ReportAccessAuditLog.ACTION_EXPORT,
+            ).count(),
+            before + 1,
+        )
+
+    def test_settlement_period_pack_denied_without_view(self):
+        from accounts.mfa import SESSION_MFA_VERIFIED
+        from django.test import Client
+
+        User.objects.create_user(
+            username="member_pack",
+            password="pass12345",
+            role="MEMBER",
+            church=self.church,
+        )
+        client = Client()
+        self.assertTrue(client.login(username="member_pack", password="pass12345"))
+        session = client.session
+        session["current_church_id"] = str(self.church.id)
+        session[SESSION_MFA_VERIFIED] = True
+        session.save()
+        response = client.get(reverse("remittance:settlement_pack"))
+        self.assertEqual(response.status_code, 403)
+

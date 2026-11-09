@@ -9,6 +9,7 @@ urlpatterns = [
     path("policies/add/", views.policy_create, name="policy_create"),
     path("policies/<uuid:pk>/edit/", views.policy_edit, name="policy_edit"),
     path("settlements/", views.settlement_list, name="settlements"),
+    path("settlements/pack/", views.settlement_period_pack, name="settlement_pack"),
     path("settlements/<uuid:pk>/post/", views.settlement_post, name="settlement_post"),
     path("welfare/", views.welfare_index, name="welfare"),
     path("welfare/member/<uuid:member_id>/", views.member_welfare_statement, name="member_welfare"),

@@ -106,6 +106,13 @@ REPORT_CATALOG = {
         "permission": "finance",
         "requires_feature": "remittance",
     },
+    "settlement_register": {
+        "label": "Settlement Register",
+        "description": "Posted settlement batches, linked transfer journals, and district remittance payments for the period.",
+        "icon": "bi-arrow-repeat",
+        "permission": "finance",
+        "requires_feature": "remittance",
+    },
     "budget_vs_actual": {
         "label": "Budget vs Actual",
         "description": "Annual budget performance by account with favorable variance indicators.",

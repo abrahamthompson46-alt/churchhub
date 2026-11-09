@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Settlement Register — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container page-shell">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Settlement Register" page_description="Posted batches, linked journals, and remittance payments for the selected dates." %}
+
+    <form method="get" class="row g-2 align-items-end mb-3">
+        {% if desk %}
+        <input type="hidden" name="desk" value="{{ desk.unit_type }}:{{ desk.unit_id }}">
+        {% endif %}
+        <div class="col-auto">
+            <label class="form-label small text-muted mb-1" for="pack-start">From</label>
+            <input id="pack-start" type="date" name="start" class="form-control form-control-sm" value="{{ start|date:'Y-m-d' }}">
+        </div>
+        <div class="col-auto">
+            <label class="form-label small text-muted mb-1" for="pack-end">To</label>
+            <input id="pack-end" type="date" name="end" class="form-control form-control-sm" value="{{ end|date:'Y-m-d' }}">
+        </div>
+        <div class="col-auto">
+            <label class="form-label small text-muted mb-1" for="pack-offering">Offering</label>
+            <select id="pack-offering" name="offering" class="form-select form-select-sm">
+                <option value="">Any</option>
+                <option value="TITHE" {% if offering == "TITHE" %}selected{% endif %}>Tithe</option>
+                <option value="COMBINED" {% if offering == "COMBINED" %}selected{% endif %}>Combined</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary btn-sm">Generate</button>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'remittance:settlements' %}{% if desk %}?desk={{ desk.unit_type }}:{{ desk.unit_id }}{% endif %}" class="btn btn-outline-secondary btn-sm">Back to desk</a>
+        </div>
+    </form>
+
+    {% if data %}
+    <div class="export-toolbar mb-3">
+        <span class="chip"><i class="bi bi-calendar3"></i> {{ start }} – {{ end }}</span>
+        {% if data.truncated %}
+        <span class="chip text-warning"><i class="bi bi-exclamation-triangle"></i> Results truncated</span>
+        {% endif %}
+        <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-outline-secondary" onclick="window.print()">Print</button>
+            {% if can_export_reports_csv %}
+            <a href="{{ export_links.csv }}" class="btn btn-outline-secondary">CSV</a>
+            {% endif %}
+            {% if can_export_reports_excel %}
+            <a href="{{ export_links.excel }}" class="btn btn-outline-secondary">Excel</a>
+            {% endif %}
+            {% if can_export_reports_pdf %}
+            <a href="{{ export_links.pdf }}" class="btn btn-outline-secondary">PDF</a>
+            {% endif %}
+        </div>
+    </div>
+    {% include "reports/includes/settlement_register.html" %}
+    {% endif %}
+</div>
+{% endblock %}

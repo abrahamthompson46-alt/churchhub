@@ -523,6 +523,29 @@ class RemittancePolicyTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.url.startswith(reverse("remittance:index")))
 
+    def test_welfare_register_toggles_single_form(self):
+        from accounts.mfa import SESSION_MFA_VERIFIED
+        from django.test import Client
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
+        client = Client()
+        self.assertTrue(client.login(username="treasury", password="pass12345"))
+        session = client.session
+        session["current_church_id"] = str(self.church.id)
+        session[SESSION_MFA_VERIFIED] = True
+        session.save()
+        assist = client.get(reverse("remittance:welfare"))
+        self.assertEqual(assist.status_code, 200)
+        self.assertContains(assist, "Request Assistance")
+        self.assertContains(assist, "Submit Case")
+        self.assertNotContains(assist, "Post Contribution")
+        contrib = client.get(reverse("remittance:welfare"), {"form": "contrib"})
+        self.assertEqual(contrib.status_code, 200)
+        self.assertContains(contrib, "Record Contribution")
+        self.assertContains(contrib, "Post Contribution")
+        self.assertNotContains(contrib, "Submit Case")
+
     def test_settlement_period_pack_scoped_and_exportable(self):
         from accounts.mfa import SESSION_MFA_VERIFIED
         from django.test import Client

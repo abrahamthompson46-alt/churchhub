@@ -628,12 +628,16 @@ def welfare_index(request):
     cases = selectors.welfare_cases_for_year(church, year)
     case_form = WelfareCaseForm(church=church)
     contribution_form = WelfareContributionForm(church=church)
+    welfare_form = (request.GET.get("form") or "assist").lower()
+    if welfare_form not in ("assist", "contrib"):
+        welfare_form = "assist"
 
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "create_case":
             if not can_manage_welfare_cases(request.user):
                 raise PermissionDenied
+            welfare_form = "assist"
             case_form = WelfareCaseForm(request.POST, church=church)
             if case_form.is_valid():
                 case = create_welfare_case(
@@ -650,6 +654,7 @@ def welfare_index(request):
         elif action == "record_contribution":
             if not can_manage_welfare_cases(request.user):
                 raise PermissionDenied
+            welfare_form = "contrib"
             contribution_form = WelfareContributionForm(request.POST, church=church)
             if contribution_form.is_valid():
                 try:
@@ -676,6 +681,7 @@ def welfare_index(request):
         "active_church": church,
         "case_form": case_form,
         "contribution_form": contribution_form,
+        "welfare_form": welfare_form,
         "can_manage": can_manage_welfare_cases(request.user),
         "can_approve": can_approve_welfare(request.user),
     })

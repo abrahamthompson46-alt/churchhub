@@ -628,9 +628,9 @@ def welfare_index(request):
     cases = selectors.welfare_cases_for_year(church, year)
     case_form = WelfareCaseForm(church=church)
     contribution_form = WelfareContributionForm(church=church)
-    welfare_form = (request.GET.get("form") or "assist").lower()
+    welfare_form = (request.GET.get("form") or "contrib").lower()
     if welfare_form not in ("assist", "contrib"):
-        welfare_form = "assist"
+        welfare_form = "contrib"
 
     if request.method == "POST":
         action = request.POST.get("action")

@@ -143,7 +143,7 @@ Views also accept `manage_finances` on some finance/policy gates.
 
 **Views:** policy index/create/edit; settlement list/post (`remittance/settlement_desk.py` org scope); welfare views.
 
-**Templates:** `templates/remittance/` (`settlements.html` — desk KPIs, tabs, filters, period-pack entry; `settlement_pack.html` — printable register; `welfare.html` — year KPIs, one form at a time via `?form=assist|contrib`, contribution and case lists).
+**Templates:** `templates/remittance/` (`settlements.html` — desk KPIs, tabs, filters, period-pack entry; `settlement_pack.html` — printable register; `welfare.html` — compact KPIs, one form at a time via `?form=contrib|assist`, default Record Contribution).
 
 ---
 

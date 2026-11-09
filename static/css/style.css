@@ -2927,6 +2927,24 @@ body.app-body.auth-page {
     }
 }
 
+.welfare-entry-shell {
+    max-width: 28rem;
+}
+.welfare-entry-shell .form-card-inner > .card-body {
+    padding: 0.85rem 1rem !important;
+}
+.welfare-entry-shell .form-control,
+.welfare-entry-shell .form-select,
+.welfare-entry-shell .member-picker {
+    max-width: 16rem;
+    width: 16rem;
+}
+.welfare-entry-shell textarea.form-control {
+    max-width: 22rem;
+    width: 22rem;
+    min-height: 2.5rem;
+}
+
 /* Transfer / record member preview */
 .member-preview-card {
     border: 1px solid var(--ch-border);

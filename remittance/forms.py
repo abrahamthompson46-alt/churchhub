@@ -150,7 +150,7 @@ class WelfareCaseForm(forms.Form):
         widget=forms.NumberInput(attrs=input_attrs(step="0.01", min="0.01")),
     )
     reason = forms.CharField(
-        widget=forms.Textarea(attrs=textarea_attrs(rows=3)),
+        widget=forms.Textarea(attrs=textarea_attrs(rows=2)),
     )
 
     def __init__(self, *args, church=None, **kwargs):

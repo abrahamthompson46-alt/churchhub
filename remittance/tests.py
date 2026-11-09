@@ -535,16 +535,16 @@ class RemittancePolicyTests(TestCase):
         session["current_church_id"] = str(self.church.id)
         session[SESSION_MFA_VERIFIED] = True
         session.save()
-        assist = client.get(reverse("remittance:welfare"))
-        self.assertEqual(assist.status_code, 200)
-        self.assertContains(assist, "Request Assistance")
-        self.assertContains(assist, "Submit Case")
-        self.assertNotContains(assist, "Post Contribution")
-        contrib = client.get(reverse("remittance:welfare"), {"form": "contrib"})
+        contrib = client.get(reverse("remittance:welfare"))
         self.assertEqual(contrib.status_code, 200)
         self.assertContains(contrib, "Record Contribution")
         self.assertContains(contrib, "Post Contribution")
         self.assertNotContains(contrib, "Submit Case")
+        assist = client.get(reverse("remittance:welfare"), {"form": "assist"})
+        self.assertEqual(assist.status_code, 200)
+        self.assertContains(assist, "Request Assistance")
+        self.assertContains(assist, "Submit Case")
+        self.assertNotContains(assist, "Post Contribution")
 
     def test_settlement_period_pack_scoped_and_exportable(self):
         from accounts.mfa import SESSION_MFA_VERIFIED

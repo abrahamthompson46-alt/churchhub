@@ -2835,12 +2835,27 @@ body.app-body.auth-page {
     color: var(--ch-muted);
 }
 
-/* ── Finance entry forms (journal, receipt) — compact, centered ── */
+/* ── Finance entry forms (journal, receipt, expense) ── */
 .finance-entry-shell {
     width: 100%;
     max-width: 40rem;
     align-self: center;
     overflow: visible;
+}
+@media (min-width: 992px) {
+    .finance-entry-shell {
+        max-width: none;
+        align-self: stretch;
+    }
+    /* Wider page; keep compact control size */
+    .finance-entry-form .form-control,
+    .finance-entry-form .form-select {
+        max-width: 22rem;
+    }
+    .finance-entry-form textarea.form-control {
+        max-width: 40rem;
+        min-height: 2.5rem;
+    }
 }
 .finance-entry-shell .form-card-inner,
 .finance-entry-shell .form-card-inner.card {
@@ -2905,6 +2920,11 @@ body.app-body.auth-page {
 .finance-entry-shell .form-card-inner > .card-body {
     padding: 1rem 1.25rem !important;
     overflow: visible;
+}
+@media (min-width: 992px) {
+    .finance-entry-shell .form-card-inner > .card-body {
+        padding: 1.35rem 1.75rem !important;
+    }
 }
 
 /* Transfer / record member preview */

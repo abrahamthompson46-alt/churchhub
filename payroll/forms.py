@@ -146,7 +146,7 @@ class PayrollRunForm(PayingUnitFormMixin, forms.Form):
     description = forms.CharField(required=False, widget=forms.TextInput(attrs=input_attrs()))
 
     def __init__(self, *args, church=None, **kwargs):
-        super().__init__(*args, church=church, **kwargs)
+        super().__init__(*args, **kwargs)
         self.church = church
         today = timezone.now().date()
         if not self.initial.get("year"):

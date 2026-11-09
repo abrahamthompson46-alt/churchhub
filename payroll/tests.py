@@ -240,3 +240,10 @@ class PayrollTests(TestCase):
         rows = hierarchy_payroll_rollup(self.treasury, year=2026, month=11)
         self.assertEqual(len(rows), 1)
         self.assertGreater(rows[0]["gross"], Decimal("0"))
+
+    def test_payroll_run_form_accepts_church(self):
+        from payroll.forms import PayrollRunForm
+
+        form = PayrollRunForm(church=self.church)
+        self.assertIn("paying_unit_id", form.fields)
+        self.assertEqual(form.church, self.church)

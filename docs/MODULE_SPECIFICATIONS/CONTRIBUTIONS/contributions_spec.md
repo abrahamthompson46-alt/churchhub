@@ -39,6 +39,7 @@ Churches open **contribution campaigns** (harvest, rent, building, etc.) with a 
 ## Business rules (Current)
 
 - Campaign must link to a church-scoped active `OfferingCategory`.
+- Staff do not enter a campaign code. `generate_campaign_code` assigns `CMP-YYYY-NN` (or `FUN-YYYY-NN` for district funerals), unique per church. Existing codes are not changed on edit.
 - Gifts post as balanced receipts using the category code in `special_offerings`.
 - Recording allowed only when campaign status is **OPEN**.
 - Manual close blocks new entries; archived campaigns are read-only.

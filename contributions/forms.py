@@ -15,7 +15,6 @@ class ContributionCampaignForm(forms.ModelForm):
         fields = [
             "kind",
             "name",
-            "code",
             "purpose",
             "deadline",
             "target_amount",
@@ -26,7 +25,7 @@ class ContributionCampaignForm(forms.ModelForm):
             "send_email_reminders",
         ]
         widgets = {
-            "purpose": forms.Textarea(attrs={"rows": 4}),
+            "purpose": forms.Textarea(attrs={"rows": 2}),
             "deadline": forms.DateInput(attrs={"type": "date"}),
         }
 
@@ -53,12 +52,21 @@ class ContributionCampaignForm(forms.ModelForm):
                         self.fields["offering_category"].initial = funeral.pk
                         self.fields["kind"].initial = CampaignKind.DISTRICT_FUNERAL
         self.fields["kind"].help_text = (
-            "Use District funeral collection for voluntary district bereavement drives. "
-            "Do not record those gifts on the Welfare Register."
+            "District funeral collections are held separately from welfare."
         )
-        self.fields["code"].help_text = "Short unique code (e.g. FUN2026-01 or HARVEST2026)."
+        self.fields["purpose"].help_text = "Shown to members on the portal."
         self.fields["target_amount"].required = False
+        self.fields["target_amount"].label = "Church goal"
         self.fields["default_member_target"].required = False
+        self.fields["default_member_target"].label = "Member target"
+        kind_value = (
+            (self.initial.get("kind") if self.initial else None)
+            or self.data.get("kind")
+            or (self.instance.kind if self.instance.pk else None)
+        )
+        if kind_value == CampaignKind.DISTRICT_FUNERAL:
+            self.fields["offering_category"].widget = forms.HiddenInput()
+            self.fields["offering_category"].required = False
         for field in self.fields.values():
             widget = field.widget
             if isinstance(widget, forms.HiddenInput):
@@ -69,9 +77,6 @@ class ContributionCampaignForm(forms.ModelForm):
                 widget.attrs.setdefault("class", "form-check-input")
             else:
                 widget.attrs.setdefault("class", "form-control form-control-sm")
-
-    def clean_code(self):
-        return (self.cleaned_data.get("code") or "").strip().upper()
 
     def clean_deadline(self):
         deadline = self.cleaned_data.get("deadline")

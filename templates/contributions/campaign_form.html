@@ -3,24 +3,30 @@
 {% block title %}{{ title }} — ChurchHub{% endblock %}
 
 {% block content %}
-<div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title=title page_description="Link each campaign to an offering category for correct receipt posting." %}
+<div class="page-container finance-entry-shell">
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title=title page_description="Gifts post to the selected offering category. Campaign codes are assigned automatically." %}
 
-    <div class="card shadow-sm">
+    <div class="card shadow-sm form-card-inner">
         <div class="card-body">
-            <form method="post" class="row g-3">
+            <form method="post" class="finance-entry-form">
                 {% csrf_token %}
-                {% for field in form %}
-                <div class="{% if field.name in 'purpose portal_visible show_church_progress' %}col-12{% else %}col-md-6{% endif %}">
-                    <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                    {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-                </div>
-                {% endfor %}
-                <div class="col-12 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">Save</button>
-                    <a href="{% if campaign %}{% url 'contributions:campaign_detail' campaign.pk %}{% else %}{% url 'contributions:campaign_list' %}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+                {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+                {% if campaign %}
+                <p class="small text-muted mb-2">Code {{ campaign.code }}</p>
+                {% endif %}
+                {% include "includes/form_field.html" with field=form.kind %}
+                {% include "includes/form_field.html" with field=form.name %}
+                {% include "includes/form_field.html" with field=form.deadline %}
+                {% include "includes/form_field.html" with field=form.offering_category %}
+                {% include "includes/form_field.html" with field=form.target_amount %}
+                {% include "includes/form_field.html" with field=form.default_member_target %}
+                {% include "includes/form_field.html" with field=form.purpose %}
+                {% include "includes/form_field.html" with field=form.portal_visible %}
+                {% include "includes/form_field.html" with field=form.show_church_progress %}
+                {% include "includes/form_field.html" with field=form.send_email_reminders %}
+                <div class="d-flex gap-2 mt-2">
+                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                    <a href="{% if campaign %}{% url 'contributions:campaign_detail' campaign.pk %}{% else %}{% url 'contributions:campaign_list' %}{% endif %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
                 </div>
             </form>
         </div>

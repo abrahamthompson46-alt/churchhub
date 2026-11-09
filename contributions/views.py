@@ -128,7 +128,6 @@ def campaign_create(request):
                 church,
                 performed_by=request.user,
                 name=form.cleaned_data["name"],
-                code=form.cleaned_data["code"],
                 purpose=form.cleaned_data["purpose"],
                 deadline=form.cleaned_data["deadline"],
                 offering_category=form.cleaned_data["offering_category"],

@@ -87,6 +87,27 @@ class ContributionCampaignTests(TestCase):
         )
         open_campaign(self.campaign, performed_by=self.treasurer)
 
+    def test_generates_unique_codes(self):
+        second_campaign = create_campaign(
+            self.church,
+            performed_by=self.treasurer,
+            name="Building Drive",
+            purpose="Roof",
+            deadline=timezone.localdate() + timedelta(days=10),
+            offering_category=self.category,
+        )
+        third_campaign = create_campaign(
+            self.church,
+            performed_by=self.treasurer,
+            name="Youth Drive",
+            purpose="Camp",
+            deadline=timezone.localdate() + timedelta(days=10),
+            offering_category=self.category,
+        )
+        self.assertTrue(second_campaign.code.startswith("CMP-"))
+        self.assertTrue(third_campaign.code.startswith("CMP-"))
+        self.assertNotEqual(second_campaign.code, third_campaign.code)
+
     def test_record_contribution_posts_receipt(self):
         gift = record_member_contribution(
             self.campaign,
@@ -127,6 +148,10 @@ class ContributionCampaignTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Annual Harvest")
         self.assertContains(response, "New Campaign")
+        create = client.get(reverse("contributions:campaign_create"))
+        self.assertEqual(create.status_code, 200)
+        self.assertContains(create, "finance-entry-form")
+        self.assertNotContains(create, 'name="code"')
 
     def test_navigation_includes_new_campaign_for_treasurer(self):
         from accounts.mfa import SESSION_MFA_VERIFIED
@@ -254,6 +279,18 @@ class DistrictFuneralCampaignTests(ContributionCampaignTests):
         )
         open_campaign(self.funeral, performed_by=self.treasurer)
 
+    def test_funeral_codes_use_fun_prefix(self):
+        auto = create_campaign(
+            self.church,
+            performed_by=self.treasurer,
+            name="Brother Owusu funeral",
+            purpose="District funeral collection.",
+            deadline=timezone.localdate() + timedelta(days=14),
+            offering_category=self.funeral_category,
+            kind=CampaignKind.DISTRICT_FUNERAL,
+        )
+        self.assertTrue(auto.code.startswith("FUN-"))
+
     def test_cannot_use_welfare_category(self):
         welfare = OfferingCategory.objects.get(church=self.church, code="WELFARE")
         with self.assertRaises(ValidationError):
@@ -274,7 +311,6 @@ class DistrictFuneralCampaignTests(ContributionCampaignTests):
             data={
                 "kind": CampaignKind.DISTRICT_FUNERAL,
                 "name": "Form funeral",
-                "code": "FUN-FORM-1",
                 "purpose": "District funeral",
                 "deadline": (timezone.localdate() + timedelta(days=10)).isoformat(),
                 "offering_category": str(welfare.pk),
@@ -286,6 +322,7 @@ class DistrictFuneralCampaignTests(ContributionCampaignTests):
         )
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["offering_category"].code, "DISTRICT_FUNERAL")
+        self.assertNotIn("code", form.cleaned_data)
 
     def test_gift_and_remit_posts_pending_transfer(self):
         from contributions.services import build_campaign_summary

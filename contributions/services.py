@@ -41,16 +41,36 @@ def _validate_category_for_church(church, offering_category):
         raise ValidationError({"offering_category": "Offering category must be active."})
 
 
+def generate_campaign_code(church, kind=CampaignKind.GENERAL) -> str:
+    """Allocate a church-unique campaign code (FUN-YYYY-NN or CMP-YYYY-NN)."""
+    year = timezone.localdate().year
+    prefix = "FUN" if kind == CampaignKind.DISTRICT_FUNERAL else "CMP"
+    stem = f"{prefix}-{year}-"
+    existing = ContributionCampaign.objects.filter(
+        church=church, code__startswith=stem
+    ).values_list("code", flat=True)
+    max_seq = 0
+    for value in existing:
+        tail = value[len(stem) :]
+        if tail.isdigit():
+            max_seq = max(max_seq, int(tail))
+    for seq in range(max_seq + 1, max_seq + 1000):
+        candidate = f"{stem}{seq:02d}"
+        if not ContributionCampaign.objects.filter(church=church, code=candidate).exists():
+            return candidate
+    raise ContributionServiceError("Could not allocate a campaign code.")
+
+
 @db_transaction.atomic
 def create_campaign(
     church,
     *,
     performed_by,
     name,
-    code,
     purpose,
     deadline,
     offering_category,
+    code=None,
     target_amount=None,
     default_member_target=None,
     portal_visible=True,
@@ -65,6 +85,8 @@ def create_campaign(
             {"offering_category": "District funeral collections cannot use the Welfare Fund."}
         )
     code = (code or "").strip().upper()
+    if not code:
+        code = generate_campaign_code(church, kind)
     if ContributionCampaign.objects.filter(church=church, code=code).exists():
         raise ValidationError({"code": "A campaign with this code already exists in this church."})
     campaign = ContributionCampaign(

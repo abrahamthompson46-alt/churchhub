@@ -71,8 +71,9 @@
         <div class="card-header fw-semibold">Remit to district</div>
         <div class="card-body">
             {% if summary.has_pending_remittance %}
-            <p class="small text-muted mb-0">A remittance journal is pending approval. Approve it before sending another.</p>
+            <p class="small text-muted mb-0">A remittance journal is pending approval. Approve it before sending another. Approval reduces church Cash or Bank by this amount so you can send that money to district.</p>
             {% elif remit_form %}
+            <p class="small text-muted mb-2">This transfer takes the amount out of church Cash or Bank (after checker approval). Physically send that cash or transfer to district. District does not receive a journal in ChurchHub.</p>
             <form method="post" action="{% url 'contributions:campaign_remit' campaign.pk %}" class="row g-2 align-items-end">
                 {% csrf_token %}
                 {{ remit_form.idempotency_key }}
@@ -123,15 +124,15 @@
     <div class="card shadow-sm mb-4">
         <div class="card-header fw-semibold">Record contribution</div>
         <div class="card-body">
-            <form method="post" action="{% url 'contributions:campaign_record' campaign.pk %}" class="row g-3 align-items-end">
+            <form method="post" action="{% url 'contributions:campaign_record' campaign.pk %}" class="finance-entry-form" style="max-width: 22rem;">
                 {% csrf_token %}
                 {{ record_form.idempotency_key }}
-                <div class="col-md-4">{{ record_form.member.label_tag }}{{ record_form.member }}</div>
-                <div class="col-md-2">{{ record_form.amount.label_tag }}{{ record_form.amount }}</div>
-                <div class="col-md-2">{{ record_form.contribution_date.label_tag }}{{ record_form.contribution_date }}</div>
-                <div class="col-md-2">{{ record_form.payment_account_type.label_tag }}{{ record_form.payment_account_type }}</div>
-                <div class="col-md-2">{{ record_form.notes.label_tag }}{{ record_form.notes }}</div>
-                <div class="col-12"><button type="submit" class="btn btn-primary">Post receipt &amp; record</button></div>
+                {% include "includes/form_field.html" with field=record_form.member %}
+                {% include "includes/form_field.html" with field=record_form.amount %}
+                {% include "includes/form_field.html" with field=record_form.contribution_date %}
+                {% include "includes/form_field.html" with field=record_form.payment_account_type %}
+                {% include "includes/form_field.html" with field=record_form.notes %}
+                <button type="submit" class="btn btn-primary btn-sm">Post receipt &amp; record</button>
             </form>
         </div>
     </div>

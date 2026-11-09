@@ -103,17 +103,31 @@ class ContributionCampaignForm(forms.ModelForm):
 
 
 class RecordContributionForm(forms.Form):
-    member = forms.ModelChoiceField(queryset=Member.objects.none(), label="Member")
-    amount = forms.DecimalField(min_value=0.01, max_digits=14, decimal_places=2)
+    member = forms.ModelChoiceField(
+        queryset=Member.objects.none(),
+        label="Member",
+        widget=forms.HiddenInput(),
+    )
+    amount = forms.DecimalField(
+        min_value=0.01,
+        max_digits=14,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "form-control form-control-sm", "step": "0.01"}),
+    )
     contribution_date = forms.DateField(
         initial=timezone.localdate,
-        widget=forms.DateInput(attrs={"type": "date"}),
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control form-control-sm"}),
     )
     payment_account_type = forms.ChoiceField(
         choices=[("CASH", "Cash"), ("BANK", "Bank")],
         initial="CASH",
+        widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
     )
-    notes = forms.CharField(required=False, max_length=255, widget=forms.TextInput)
+    notes = forms.CharField(
+        required=False,
+        max_length=255,
+        widget=forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+    )
     idempotency_key = forms.CharField(max_length=64, widget=forms.HiddenInput)
 
     def __init__(self, *args, church=None, **kwargs):

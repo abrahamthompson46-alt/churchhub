@@ -152,6 +152,10 @@ class ContributionCampaignTests(TestCase):
         self.assertEqual(create.status_code, 200)
         self.assertContains(create, "finance-entry-form")
         self.assertNotContains(create, 'name="code"')
+        detail = client.get(reverse("contributions:campaign_detail", args=[self.campaign.pk]))
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, "data-member-picker")
+        self.assertContains(detail, "Search member")
 
     def test_navigation_includes_new_campaign_for_treasurer(self):
         from accounts.mfa import SESSION_MFA_VERIFIED

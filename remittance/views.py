@@ -621,7 +621,10 @@ def settlement_post(request, pk):
 @_finance_or_policy
 def welfare_index(request):
     church = require_church(request)
-    year = int(request.GET.get("year", timezone.now().year))
+    try:
+        year = int(request.GET.get("year") or timezone.now().year)
+    except (TypeError, ValueError):
+        year = timezone.now().year
     dashboard = church_welfare_dashboard(church, year=year)
 
     contributions = selectors.welfare_contributions_for_year(church, year)
@@ -669,7 +672,7 @@ def welfare_index(request):
                     )
                     flash_success(request, "Welfare contribution recorded.")
                     return redirect("remittance:welfare")
-                except RemittancePolicyError as exc:
+                except (RemittancePolicyError, ValueError) as exc:
                     flash_exception(request, exc)
 
     return render(request, "remittance/welfare.html", {

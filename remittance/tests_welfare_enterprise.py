@@ -131,6 +131,25 @@ class WelfareEnterpriseTests(TestCase):
         approve_transaction(trx, self.pastor)
         self.assertGreater(get_welfare_fund_balance(self.church), Decimal("0"))
 
+    def test_manual_contribution_defaults_to_working_day(self):
+        from datetime import timedelta
+
+        from remittance.forms import WelfareContributionForm
+
+        form = WelfareContributionForm(church=self.church)
+        self.assertEqual(
+            form.fields["contribution_date"].initial, timezone.localdate()
+        )
+        wrong = timezone.localdate() + timedelta(days=1)
+        with self.assertRaises(RemittancePolicyError):
+            record_manual_welfare_contribution(
+                church=self.church,
+                member=self.member,
+                amount=Decimal("10.00"),
+                user=self.treasurer,
+                contribution_date=wrong,
+            )
+
     def test_fund_balance_guard(self):
         balance = get_welfare_fund_balance(self.church)
         with self.assertRaises(RemittancePolicyError):

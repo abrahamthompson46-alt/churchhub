@@ -627,20 +627,23 @@ def _disburse_welfare_case_atomic(case_id, user, payment_account_type, idempoten
 @db_transaction.atomic
 def record_manual_welfare_contribution(church, member, amount, user, contribution_date=None, notes="", payment_account_type="CASH"):
     """Record welfare contribution via standard receipt posting."""
-    from transactions.services import record_receipt
+    from transactions.services import record_receipt, resolve_transaction_date
 
     if not member:
         raise RemittancePolicyError("A member is required for tracked welfare contributions.")
-    contribution_date = contribution_date or timezone.now().date()
-    trx = record_receipt(
-        church=church,
-        created_by=user,
-        special_offerings={"WELFARE": _quantize(amount)},
-        member=member,
-        payment_account_type=payment_account_type,
-        date=contribution_date,
-        description=notes or f"Welfare contribution — {member.full_name}",
-    )
+    contribution_date = contribution_date or resolve_transaction_date(church)
+    try:
+        trx = record_receipt(
+            church=church,
+            created_by=user,
+            special_offerings={"WELFARE": _quantize(amount)},
+            member=member,
+            payment_account_type=payment_account_type,
+            date=contribution_date,
+            description=notes or f"Welfare contribution — {member.full_name}",
+        )
+    except ValueError as exc:
+        raise RemittancePolicyError(str(exc)) from exc
     contribution = selectors.contribution_for_transaction_member(trx, member)
     if contribution:
         update_fields = []

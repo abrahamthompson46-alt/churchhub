@@ -219,7 +219,6 @@ class WelfareContributionForm(forms.Form):
         widget=forms.NumberInput(attrs=input_attrs(step="0.01", min="0.01")),
     )
     contribution_date = forms.DateField(
-        initial=timezone.now().date,
         widget=forms.DateInput(attrs=input_attrs(type="date")),
     )
     payment_account_type = forms.ChoiceField(
@@ -235,6 +234,10 @@ class WelfareContributionForm(forms.Form):
     def __init__(self, *args, church=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.church = church
+        if church and not self.data:
+            from transactions.services import resolve_transaction_date
+
+            self.fields["contribution_date"].initial = resolve_transaction_date(church)
 
     def clean(self):
         cleaned = super().clean()

@@ -56,6 +56,41 @@ class AccountingReportTests(TestCase):
         self.assertTrue(data["statement"]["balanced"])
         self.assertTrue(data["statement"]["sections"])
 
+    def test_trial_balance_omits_zero_net_accounts(self):
+        cash = Account.objects.filter(church=self.church, account_type="CASH").first()
+        parking = Account.objects.create(
+            name="Zero Holding",
+            account_type="INCOME",
+            church=self.church,
+        )
+        inbound = Transaction.objects.create(
+            transaction_type="RECEIPT",
+            church=self.church,
+            created_by=self.treasury,
+            description="Temporary holding in",
+            approval_status="APPROVED",
+        )
+        TransactionLine.objects.create(transaction=inbound, account=cash, amount=Decimal("50.00"))
+        TransactionLine.objects.create(transaction=inbound, account=parking, amount=Decimal("-50.00"))
+        validate_transaction_balance(inbound)
+        outbound = Transaction.objects.create(
+            transaction_type="TRANSFER",
+            church=self.church,
+            created_by=self.treasury,
+            description="Temporary holding out",
+            approval_status="APPROVED",
+        )
+        TransactionLine.objects.create(transaction=outbound, account=parking, amount=Decimal("50.00"))
+        TransactionLine.objects.create(transaction=outbound, account=cash, amount=Decimal("-50.00"))
+        validate_transaction_balance(outbound)
+
+        data = build_report("trial_balance", self._request(), period="monthly")
+        names = [row[1] for row in data["rows"] if row[1] != "TOTAL"]
+        self.assertNotIn("Zero Holding", names)
+        self.assertIn("Cash", names)
+        self.assertEqual(data["summary"]["total_debit"], data["summary"]["total_credit"])
+        self.assertEqual(data["summary"]["total_debit"], Decimal("100.00"))
+
     def test_balance_sheet_builds(self):
         data = build_report("balance_sheet", self._request(), period="monthly")
         self.assertEqual(data["title"], "Balance Sheet")

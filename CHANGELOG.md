@@ -26,6 +26,10 @@ Versioning per [Semantic Versioning](https://semver.org/).
 - Forwarded client IPs are accepted only from explicitly trusted proxy addresses.
 - Dedicated `MFA_ENCRYPTION_KEY` with `SECRET_KEY` decrypt fallback; absolute sessions; logout-all; IP-primary lockout; privileged password history; birthday photo consent default-off (including existing members via migration); Beat birthday/export purge; non-DEMO denominations close public `/apply/`.
 
+### Changed
+
+- Trial Balance hides accounts with a zero net debit and credit as of period end.
+
 ### Fixed
 
 - Institution hierarchy-admin invitations no longer fail email rendering when no home church is assigned.

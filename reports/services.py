@@ -687,6 +687,8 @@ def _trial_balance(request, start, end, **hierarchy):
     total_credit = Decimal("0")
     for entry in sorted(balances.values(), key=lambda x: (x["church_name"], x["account"].name)):
         bal = _quantize(entry["balance"])
+        if bal == 0:
+            continue
         debit = bal if bal > 0 else Decimal("0")
         credit = abs(bal) if bal < 0 else Decimal("0")
         total_debit += debit
@@ -742,7 +744,8 @@ def _trial_balance(request, start, end, **hierarchy):
         sections=sections,
         notes=[
             "Debits equal credits when the books are in balance. Click a church "
-            "to view account-level debit and credit balances as of period end.",
+            "to view account-level debit and credit balances as of period end. "
+            "Accounts with a zero net balance are omitted.",
         ],
         balanced=difference == 0,
         layout="trial_balance",

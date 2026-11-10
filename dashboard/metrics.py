@@ -26,9 +26,8 @@ def aggregate_giving_and_ie_mtd(finance_church_ids, month_start_date):
         }
     mtd_lines = selectors.lines_for_churches_calendar_month(list(finance_church_ids), month_start_date)
     mtd_tithe, mtd_combined = selectors.sum_tithe_combined_mtd(mtd_lines)
-    mtd_totals = selectors.sum_line_amounts_by_types(mtd_lines, ("INCOME", "EXPENSE"))
-    mtd_income = mtd_totals["INCOME"]
-    mtd_expense = mtd_totals["EXPENSE"]
+    mtd_income = selectors.sum_operating_income(mtd_lines)
+    mtd_expense = selectors.sum_line_amount_for_types(mtd_lines, ("EXPENSE",))
     return {
         "mtd_tithe": mtd_tithe,
         "mtd_combined": mtd_combined,
@@ -64,9 +63,8 @@ def aggregate_giving_calendar_month(finance_church_ids, month_start_date):
         }
     lines = selectors.lines_for_churches_calendar_month(list(finance_church_ids), month_start_date)
     mtd_tithe, mtd_combined = selectors.sum_tithe_combined_mtd(lines)
-    mtd_totals = selectors.sum_line_amounts_by_types(lines, ("INCOME", "EXPENSE"))
-    mtd_income = mtd_totals["INCOME"]
-    mtd_expense = mtd_totals["EXPENSE"]
+    mtd_income = selectors.sum_operating_income(lines)
+    mtd_expense = selectors.sum_line_amount_for_types(lines, ("EXPENSE",))
     return {
         "mtd_tithe": mtd_tithe,
         "mtd_combined": mtd_combined,
@@ -186,8 +184,10 @@ def income_expense_trend_chart(finance_church_ids, now=None, months=12):
             continue
         acc_type = row["account__account_type"]
         amount = float(abs(row["total"] or 0))
-        if acc_type in ("INCOME", "EXPENSE"):
-            buckets[label][acc_type] += amount
+        if acc_type == "EXPENSE":
+            buckets[label]["EXPENSE"] += amount
+        if acc_type in selectors.OPERATING_INCOME_TYPES:
+            buckets[label]["INCOME"] += amount
         if acc_type in tithe_types:
             buckets[label]["TITHE"] += amount
         if acc_type in combined_types:

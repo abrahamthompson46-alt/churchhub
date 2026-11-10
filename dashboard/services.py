@@ -297,13 +297,14 @@ def get_workspace_finance_mtd(request):
     month_start_date = as_of.replace(day=1)
     mtd_lines = selectors.lines_for_churches_calendar_month([church.pk], month_start_date)
     mtd_tithe, mtd_combined = selectors.sum_tithe_combined_mtd(mtd_lines)
-    ie = selectors.sum_line_amounts_by_types(mtd_lines, ("INCOME", "EXPENSE"))
+    mtd_income = selectors.sum_operating_income(mtd_lines)
+    mtd_expense = selectors.sum_line_amount_for_types(mtd_lines, ("EXPENSE",))
     mtd_remit = _sum_remittance_payable_mtd_for_churches([church], month_start_date)
     return {
         "mtd_tithe": mtd_tithe,
         "mtd_combined": mtd_combined,
         "mtd_remittance_payable": mtd_remit,
-        "mtd_net": ie["INCOME"] - ie["EXPENSE"],
+        "mtd_net": mtd_income - mtd_expense,
     }
 
 
@@ -320,9 +321,8 @@ def get_financial_summary(request):
     all_time_lines = selectors.lines_for_transactions(approved)
 
     tithe_total, combined_total = selectors.sum_tithe_combined_mtd(mtd_lines)
-    mtd_totals = selectors.sum_line_amounts_by_types(mtd_lines, ("INCOME", "EXPENSE"))
-    income_total = mtd_totals["INCOME"]
-    expense_total = mtd_totals["EXPENSE"]
+    income_total = selectors.sum_operating_income(mtd_lines)
+    expense_total = selectors.sum_line_amount_for_types(mtd_lines, ("EXPENSE",))
 
     if church:
         monthly_cutoff_total = _sum_remittance_payable_mtd_for_churches(
@@ -354,6 +354,8 @@ def get_financial_summary(request):
             continue
         label = month_val.strftime("%b %Y")
         acc_type = row["account__account_type"]
+        if acc_type == "COMBINED_RETENTION":
+            acc_type = "INCOME"
         if label in trend_dict and acc_type in trend_dict[label]:
             trend_dict[label][acc_type] += float(abs(row["total"] or 0))
 

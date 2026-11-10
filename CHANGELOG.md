@@ -28,6 +28,7 @@ Versioning per [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Income MTD, Net MTD, and Financial Summary operating income include Combined Retention Income (the church share of combined offering). Combined MTD remains gross collected.
 - Member Summary counts new members from 1 January (New this year), not the current month.
 - Trial Balance hides accounts with a zero net debit and credit as of period end, with a Show zeros toggle.
 

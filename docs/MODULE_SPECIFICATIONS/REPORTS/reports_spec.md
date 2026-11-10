@@ -52,7 +52,8 @@ erDiagram
 4. Detail rows soft-capped (`REPORT_ROW_LIMIT = 500`). The Detailed Financial Report (`general_ledger`) lists approved journal lines with narration and stops at whole journals when the cap is reached.  
 5. Builders are read-only ORM aggregates — must not post journals.  
 6. **Settlement Register** (`settlement_register`) lists posted `SettlementBatch` rows by **posted date**, linked `SettlementLine.source_transaction` journals, and district remittance payment journals (`FinancialAuditLog.action=REMIT`). Union/GC drafts that stay unposted are omitted. The same pack is available from Settlement Desk (`remittance:settlement_pack`) for users with settlement view rights who may lack Report Center access.  
-7. **Trial Balance** omits accounts whose signed net as of period end is zero (unused chart accounts were already omitted). Totals still use remaining debit/credit rows. **Show zeros** (`show_zeros=1`) includes posted accounts that net to zero.
+7. **Trial Balance** omits accounts whose signed net as of period end is zero (unused chart accounts were already omitted). Totals still use remaining debit/credit rows. **Show zeros** (`show_zeros=1`) includes posted accounts that net to zero.  
+8. **Financial Summary** operating income / operating net include **Combined Retention Income** (the church share of combined offering). Tithe and combined remittance payable are excluded from operating income. Combined MTD on the dashboard remains gross collected.
 
 ### Catalog keys (Current)
 

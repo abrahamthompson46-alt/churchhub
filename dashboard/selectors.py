@@ -29,6 +29,8 @@ REMIT_PAYABLE_TYPES = ("TITHE_REMIT_PAYABLE", "COMBINED_REMIT_PAYABLE")
 # Gross offering MTD: retain + remit portions (remittance posting uses split accounts).
 TITHE_GIVING_TYPES = ("TITHE", "TITHE_REMIT_PAYABLE")
 COMBINED_GIVING_TYPES = ("COMBINED", "COMBINED_RETENTION", "COMBINED_REMIT_PAYABLE")
+# Local combined share is church operating income; remit payable is not.
+OPERATING_INCOME_TYPES = ("INCOME", "COMBINED_RETENTION")
 INCOME_REMIT_TYPES = TITHE_GIVING_TYPES + COMBINED_GIVING_TYPES
 
 
@@ -130,6 +132,11 @@ def sum_tithe_combined_mtd(lines_qs):
     )
 
 
+def sum_operating_income(lines_qs):
+    """Generic Income plus Combined Retention Income (local combined share)."""
+    return sum_line_amount_for_types(lines_qs, OPERATING_INCOME_TYPES)
+
+
 def remittance_payable_mtd_amounts(church, month_start_date):
     """Return (tithe, combined, total) remittance payable GL sums for church/month."""
     approved_filter = {
@@ -170,7 +177,9 @@ def monthly_cutoff_for_church_month(church, month_start_date):
 
 
 def income_expense_trend_aggregates(lines_qs, since_date):
-    return trend_aggregates_by_account_types(lines_qs, since_date, ["INCOME", "EXPENSE"])
+    return trend_aggregates_by_account_types(
+        lines_qs, since_date, ["INCOME", "EXPENSE", "COMBINED_RETENTION"]
+    )
 
 
 def trend_aggregates_by_account_types(lines_qs, since_date, account_types):

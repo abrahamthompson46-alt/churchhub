@@ -167,6 +167,10 @@ class ServiceTests(DashboardTestMixin, TestCase):
         self.assertEqual(kpis["mtd_remittance_payable"], summary["monthly_cutoff_total"])
         self.assertEqual(kpis["mtd_tithe"], summary["tithe_total"])
         self.assertEqual(kpis["mtd_combined"], summary["combined_total"])
+        # Combined 50 → 25 retain + generic income 10.
+        self.assertEqual(kpis["mtd_income"], Decimal("35.00"))
+        self.assertEqual(kpis["mtd_net"], Decimal("35.00"))
+        self.assertEqual(summary["church_income_total"], Decimal("35.00"))
 
         stale = MonthlyCutoff.objects.create(
             church=self.church,

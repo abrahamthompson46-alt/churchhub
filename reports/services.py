@@ -366,11 +366,12 @@ def _financial_summary(request, start, end, **hierarchy):
     summary = {
         "tithe": _sum_type("TITHE"),
         "combined": _sum_type("COMBINED"),
-        "income": _sum_type("INCOME"),
+        "income": _sum_type("INCOME") + _sum_type("COMBINED_RETENTION"),
         "expense": _sum_type("EXPENSE"),
         "transaction_count": txns.count(),
     }
-    # Operating net excludes tithe/combined (remitted / restricted); documented in row label.
+    # Operating net is generic Income plus Combined Retention (local combined share).
+    # Tithe and combined remit payable stay off this total.
     operating_net = summary["income"] - summary["expense"]
     giving_total = summary["tithe"] + summary["combined"]
     headers = ["Category", "Amount"]
@@ -413,7 +414,7 @@ def _financial_summary(request, start, end, **hierarchy):
                 "id": "fs-income",
                 "title": "Church income (operating)",
                 "total": summary["income"],
-                "lines": _account_activity_lines(lines, ["INCOME"]),
+                "lines": _account_activity_lines(lines, ["INCOME", "COMBINED_RETENTION"]),
                 "empty": "No operating income posted in this period.",
             },
             {
@@ -426,8 +427,9 @@ def _financial_summary(request, start, end, **hierarchy):
         ],
         notes=[
             "Giving subtotal (tithe + combined) is "
-            f"{giving_total}. Operating net is income minus expense and excludes "
-            "tithe and combined offering, which are remitted or restricted.",
+            f"{giving_total}. Operating income includes Combined Retention Income "
+            "(the church share of combined offering). Tithe and combined remittance "
+            "payable are not operating income.",
             f"{summary['transaction_count']} approved journal(s) in this period.",
         ],
     )

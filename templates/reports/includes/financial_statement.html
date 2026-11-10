@@ -25,6 +25,9 @@
     <div class="stmt__toolbar">
         <p class="stmt__hint mb-0"><i class="bi bi-hand-index" aria-hidden="true"></i> Click a section to view account detail.</p>
         <div class="btn-group btn-group-sm">
+            {% if report_key == 'trial_balance' and zeros_toggle_qs %}
+            <a href="?{{ zeros_toggle_qs }}" class="btn {% if show_zeros %}btn-secondary{% else %}btn-outline-secondary{% endif %}">{% if show_zeros %}Hide zeros{% else %}Show zeros{% endif %}</a>
+            {% endif %}
             <button type="button" class="btn btn-outline-secondary" data-stmt-expand="1">Expand all</button>
             <button type="button" class="btn btn-outline-secondary" data-stmt-expand="0">Collapse all</button>
         </div>

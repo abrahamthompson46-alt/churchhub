@@ -14,6 +14,7 @@ from .forms import ReportFilterForm, WelfareStatementForm
 from .models import ReportAccessAuditLog
 from .registry import REPORT_CATALOG
 from .services import (
+    _flag_enabled,
     build_report,
     get_hierarchy_context,
     log_report_access,
@@ -83,7 +84,20 @@ def _report_export_params(request, report_key, cleaned):
     params = _export_params_from_form(cleaned)
     if report_key == "campaign_register":
         params["campaign_kind"] = _campaign_register_kind(request)
+    if report_key == "trial_balance":
+        params["show_zeros"] = "1" if _flag_enabled(request.GET.get("show_zeros")) else "0"
     return params
+
+
+def _zeros_toggle_query(request):
+    params = request.GET.copy()
+    params.pop("export", None)
+    params.pop("async", None)
+    if _flag_enabled(params.get("show_zeros")):
+        params.pop("show_zeros", None)
+    else:
+        params["show_zeros"] = "1"
+    return params.urlencode()
 
 
 def _queue_async_export(user, report_key, export_fmt, params):
@@ -132,6 +146,7 @@ def run_report(request, report_key):
     want_async = export_fmt in ("csv", "excel", "pdf") and request.GET.get("async") == "1"
 
     campaign_kind = _campaign_register_kind(request) if report_key == "campaign_register" else ""
+    show_zeros = _flag_enabled(request.GET.get("show_zeros")) if report_key == "trial_balance" else False
 
     if form.is_valid() and want_async:
         # Skip sync build_report — Celery rebuilds the export (avoids double work)
@@ -159,6 +174,8 @@ def run_report(request, report_key):
         extra = {}
         if report_key == "campaign_register":
             extra["campaign_kind"] = campaign_kind
+        if report_key == "trial_balance":
+            extra["show_zeros"] = show_zeros
         data = build_report(
             report_key,
             request,
@@ -213,6 +230,8 @@ def run_report(request, report_key):
         "export_links": export_links,
         "show_hierarchy": form.show_hierarchy_filters,
         "campaign_kind": campaign_kind,
+        "show_zeros": show_zeros,
+        "zeros_toggle_qs": _zeros_toggle_query(request) if report_key == "trial_balance" else "",
         "breadcrumbs": [
             {"label": "Reports", "url": "/reports/"},
             {"label": meta["label"]},

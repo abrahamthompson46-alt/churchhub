@@ -87,9 +87,20 @@ class AccountingReportTests(TestCase):
         data = build_report("trial_balance", self._request(), period="monthly")
         names = [row[1] for row in data["rows"] if row[1] != "TOTAL"]
         self.assertNotIn("Zero Holding", names)
-        self.assertIn("Cash", names)
+        self.assertIn(cash.name, names)
         self.assertEqual(data["summary"]["total_debit"], data["summary"]["total_credit"])
         self.assertEqual(data["summary"]["total_debit"], Decimal("100.00"))
+
+        shown = build_report(
+            "trial_balance",
+            self._request(),
+            period="monthly",
+            show_zeros=True,
+        )
+        shown_names = [row[1] for row in shown["rows"] if row[1] != "TOTAL"]
+        self.assertIn("Zero Holding", shown_names)
+        self.assertEqual(shown["summary"]["total_debit"], Decimal("100.00"))
+        self.assertTrue(shown["show_zeros"])
 
     def test_balance_sheet_builds(self):
         data = build_report("balance_sheet", self._request(), period="monthly")

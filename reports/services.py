@@ -219,6 +219,8 @@ def build_report(report_key, request, period="monthly", start_date=None, end_dat
     extra = {}
     if report_key == "campaign_register":
         extra["campaign_kind"] = hierarchy.pop("campaign_kind", "DISTRICT_FUNERAL")
+    if report_key == "trial_balance":
+        extra["show_zeros"] = _flag_enabled(hierarchy.pop("show_zeros", False))
     data = builder(request, start, end, **extra, **hierarchy)
     data["period_label"] = dict(PERIOD_CHOICES).get(period, period)
     data["start_date"] = start
@@ -612,6 +614,12 @@ def _payroll_summary(request, start, end, **hierarchy):
     return {"title": "Payroll Summary", "headers": headers, "rows": rows}
 
 
+def _flag_enabled(raw) -> bool:
+    if isinstance(raw, bool):
+        return raw
+    return str(raw or "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def _quantize(value):
     from transactions.services import _quantize_currency
     return _quantize_currency(value or Decimal("0"))
@@ -678,16 +686,17 @@ def _account_balances(churches, end, start=None):
     return balances
 
 
-def _trial_balance(request, start, end, **hierarchy):
+def _trial_balance(request, start, end, show_zeros=False, **hierarchy):
     churches = _churches_in_scope(request, **hierarchy)
     balances = _account_balances(churches, end)
+    show_zeros = _flag_enabled(show_zeros)
     headers = ["Church", "Account", "Type", "Debit", "Credit"]
     rows = []
     total_debit = Decimal("0")
     total_credit = Decimal("0")
     for entry in sorted(balances.values(), key=lambda x: (x["church_name"], x["account"].name)):
         bal = _quantize(entry["balance"])
-        if bal == 0:
+        if bal == 0 and not show_zeros:
             continue
         debit = bal if bal > 0 else Decimal("0")
         credit = abs(bal) if bal < 0 else Decimal("0")
@@ -745,7 +754,11 @@ def _trial_balance(request, start, end, **hierarchy):
         notes=[
             "Debits equal credits when the books are in balance. Click a church "
             "to view account-level debit and credit balances as of period end. "
-            "Accounts with a zero net balance are omitted.",
+            + (
+                "Zero-net accounts are included."
+                if show_zeros
+                else "Accounts with a zero net balance are omitted."
+            ),
         ],
         balanced=difference == 0,
         layout="trial_balance",
@@ -755,6 +768,7 @@ def _trial_balance(request, start, end, **hierarchy):
         "headers": headers,
         "rows": rows,
         "summary": {"total_debit": total_debit, "total_credit": total_credit},
+        "show_zeros": show_zeros,
         "statement": statement,
     }
 

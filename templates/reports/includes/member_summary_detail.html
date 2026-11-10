@@ -7,7 +7,7 @@
     {% if member_dashboard.insights.male_pct is not None %}
     <li>Gender: {{ member_dashboard.insights.male_pct }}% male · {{ member_dashboard.insights.female_pct }}% female</li>
     {% endif %}
-    <li>New members this month: {{ member_dashboard.insights.new_this_month }}</li>
+    <li>New members this year: {{ member_dashboard.insights.new_this_year }}</li>
     {% if member_dashboard.insights.new_period_delta_pct is not None %}
     <li>Joins vs prior {{ member_dashboard.trend_months }} months:
         {% if member_dashboard.insights.new_period_delta_pct >= 0 %}+{% endif %}{{ member_dashboard.insights.new_period_delta_pct|floatformat:1 }}%

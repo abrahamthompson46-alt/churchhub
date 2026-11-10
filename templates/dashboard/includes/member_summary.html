@@ -20,7 +20,7 @@
         <div class="cc-member-kpi"><span class="cc-member-kpi__label">Active</span><strong class="cc-member-kpi__value">{{ member_dashboard.kpis.active|intcomma }}</strong></div>
         {% endif %}
         <div class="cc-member-kpi"><span class="cc-member-kpi__label">Inactive</span><strong class="cc-member-kpi__value">{{ member_dashboard.kpis.inactive|intcomma }}</strong></div>
-        <div class="cc-member-kpi"><span class="cc-member-kpi__label">New this month</span><strong class="cc-member-kpi__value">{{ member_dashboard.kpis.new_this_month|intcomma }}</strong></div>
+        <div class="cc-member-kpi"><span class="cc-member-kpi__label">New this year</span><strong class="cc-member-kpi__value">{{ member_dashboard.kpis.new_this_year|intcomma }}</strong></div>
         {% if not member_dashboard.compact %}
         <div class="cc-member-kpi"><span class="cc-member-kpi__label">Transferred / former</span><strong class="cc-member-kpi__value">{{ member_dashboard.kpis.left|intcomma }}</strong></div>
         <div class="cc-member-kpi"><span class="cc-member-kpi__label">Baptized</span><strong class="cc-member-kpi__value">{{ member_dashboard.kpis.baptized|intcomma }}</strong></div>

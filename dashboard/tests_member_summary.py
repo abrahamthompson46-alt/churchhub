@@ -140,7 +140,7 @@ class MemberDashboardTests(TestCase):
         self.assertEqual(snap["kpis"]["left"], 1)
         self.assertEqual(snap["kpis"]["baptized"], 1)
         self.assertEqual(snap["kpis"]["unbaptized"], 3)
-        self.assertEqual(snap["kpis"]["new_this_month"], 1)
+        self.assertEqual(snap["kpis"]["new_this_year"], 1)
         gender = {row["code"]: row["count"] for row in snap["gender_rows"]}
         self.assertEqual(gender[Gender.FEMALE], 2)
         self.assertEqual(gender[Gender.MALE], 1)

@@ -41,6 +41,10 @@ def _month_start(d: date) -> date:
     return d.replace(day=1)
 
 
+def _year_start(d: date) -> date:
+    return d.replace(month=1, day=1)
+
+
 def _month_keys(end_month: date, months: int) -> list[date]:
     keys = []
     cursor = end_month
@@ -75,6 +79,7 @@ def build_member_dashboard(request, *, church_ids=None, compact=False):
     months = parse_trend_months(request.GET.get("member_months"))
     today = timezone.localdate()
     this_month = _month_start(today)
+    this_year = _year_start(today)
     period_start = this_month - relativedelta(months=months - 1)
     prior_start = period_start - relativedelta(months=months)
     qs = selectors.scoped_members_qs(request)
@@ -86,7 +91,7 @@ def build_member_dashboard(request, *, church_ids=None, compact=False):
             inactive=Count("id", filter=Q(membership_status=MembershipStatus.INACTIVE)),
             is_active_true=Count("id", filter=Q(is_active=True)),
             is_active_false=Count("id", filter=Q(is_active=False)),
-            new_this_month=Count("id", filter=Q(date_joined__gte=this_month)),
+            new_this_year=Count("id", filter=Q(date_joined__gte=this_year)),
         )
         return {
             "visible": True,
@@ -95,7 +100,7 @@ def build_member_dashboard(request, *, church_ids=None, compact=False):
                 "total": int(compact_agg["total"] or 0),
                 "active": int(compact_agg["active"] or 0),
                 "inactive": int(compact_agg["inactive"] or 0),
-                "new_this_month": int(compact_agg["new_this_month"] or 0),
+                "new_this_year": int(compact_agg["new_this_year"] or 0),
             },
             "member_count": int(compact_agg["is_active_true"] or 0),
             "inactive_count": int(compact_agg["is_active_false"] or 0),
@@ -121,7 +126,7 @@ def build_member_dashboard(request, *, church_ids=None, compact=False):
         male=Count("id", filter=Q(gender=Gender.MALE)),
         female=Count("id", filter=Q(gender=Gender.FEMALE)),
         gender_unknown=Count("id", filter=~Q(gender__in=known_gender)),
-        new_this_month=Count("id", filter=Q(date_joined__gte=this_month)),
+        new_this_year=Count("id", filter=Q(date_joined__gte=this_year)),
         new_period=Count(
             "id",
             filter=Q(date_joined__gte=period_start, date_joined__isnull=False),
@@ -292,7 +297,7 @@ def build_member_dashboard(request, *, church_ids=None, compact=False):
             "total": total,
             "active": int(aggregates["active"] or 0),
             "inactive": int(aggregates["inactive"] or 0),
-            "new_this_month": int(aggregates["new_this_month"] or 0),
+            "new_this_year": int(aggregates["new_this_year"] or 0),
             "new_period": new_period,
             "left": left_snapshot,
             "baptized": int(aggregates["baptized"] or 0),
@@ -307,7 +312,7 @@ def build_member_dashboard(request, *, church_ids=None, compact=False):
             "largest_age_count": largest_age["count"] if largest_age else 0,
             "male_pct": _pct(int(aggregates["male"] or 0), total),
             "female_pct": _pct(int(aggregates["female"] or 0), total),
-            "new_this_month": int(aggregates["new_this_month"] or 0),
+            "new_this_year": int(aggregates["new_this_year"] or 0),
             "new_period_delta_pct": metrics.pct_change(new_period, new_prior),
             "active_pct": _pct(int(aggregates["active"] or 0), total),
             "incomplete_demographics": incomplete_demo,

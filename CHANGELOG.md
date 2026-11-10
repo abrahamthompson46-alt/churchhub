@@ -28,6 +28,7 @@ Versioning per [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Member Summary counts new members from 1 January (New this year), not the current month.
 - Trial Balance hides accounts with a zero net debit and credit as of period end, with a Show zeros toggle.
 
 ### Fixed

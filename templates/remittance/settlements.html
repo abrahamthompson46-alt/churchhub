@@ -97,7 +97,7 @@
     <details class="mb-4"{% if not batch_rows %} open{% endif %}>
         <summary class="small text-muted" style="cursor:pointer">New draft</summary>
         <div class="mt-3">
-            {% if can_hierarchy_edit %}
+            {% if can_hierarchy_edit and hierarchy_draft_units %}
             <form method="post" class="row g-2 align-items-end mb-3">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="create_draft">
@@ -122,6 +122,8 @@
                     <button type="submit" class="btn btn-primary btn-sm">Create hierarchy draft</button>
                 </div>
             </form>
+            {% elif can_hierarchy_edit %}
+            <p class="small text-muted mb-3">This desk has no unit that can settle upward. Conference drafts need districts below, or a union linked in Organization.</p>
             {% endif %}
             {% if can_edit %}
             <form method="post" class="row g-2 align-items-end">

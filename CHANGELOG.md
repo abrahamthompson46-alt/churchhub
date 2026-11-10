@@ -33,6 +33,7 @@ Versioning per [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Settlement Desk hierarchy drafts pick child units that settle to the current desk, so a conference without a union no longer fails with “No parent unit exists.”
 - Institution hierarchy-admin invitations no longer fail email rendering when no home church is assigned.
 - Submitting an already-pending invitation now refreshes and resends it instead of silently leaving the recipient without another delivery attempt.
 - Churchless pending-invitation lookup is denomination-scoped.

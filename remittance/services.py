@@ -546,10 +546,15 @@ def _parent_unit(unit_type, unit_id):
     """Return (parent_type, parent_id) for the next level up."""
     if unit_type == "CHURCH":
         church = selectors.church_with_hierarchy(unit_id)
+        if not church.district_id:
+            return None, None
         return "DISTRICT", church.district.pk
     if unit_type == "DISTRICT":
         district = selectors.district_with_hierarchy(unit_id)
-        return "CONFERENCE", district.zone.conference.pk
+        conference_id = getattr(getattr(district.zone, "conference", None), "pk", None)
+        if not conference_id:
+            return None, None
+        return "CONFERENCE", conference_id
     if unit_type == "CONFERENCE":
         conference = selectors.conference_with_union(unit_id)
         if conference.union_id:
@@ -557,8 +562,30 @@ def _parent_unit(unit_type, unit_id):
         return None, None
     if unit_type == "UNION":
         union = selectors.union_with_gc(unit_id)
-        return "GENERAL_CONFERENCE", union.general_conference.pk
+        gc_id = getattr(union, "general_conference_id", None)
+        if not gc_id:
+            return None, None
+        return "GENERAL_CONFERENCE", gc_id
     return None, None
+
+
+def _parent_missing_message(unit_type) -> str:
+    if unit_type == "GENERAL_CONFERENCE":
+        return (
+            "General Conference is the top of the hierarchy, so it cannot settle upward. "
+            "Create a draft from a union, conference, or district instead."
+        )
+    if unit_type == "CONFERENCE":
+        return (
+            "This conference is not linked to a union, so it cannot settle upward. "
+            "Create a district-to-conference draft, or link the conference to a union in Organization."
+        )
+    if unit_type == "UNION":
+        return (
+            "This union is not linked to a General Conference, so it cannot settle upward. "
+            "Create a conference-to-union draft, or link the union in Organization."
+        )
+    return "No parent unit exists for this settlement."
 
 
 def compute_period_remit_payable(church, offering_type, period_start, period_end):
@@ -589,8 +616,8 @@ def create_settlement_draft(from_unit_type, from_unit_id, offering_type, period_
     from remittance.models import SettlementBatch
 
     to_unit_type, to_unit_id = _parent_unit(from_unit_type, from_unit_id)
-    if not to_unit_type:
-        raise RemittancePolicyError("No parent unit exists for this settlement.")
+    if not to_unit_type or not to_unit_id:
+        raise RemittancePolicyError(_parent_missing_message(from_unit_type))
 
     # Serialize concurrent creates for the same obligation key.
     list(
@@ -614,6 +641,7 @@ def create_settlement_draft(from_unit_type, from_unit_id, offering_type, period_
         retain = Decimal("0.00")
         remit = gross
     else:
+        ensure_default_settlement_policies(from_unit_type, from_unit_id, user=user)
         gross = compute_received_from_below(from_unit_type, from_unit_id, offering_type, period_start, period_end)
         policy = get_settlement_policy(from_unit_type, from_unit_id, offering_type, as_of_date=period_end)
         if not policy:

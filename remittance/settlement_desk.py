@@ -10,6 +10,12 @@ from remittance.services import get_unit_choices, unit_in_user_scope
 
 DESK_UNIT_TYPES = ("DISTRICT", "CONFERENCE", "UNION", "GENERAL_CONFERENCE")
 
+_CHILD_UNIT_TYPE = {
+    "CONFERENCE": "DISTRICT",
+    "UNION": "CONFERENCE",
+    "GENERAL_CONFERENCE": "UNION",
+}
+
 _SCOPE_TO_DESK_TYPE = {
     OrgScopeLevel.DISTRICT: "DISTRICT",
     OrgScopeLevel.ZONE: "DISTRICT",
@@ -114,6 +120,40 @@ def resolve_settlement_desk(user, request, *, church=None) -> SettlementDesk | N
                 return desk
 
     return desks[0]
+
+
+def draftable_hierarchy_from_units(user, desk, *, church=None) -> list[tuple[str, str, str]]:
+    """
+    Units this desk may create an outgoing hierarchy draft from.
+
+    Child units that settle *to* the desk come first (district → conference, etc.).
+    The desk itself is included only when it has a parent to settle toward.
+    """
+    from remittance.services import _parent_unit, get_unit_choices
+
+    if desk is None:
+        return []
+
+    rows: list[tuple[str, str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    child_type = _CHILD_UNIT_TYPE.get(desk.unit_type)
+    if child_type:
+        for unit_id, label in get_unit_choices(child_type, user=user, church=church):
+            parent_type, parent_id = _parent_unit(child_type, unit_id)
+            if not parent_type or str(parent_id) != str(desk.unit_id):
+                continue
+            key = (child_type, str(unit_id))
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append((child_type, str(unit_id), label))
+
+    parent_type, parent_id = _parent_unit(desk.unit_type, desk.unit_id)
+    if parent_type and parent_id:
+        key = (desk.unit_type, str(desk.unit_id))
+        if key not in seen:
+            rows.append((desk.unit_type, str(desk.unit_id), desk.label))
+    return rows
 
 
 def user_has_hierarchy_settlement_desk(user, *, church=None) -> bool:

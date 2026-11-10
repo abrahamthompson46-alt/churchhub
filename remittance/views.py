@@ -57,6 +57,7 @@ from remittance.services import (
     unit_in_user_scope,
 )
 from remittance.settlement_desk import (
+    draftable_hierarchy_from_units,
     list_settlement_desks,
     resolve_settlement_desk,
     user_can_access_settlement_batch,
@@ -335,13 +336,21 @@ def settlement_list(request):
         "period_start": timezone.now().date().replace(day=1),
         "period_end": timezone.now().date(),
     }
+    draft_from_units = (
+        draftable_hierarchy_from_units(request.user, desk, church=church)
+        if hierarchy_mode and desk
+        else []
+    )
+    hierarchy_initial = dict(period_defaults)
+    if draft_from_units:
+        hierarchy_initial["from_unit"] = f"{draft_from_units[0][0]}:{draft_from_units[0][1]}"
     draft_form = SettlementDraftForm(request.POST or None, initial=period_defaults)
     hierarchy_draft_form = HierarchySettlementDraftForm(
         request.POST or None,
         user=request.user,
         church=church,
-        desk_choices=desk_choices,
-        initial=period_defaults,
+        desk_choices=draft_from_units,
+        initial=hierarchy_initial,
     )
 
     can_create_church = bool(church) and can_manage_finances(request.user)
@@ -355,7 +364,7 @@ def settlement_list(request):
                 request.POST,
                 user=request.user,
                 church=church,
-                desk_choices=desk_choices,
+                desk_choices=draft_from_units,
             )
             if hierarchy_draft_form.is_valid():
                 from_type, from_id = hierarchy_draft_form.cleaned_data["from_unit"]
@@ -420,6 +429,7 @@ def settlement_list(request):
         "can_hierarchy_edit": can_create_hierarchy,
         "draft_form": draft_form,
         "hierarchy_draft_form": hierarchy_draft_form,
+        "hierarchy_draft_units": draft_from_units,
         "hierarchy_mode": hierarchy_mode,
         "desk": desk,
         "desk_choices": desk_choices,

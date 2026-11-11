@@ -115,7 +115,7 @@ Runtime defaults also come from `permissions/registry.py` when matrix rows are m
 |------|--------|
 | `Gender` | `Male`, `Female` |
 | `MaritalStatus` | `Single`, `Married`, `Widowed`, `Divorced` |
-| `MembershipStatus` | `Active`, `Inactive`, `Transferred`, `Deceased` |
+| `MembershipStatus` | `Active`, `Inactive`, `Transferred`, `Deceased`, `Missing`, `Suspended`, `Former Member` |
 | `TransferStatus` | `Pending`, `Completed`, `Rejected` |
 | `RecordType` | `Baptism`, `Marriage`, `Funeral`, `Meeting`, `Transfer`, `Other` |
 | `RecordStatus` | `Active`, `Archived` |
@@ -136,6 +136,8 @@ Age groups (computed, not a stored enum on Member): `CHILD`, `TEEN`, `YOUTH`, `A
 | `SpiritualGift` / `MemberSpiritualGift` | Gift catalog + M2M-style link |
 | `LeadershipRole` | FK church/member; optional department; `title`; `start_date` / `end_date`; `is_active` |
 | `MemberAuditLog` | Member audit |
+| `MemberEngagementPolicy` | OneToOne church; Missing/Inactive week windows; `giving_protects`; `auto_apply_missing` (Active ↔ Missing only) |
+| `MemberEngagementDismissal` | Unique church+member; freeze `last_seen_on` until attendance changes |
 
 **Constraints on Member:** unique non-empty `(church, phone)`, unique non-empty `(church, membership_number)`.
 

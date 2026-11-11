@@ -171,7 +171,9 @@ Tenant: **global** catalog (not church-scoped). Authorization scope is applied a
 | `SpiritualGift` | UUID | FK church; unique `(church, name)` | church |
 | `MemberSpiritualGift` | UUID | FK member, gift; unique `(member, gift)` | via member |
 | `LeadershipRole` | UUID | FK church, member, department nullable | church |
-| `MemberAuditLog` | UUID | FK church, member, performed_by; action CREATE/UPDATE/STATUS/TRANSFER_*/EXPORT/DEACTIVATE/ACTIVATE | church |
+| `MemberAuditLog` | UUID | FK church, member, performed_by; action CREATE/UPDATE/STATUS/TRANSFER_*/EXPORT/DEACTIVATE/ACTIVATE/ENGAGEMENT_DISMISS | church |
+| `MemberEngagementPolicy` | UUID | OneToOne church; week windows; giving_protects; auto_apply_missing | church |
+| `MemberEngagementDismissal` | UUID | unique (church, member); last_seen_on; dismissed_by | church |
 
 ---
 

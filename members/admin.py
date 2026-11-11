@@ -17,6 +17,8 @@ from .models import (
     LeadershipRole,
     Member,
     MemberAuditLog,
+    MemberEngagementDismissal,
+    MemberEngagementPolicy,
     MemberLookupOption,
     MemberTransfer,
     Occupation,
@@ -334,6 +336,28 @@ class MemberLookupOptionAdmin(admin.ModelAdmin):
     list_filter = ("category", "is_active", "is_system")
     search_fields = ("label", "code")
     ordering = ("category", "sort_order", "label")
+
+@admin.register(MemberEngagementPolicy)
+class MemberEngagementPolicyAdmin(admin.ModelAdmin):
+    list_display = (
+        "church",
+        "missing_after_weeks",
+        "inactive_after_weeks",
+        "giving_protects",
+        "auto_apply_missing",
+    )
+
+    def get_queryset(self, request):
+        return _church_qs(super().get_queryset(request), request)
+
+
+@admin.register(MemberEngagementDismissal)
+class MemberEngagementDismissalAdmin(ReadOnlyAuditModelAdmin):
+    list_display = ("church", "member", "last_seen_on", "dismissed_at", "dismissed_by")
+
+    def get_queryset(self, request):
+        return _church_qs(super().get_queryset(request), request)
+
 
 @admin.register(Visitor)
 class VisitorAdmin(admin.ModelAdmin):

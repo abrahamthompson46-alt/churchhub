@@ -8,6 +8,7 @@ urlpatterns = [
     path("", views.MemberListView.as_view(), name="list"),
     path("api/search/", views.member_search, name="search"),
     path("add/", views.add, name="add"),
+    path("engagement/", views.engagement_review, name="engagement_review"),
     path("visitors/", views.visitor_list, name="visitor_list"),
     path("visitors/add/", views.visitor_add, name="visitor_add"),
     path("visitors/<uuid:pk>/edit/", views.visitor_edit, name="visitor_edit"),

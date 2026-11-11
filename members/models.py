@@ -1035,6 +1035,7 @@ class MemberAuditLog(models.Model):
         ("GROUP_PAIR", "Care Partnership Created"),
         ("GROUP_UNPAIR", "Care Partnership Ended"),
         ("MEMBER_MERGE", "Member Merged"),
+        ("ENGAGEMENT_DISMISS", "Engagement Review Dismissed"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -1070,3 +1071,78 @@ class MemberAuditLog(models.Model):
 
     def __str__(self):
         return f"{self.action} — {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class MemberEngagementPolicy(models.Model):
+    """Per-church attendance windows for Missing / Inactive review."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    church = models.OneToOneField(
+        Church,
+        on_delete=models.CASCADE,
+        related_name="engagement_policy",
+    )
+    missing_after_weeks = models.PositiveSmallIntegerField(
+        default=8,
+        help_text="Active members with no present mark for this many weeks become Missing candidates.",
+    )
+    inactive_after_weeks = models.PositiveSmallIntegerField(
+        default=8,
+        help_text="After already Missing, this many further weeks without a present mark become Inactive candidates.",
+    )
+    giving_protects = models.BooleanField(
+        default=True,
+        help_text="Recent approved receipts skip Missing and Inactive suggestions.",
+    )
+    auto_apply_missing = models.BooleanField(
+        default=False,
+        help_text="Nightly job may apply Active ↔ Missing only. Inactive always needs a clerk.",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "member engagement policy"
+        verbose_name_plural = "member engagement policies"
+
+    def __str__(self):
+        return f"Engagement policy — {self.church}"
+
+
+class MemberEngagementDismissal(models.Model):
+    """Hide a candidate until last-seen attendance changes."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    church = models.ForeignKey(
+        Church,
+        on_delete=models.CASCADE,
+        related_name="engagement_dismissals",
+    )
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name="engagement_dismissals",
+    )
+    last_seen_on = models.DateField(null=True, blank=True)
+    dismissed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="engagement_dismissals",
+    )
+    dismissed_at = models.DateTimeField(auto_now_add=True)
+    notes = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["church", "member"],
+                name="uniq_engagement_dismissal_per_member",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["church", "dismissed_at"]),
+        ]
+
+    def __str__(self):
+        return f"Dismissed {self.member_id}"

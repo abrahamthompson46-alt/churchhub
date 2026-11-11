@@ -922,6 +922,19 @@ if env_flag(
                 "expires": 3600,
             },
         },
+        "remind-member-engagement-daily": {
+            "task": (
+                "church_system.tasks."
+                "remind_member_engagement_task"
+            ),
+            "schedule": crontab(
+                hour=7,
+                minute=15,
+            ),
+            "options": {
+                "expires": 3600,
+            },
+        },
     }
 
 

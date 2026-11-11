@@ -113,3 +113,21 @@ def remind_stale_visitor_follow_ups(*, stale_days=14):
         )
         notified += len(recipients)
     return {"churches": len(by_church), "notified": notified}
+
+
+def notify_engagement_review(church, *, count, as_of=None):
+    """Notify clerks that the engagement review list has candidates."""
+    as_of = as_of or timezone.localdate()
+    url = reverse("members:engagement_review")
+    recipients = _users_for_church(church, can_manage_members, can_view_members)
+    if not recipients:
+        return 0
+    notify_users(
+        recipients,
+        f"Engagement review — {church.name}",
+        f"{count} member(s) need a Missing / Inactive / Active review.",
+        category="INFO",
+        action_url=url,
+        event_key=f"engagement.review.{church.pk}.{as_of.isoformat()}",
+    )
+    return len(recipients)

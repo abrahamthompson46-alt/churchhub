@@ -43,7 +43,7 @@ Own **local church membership**: directory, member CRUD, families/departments, p
 |------|--------|
 | `Gender` | Male, Female |
 | `MaritalStatus` | Single, Married, Widowed, Divorced |
-| `MembershipStatus` | **Active, Inactive, Transferred, Deceased** |
+| `MembershipStatus` | **Active, Inactive, Transferred, Deceased, Missing, Suspended, Former Member** |
 | `TransferStatus` | Pending, Completed, Rejected |
 | `RecordType` | Baptism, Marriage, Funeral, Meeting, Transfer, Other (seeded; editable via platform Member Dropdowns) |
 | `MemberLookupOption` | Platform catalog for record type, status, gender, marital status, membership status |
@@ -66,9 +66,11 @@ Own **local church membership**: directory, member CRUD, families/departments, p
 | `History` / `HistoryImage` | History events + images |
 | `SpiritualGift` / `MemberSpiritualGift` | Gift catalog + assignments |
 | `LeadershipRole` | title, dates, optional department, `is_active` |
-| `MemberAuditLog` | CREATE/UPDATE/STATUS/TRANSFER_*/EXPORT/DEACTIVATE/ACTIVATE/LOCATION_*/GROUP_* |
+| `MemberAuditLog` | CREATE/UPDATE/STATUS/TRANSFER_*/EXPORT/DEACTIVATE/ACTIVATE/LOCATION_*/GROUP_*/ENGAGEMENT_DISMISS |
+| `MemberEngagementPolicy` | OneToOne church; default 8+8 weeks; giving protects; `auto_apply_missing` off |
+| `MemberEngagementDismissal` | Unique church+member; hides a candidate until last present date changes |
 
-`Member.save`: Inactive/Transferred/Deceased → `is_active=False`; Active → `True`. Department/family/occupation must match church.
+`Member.save`: Inactive/Transferred/Deceased/Missing/Suspended/Former → `is_active=False`; Active → `True`. Department/family/occupation must match church. Do not drive `is_active` independently of `membership_status`.
 
 ---
 
@@ -87,6 +89,7 @@ Views → Services → Selectors → Repositories → Models
 | Selectors | `members/selectors.py` | Church-/manageable-scoped reads (directory, search, detail, records, families, transfers, leadership, gifts) |
 | Repositories | `members/repositories.py` | Persistence writes (member/transfer/record/audit/dept/family/gift/leadership) |
 | Services | `members/services.py` | Business rules, uniqueness, transfer lifecycle, delete blockers, audit orchestration |
+| Engagement | `members/engagement_services.py` | Attendance last-seen, Missing/Inactive candidates, apply/dismiss, Beat notify |
 
 Views no longer call `Member.objects` / `filter_by_church` directly for list/detail paths; they use selectors. Form `save()` on edit paths remains for ModelForm updates.
 
@@ -128,6 +131,7 @@ Management: `export_member_data`.
 | `baptism_register` | Baptism list/export; **Add baptism** when `manage_member_records` or `manage_baptisms` |
 | Leadership / spiritual gift views | Roles and gifts |
 | `configuration_hub` / `occupation_*` / `member_lookup_*` | Administration → Configuration (occupations + form lists) |
+| `engagement_review` | Clerk review list for attendance-based Missing / Inactive / Active |
 
 ---
 
@@ -149,6 +153,7 @@ Management: `export_member_data`.
 | `baptisms/` | `baptism_register` |
 | `leadership/…` | `leadership_*` |
 | `spiritual-gifts/…`, assign/remove gift | gift routes |
+| `engagement/` | `members:engagement_review` |
 | `configuration/` | `members:configuration` |
 | `configuration/occupations/…` | `occupation_*` (church-scoped) |
 | `configuration/lists/…` | `member_lookup_*` (shared dropdown catalog; permission-gated) |
@@ -188,8 +193,17 @@ Church scoping: `filter_by_church` / `require_church` / manageable churches for 
 
 **Status ↔ active**
 
-- Inactive / Transferred / Deceased force `is_active=False`.  
+- Inactive / Transferred / Deceased / Missing / Suspended / Former force `is_active=False`.  
 - Active forces `is_active=True`.
+
+**Engagement review (Current)**
+
+- Last present = latest `meetings.AttendanceRecord` or `MeetingAttendance` with `is_present=True`.  
+- Active → **Missing** after `missing_after_weeks` (default 8) with no present mark; Missing → **Inactive** after a further `inactive_after_weeks` (default 8). Present again (while Missing or Inactive) suggests **Active**.  
+- Never auto-suggest Transferred / Deceased / Suspended / Former. Churches with fewer than two present-marked events in the window get no Missing/Inactive mass suggestions. Members still inside the Missing window from `date_joined` (else `created_at`) are skipped.  
+- Approved, non-voided `RECEIPT` journals with a member skip Missing/Inactive when `giving_protects` is on.  
+- Clerks apply or dismiss on `/members/engagement/`. Dismiss freezes until last-seen changes. Apply uses `update_member` (STATUS audit).  
+- `auto_apply_missing` default off; Beat may apply Active ↔ Missing only — never Inactive.
 
 **Family / department**
 

@@ -333,6 +333,7 @@ def _people_sections(user):
         member_items.append(_item("Add Member", "members:add", "bi-person-plus"))
     if can_view_members(user) or can_manage_members(user):
         member_items.append(_item("Visitors", "members:visitor_list", "bi-person-heart"))
+        member_items.append(_item("Engagement review", "members:engagement_review", "bi-person-exclamation"))
     if can_transfer_members(user):
         member_items.append(_item("Transfers", "members:transfer_list", "bi-arrow-left-right"))
     if can_manage_baptisms(user) or can_view_members(user):
@@ -688,6 +689,7 @@ MODULE_TABS = {
     "people": [
         _item("Directory", "members:list", "bi-list-ul"),
         _item("Visitors", "members:visitor_list", "bi-person-heart"),
+        _item("Engagement", "members:engagement_review", "bi-person-exclamation"),
         _item("Care groups", "members:care_group_list", "bi-people"),
         _item("Meetings", "meetings:list", "bi-calendar-event"),
         _item("Transfers", "members:transfer_list", "bi-arrow-left-right"),
@@ -864,6 +866,7 @@ def _tab_allowed(user, url_name, active_church=None):
         "members:list": lambda: can_view_members(user) or can_manage_members(user),
         "members:add": lambda: can_add_members(user),
         "members:visitor_list": lambda: can_view_members(user) or can_manage_members(user),
+        "members:engagement_review": lambda: can_view_members(user) or can_manage_members(user),
         "members:department_list": lambda: can_manage_departments(user) or can_view_members(user),
         "members:family_list": lambda: can_manage_families(user) or can_view_members(user),
         "members:care_group_list": lambda: can_manage_care_groups(user) or can_view_members(user),

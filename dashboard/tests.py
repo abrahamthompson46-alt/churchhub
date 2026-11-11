@@ -399,7 +399,7 @@ class NavigationDensityTests(DashboardTestMixin, TestCase):
         self.assertEqual(eyebrow["section"], "Finance")
         self.assertEqual(eyebrow["page"], "Pending")
 
-    def test_people_tabs_are_five_operational(self):
+    def test_people_tabs_are_six_operational(self):
         from church_system.navigation import get_module_tabs
 
         pastor = User.objects.create_user(
@@ -416,6 +416,7 @@ class NavigationDensityTests(DashboardTestMixin, TestCase):
             [
                 "members:list",
                 "members:visitor_list",
+                "members:engagement_review",
                 "members:care_group_list",
                 "meetings:list",
                 "members:transfer_list",

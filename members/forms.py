@@ -10,6 +10,7 @@ from .models import (
     Family,
     FamilyRelationship,
     Member,
+    MemberEngagementPolicy,
     MemberLocation,
     MemberTransfer,
     MembershipStatus,
@@ -821,3 +822,20 @@ class MemberMergeForm(forms.Form):
         if self.keeper and duplicate.church_id != self.keeper.church_id:
             raise forms.ValidationError("Both members must belong to the same church.")
         return duplicate
+
+
+class MemberEngagementPolicyForm(forms.ModelForm):
+    class Meta:
+        model = MemberEngagementPolicy
+        fields = (
+            "missing_after_weeks",
+            "inactive_after_weeks",
+            "giving_protects",
+            "auto_apply_missing",
+        )
+        widgets = {
+            "missing_after_weeks": forms.NumberInput(attrs=input_attrs()),
+            "inactive_after_weeks": forms.NumberInput(attrs=input_attrs()),
+            "giving_protects": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "auto_apply_missing": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }

@@ -24,7 +24,7 @@
 | App | Migrations (ordered) |
 |-----|----------------------|
 | **accounts** | `0001_initial` → … → `0019_system_settings_activity_action` → `0020_session_epoch_password_history` |
-| **members** (10) | `0001_initial` → … → `0009_alter_member_date_of_birth` → `0010_member_birthday_privacy` → `0011_birthday_photo_consent_default` → `0012_clear_birthday_photo_consent` |
+| **members** (10) | `0001_initial` → … → `0012_clear_birthday_photo_consent` → `0013`/`0014` care groups → `0015_member_engagement_policy` |
 | **transactions** (17) | `0001_initial` → `0002_financialperiod` → `0003_…void…` → `0004_ledger_category` → `0005_remittance_accounts_and_fund` → `0006_fix_welfare_fund_account_type` → `0007_payroll` → `0008_alter_account_account_type_and_more` → `0009_financialidempotencykey` → `0010_workingday` → `0011_welfare_enterprise` → `0012_budget_enterprise` → `0013_transactions_enterprise` → `0014_transaction_reference_per_church` → `0015_ledger_idempotency_action` → `0016_payroll_idempotency_actions` → `0017_account_code_and_active` |
 | **sitecontrol** (10) | `0001_initial` → … → `0026_denomination_system_settings` → `0027_close_non_demo_public_registration` |
 | **remittance** (3) | `0001_initial` → `0002_rename_…idx` → `0003_welfare_enterprise` |

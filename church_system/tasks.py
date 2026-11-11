@@ -299,3 +299,12 @@ def remind_visitor_follow_up_task(self, stale_days=14):
     stats = remind_stale_visitor_follow_ups(stale_days=stale_days)
     logger.info("Visitor follow-up reminders: %s", stats)
     return stats
+
+
+@shared_task(bind=True, max_retries=1, default_retry_delay=300)
+def remind_member_engagement_task(self):
+    from members.engagement_services import remind_engagement_reviews
+
+    stats = remind_engagement_reviews()
+    logger.info("Member engagement review: %s", stats)
+    return stats

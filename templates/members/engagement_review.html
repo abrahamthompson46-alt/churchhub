@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Engagement review — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container page-shell">
+    {% include "includes/page_header.html" with page_subtitle="Members" page_title="Engagement review" page_description="Attendance-first Missing and Inactive suggestions. Clerks apply or dismiss; the system never auto-sets Transferred, Deceased, Suspended, or Former." %}
+
+    {% if review.attendance_too_thin %}
+    <div class="alert alert-warning">
+        This church has fewer than two attendance events with a present mark in the review window
+        ({{ review.attendance_event_count }} found). Missing and Inactive suggestions are held so an empty roll does not mass-inactivate people.
+        Restoration to Active still appears when someone is marked present.
+    </div>
+    {% endif %}
+
+    {% if can_apply %}
+    <div class="data-card mb-4">
+        <div class="data-card__header"><span>Church windows</span></div>
+        <div class="p-3">
+            <form method="post" class="row g-3 align-items-end">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_policy">
+                <div class="col-md-3">
+                    <label class="form-label" for="{{ policy_form.missing_after_weeks.id_for_label }}">Missing after (weeks)</label>
+                    {{ policy_form.missing_after_weeks }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="{{ policy_form.inactive_after_weeks.id_for_label }}">Then Inactive after (weeks)</label>
+                    {{ policy_form.inactive_after_weeks }}
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check mt-4">
+                        {{ policy_form.giving_protects }}
+                        <label class="form-check-label" for="{{ policy_form.giving_protects.id_for_label }}">Giving protects</label>
+                    </div>
+                    <div class="form-check">
+                        {{ policy_form.auto_apply_missing }}
+                        <label class="form-check-label" for="{{ policy_form.auto_apply_missing.id_for_label }}">Auto-apply Active ↔ Missing</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-outline-primary btn-sm">Save windows</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="data-card">
+        <div class="data-card__header"><span>Candidates ({{ review.candidates|length }})</span></div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="apply">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            {% if can_apply %}<th></th>{% endif %}
+                            <th>Member</th>
+                            <th>Now</th>
+                            <th>Suggest</th>
+                            <th>Last present</th>
+                            <th>Last gift</th>
+                            <th>Why</th>
+                            {% if can_apply %}<th class="text-end">Dismiss</th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in review.candidates %}
+                        <tr>
+                            {% if can_apply %}
+                            <td>
+                                <input type="checkbox" name="member_ids" value="{{ row.member.pk }}" checked>
+                                <input type="hidden" name="suggested_{{ row.member.pk }}" value="{{ row.suggested_status }}">
+                            </td>
+                            {% endif %}
+                            <td><a href="{% url 'members:detail' row.member.pk %}">{{ row.member.full_name }}</a></td>
+                            <td>{{ row.current_status }}</td>
+                            <td><strong>{{ row.suggested_status }}</strong></td>
+                            <td>{% if row.last_seen_on %}{{ row.last_seen_on }}{% else %}Never{% endif %}</td>
+                            <td>{% if row.last_gave_on %}{{ row.last_gave_on }}{% else %}—{% endif %}</td>
+                            <td class="small text-muted">{{ row.reason }}</td>
+                            {% if can_apply %}
+                            <td class="text-end">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary"
+                                    form="dismiss-{{ row.member.pk }}">Hide</button>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-muted p-3">No engagement candidates for {{ church.name }}.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if can_apply and review.candidates %}
+            <div class="p-3">
+                <button type="submit" class="btn btn-primary btn-sm">Apply selected</button>
+            </div>
+            {% endif %}
+        </form>
+        {% if can_apply %}
+            {% for row in review.candidates %}
+            <form id="dismiss-{{ row.member.pk }}" method="post" class="d-none">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="dismiss">
+                <input type="hidden" name="member_id" value="{{ row.member.pk }}">
+            </form>
+            {% endfor %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

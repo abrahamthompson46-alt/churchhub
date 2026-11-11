@@ -50,6 +50,7 @@ from .forms import (
     DepartmentForm,
     FamilyForm,
     LeadershipRoleForm,
+    MemberEngagementPolicyForm,
     MemberFilterForm,
     MemberForm,
     MemberGiftForm,
@@ -82,6 +83,11 @@ from members.care_group_views import (  # re-exported for urls
     location_add,
     location_delete,
     location_edit,
+)
+from .engagement_services import (
+    apply_engagement_candidate,
+    dismiss_engagement_candidate,
+    evaluate_church_engagement,
 )
 from .services import (
     MemberServiceError,
@@ -1070,6 +1076,63 @@ def visitor_list(request):
             or can_add_members(request.user)
             or can_edit_members(request.user)
         ),
+    })
+
+
+@login_required
+def engagement_review(request):
+    require_view_members(request)
+    church = require_church(request)
+    review = evaluate_church_engagement(church)
+    policy_form = MemberEngagementPolicyForm(instance=review.policy)
+    can_apply = can_edit_members(request.user)
+
+    if request.method == "POST":
+        if not can_apply:
+            raise PermissionDenied
+        action = request.POST.get("action") or ""
+        if action == "save_policy":
+            policy_form = MemberEngagementPolicyForm(request.POST, instance=review.policy)
+            if policy_form.is_valid():
+                policy_form.save()
+                flash_success(request, "Engagement windows saved.")
+                return redirect("members:engagement_review")
+        elif action == "apply":
+            member_ids = request.POST.getlist("member_ids")
+            applied = 0
+            for member_id in member_ids:
+                member = selectors.member_for_request(request, member_id)
+                suggested = request.POST.get(f"suggested_{member.pk}")
+                if not suggested:
+                    continue
+                try:
+                    apply_engagement_candidate(
+                        church=church,
+                        member=member,
+                        suggested_status=suggested,
+                        performed_by=request.user,
+                    )
+                    applied += 1
+                except ValueError as exc:
+                    flash_warning(request, str(exc))
+            if applied:
+                flash_success(request, f"Updated status for {applied} member(s).")
+            return redirect("members:engagement_review")
+        elif action == "dismiss":
+            member = selectors.member_for_request(request, request.POST.get("member_id"))
+            dismiss_engagement_candidate(
+                church=church,
+                member=member,
+                performed_by=request.user,
+            )
+            flash_success(request, f"Hid {member.full_name} until attendance changes.")
+            return redirect("members:engagement_review")
+
+    return render(request, "members/engagement_review.html", {
+        "review": review,
+        "policy_form": policy_form,
+        "can_apply": can_apply,
+        "church": church,
     })
 
 

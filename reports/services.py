@@ -1,5 +1,6 @@
 """Report data builders — hierarchy-aware, read-only queries."""
 
+from calendar import monthrange
 from datetime import date, datetime, timedelta
 from itertools import groupby
 from decimal import Decimal
@@ -206,6 +207,7 @@ def build_report(report_key, request, period="monthly", start_date=None, end_dat
         "balance_sheet": _balance_sheet,
         "income_statement": _income_statement,
         "cash_position": _cash_position,
+        "end_of_year_detailed": _end_of_year_detailed,
         "asset_register": _asset_register_report,
         "depreciation_schedule": _depreciation_schedule_report,
         "asset_hierarchy_rollup": _asset_hierarchy_rollup_report,
@@ -1021,6 +1023,222 @@ def _cash_position(request, start, end, **hierarchy):
         "rows": rows,
         "summary": {"total": total},
         "statement": statement,
+    }
+
+
+def _eoy_month_windows(start: date, end: date):
+    """Yield (month_start, month_end, label) for each calendar month overlapping the range."""
+    cursor = start.replace(day=1)
+    while cursor <= end:
+        last_dom = monthrange(cursor.year, cursor.month)[1]
+        month_end = min(end, date(cursor.year, cursor.month, last_dom))
+        month_start = max(start, cursor)
+        yield month_start, month_end, cursor.strftime("%B %Y")
+        if cursor.month == 12:
+            cursor = date(cursor.year + 1, 1, 1)
+        else:
+            cursor = date(cursor.year, cursor.month + 1, 1)
+
+
+def _monthly_giving_breakdown(request, start, end, **hierarchy):
+    lines = []
+    tithe_total = Decimal("0")
+    combined_total = Decimal("0")
+    for month_start, month_end, label in _eoy_month_windows(start, end):
+        txns = _transactions_in_scope(request, month_start, month_end, **hierarchy)
+        period_lines = selectors.transaction_lines_for_transactions(txns)
+        tithe = abs(selectors.sum_line_amount_for_type(period_lines, "TITHE") or Decimal("0"))
+        combined = abs(selectors.sum_line_amount_for_type(period_lines, "COMBINED") or Decimal("0"))
+        tithe_total += tithe
+        combined_total += combined
+        lines.append(
+            {
+                "label": label,
+                "church": "",
+                "amount": tithe + combined,
+                "tithe": tithe,
+                "combined": combined,
+            }
+        )
+    return lines, tithe_total, combined_total
+
+
+def _eoy_membership_snapshot(request, start, end, **hierarchy):
+    members = _members_in_scope(request, **hierarchy)
+    churches = _churches_in_scope(request, **hierarchy)
+    active = members.filter(
+        is_active=True,
+        membership_status=MembershipStatus.ACTIVE,
+    ).count()
+    transfer_count = selectors.transfers_in_scope(churches, start, end).count()
+    present_total = (
+        selectors.attendance_events_in_scope(churches, start, end).aggregate(
+            total=Sum("present_count")
+        )["total"]
+        or 0
+    )
+    return [
+        {"label": "Members on roll", "church": "", "amount": members.count()},
+        {"label": "Active members", "church": "", "amount": active},
+        {"label": "Transfers (period)", "church": "", "amount": transfer_count},
+        {"label": "Attendance present (period)", "church": "", "amount": present_total},
+    ]
+
+
+def _statement_sections_prefixed(sections, id_prefix, title_prefix=""):
+    out = []
+    for section in sections:
+        item = dict(section)
+        item["id"] = f"{id_prefix}-{item.get('id', 'sec')}"
+        if title_prefix:
+            item["title"] = f"{title_prefix}{item['title']}"
+        out.append(item)
+    return out
+
+
+def _end_of_year_detailed(request, start, end, **hierarchy):
+    """
+    Composite year review: giving trend, operating summary, financial statements,
+    cash, membership snapshot, and trial balance totals.
+    """
+    financial = _financial_summary(request, start, end, **hierarchy)
+    income = _income_statement(request, start, end, **hierarchy)
+    balance = _balance_sheet(request, start, end, **hierarchy)
+    cash = _cash_position(request, start, end, **hierarchy)
+    trial = _trial_balance(request, start, end, show_zeros=False, **hierarchy)
+
+    monthly_lines, monthly_tithe, monthly_combined = _monthly_giving_breakdown(
+        request, start, end, **hierarchy
+    )
+    membership_lines = _eoy_membership_snapshot(request, start, end, **hierarchy)
+
+    fs_summary = financial["summary"]
+    is_summary = income["summary"]
+    bs_summary = balance["summary"]
+    cash_total = cash["summary"]["total"]
+    tb_summary = trial["summary"]
+
+    sections = [
+        {
+            "id": "eoy-monthly",
+            "title": "Monthly giving (tithe + combined)",
+            "total": monthly_tithe + monthly_combined,
+            "lines": monthly_lines,
+            "empty": "No giving recorded in this period.",
+            "layout": "monthly_giving",
+        },
+        *_statement_sections_prefixed(
+            financial["statement"]["sections"],
+            "eoy-fs",
+            title_prefix="Operating — ",
+        ),
+        *_statement_sections_prefixed(
+            income["statement"]["sections"],
+            "eoy-is",
+            title_prefix="Income statement — ",
+        ),
+        *_statement_sections_prefixed(
+            balance["statement"]["sections"],
+            "eoy-bs",
+            title_prefix="Balance sheet — ",
+        ),
+        *_statement_sections_prefixed(
+            cash["statement"]["sections"],
+            "eoy-cash",
+            title_prefix="Cash & bank — ",
+        ),
+        {
+            "id": "eoy-membership",
+            "title": "Membership & attendance snapshot",
+            "total": membership_lines[0]["amount"] if membership_lines else 0,
+            "lines": membership_lines,
+            "empty": "No membership data in scope.",
+            "layout": "integer",
+        },
+    ]
+
+    operating_net = fs_summary["income"] - fs_summary["expense"]
+    kpis = [
+        {"label": "Tithe (year)", "value": fs_summary["tithe"], "tone": "primary"},
+        {"label": "Combined (year)", "value": fs_summary["combined"], "tone": "accent"},
+        {
+            "label": "Operating net",
+            "value": operating_net,
+            "tone": "success" if operating_net >= 0 else "danger",
+        },
+        {"label": "Net surplus / (deficit)", "value": is_summary["net"], "tone": "primary"},
+        {"label": "Total assets", "value": bs_summary.get("Assets", Decimal("0")), "tone": "success"},
+        {"label": "Cash & bank", "value": cash_total, "tone": "accent"},
+    ]
+
+    notes = [
+        f"Period {start} through {end}. Monthly giving shows tithe and combined by calendar month.",
+        "Operating sections follow the Financial Summary rules (Combined Retention is operating income).",
+        "Balance sheet and cash figures are as of period end.",
+        (
+            f"Trial balance as of period end: debits {_quantize(tb_summary['total_debit'])} "
+            f"and credits {_quantize(tb_summary['total_credit'])}."
+        ),
+        f"{fs_summary['transaction_count']} approved journal(s) in the period.",
+    ]
+
+    statement = _statement(
+        kpis=kpis,
+        sections=sections,
+        notes=notes,
+        balanced=trial["statement"].get("balanced"),
+    )
+    statement["footer_totals"] = [
+        {"label": "Total income (activity)", "amount": is_summary["income"]},
+        {"label": "Total expense (activity)", "amount": is_summary["expense"]},
+        {"label": "Net surplus / (deficit)", "amount": is_summary["net"], "emphasis": True},
+        {"label": "Total assets (period end)", "amount": bs_summary.get("Assets", Decimal("0"))},
+        {"label": "Cash & bank (period end)", "amount": cash_total},
+    ]
+
+    headers = ["Part", "Metric", "Amount"]
+    rows = [
+        ["Monthly giving", "Tithe total", monthly_tithe],
+        ["Monthly giving", "Combined total", monthly_combined],
+        ["Operating", "Tithe", fs_summary["tithe"]],
+        ["Operating", "Combined offering", fs_summary["combined"]],
+        ["Operating", "Operating income", fs_summary["income"]],
+        ["Operating", "Operating expense", fs_summary["expense"]],
+        ["Operating", "Operating net", operating_net],
+        ["Income statement", "Total income", is_summary["income"]],
+        ["Income statement", "Total expense", is_summary["expense"]],
+        ["Income statement", "Net surplus / (deficit)", is_summary["net"]],
+        ["Balance sheet", "Assets", bs_summary.get("Assets", Decimal("0"))],
+        ["Balance sheet", "Liabilities", bs_summary.get("Liabilities", Decimal("0"))],
+        ["Balance sheet", "Funds & equity", bs_summary.get("Funds & Equity", Decimal("0"))],
+        ["Cash & bank", "Total", cash_total],
+        ["Trial balance", "Total debits", tb_summary["total_debit"]],
+        ["Trial balance", "Total credits", tb_summary["total_credit"]],
+    ]
+    for line in membership_lines:
+        rows.append(["Membership", line["label"], line["amount"]])
+
+    chart_labels = [line["label"] for line in monthly_lines]
+    chart_amounts = [line["amount"] for line in monthly_lines]
+
+    return {
+        "title": "End of Year Detailed Report",
+        "headers": headers,
+        "rows": rows,
+        "summary": {
+            "tithe": fs_summary["tithe"],
+            "combined": fs_summary["combined"],
+            "operating_net": operating_net,
+            "income_statement_net": is_summary["net"],
+            "assets": bs_summary.get("Assets", Decimal("0")),
+            "cash": cash_total,
+            "trial_balanced": trial["statement"].get("balanced"),
+        },
+        "statement": statement,
+        "chart": {
+            "labels": chart_labels,
+            "amounts": chart_amounts,
+        },
     }
 
 

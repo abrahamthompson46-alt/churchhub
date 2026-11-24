@@ -146,7 +146,15 @@ def run_report(request, report_key):
         raise PermissionDenied
     meta = REPORT_CATALOG[report_key]
     hierarchy = get_hierarchy_context(request.user)
-    form = ReportFilterForm(request.GET or None, user=request.user, hierarchy=hierarchy)
+    form_initial = None
+    if report_key == "end_of_year_detailed" and not request.GET:
+        form_initial = {"period": "annual"}
+    form = ReportFilterForm(
+        request.GET or None,
+        user=request.user,
+        hierarchy=hierarchy,
+        initial=form_initial,
+    )
 
     data = None
     export_fmt = request.GET.get("export")

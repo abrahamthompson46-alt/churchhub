@@ -138,7 +138,8 @@
 })();
 </script>
 {% endif %}
-{% if report_key == "financial_summary" and data.chart %}
+{% if data.chart %}
+{% if report_key == "financial_summary" or report_key == "end_of_year_detailed" %}
 <script>
 (function () {
     const el = document.getElementById("financialSummaryChart");
@@ -167,6 +168,7 @@
     });
 })();
 </script>
+{% endif %}
 {% endif %}
 {% if show_hierarchy %}
 <script>

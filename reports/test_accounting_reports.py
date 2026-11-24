@@ -122,6 +122,16 @@ class AccountingReportTests(TestCase):
         data = build_report("cash_position", self._request(), period="monthly")
         self.assertEqual(data["summary"]["total"], Decimal("100.00"))
 
+    def test_end_of_year_detailed_composes_sections(self):
+        data = build_report("end_of_year_detailed", self._request(), period="annual")
+        self.assertEqual(data["title"], "End of Year Detailed Report")
+        self.assertGreaterEqual(len(data["statement"]["sections"]), 8)
+        titles = [s["title"] for s in data["statement"]["sections"]]
+        self.assertTrue(any("Monthly giving" in t for t in titles))
+        self.assertTrue(any("Membership" in t for t in titles))
+        self.assertIn("footer_totals", data["statement"])
+        self.assertTrue(data["chart"]["labels"])
+
     def test_general_ledger_lists_each_line_with_narration(self):
         data = build_report("general_ledger", self._request(), period="monthly")
         self.assertEqual(data["title"], "Detailed Financial Report")

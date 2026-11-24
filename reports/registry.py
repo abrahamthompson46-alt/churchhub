@@ -78,6 +78,16 @@ REPORT_CATALOG = {
         "permission": "finance",
         "requires_advanced": True,
     },
+    "end_of_year_detailed": {
+        "label": "End of Year Detailed Report",
+        "description": (
+            "Year review pack: monthly giving, operating summary, income statement, "
+            "balance sheet, cash position, membership, and trial balance KPIs."
+        ),
+        "icon": "bi-calendar2-range",
+        "permission": "finance",
+        "requires_advanced": True,
+    },
     "asset_register": {
         "label": "Fixed Asset Register",
         "description": "Capital assets, costs, accumulated depreciation, and net book value.",

@@ -25,12 +25,14 @@
     </div>
     {% endif %}
 
-    {% if report_key == "financial_summary" and data.chart %}
+    {% if data.chart %}
+    {% if report_key == "financial_summary" or report_key == "end_of_year_detailed" %}
     <div class="stmt__chart-wrap px-3 py-3 border-bottom">
         <canvas id="financialSummaryChart" height="120" aria-label="Giving and operating totals"></canvas>
     </div>
     {{ data.chart.labels|json_script:"fin-chart-labels" }}
     {{ data.chart.amounts|json_script:"fin-chart-amounts" }}
+    {% endif %}
     {% endif %}
 
     <div class="stmt__toolbar no-print">
@@ -58,6 +60,8 @@
                 Dr {{ section.total|floatformat:2|intcomma }}
                 <span class="text-muted">·</span>
                 Cr {{ section.total_credit|floatformat:2|intcomma }}
+                {% elif section.layout == "integer" %}
+                {{ section.total|intcomma }}
                 {% else %}
                 {{ section.total|floatformat:2|intcomma }}
                 {% endif %}
@@ -93,7 +97,9 @@
                             <td class="text-end text-currency">{% if line.credit %}{{ line.credit|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
                             {% else %}
                             {% if data.document.multi_church %}<td class="text-muted">{{ line.church|default:"—" }}</td>{% endif %}
-                            <td class="text-end text-currency">{{ line.amount|floatformat:2|intcomma }}</td>
+                            <td class="text-end{% if section.layout != 'integer' %} text-currency{% endif %}">
+                                {% if section.layout == "integer" %}{{ line.amount|intcomma }}{% else %}{{ line.amount|floatformat:2|intcomma }}{% endif %}
+                            </td>
                             {% endif %}
                         </tr>
                         {% endfor %}

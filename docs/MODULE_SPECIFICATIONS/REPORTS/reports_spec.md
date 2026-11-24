@@ -61,7 +61,7 @@ erDiagram
 | Key | Domain | Extra gate |
 |-----|--------|------------|
 | financial_summary, general_ledger, tithe_report | finance | — |
-| trial_balance, balance_sheet, income_statement, cash_position | finance | `advanced_reports` |
+| trial_balance, balance_sheet, income_statement, cash_position, end_of_year_detailed | finance | `advanced_reports` |
 | payroll_summary | finance | feature `payroll` |
 | asset_register, depreciation_schedule | finance | feature `assets` |
 | asset_hierarchy_rollup | overseer | feature `assets` |

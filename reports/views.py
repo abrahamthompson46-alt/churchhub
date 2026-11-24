@@ -19,7 +19,14 @@ from .exporters import (
 )
 from .forms import ReportFilterForm, WelfareStatementForm
 from .models import ReportAccessAuditLog
+from .eoy_sections import eoy_sections_for_export
+from .period_presets import REPORT_PERIOD_PRESETS
 from .registry import REPORT_CATALOG
+from .run_context import (
+    eoy_section_choices_for_template,
+    prepare_report_querydict,
+    save_session_filters,
+)
 from .services import (
     _flag_enabled,
     build_report,
@@ -93,6 +100,8 @@ def _report_export_params(request, report_key, cleaned):
         params["campaign_kind"] = _campaign_register_kind(request)
     if report_key == "trial_balance":
         params["show_zeros"] = "1" if _flag_enabled(request.GET.get("show_zeros")) else "0"
+    if report_key == "end_of_year_detailed":
+        params.update(eoy_sections_for_export(request.GET))
     return params
 
 
@@ -146,14 +155,11 @@ def run_report(request, report_key):
         raise PermissionDenied
     meta = REPORT_CATALOG[report_key]
     hierarchy = get_hierarchy_context(request.user)
-    form_initial = None
-    if report_key == "end_of_year_detailed" and not request.GET:
-        form_initial = {"period": "annual"}
+    get_params = prepare_report_querydict(request, report_key)
     form = ReportFilterForm(
-        request.GET or None,
+        get_params if get_params else None,
         user=request.user,
         hierarchy=hierarchy,
-        initial=form_initial,
     )
 
     data = None
@@ -191,6 +197,10 @@ def run_report(request, report_key):
             extra["campaign_kind"] = campaign_kind
         if report_key == "trial_balance":
             extra["show_zeros"] = show_zeros
+        if report_key == "end_of_year_detailed":
+            from reports.eoy_sections import parse_eoy_sections
+
+            extra["eoy_sections"] = parse_eoy_sections(get_params)
         data = build_report(
             report_key,
             request,
@@ -199,6 +209,11 @@ def run_report(request, report_key):
             end_date=cleaned.get("end_date"),
             **_hierarchy_kwargs(cleaned),
             **extra,
+        )
+        save_session_filters(
+            request.session,
+            report_key,
+            {**cleaned, **extra, "campaign_kind": campaign_kind},
         )
 
     if data and export_fmt in ("csv", "excel", "pdf"):
@@ -248,7 +263,14 @@ def run_report(request, report_key):
             export_links[fmt] = "?" + _export_query_string(request, fmt)
         export_links["async_csv"] = "?" + _export_query_string(request, "csv", async_export=True)
 
-    document_mode = request.GET.get("layout") == "document"
+    layout = request.GET.get("layout")
+    document_mode = layout != "table" and bool(
+        data and (data.get("statement") or data.get("ledger"))
+    )
+
+    eoy_sections = []
+    if report_key == "end_of_year_detailed":
+        eoy_sections = eoy_section_choices_for_template(get_params, request, active)
 
     return render(request, "reports/run.html", {
         "report_key": report_key,
@@ -261,6 +283,9 @@ def run_report(request, report_key):
         "campaign_kind": campaign_kind,
         "show_zeros": show_zeros,
         "zeros_toggle_qs": _zeros_toggle_query(request) if report_key == "trial_balance" else "",
+        "period_presets": REPORT_PERIOD_PRESETS if meta.get("permission") == "finance" else [],
+        "eoy_sections": eoy_sections,
+        "filter_open": bool(request.GET),
         "breadcrumbs": [
             {"label": "Reports", "url": "/reports/"},
             {"label": meta["label"]},

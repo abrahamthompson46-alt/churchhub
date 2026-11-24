@@ -4,88 +4,139 @@
 {% block title %}{{ meta.label }} — ChurchHub{% endblock %}
 
 {% block content %}
-<div class="page-container">
+<div class="page-container page-container--report-run">
     {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Analytics" page_title=meta.label page_description=meta.description %}
 
-    <div class="filter-panel no-print">
-        <p class="filter-panel-title">Report filters</p>
-        <form method="get" class="filter-form" id="report-filter-form">
-            <div class="filter-field">
-                <label class="form-label">Period</label>
-                {{ form.period }}
-            </div>
-            <div class="filter-field">
-                <label class="form-label">From</label>
-                {{ form.start_date }}
-            </div>
-            <div class="filter-field">
-                <label class="form-label">To</label>
-                {{ form.end_date }}
-            </div>
-            {% if show_hierarchy %}
-            <div class="filter-field">
-                <label class="form-label">Conference</label>
-                {{ form.conference }}
-            </div>
-            <div class="filter-field">
-                <label class="form-label">Zone</label>
-                {{ form.zone }}
-            </div>
-            <div class="filter-field">
-                <label class="form-label">District</label>
-                {{ form.district }}
-            </div>
-            <div class="filter-field">
-                <label class="form-label">Church</label>
-                {{ form.church }}
+    {% include "includes/filter_disclosure_start.html" with filter_open=filter_open %}
+        <form method="get" class="filter-form filter-form--report" id="report-filter-form">
+            {% if period_presets %}
+            <div class="report-period-presets">
+                {% for slug, label in period_presets %}
+                <a class="btn btn-sm btn-outline-secondary" href="?preset={{ slug }}">{{ label }}</a>
+                {% endfor %}
             </div>
             {% endif %}
-            {% if report_key == 'campaign_register' %}
-            <div class="filter-field">
-                <label class="form-label" for="id_campaign_kind">Type</label>
-                <select name="campaign_kind" id="id_campaign_kind" class="form-select form-select-sm">
-                    <option value="DISTRICT_FUNERAL"{% if campaign_kind == 'DISTRICT_FUNERAL' %} selected{% endif %}>District funeral collections</option>
-                    <option value="GENERAL"{% if campaign_kind == 'GENERAL' %} selected{% endif %}>Church campaigns</option>
-                    <option value="ALL"{% if campaign_kind == 'ALL' %} selected{% endif %}>All types</option>
-                </select>
+
+            <div class="filter-form__grid">
+                <div class="filter-field">
+                    <label class="form-label">Period</label>
+                    {{ form.period }}
+                </div>
+                <div class="filter-field">
+                    <label class="form-label">From</label>
+                    {{ form.start_date }}
+                </div>
+                <div class="filter-field">
+                    <label class="form-label">To</label>
+                    {{ form.end_date }}
+                </div>
+                {% if show_hierarchy %}
+                <div class="filter-field">
+                    <label class="form-label">Conference</label>
+                    {{ form.conference }}
+                </div>
+                <div class="filter-field">
+                    <label class="form-label">Zone</label>
+                    {{ form.zone }}
+                </div>
+                <div class="filter-field">
+                    <label class="form-label">District</label>
+                    {{ form.district }}
+                </div>
+                <div class="filter-field">
+                    <label class="form-label">Church</label>
+                    {{ form.church }}
+                </div>
+                {% endif %}
+                {% if report_key == 'campaign_register' %}
+                <div class="filter-field">
+                    <label class="form-label" for="id_campaign_kind">Type</label>
+                    <select name="campaign_kind" id="id_campaign_kind" class="form-select form-select-sm">
+                        <option value="DISTRICT_FUNERAL"{% if campaign_kind == 'DISTRICT_FUNERAL' %} selected{% endif %}>District funeral collections</option>
+                        <option value="GENERAL"{% if campaign_kind == 'GENERAL' %} selected{% endif %}>Church campaigns</option>
+                        <option value="ALL"{% if campaign_kind == 'ALL' %} selected{% endif %}>All types</option>
+                    </select>
+                </div>
+                {% endif %}
             </div>
+
+            {% if report_key == 'end_of_year_detailed' and eoy_sections %}
+            <fieldset class="report-eoy-sections">
+                <legend class="form-label">Include in pack</legend>
+                <div class="report-eoy-sections__grid">
+                    {% for sec in eoy_sections %}
+                    <label class="form-check form-check-inline report-eoy-sections__item">
+                        <input type="checkbox" class="form-check-input" name="eoy_{{ sec.key }}" value="1"{% if sec.enabled %} checked{% endif %}>
+                        <span class="form-check-label">{{ sec.label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
             {% endif %}
+
             <div class="filter-actions">
                 <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-play-fill me-1"></i>Generate</button>
             </div>
         </form>
-    </div>
+    {% include "includes/filter_disclosure_end.html" %}
 
     {% if data %}
-    <div class="export-toolbar no-print">
-        <span class="chip"><i class="bi bi-calendar3"></i> {{ data.period_label }} · {{ data.start_date }} – {{ data.end_date }}</span>
-        {% if data.document.scope_label %}
-        <span class="chip"><i class="bi bi-geo-alt"></i> {{ data.document.scope_label }}</span>
-        {% endif %}
+    <div class="report-export-bar no-print">
         {% if data.truncated %}
-        <span class="chip text-warning"><i class="bi bi-exclamation-triangle"></i> Results truncated</span>
+        <span class="report-export-bar__meta text-warning small"><i class="bi bi-exclamation-triangle"></i> Truncated</span>
         {% endif %}
-        <div class="btn-group btn-group-sm">
-            {% if can_export_reports_csv %}
-            <a href="{{ export_links.csv }}" class="btn btn-outline-secondary">CSV</a>
-            {% endif %}
-            {% if can_export_reports_excel %}
-            <a href="{{ export_links.excel }}" class="btn btn-outline-secondary">Excel</a>
+        <div class="report-export-bar__actions">
+            {% if data.statement or data.ledger %}
+            <button type="button" class="btn btn-primary btn-sm" id="report-print-btn"><i class="bi bi-printer me-1"></i>Print</button>
             {% endif %}
             {% if can_export_reports_pdf %}
-            <a href="{{ export_links.pdf }}" class="btn btn-outline-secondary">PDF</a>
+            <a href="{{ export_links.pdf }}" class="btn btn-outline-secondary btn-sm">PDF</a>
             {% endif %}
-            {% if can_export_reports_csv %}
-            <a href="{{ export_links.async_csv }}" class="btn btn-outline-secondary" title="Queue background export">Async CSV</a>
+            {% if can_export_reports_excel %}
+            <a href="{{ export_links.excel }}" class="btn btn-outline-secondary btn-sm">Excel</a>
             {% endif %}
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">More</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    {% if can_export_reports_csv %}
+                    <li><a class="dropdown-item" href="{{ export_links.csv }}">CSV</a></li>
+                    <li><a class="dropdown-item" href="{{ export_links.async_csv }}">CSV (background)</a></li>
+                    {% endif %}
+                    {% if data.statement or data.ledger %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}layout=table">Table layout</a></li>
+                    <li><a class="dropdown-item" href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}layout=document">Document layout</a></li>
+                    {% endif %}
+                </ul>
+            </div>
         </div>
     </div>
+
     {% if data.ledger %}
     {% include "reports/includes/general_ledger.html" %}
     {% elif data.settlement_pack %}
     {% include "reports/includes/settlement_register.html" %}
-    {% elif data.statement %}
+    {% elif data.statement and document_mode %}
     {% include "reports/includes/financial_statement.html" %}
+    {% elif data.statement %}
+    {% include "includes/table_open.html" with table_title="Summary table" table_icon="bi-table" %}
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>{% for h in data.headers %}<th{% if forloop.counter > 1 %} class="text-end"{% endif %}>{{ h }}</th>{% endfor %}</tr>
+                </thead>
+                <tbody>
+                    {% for row in data.rows %}
+                    <tr>
+                        {% for cell in row %}
+                        <td{% if not forloop.first %} class="text-end text-currency"{% endif %}>{{ cell }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="{{ data.headers|length }}">{% include "includes/empty_state.html" with icon="bi-inbox" message="No data for this period." %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% include "includes/table_close.html" %}
     {% else %}
     {% include "includes/table_open.html" with table_title="Results" table_icon="bi-table" %}
             <table class="table table-hover mb-0">
@@ -106,12 +157,13 @@
             </table>
             {% include "includes/table_close.html" %}
     {% endif %}
-            {% if report_key == "member_summary" and data.member_dashboard %}
-            <div class="mt-3">
-                {% include "dashboard/includes/member_summary.html" with member_dashboard=data.member_dashboard %}
-            </div>
-            {% endif %}
-            {% endif %}
+
+    {% if report_key == "member_summary" and data.member_dashboard %}
+    <div class="mt-3">
+        {% include "dashboard/includes/member_summary.html" with member_dashboard=data.member_dashboard %}
+    </div>
+    {% endif %}
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -131,7 +183,9 @@
   });
   document.querySelectorAll("#report-print-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      root.querySelectorAll(".stmt__section").forEach((el) => { el.open = true; });
+      if (root) {
+        root.querySelectorAll(".stmt__section").forEach((el) => { el.open = true; });
+      }
       window.print();
     });
   });
@@ -153,7 +207,7 @@
             datasets: [{
                 label: "Amount",
                 data: JSON.parse(amountsEl.textContent),
-                backgroundColor: ["#1e3a5f", "#0e7490", "#059669", "#dc2626"],
+                backgroundColor: "#1e3a5f",
                 borderSkipped: false
             }]
         },

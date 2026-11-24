@@ -2041,6 +2041,56 @@ body.app-body.auth-page {
     margin-bottom: 1rem;
 }
 
+.page-container--report-run .filter-disclosure {
+    margin-bottom: 1rem;
+}
+
+.report-period-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+
+.report-export-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+}
+
+.report-export-bar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.report-eoy-sections {
+    margin: 0.75rem 0 0;
+    padding: 0;
+    border: 0;
+}
+
+.report-eoy-sections__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: 0.35rem 1rem;
+}
+
+.report-eoy-sections__item {
+    margin: 0;
+    font-size: 0.8125rem;
+}
+
+.filter-form--report .filter-form__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    gap: 0.65rem 1rem;
+}
+
 .chip {
     display: inline-flex;
     align-items: center;

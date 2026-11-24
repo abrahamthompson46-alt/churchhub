@@ -1,6 +1,7 @@
 {% load humanize %}
-<article class="stmt gl" aria-label="{{ data.title }}">
+<article class="stmt gl{% if document_mode %} stmt--document{% endif %}" aria-label="{{ data.title }}">
     <header class="stmt__masthead">
+        {% include "reports/includes/report_document_head.html" %}
         <p class="stmt__kicker">ChurchHub · Books of record</p>
         <h2 class="stmt__title">{{ data.title }}</h2>
         <p class="stmt__period">{{ data.period_label }} · {{ data.start_date }} to {{ data.end_date }}</p>
@@ -24,7 +25,51 @@
     </div>
     {% endif %}
 
-    {% if data.ledger.journals %}
+    <div class="stmt__toolbar no-print">
+        <p class="stmt__hint mb-0">Journals grouped by business date{% if data.truncated %} · display capped{% endif %}.</p>
+        <button type="button" class="btn btn-sm btn-outline-primary" id="report-print-btn"><i class="bi bi-printer me-1"></i>Print</button>
+    </div>
+
+    {% if data.ledger.groups %}
+    <div class="gl__list">
+        {% for day in data.ledger.groups %}
+        <div class="gl__day">
+            <h3 class="gl__day-heading"><time datetime="{{ day.date|date:'Y-m-d' }}">{{ day.date|date:"l, F j, Y" }}</time></h3>
+            {% for journal in day.journals %}
+            <section class="gl__journal">
+                <header class="gl__journal-head">
+                    <div class="gl__journal-meta">
+                        {% if journal.reference %}<span class="gl__ref">{{ journal.reference }}</span>{% endif %}
+                        <span class="gl__type">{{ journal.type }}</span>
+                        {% if data.document.multi_church %}<span class="gl__church">{{ journal.church }}</span>{% endif %}
+                    </div>
+                    <p class="gl__narration">{{ journal.narration }}</p>
+                    {% if journal.member %}<p class="gl__member">Member · {{ journal.member }}</p>{% endif %}
+                </header>
+                <table class="table table-sm mb-0 gl__lines">
+                    <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th class="text-end">Debit</th>
+                            <th class="text-end">Credit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for line in journal.lines %}
+                        <tr>
+                            <td>{{ line.account }}</td>
+                            <td class="text-end text-currency">{% if line.debit %}{{ line.debit|floatformat:2|intcomma }}{% endif %}</td>
+                            <td class="text-end text-currency">{% if line.credit %}{{ line.credit|floatformat:2|intcomma }}{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+    {% elif data.ledger.journals %}
     <div class="gl__list">
         {% for journal in data.ledger.journals %}
         <section class="gl__journal">
@@ -33,7 +78,7 @@
                     <time datetime="{{ journal.date|date:'Y-m-d' }}">{{ journal.date }}</time>
                     {% if journal.reference %}<span class="gl__ref">{{ journal.reference }}</span>{% endif %}
                     <span class="gl__type">{{ journal.type }}</span>
-                    <span class="gl__church">{{ journal.church }}</span>
+                    {% if data.document.multi_church %}<span class="gl__church">{{ journal.church }}</span>{% endif %}
                 </div>
                 <p class="gl__narration">{{ journal.narration }}</p>
                 {% if journal.member %}<p class="gl__member">Member · {{ journal.member }}</p>{% endif %}

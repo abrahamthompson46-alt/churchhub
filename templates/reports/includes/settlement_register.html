@@ -1,6 +1,7 @@
 {% load humanize %}
 <article class="stmt" aria-label="{{ data.title }}">
     <header class="stmt__masthead">
+        {% if data.document %}{% include "reports/includes/report_document_head.html" %}{% endif %}
         <p class="stmt__kicker">ChurchHub · Settlement records</p>
         <h2 class="stmt__title">{{ data.title }}</h2>
         <p class="stmt__period">{{ data.period_label }} · {{ data.start_date }} to {{ data.end_date }}</p>

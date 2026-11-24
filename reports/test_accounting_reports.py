@@ -51,6 +51,8 @@ class AccountingReportTests(TestCase):
 
     def test_trial_balance_balanced(self):
         data = build_report("trial_balance", self._request(), period="monthly")
+        self.assertIn("document", data)
+        self.assertIn("scope_label", data["document"])
         self.assertEqual(data["title"], "Trial Balance")
         self.assertEqual(data["summary"]["total_debit"], data["summary"]["total_credit"])
         self.assertTrue(data["statement"]["balanced"])

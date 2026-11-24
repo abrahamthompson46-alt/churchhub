@@ -9,7 +9,14 @@ from permissions.checks import can_view_reports
 
 from . import repositories as repo
 from . import selectors
-from .exporters import export_table_csv, export_table_excel, export_table_pdf
+from .exporters import (
+    export_ledger_pdf,
+    export_statement_excel,
+    export_statement_pdf,
+    export_table_csv,
+    export_table_excel,
+    export_table_pdf,
+)
 from .forms import ReportFilterForm, WelfareStatementForm
 from .models import ReportAccessAuditLog
 from .registry import REPORT_CATALOG
@@ -200,10 +207,21 @@ def run_report(request, report_key):
         )
         slug = report_key.replace("_", "-")
         subtitle = f"{data['period_label']} — {data['start_date']} to {data['end_date']}"
+        stmt = data.get("statement") or {}
+        use_statement = (
+            export_fmt in ("pdf", "excel")
+            and bool(stmt.get("sections"))
+        )
         if export_fmt == "csv":
             return export_table_csv(data["headers"], data["rows"], f"{slug}.csv")
+        if export_fmt == "excel" and use_statement:
+            return export_statement_excel(data, filename=f"{slug}.xlsx")
         if export_fmt == "excel":
             return export_table_excel(data["headers"], data["rows"], f"{slug}.xlsx", data["title"])
+        if export_fmt == "pdf" and use_statement:
+            return export_statement_pdf(data, filename=f"{slug}.pdf")
+        if export_fmt == "pdf" and (data.get("ledger") or {}).get("journals"):
+            return export_ledger_pdf(data, filename=f"{slug}.pdf")
         return export_table_pdf(data["headers"], data["rows"], data["title"], subtitle, f"{slug}.pdf")
 
     if data:
@@ -222,12 +240,15 @@ def run_report(request, report_key):
             export_links[fmt] = "?" + _export_query_string(request, fmt)
         export_links["async_csv"] = "?" + _export_query_string(request, "csv", async_export=True)
 
+    document_mode = request.GET.get("layout") == "document"
+
     return render(request, "reports/run.html", {
         "report_key": report_key,
         "meta": meta,
         "form": form,
         "data": data,
         "export_links": export_links,
+        "document_mode": document_mode,
         "show_hierarchy": form.show_hierarchy_filters,
         "campaign_kind": campaign_kind,
         "show_zeros": show_zeros,

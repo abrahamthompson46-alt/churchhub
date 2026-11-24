@@ -6208,6 +6208,85 @@ a.alert-banner:hover {
 .birthday-desk-preview--story { aspect-ratio: 9 / 16; }
 
 /* Financial statement reports (summary, TB, BS, income statement) */
+.stmt__letterhead {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px dashed var(--ch-border);
+}
+.stmt__letterhead-main {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+.stmt__letterhead-logo {
+    max-height: 42px;
+    max-width: 140px;
+    object-fit: contain;
+}
+.stmt__scope {
+    font-weight: 700;
+    font-size: 1.05rem;
+    margin: 0;
+    color: var(--ch-text);
+}
+.stmt__meta {
+    display: grid;
+    gap: 0.35rem 1rem;
+    text-align: right;
+}
+.stmt__meta div {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 0.5rem;
+    justify-content: end;
+}
+.stmt__meta dt {
+    margin: 0;
+    color: var(--ch-muted);
+    font-weight: 500;
+}
+.stmt__meta dd {
+    margin: 0;
+    font-weight: 600;
+}
+.stmt__chart-wrap {
+    background: #fff;
+}
+.stmt__subtotal th,
+.stmt__subtotal td {
+    background: #f1f5f9;
+    border-top: 2px solid var(--ch-border);
+    font-weight: 600;
+}
+.stmt__table tbody tr:nth-child(even) {
+    background: rgba(248, 250, 252, 0.65);
+}
+.stmt__grand-totals {
+    padding: 0.75rem 1.5rem 1rem;
+    border-top: 2px solid var(--ch-border);
+    background: #f8fafc;
+}
+.stmt__grand-total th,
+.stmt__grand-total td {
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+.gl__day-heading {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ch-muted);
+    padding: 0.85rem 1.25rem 0.35rem;
+    margin: 0;
+    background: #f8fafc;
+    border-top: 1px solid var(--ch-border);
+}
 .stmt {
     background: var(--ch-card);
     border: 1px solid var(--ch-border);
@@ -6425,8 +6504,14 @@ a.alert-banner:hover {
     color: var(--ch-muted);
 }
 @media print {
-    .stmt__toolbar, .filter-panel, .export-toolbar { display: none !important; }
+    .stmt__toolbar, .filter-panel, .export-toolbar, .stmt__chart-wrap { display: none !important; }
     .stmt__section { break-inside: avoid; }
-    .stmt__section:not([open]) { display: block; }
+    .stmt__section .stmt__body { display: block !important; }
+    details.stmt__section > summary { display: none; }
+    .stmt {
+        box-shadow: none;
+        border: 1px solid #ccc;
+    }
     .gl__journal { break-inside: avoid; }
+    .main-content { padding: 0; }
 }

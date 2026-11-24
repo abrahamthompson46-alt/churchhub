@@ -1,6 +1,7 @@
 """Report data builders — hierarchy-aware, read-only queries."""
 
 from datetime import date, datetime, timedelta
+from itertools import groupby
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -225,6 +226,15 @@ def build_report(report_key, request, period="monthly", start_date=None, end_dat
     data["period_label"] = dict(PERIOD_CHOICES).get(period, period)
     data["start_date"] = start
     data["end_date"] = end
+    from reports.presentation import (
+        build_report_document_context,
+        normalize_statement_kpis,
+    )
+
+    data["document"] = build_report_document_context(request, **hierarchy)
+    if stmt := data.get("statement"):
+        stmt["kpis"] = normalize_statement_kpis(stmt.get("kpis"))
+        data["statement"] = stmt
     return data
 
 
@@ -306,6 +316,10 @@ def _general_ledger(request, start, end, **hierarchy):
             shown_lines += 1
         journals.append(journal)
 
+    ledger_groups = []
+    for journal_date, group in groupby(journals, key=lambda j: j["date"]):
+        ledger_groups.append({"date": journal_date, "journals": list(group)})
+
     if truncated:
         rows.append(
             [
@@ -341,13 +355,13 @@ def _general_ledger(request, start, end, **hierarchy):
             "total_debit": _quantize(total_debit),
             "total_credit": _quantize(total_credit),
         },
-        "ledger": {"journals": journals},
+        "ledger": {"journals": journals, "groups": ledger_groups},
         "statement": _statement(
             kpis=[
                 {"label": "Journals", "value": journal_count, "tone": "primary", "format": "integer"},
                 {"label": "Lines", "value": total_lines, "tone": "primary", "format": "integer"},
-                {"label": "Debits", "value": _quantize(total_debit), "tone": "ok"},
-                {"label": "Credits", "value": _quantize(total_credit), "tone": "ok"},
+                {"label": "Debits", "value": _quantize(total_debit), "tone": "success"},
+                {"label": "Credits", "value": _quantize(total_credit), "tone": "success"},
             ],
             sections=[],
             notes=notes,
@@ -439,6 +453,15 @@ def _financial_summary(request, start, end, **hierarchy):
         "headers": headers,
         "rows": rows,
         "statement": statement,
+        "chart": {
+            "labels": ["Tithe", "Combined offering", "Operating income", "Operating expense"],
+            "amounts": [
+                summary["tithe"],
+                summary["combined"],
+                summary["income"],
+                summary["expense"],
+            ],
+        },
     }
 
 
@@ -721,7 +744,7 @@ def _trial_balance(request, start, end, show_zeros=False, **hierarchy):
         bucket["lines"].append(
             {
                 "label": account_name,
-                "church": acc_type,
+                "account_type": acc_type,
                 "debit": debit,
                 "credit": credit,
             }
@@ -846,6 +869,19 @@ def _balance_sheet(request, start, end, **hierarchy):
             f"Assets {assets} versus liabilities plus funds {claims}.",
         ],
     )
+    statement["footer_totals"] = [
+        {"label": "Total assets", "amount": assets},
+        {"label": "Total liabilities", "amount": section_totals.get("Liabilities", Decimal("0"))},
+        {
+            "label": "Total funds & equity",
+            "amount": section_totals.get("Funds & Equity", Decimal("0")),
+        },
+        {
+            "label": "Liabilities + funds & equity",
+            "amount": claims,
+            "emphasis": True,
+        },
+    ]
     return {
         "title": "Balance Sheet",
         "headers": headers,
@@ -926,6 +962,11 @@ def _income_statement(request, start, end, **hierarchy):
             "to view account and church detail.",
         ],
     )
+    statement["footer_totals"] = [
+        {"label": "Total income", "amount": total_income},
+        {"label": "Total expense", "amount": total_expense},
+        {"label": "Net surplus / (deficit)", "amount": net, "emphasis": True},
+    ]
     return {
         "title": "Income Statement",
         "headers": headers,
@@ -953,11 +994,33 @@ def _cash_position(request, start, end, **hierarchy):
             bal,
         ])
     rows.append(["", "Total Cash & Bank", "", total])
+    detail_lines = [
+        {
+            "label": row[1],
+            "church": row[0],
+            "amount": row[3],
+        }
+        for row in rows[:-1]
+    ]
+    statement = _statement(
+        kpis=[{"label": "Cash & bank total", "value": total, "tone": "primary"}],
+        sections=[
+            {
+                "id": "cash-bank",
+                "title": "Cash and bank accounts",
+                "total": total,
+                "lines": detail_lines,
+                "empty": "No cash or bank balances at period end.",
+            }
+        ],
+        notes=["Balances as of period end for CASH and BANK accounts only."],
+    )
     return {
         "title": "Cash & Bank Position",
         "headers": headers,
         "rows": rows,
         "summary": {"total": total},
+        "statement": statement,
     }
 
 

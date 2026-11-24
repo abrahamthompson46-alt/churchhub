@@ -141,11 +141,12 @@ def generate_report_export_task(self, job_id):
         )
         content, content_type, filename = build_export_bytes(
             job.export_format,
-            data["headers"],
-            data["rows"],
+            data.get("headers") or [],
+            data.get("rows") or [],
             data["title"],
             f"{data['period_label']} — {data['start_date']} to {data['end_date']}",
             job.report_key,
+            data=data,
         )
         job.export_file.save(filename, ContentFile(content), save=False)
         job.content_type = content_type

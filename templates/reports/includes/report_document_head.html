@@ -1,0 +1,20 @@
+{% load humanize %}
+<div class="stmt__letterhead">
+    <div class="stmt__letterhead-main">
+        {% if data.document.logo_url %}
+        <img src="{{ data.document.logo_url }}" alt="" class="stmt__letterhead-logo">
+        {% elif site_logo %}
+        <img src="{{ site_logo.url }}" alt="" class="stmt__letterhead-logo">
+        {% endif %}
+        <div>
+            <p class="stmt__scope">{{ data.document.scope_label }}</p>
+            {% if data.document.scope_secondary %}
+            <p class="stmt__scope-sub text-muted small mb-0">{{ data.document.scope_secondary }}</p>
+            {% endif %}
+        </div>
+    </div>
+    <dl class="stmt__meta small mb-0">
+        <div><dt>Prepared by</dt><dd>{{ data.document.prepared_by }}</dd></div>
+        <div><dt>Generated</dt><dd>{{ data.document.generated_at|date:"M j, Y, g:i A" }}</dd></div>
+    </dl>
+</div>

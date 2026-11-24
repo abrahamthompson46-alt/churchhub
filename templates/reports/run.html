@@ -7,7 +7,7 @@
 <div class="page-container">
     {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Analytics" page_title=meta.label page_description=meta.description %}
 
-    <div class="filter-panel">
+    <div class="filter-panel no-print">
         <p class="filter-panel-title">Report filters</p>
         <form method="get" class="filter-form" id="report-filter-form">
             <div class="filter-field">
@@ -52,17 +52,16 @@
             {% endif %}
             <div class="filter-actions">
                 <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-play-fill me-1"></i>Generate</button>
-                {% if report_key == 'trial_balance' %}
-                <input type="hidden" name="show_zeros" value="{% if show_zeros %}1{% else %}0{% endif %}">
-                <button type="submit" name="show_zeros" value="{% if show_zeros %}0{% else %}1{% endif %}" class="btn btn-sm {% if show_zeros %}btn-secondary{% else %}btn-outline-secondary{% endif %}">{% if show_zeros %}Hide zeros{% else %}Show zeros{% endif %}</button>
-                {% endif %}
             </div>
         </form>
     </div>
 
     {% if data %}
-    <div class="export-toolbar">
+    <div class="export-toolbar no-print">
         <span class="chip"><i class="bi bi-calendar3"></i> {{ data.period_label }} · {{ data.start_date }} – {{ data.end_date }}</span>
+        {% if data.document.scope_label %}
+        <span class="chip"><i class="bi bi-geo-alt"></i> {{ data.document.scope_label }}</span>
+        {% endif %}
         {% if data.truncated %}
         <span class="chip text-warning"><i class="bi bi-exclamation-triangle"></i> Results truncated</span>
         {% endif %}
@@ -117,7 +116,7 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if data.statement %}
+{% if data.statement or data.ledger %}
 <script>
 (function () {
   const root = document.querySelector(".stmt");
@@ -130,6 +129,42 @@
       });
     });
   });
+  document.querySelectorAll("#report-print-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      root.querySelectorAll(".stmt__section").forEach((el) => { el.open = true; });
+      window.print();
+    });
+  });
+})();
+</script>
+{% endif %}
+{% if report_key == "financial_summary" and data.chart %}
+<script>
+(function () {
+    const el = document.getElementById("financialSummaryChart");
+    const labelsEl = document.getElementById("fin-chart-labels");
+    const amountsEl = document.getElementById("fin-chart-amounts");
+    if (!el || !labelsEl || !amountsEl || typeof Chart === "undefined") return;
+    new Chart(el, {
+        type: "bar",
+        data: {
+            labels: JSON.parse(labelsEl.textContent),
+            datasets: [{
+                label: "Amount",
+                data: JSON.parse(amountsEl.textContent),
+                backgroundColor: ["#1e3a5f", "#0e7490", "#059669", "#dc2626"],
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+                x: { ticks: { font: { size: 10 }, maxRotation: 25 } }
+            }
+        }
+    });
 })();
 </script>
 {% endif %}

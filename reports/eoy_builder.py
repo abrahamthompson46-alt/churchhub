@@ -241,10 +241,18 @@ def build_end_of_year_detailed(services, request, start, end, *, eoy_sections=No
             "amounts": [line["amount"] for line in monthly_lines],
         }
 
+    profit_loss_grid = None
+    if flags.get("income_statement"):
+        from reports.profit_loss_grid import build_profit_loss_grid
+
+        churches = services._churches_in_scope(request, **hierarchy)
+        profit_loss_grid = build_profit_loss_grid(churches, start, end)
+
     return {
         "title": "End of Year Detailed Report",
         "headers": headers,
         "rows": rows,
+        "profit_loss_grid": profit_loss_grid,
         "summary": {
             "tithe": fs_summary.get("tithe", Decimal("0")),
             "combined": fs_summary.get("combined", Decimal("0")),

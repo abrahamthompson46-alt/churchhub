@@ -2091,6 +2091,63 @@ body.app-body.auth-page {
     gap: 0.65rem 1rem;
 }
 
+.stmt-pl {
+    margin: 0 0 1.25rem;
+    border: 1px solid var(--ch-border);
+    border-radius: var(--ch-radius, 0.5rem);
+    background: var(--ch-surface);
+    overflow: hidden;
+}
+.stmt-pl__head {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--ch-border);
+    background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+}
+.stmt-pl__title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--ch-primary);
+}
+.stmt-pl__subtitle {
+    margin: 0.35rem 0 0;
+    font-size: 0.8125rem;
+    color: var(--ch-text-secondary);
+}
+.stmt-pl__table thead th {
+    background: var(--ch-primary);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 0;
+    white-space: nowrap;
+}
+.stmt-pl__table tbody tr:nth-child(even) {
+    background: #f8fafc;
+}
+.stmt-pl__account-col {
+    min-width: 12rem;
+}
+.stmt-pl__account a {
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--ch-primary);
+}
+.stmt-pl__account a:hover {
+    text-decoration: underline;
+}
+.stmt-pl__subtotal th,
+.stmt-pl__subtotal td {
+    border-top: 2px solid var(--ch-border);
+    background: #f1f5f9;
+    font-weight: 600;
+}
+.stmt-pl__net th,
+.stmt-pl__net td {
+    border-top: 2px solid var(--ch-primary);
+    background: #e8edf4;
+}
+
 .chip {
     display: inline-flex;
     align-items: center;

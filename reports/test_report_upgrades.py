@@ -22,6 +22,16 @@ class PeriodPresetTests(SimpleTestCase):
         self.assertEqual(end, date(2026, 2, 28))
 
 
+class ProfitLossGridTests(SimpleTestCase):
+    def test_month_columns_span_year(self):
+        from reports.profit_loss_grid import _month_columns
+        from datetime import date
+
+        cols = _month_columns(date(2025, 1, 1), date(2025, 3, 15))
+        self.assertEqual(len(cols), 3)
+        self.assertEqual(cols[0]["label"], "Jan")
+
+
 class EoySectionTests(SimpleTestCase):
     def test_defaults_exclude_optional_modules(self):
         flags = default_eoy_sections()

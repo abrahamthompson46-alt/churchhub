@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ data.title }} — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container page-container--report-run">
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Reports" page_title=data.title page_description=account.church.name %}
+
+    <div class="no-print mb-3">
+        <a href="{{ return_to }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back to report</a>
+        <span class="chip ms-2"><i class="bi bi-calendar3"></i> {{ data.start_date }} – {{ data.end_date }}</span>
+    </div>
+
+    {% include "reports/includes/financial_statement.html" with report_key="account_activity" %}
+
+    {% include "includes/table_open.html" with table_title="Posted journal lines" table_icon="bi-journal-text" %}
+    <table class="table table-sm table-hover mb-0">
+        <thead>
+            <tr>
+                {% for h in data.headers %}
+                <th{% if forloop.counter > 4 %} class="text-end"{% endif %}>{{ h }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data.rows %}
+            <tr>
+                {% for cell in row %}
+                <td{% if forloop.counter > 4 %} class="text-end text-currency"{% endif %}>{{ cell }}</td>
+                {% endfor %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="{{ data.headers|length }}">{% include "includes/empty_state.html" with icon="bi-inbox" message="No posted lines for this account in the period." %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% include "includes/table_close.html" %}
+</div>
+{% endblock %}

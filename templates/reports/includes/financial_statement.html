@@ -35,6 +35,8 @@
     {% endif %}
     {% endif %}
 
+    {% include "reports/includes/profit_loss_grid.html" %}
+
     <div class="stmt__toolbar no-print">
         <div class="btn-group btn-group-sm">
             {% if report_key == 'trial_balance' and zeros_toggle_qs %}
@@ -88,7 +90,13 @@
                     <tbody>
                         {% for line in section.lines %}
                         <tr>
-                            <td>{{ line.label }}</td>
+                            <td>
+                                {% if line.account_id %}
+                                <a href="{% url 'reports:account_activity' line.account_id %}?{{ data.drill_query }}&return_to={{ request.get_full_path|urlencode }}">{{ line.label }}</a>
+                                {% else %}
+                                {{ line.label }}
+                                {% endif %}
+                            </td>
                             {% if section.layout == "trial_balance" %}
                             <td class="text-muted">{{ line.account_type|default:"—" }}</td>
                             <td class="text-end text-currency">{% if line.debit %}{{ line.debit|floatformat:2|intcomma }}{% else %}—{% endif %}</td>

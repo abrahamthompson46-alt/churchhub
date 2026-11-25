@@ -1,0 +1,67 @@
+{% load humanize %}
+{% if data.profit_loss_grid and data.profit_loss_grid.columns %}
+<section class="stmt-pl" aria-label="{{ data.profit_loss_grid.title }}">
+    <header class="stmt-pl__head">
+        <h3 class="stmt-pl__title">{{ data.profit_loss_grid.title }}</h3>
+        <p class="stmt-pl__subtitle">{{ data.profit_loss_grid.subtitle }}</p>
+    </header>
+    <div class="table-responsive">
+        <table class="table table-sm stmt-pl__table mb-0">
+            <thead>
+                <tr>
+                    <th scope="col" class="stmt-pl__account-col">Category</th>
+                    {% for col in data.profit_loss_grid.columns %}
+                    <th scope="col" class="text-end">{{ col.label }}</th>
+                    {% endfor %}
+                    <th scope="col" class="text-end">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data.profit_loss_grid.income_rows %}
+                <tr>
+                    <th scope="row" class="stmt-pl__account">
+                        <a href="{% url 'reports:account_activity' row.account_id %}?{{ data.drill_query }}&return_to={{ request.get_full_path|urlencode }}">{{ row.account_name }}</a>
+                    </th>
+                    {% for cell in row.cells %}
+                    <td class="text-end text-currency">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                    {% endfor %}
+                    <td class="text-end text-currency fw-semibold">{{ row.total|floatformat:2|intcomma }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="stmt-pl__subtotal">
+                    <th scope="row">Total Income</th>
+                    {% for cell in data.profit_loss_grid.income_totals %}
+                    <td class="text-end text-currency">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                    {% endfor %}
+                    <td class="text-end text-currency fw-semibold">{{ data.profit_loss_grid.grand_income|floatformat:2|intcomma }}</td>
+                </tr>
+                {% for row in data.profit_loss_grid.expense_rows %}
+                <tr>
+                    <th scope="row" class="stmt-pl__account">
+                        <a href="{% url 'reports:account_activity' row.account_id %}?{{ data.drill_query }}&return_to={{ request.get_full_path|urlencode }}">{{ row.account_name }}</a>
+                    </th>
+                    {% for cell in row.cells %}
+                    <td class="text-end text-currency">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                    {% endfor %}
+                    <td class="text-end text-currency fw-semibold">{{ row.total|floatformat:2|intcomma }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="stmt-pl__subtotal">
+                    <th scope="row">Total Expense</th>
+                    {% for cell in data.profit_loss_grid.expense_totals %}
+                    <td class="text-end text-currency">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                    {% endfor %}
+                    <td class="text-end text-currency fw-semibold">{{ data.profit_loss_grid.grand_expense|floatformat:2|intcomma }}</td>
+                </tr>
+                <tr class="stmt-pl__net">
+                    <th scope="row">Net Income</th>
+                    {% for cell in data.profit_loss_grid.net_totals %}
+                    <td class="text-end text-currency">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                    {% endfor %}
+                    <td class="text-end text-currency fw-bold">{{ data.profit_loss_grid.grand_net|floatformat:2|intcomma }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}

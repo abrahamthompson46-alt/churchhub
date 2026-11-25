@@ -241,7 +241,22 @@ def build_report(report_key, request, period="monthly", start_date=None, end_dat
     if stmt := data.get("statement"):
         stmt["kpis"] = normalize_statement_kpis(stmt.get("kpis"))
         data["statement"] = stmt
+    data["drill_query"] = _report_drill_query(start, end, **hierarchy)
     return data
+
+
+def _report_drill_query(start, end, **hierarchy) -> str:
+    from urllib.parse import urlencode
+
+    params = {
+        "start_date": start.isoformat() if start else "",
+        "end_date": end.isoformat() if end else "",
+        "period": "custom",
+    }
+    for key in ("conference_id", "zone_id", "district_id", "church_id"):
+        if hierarchy.get(key):
+            params[key] = str(hierarchy[key])
+    return urlencode(params)
 
 
 def _ledger_narration(txn):
@@ -249,6 +264,51 @@ def _ledger_narration(txn):
     if text:
         return text
     return txn.get_transaction_type_display()
+
+
+def build_account_activity(request, account, start, end, **hierarchy):
+    """Journal lines for a single GL account (report drill-down)."""
+    txns = selectors.ledger_transactions_for_account(request, account, start, end, **hierarchy)
+    headers = ["Date", "Reference", "Church", "Narration", "Debit", "Credit", "Balance Δ"]
+    rows = []
+    total = Decimal("0")
+    for txn in txns:
+        narration = _ledger_narration(txn)
+        for line in txn.lines.filter(account=account).order_by("-amount", "pk"):
+            amount = _quantize(line.amount)
+            total += amount
+            debit = amount if amount > 0 else Decimal("0")
+            credit = abs(amount) if amount < 0 else Decimal("0")
+            rows.append(
+                [
+                    txn.date,
+                    txn.reference or "",
+                    txn.church.name,
+                    narration,
+                    debit if debit else "",
+                    credit if credit else "",
+                    amount,
+                ]
+            )
+    statement = _statement(
+        kpis=[
+            {"label": "Period activity (signed)", "value": total, "tone": "primary"},
+            {"label": "Journal lines", "value": len(rows), "tone": "accent", "format": "integer"},
+        ],
+        sections=[],
+        notes=[
+            f"Account {account.name} ({account.get_account_type_display()}) · {account.church.name}",
+            "Amounts use the ledger sign convention (debit positive).",
+        ],
+    )
+    return {
+        "title": f"Account activity — {account.name}",
+        "headers": headers,
+        "rows": rows,
+        "statement": statement,
+        "account": account,
+        "summary": {"line_count": len(rows), "signed_total": total},
+    }
 
 
 def _general_ledger(request, start, end, **hierarchy):
@@ -716,7 +776,7 @@ def _account_activity_lines(lines, account_types):
     """Period lines grouped by account and church; amounts as positive activity."""
     rows = (
         lines.filter(account__account_type__in=account_types)
-        .values("account__name", "transaction__church__name")
+        .values("account_id", "account__name", "transaction__church__name")
         .annotate(total=Sum("amount"))
         .order_by("account__name", "transaction__church__name")
     )
@@ -730,6 +790,7 @@ def _account_activity_lines(lines, account_types):
                 "label": row["account__name"],
                 "church": row["transaction__church__name"] or "",
                 "amount": amount,
+                "account_id": str(row.get("account_id") or ""),
             }
         )
     return detail
@@ -973,22 +1034,36 @@ def _income_statement(request, start, end, **hierarchy):
             # Credit-normal: activity magnitude is -balance when credits dominate.
             amount = abs(bal)
             total_income += amount
-            rows.append(["Income", entry["account"].name, entry["church_name"], amount])
+            rows.append(
+                ["Income", entry["account"].name, entry["church_name"], amount, str(entry["account"].pk)]
+            )
         elif acc_type in EXPENSE_TYPES:
             amount = abs(bal)
             total_expense += amount
-            rows.append(["Expense", entry["account"].name, entry["church_name"], amount])
+            rows.append(
+                ["Expense", entry["account"].name, entry["church_name"], amount, str(entry["account"].pk)]
+            )
     net = total_income - total_expense
     rows.append(["", "Total Income", "", total_income])
     rows.append(["", "Total Expense", "", total_expense])
     rows.append(["", "Net Surplus / (Deficit)", "", net])
     income_lines = [
-        {"label": row[1], "church": row[2], "amount": row[3]}
+        {
+            "label": row[1],
+            "church": row[2],
+            "amount": row[3],
+            "account_id": str(row[4]) if len(row) > 4 and row[4] else "",
+        }
         for row in rows
         if row[0] == "Income"
     ]
     expense_lines = [
-        {"label": row[1], "church": row[2], "amount": row[3]}
+        {
+            "label": row[1],
+            "church": row[2],
+            "amount": row[3],
+            "account_id": str(row[4]) if len(row) > 4 and row[4] else "",
+        }
         for row in rows
         if row[0] == "Expense"
     ]
@@ -1020,8 +1095,8 @@ def _income_statement(request, start, end, **hierarchy):
         ],
         notes=[
             "Figures are period activity shown as positive amounts. Income accounts "
-            "are credit-normal; expense accounts are debit-normal. Click a section "
-            "to view account and church detail.",
+            "are credit-normal; expense accounts are debit-normal. Click an account "
+            "name for posted journal detail.",
         ],
     )
     statement["footer_totals"] = [
@@ -1029,12 +1104,15 @@ def _income_statement(request, start, end, **hierarchy):
         {"label": "Total expense", "amount": total_expense},
         {"label": "Net surplus / (deficit)", "amount": net, "emphasis": True},
     ]
+    from reports.profit_loss_grid import build_profit_loss_grid
+
     return {
         "title": "Income Statement",
         "headers": headers,
         "rows": rows,
         "summary": {"income": total_income, "expense": total_expense, "net": net},
         "statement": statement,
+        "profit_loss_grid": build_profit_loss_grid(churches, start, end),
     }
 
 

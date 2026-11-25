@@ -1,11 +1,13 @@
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import FileResponse, Http404
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from church_system.church_scope import get_active_church, require_church
 from church_system.flash import flash_info
-from permissions.checks import can_view_reports
+from permissions.checks import can_manage_finances, can_view_finance_reports, can_view_reports
+from transactions.models import Account
 
 from . import repositories as repo
 from . import selectors
@@ -29,10 +31,14 @@ from .run_context import (
 )
 from .services import (
     _flag_enabled,
+    _report_drill_query,
+    build_account_activity,
     build_report,
     get_hierarchy_context,
     log_report_access,
+    parse_report_date,
     reports_for_user,
+    resolve_date_range,
     user_may_access_report,
 )
 
@@ -291,6 +297,74 @@ def run_report(request, report_key):
             {"label": meta["label"]},
         ],
     })
+
+
+def _hierarchy_from_request(request):
+    hierarchy = {}
+    for key in ("conference_id", "zone_id", "district_id", "church_id"):
+        val = request.GET.get(key)
+        if val:
+            hierarchy[key] = val
+    return hierarchy
+
+
+@login_required
+def account_activity(request, account_id):
+    """Drill-down: posted journal lines for one GL account (from report links)."""
+    if not can_view_reports(request.user):
+        raise PermissionDenied
+    if not (can_manage_finances(request.user) or can_view_finance_reports(request.user)):
+        raise PermissionDenied
+
+    account = get_object_or_404(Account.objects.select_related("church"), pk=account_id)
+    hierarchy = _hierarchy_from_request(request)
+    if not selectors.account_in_report_scope(request, account, **hierarchy):
+        raise PermissionDenied
+
+    start = parse_report_date(request.GET.get("start_date"))
+    end = parse_report_date(request.GET.get("end_date"))
+    if not start or not end:
+        start, end = resolve_date_range(
+            request.GET.get("period") or "annual",
+            request.GET.get("start_date"),
+            request.GET.get("end_date"),
+        )
+
+    data = build_account_activity(request, account, start, end, **hierarchy)
+    data["start_date"] = start
+    data["end_date"] = end
+    data["drill_query"] = _report_drill_query(start, end, **hierarchy)
+    from reports.presentation import build_report_document_context
+
+    data["document"] = build_report_document_context(request, **hierarchy)
+
+    active = get_active_church(request)
+    log_report_access(
+        user=request.user,
+        report_key="account_activity",
+        action=ReportAccessAuditLog.ACTION_RUN,
+        params={"account_id": str(account.pk), "start_date": str(start), "end_date": str(end)},
+        row_count=len(data.get("rows") or []),
+        church=active or account.church,
+    )
+
+    back_qs = request.GET.get("return_to") or ""
+    return_to = back_qs if back_qs.startswith("/reports/") else reverse("reports:run", args=["end_of_year_detailed"])
+
+    return render(
+        request,
+        "reports/account_activity.html",
+        {
+            "data": data,
+            "account": account,
+            "return_to": return_to,
+            "breadcrumbs": [
+                {"label": "Reports", "url": "/reports/"},
+                {"label": "Account activity"},
+                {"label": account.name},
+            ],
+        },
+    )
 
 
 @login_required

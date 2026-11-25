@@ -90,6 +90,19 @@ def ledger_transactions_in_scope(request, start, end, **hierarchy):
     )
 
 
+def ledger_transactions_for_account(request, account, start, end, **hierarchy):
+    """Journals in scope that touch the given GL account."""
+    return ledger_transactions_in_scope(request, start, end, **hierarchy).filter(
+        lines__account=account,
+    ).distinct()
+
+
+def account_in_report_scope(request, account, **hierarchy) -> bool:
+    """Whether the account's church is inside the active report hierarchy scope."""
+    churches = churches_in_scope(request, **hierarchy)
+    return churches.filter(pk=account.church_id).exists()
+
+
 def sum_line_amount_for_type(lines, acc_type):
     return lines.filter(account__account_type=acc_type).aggregate(t=Sum("amount"))["t"]
 

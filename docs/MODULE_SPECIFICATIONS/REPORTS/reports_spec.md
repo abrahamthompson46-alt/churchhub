@@ -58,7 +58,7 @@ erDiagram
 
 10. **End of Year Detailed Report (Current):** Composite pack with optional sections (`eoy_<key>` query flags). Default period on first open is **last calendar year**; finance reports expose period presets (last calendar year, YTD, last month, last quarter). Filters persist per user in session (`report_center_filters`).
 
-11. **Profit & loss grid & drill-down (Current):** Income Statement and End of Year packs include a monthly **Profit and loss (posted books)** matrix (account × month + total). Account names link to `/reports/account/<uuid>/` (**Account activity**) with the report period and hierarchy preserved; journal lines are church-scoped and permission-checked.
+11. **Monthly income/expense grid & drill-down (Current):** Income Statement and End of Year packs include **Monthly income and expense (posted books)** (account × month + total). Totals use **Total income**, **Total expense**, and **Net surplus / (deficit)**. Account names link to `/reports/account/<uuid>/` (**Account activity**) with the report period and hierarchy preserved; journal lines are church-scoped and permission-checked.
 
 ### Catalog keys (Current)
 

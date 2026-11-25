@@ -1,4 +1,4 @@
-"""Monthly profit & loss matrix for End of Year and income views."""
+"""Monthly income and expense matrix for End of Year and income views."""
 
 from __future__ import annotations
 
@@ -13,6 +13,17 @@ from transactions.models import TransactionLine
 
 INCOME_TYPES = {"TITHE", "COMBINED", "INCOME", "COMBINED_RETENTION"}
 EXPENSE_TYPES = {"EXPENSE", "SALARY_EXPENSE", "EMPLOYER_SSNIT_EXPENSE", "DEPRECIATION_EXPENSE"}
+
+GRID_TITLE = "Monthly income and expense (posted books)"
+GRID_LABELS = {
+    "account_column": "Account",
+    "total_column": "Total",
+    "income_section": "Income",
+    "expense_section": "Expense",
+    "total_income": "Total income",
+    "total_expense": "Total expense",
+    "net_row": "Net surplus / (deficit)",
+}
 
 
 def _month_columns(start: date, end: date) -> list[dict]:
@@ -55,8 +66,12 @@ def build_profit_loss_grid(churches, start: date, end: date) -> dict:
     columns = _month_columns(start, end)
     if not columns or not churches.exists():
         return {
-            "title": "Profit and loss (posted books)",
-            "subtitle": f"Months through {end.strftime('%d %b %Y')} using posted journal dates.",
+            "title": GRID_TITLE,
+            "subtitle": (
+                f"Months through {end.strftime('%d %b %Y')}. "
+                "Amounts from approved journals only."
+            ),
+            "labels": GRID_LABELS,
             "columns": [],
             "income_rows": [],
             "expense_rows": [],
@@ -137,11 +152,12 @@ def build_profit_loss_grid(churches, start: date, end: date) -> dict:
     grand_net = grand_income - grand_expense
 
     return {
-        "title": "Profit and loss (posted books)",
+        "title": GRID_TITLE,
         "subtitle": (
-            f"Fiscal months through {end.strftime('%d %b %Y')} using posted journal transaction dates. "
-            "Click an account name for journal detail."
+            f"Each column is calendar-month activity through {end.strftime('%d %b %Y')} "
+            "from posted journals. Select an account name to open its journal lines."
         ),
+        "labels": GRID_LABELS,
         "columns": columns,
         "income_rows": income_rows,
         "expense_rows": expense_rows,
@@ -151,4 +167,5 @@ def build_profit_loss_grid(churches, start: date, end: date) -> dict:
         "grand_income": grand_income,
         "grand_expense": grand_expense,
         "grand_net": grand_net,
+        "net_positive": grand_net >= 0,
     }

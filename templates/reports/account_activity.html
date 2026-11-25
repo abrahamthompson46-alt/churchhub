@@ -5,14 +5,26 @@
 
 {% block content %}
 <div class="page-container page-container--report-run">
-    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Reports" page_title=data.title page_description=account.church.name %}
+    {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Reports" page_title=account.name page_description="Posted journal activity" %}
 
-    <div class="no-print mb-3">
+    <div class="report-export-bar no-print mb-3">
         <a href="{{ return_to }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back to report</a>
-        <span class="chip ms-2"><i class="bi bi-calendar3"></i> {{ data.start_date }} – {{ data.end_date }}</span>
+        <span class="chip"><i class="bi bi-building"></i> {{ account.church.name }}</span>
+        <span class="chip"><i class="bi bi-calendar3"></i> {{ data.start_date|date:"M j, Y" }} – {{ data.end_date|date:"M j, Y" }}</span>
     </div>
 
-    {% include "reports/includes/financial_statement.html" with report_key="account_activity" %}
+    {% if data.statement.kpis %}
+    <div class="stmt__kpis stmt__kpis--compact mb-3" role="list">
+        {% for kpi in data.statement.kpis %}
+        <div class="stmt__kpi stmt__kpi--{{ kpi.tone|default:'primary' }}" role="listitem">
+            <span class="stmt__kpi-label">{{ kpi.label }}</span>
+            <span class="stmt__kpi-value text-currency">
+                {% if kpi.format == "integer" %}{{ kpi.value|intcomma }}{% else %}{{ kpi.value|floatformat:2|intcomma }}{% endif %}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     {% include "includes/table_open.html" with table_title="Posted journal lines" table_icon="bi-journal-text" %}
     <table class="table table-sm table-hover mb-0">

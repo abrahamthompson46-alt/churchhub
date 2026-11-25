@@ -2092,60 +2092,196 @@ body.app-body.auth-page {
 }
 
 .stmt-pl {
-    margin: 0 0 1.25rem;
+    margin: 1rem 0 1.5rem;
     border: 1px solid var(--ch-border);
-    border-radius: var(--ch-radius, 0.5rem);
-    background: var(--ch-surface);
+    border-radius: 0.625rem;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
     overflow: hidden;
 }
 .stmt-pl__head {
-    padding: 1rem 1.25rem;
+    padding: 1rem 1.25rem 0.85rem;
     border-bottom: 1px solid var(--ch-border);
     background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
 }
+.stmt-pl__kicker {
+    margin: 0 0 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ch-text-secondary);
+}
 .stmt-pl__title {
-    font-size: 1.05rem;
+    font-size: 1.0625rem;
     font-weight: 700;
     margin: 0;
     color: var(--ch-primary);
+    line-height: 1.35;
 }
 .stmt-pl__subtitle {
-    margin: 0.35rem 0 0;
+    margin: 0.4rem 0 0;
     font-size: 0.8125rem;
+    line-height: 1.45;
     color: var(--ch-text-secondary);
+    max-width: 52rem;
+}
+.stmt-pl__scroll-hint {
+    margin: 0;
+    padding: 0.4rem 1.25rem;
+    font-size: 0.75rem;
+    color: var(--ch-text-secondary);
+    background: #f8fafc;
+    border-bottom: 1px solid var(--ch-border);
+}
+.stmt-pl__scroll {
+    max-height: min(70vh, 36rem);
+}
+.stmt-pl__table {
+    margin-bottom: 0;
+    font-size: 0.8125rem;
 }
 .stmt-pl__table thead th {
-    background: var(--ch-primary);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #1e3a5f;
     color: #fff;
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     font-weight: 600;
     border: 0;
     white-space: nowrap;
-}
-.stmt-pl__table tbody tr:nth-child(even) {
-    background: #f8fafc;
+    padding: 0.5rem 0.65rem;
+    vertical-align: middle;
 }
 .stmt-pl__account-col {
-    min-width: 12rem;
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    min-width: 11.5rem;
+    max-width: 16rem;
+    box-shadow: 4px 0 6px -4px rgba(15, 23, 42, 0.12);
 }
-.stmt-pl__account a {
+.stmt-pl__table thead .stmt-pl__account-col {
+    z-index: 4;
+}
+.stmt-pl__total-col {
+    background: #163352;
+}
+.stmt-pl__month {
+    min-width: 4.25rem;
+}
+.stmt-pl__data-row:nth-child(even) td,
+.stmt-pl__data-row:nth-child(even) th {
+    background: #f9fbfd;
+}
+.stmt-pl__account {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    font-weight: 500;
+    background: inherit;
+    box-shadow: 4px 0 6px -4px rgba(15, 23, 42, 0.08);
+}
+.stmt-pl__link {
     font-weight: 600;
     text-decoration: none;
     color: var(--ch-primary);
 }
-.stmt-pl__account a:hover {
+.stmt-pl__link:hover {
     text-decoration: underline;
+}
+.stmt-pl__empty {
+    color: #94a3b8;
+}
+.stmt-pl__amount {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+    white-space: nowrap;
+}
+.stmt-pl__row-total {
+    font-weight: 600;
+    background: #f1f5f9 !important;
+}
+.stmt-pl__section th {
+    padding: 0.45rem 1rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--ch-primary);
+    background: #eef2f7;
+    border-top: 1px solid var(--ch-border);
+}
+.stmt-pl__section--expense th {
+    border-top-width: 2px;
 }
 .stmt-pl__subtotal th,
 .stmt-pl__subtotal td {
     border-top: 2px solid var(--ch-border);
     background: #f1f5f9;
     font-weight: 600;
+    font-size: 0.8125rem;
+}
+.stmt-pl__subtotal--income th,
+.stmt-pl__subtotal--income td {
+    background: #ecfdf5;
+}
+.stmt-pl__subtotal--expense th,
+.stmt-pl__subtotal--expense td {
+    background: #fff7ed;
 }
 .stmt-pl__net th,
 .stmt-pl__net td {
     border-top: 2px solid var(--ch-primary);
-    background: #e8edf4;
+    font-weight: 600;
+}
+.stmt-pl__net--surplus th,
+.stmt-pl__net--surplus td {
+    background: #ecfdf5;
+}
+.stmt-pl__net--deficit th,
+.stmt-pl__net--deficit td {
+    background: #fef2f2;
+}
+.stmt-pl__empty-row td {
+    padding: 0.65rem 1rem;
+}
+
+@media print {
+    .stmt-pl__scroll-hint {
+        display: none !important;
+    }
+    .stmt-pl__scroll {
+        max-height: none;
+        overflow: visible !important;
+    }
+    .stmt-pl__account-col,
+    .stmt-pl__account {
+        position: static;
+        box-shadow: none;
+    }
+    .stmt-pl__link {
+        color: inherit;
+        text-decoration: none;
+    }
+}
+
+.stmt .stmt__table tbody a {
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--ch-primary);
+}
+.stmt .stmt__table tbody a:hover {
+    text-decoration: underline;
+}
+
+.stmt__kpis--compact {
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.65rem;
+}
+.stmt__kpis--compact .stmt__kpi {
+    padding: 0.65rem 0.85rem;
 }
 
 .chip {

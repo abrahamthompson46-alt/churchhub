@@ -12,6 +12,8 @@ Versioning per [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Report Center upgrades: period presets, collapsible filters, document-first layout, EOY optional sections, statement layout for tithe/campaign registers, session filter memory.
+- Monthly income and expense (posted books) grid with account drill-down; ChurchHub labels (net surplus/deficit) and cleaner grid UI.
+- Monthly income and expense (posted books) grid with account drill-down; ChurchHub labels (net surplus/deficit) and cleaner grid UI.
 - District funeral collection pack (print) and remit slip after post/approval; Campaign Register defaults to district funerals with an All-types option.
 - Institution Super Admins can update logo, display name, tagline, and brand colors at `/accounts/settings/branding/` when the platform enables `allow_institution_branding` for their denomination (default on).
 - Owner-only Marketing Hub in Platform Control with campaign attribution, lead workflow, conversion summaries, approved collateral links, and copy-ready website CTAs.

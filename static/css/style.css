@@ -2185,6 +2185,34 @@ body.app-body.auth-page {
     background: inherit;
     box-shadow: 4px 0 6px -4px rgba(15, 23, 42, 0.08);
 }
+.stmt-pl__table tbody th {
+    padding: 0.35rem 0.65rem;
+    vertical-align: middle;
+    text-align: left;
+    border-bottom: 1px solid var(--ch-border);
+}
+.stmt-pl__row-label {
+    font-weight: 700;
+    min-width: 11.5rem;
+    max-width: 16rem;
+    z-index: 2;
+}
+.stmt-pl__section-total--receipts .stmt-pl__row-label {
+    background: #d1fae5;
+    color: #064e3b;
+}
+.stmt-pl__section-total--expense .stmt-pl__row-label {
+    background: #ffedd5;
+    color: #7c2d12;
+}
+.stmt-pl__net--surplus .stmt-pl__row-label {
+    background: #ecfdf5;
+    color: #065f46;
+}
+.stmt-pl__net--deficit .stmt-pl__row-label {
+    background: #fef2f2;
+    color: #991b1b;
+}
 .stmt-pl__link {
     font-weight: 600;
     text-decoration: none;
@@ -2314,7 +2342,8 @@ body.app-body.auth-page {
         overflow: visible !important;
     }
     .stmt-pl__account-col,
-    .stmt-pl__account {
+    .stmt-pl__account,
+    .stmt-pl__row-label {
         position: static;
         box-shadow: none;
     }

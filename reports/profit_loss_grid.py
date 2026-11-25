@@ -23,6 +23,7 @@ GRID_LABELS = {
     "total_income": "Total receipts",
     "total_expense": "Total expense",
     "net_row": "Net surplus / (deficit)",
+    "net_total": "Net total",
 }
 
 

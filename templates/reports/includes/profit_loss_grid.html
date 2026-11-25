@@ -36,7 +36,7 @@
                 </tr>
                 {% endfor %}
                 <tr class="stmt-pl__section-total stmt-pl__section-total--receipts">
-                    <th scope="row">{{ labels.total_income }}</th>
+                    <th scope="row" class="stmt-pl__account stmt-pl__row-label">{{ labels.total_income }}</th>
                     {% for cell in pl.income_totals %}
                     <td class="text-end text-currency stmt-pl__amount">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
                     {% endfor %}
@@ -62,7 +62,7 @@
                 </tr>
                 {% endfor %}
                 <tr class="stmt-pl__section-total stmt-pl__section-total--expense">
-                    <th scope="row">{{ labels.total_expense }}</th>
+                    <th scope="row" class="stmt-pl__account stmt-pl__row-label">{{ labels.total_expense }}</th>
                     {% for cell in pl.expense_totals %}
                     <td class="text-end text-currency stmt-pl__amount">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
                     {% endfor %}
@@ -70,7 +70,7 @@
                 </tr>
 
                 <tr class="stmt-pl__net{% if pl.net_positive %} stmt-pl__net--surplus{% else %} stmt-pl__net--deficit{% endif %}">
-                    <th scope="row">{{ labels.net_row }}</th>
+                    <th scope="row" class="stmt-pl__account stmt-pl__row-label">{{ labels.net_total }}</th>
                     {% for cell in pl.net_totals %}
                     <td class="text-end text-currency stmt-pl__amount">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
                     {% endfor %}

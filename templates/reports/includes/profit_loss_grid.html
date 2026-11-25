@@ -1,6 +1,6 @@
 {% load humanize %}
 {% if data.profit_loss_grid and data.profit_loss_grid.columns %}
-{% with pl=data.profit_loss_grid labels=pl.labels %}
+{% with pl=data.profit_loss_grid %}
 <section class="stmt-pl" aria-label="{{ pl.title }}">
     <header class="stmt-pl__head stmt-pl__head--compact">
         <h3 class="stmt-pl__title">{{ pl.title }}</h3>
@@ -9,16 +9,16 @@
         <table class="table table-sm stmt-pl__table mb-0">
             <thead>
                 <tr>
-                    <th scope="col" class="stmt-pl__account-col">{{ labels.account_column }}</th>
+                    <th scope="col" class="stmt-pl__account-col">{{ pl.labels.account_column }}</th>
                     {% for col in pl.columns %}
                     <th scope="col" class="text-end stmt-pl__month">{{ col.label }}</th>
                     {% endfor %}
-                    <th scope="col" class="text-end stmt-pl__total-col">{{ labels.total_column }}</th>
+                    <th scope="col" class="text-end stmt-pl__total-col">{{ pl.labels.total_column }}</th>
                 </tr>
             </thead>
             <tbody>
                 <tr class="stmt-pl__section">
-                    <th colspan="{{ pl.columns|length|add:2 }}" scope="colgroup">{{ labels.income_section }}</th>
+                    <th colspan="{{ pl.columns|length|add:2 }}" scope="colgroup">{{ pl.labels.income_section }}</th>
                 </tr>
                 {% for row in pl.income_rows %}
                 <tr class="stmt-pl__data-row">
@@ -36,7 +36,7 @@
                 </tr>
                 {% endfor %}
                 <tr class="stmt-pl__section-total stmt-pl__section-total--receipts">
-                    <th scope="row" class="stmt-pl__account stmt-pl__row-label">{{ labels.total_income }}</th>
+                    <th scope="row" class="stmt-pl__account stmt-pl__row-label">{{ pl.labels.total_income }}</th>
                     {% for cell in pl.income_totals %}
                     <td class="text-end text-currency stmt-pl__amount">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
                     {% endfor %}
@@ -44,7 +44,7 @@
                 </tr>
 
                 <tr class="stmt-pl__section stmt-pl__section--expense">
-                    <th colspan="{{ pl.columns|length|add:2 }}" scope="colgroup">{{ labels.expense_section }}</th>
+                    <th colspan="{{ pl.columns|length|add:2 }}" scope="colgroup">{{ pl.labels.expense_section }}</th>
                 </tr>
                 {% for row in pl.expense_rows %}
                 <tr class="stmt-pl__data-row">
@@ -62,7 +62,7 @@
                 </tr>
                 {% endfor %}
                 <tr class="stmt-pl__section-total stmt-pl__section-total--expense">
-                    <th scope="row" class="stmt-pl__account stmt-pl__row-label">{{ labels.total_expense }}</th>
+                    <th scope="row" class="stmt-pl__account stmt-pl__row-label">{{ pl.labels.total_expense }}</th>
                     {% for cell in pl.expense_totals %}
                     <td class="text-end text-currency stmt-pl__amount">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
                     {% endfor %}
@@ -70,7 +70,7 @@
                 </tr>
 
                 <tr class="stmt-pl__net{% if pl.net_positive %} stmt-pl__net--surplus{% else %} stmt-pl__net--deficit{% endif %}">
-                    <th scope="row" class="stmt-pl__account stmt-pl__row-label">{{ labels.net_total }}</th>
+                    <th scope="row" class="stmt-pl__account stmt-pl__row-label">{{ pl.labels.net_total }}</th>
                     {% for cell in pl.net_totals %}
                     <td class="text-end text-currency stmt-pl__amount">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
                     {% endfor %}

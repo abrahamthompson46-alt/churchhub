@@ -31,6 +31,62 @@ class ProfitLossGridTests(SimpleTestCase):
         self.assertEqual(len(cols), 3)
         self.assertEqual(cols[0]["label"], "Jan")
 
+    def test_grid_template_renders_total_row_labels(self):
+        from decimal import Decimal
+
+        from django.template import Context, Template
+
+        snippet = Template(
+            '{% with pl=data.profit_loss_grid %}{{ pl.labels.total_income }}{% endwith %}'
+        )
+        html = snippet.render(
+            Context(
+                {
+                    "data": {
+                        "profit_loss_grid": {
+                            "labels": {"total_income": "Total receipts"},
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(html, "Total receipts")
+
+    def test_grid_include_shows_total_labels(self):
+        from decimal import Decimal
+
+        from django.template.loader import render_to_string
+        from django.test import RequestFactory
+
+        from reports.profit_loss_grid import GRID_LABELS
+
+        rf = RequestFactory()
+        request = rf.get("/reports/end_of_year_detailed/")
+        data = {
+            "profit_loss_grid": {
+                "title": "Monthly income and expense (posted books)",
+                "labels": GRID_LABELS,
+                "columns": [{"label": "Jan", "key": "2025-01"}],
+                "income_rows": [],
+                "expense_rows": [],
+                "income_totals": [Decimal("0")],
+                "expense_totals": [Decimal("0")],
+                "net_totals": [Decimal("0")],
+                "grand_income": Decimal("0"),
+                "grand_expense": Decimal("0"),
+                "grand_net": Decimal("0"),
+                "net_positive": True,
+            },
+            "drill_query": "start_date=2025-01-01&end_date=2025-12-31",
+        }
+        html = render_to_string(
+            "reports/includes/profit_loss_grid.html",
+            {"data": data, "request": request},
+        )
+        self.assertIn("Total receipts", html)
+        self.assertIn("Total expense", html)
+        self.assertIn("Net total", html)
+
 
 class EoySectionTests(SimpleTestCase):
     def test_defaults_exclude_optional_modules(self):

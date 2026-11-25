@@ -2,12 +2,9 @@
 {% if data.profit_loss_grid and data.profit_loss_grid.columns %}
 {% with pl=data.profit_loss_grid labels=pl.labels %}
 <section class="stmt-pl" aria-label="{{ pl.title }}">
-    <header class="stmt-pl__head">
-        <p class="stmt-pl__kicker">Income statement detail</p>
+    <header class="stmt-pl__head stmt-pl__head--compact">
         <h3 class="stmt-pl__title">{{ pl.title }}</h3>
-        <p class="stmt-pl__subtitle">{{ pl.subtitle }}</p>
     </header>
-    <p class="stmt-pl__scroll-hint no-print"><i class="bi bi-arrows-expand" aria-hidden="true"></i> Scroll horizontally for more months</p>
     <div class="table-responsive stmt-pl__scroll">
         <table class="table table-sm stmt-pl__table mb-0">
             <thead>
@@ -31,19 +28,19 @@
                     {% for cell in row.cells %}
                     <td class="text-end text-currency stmt-pl__amount">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
                     {% endfor %}
-                    <td class="text-end text-currency stmt-pl__amount stmt-pl__row-total">{{ row.total|floatformat:2|intcomma }}</td>
+                    <td class="text-end text-currency stmt-pl__amount stmt-pl__cell-total">{{ row.total|floatformat:2|intcomma }}</td>
                 </tr>
                 {% empty %}
                 <tr class="stmt-pl__empty-row">
                     <td colspan="{{ pl.columns|length|add:2 }}" class="text-muted small">No income activity in this period.</td>
                 </tr>
                 {% endfor %}
-                <tr class="stmt-pl__subtotal stmt-pl__subtotal--income">
+                <tr class="stmt-pl__section-total stmt-pl__section-total--receipts">
                     <th scope="row">{{ labels.total_income }}</th>
                     {% for cell in pl.income_totals %}
-                    <td class="text-end text-currency">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
+                    <td class="text-end text-currency stmt-pl__amount">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
                     {% endfor %}
-                    <td class="text-end text-currency">{{ pl.grand_income|floatformat:2|intcomma }}</td>
+                    <td class="text-end text-currency stmt-pl__amount stmt-pl__cell-total">{{ pl.grand_income|floatformat:2|intcomma }}</td>
                 </tr>
 
                 <tr class="stmt-pl__section stmt-pl__section--expense">
@@ -57,27 +54,27 @@
                     {% for cell in row.cells %}
                     <td class="text-end text-currency stmt-pl__amount">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
                     {% endfor %}
-                    <td class="text-end text-currency stmt-pl__amount stmt-pl__row-total">{{ row.total|floatformat:2|intcomma }}</td>
+                    <td class="text-end text-currency stmt-pl__amount stmt-pl__cell-total">{{ row.total|floatformat:2|intcomma }}</td>
                 </tr>
                 {% empty %}
                 <tr class="stmt-pl__empty-row">
                     <td colspan="{{ pl.columns|length|add:2 }}" class="text-muted small">No expense activity in this period.</td>
                 </tr>
                 {% endfor %}
-                <tr class="stmt-pl__subtotal stmt-pl__subtotal--expense">
+                <tr class="stmt-pl__section-total stmt-pl__section-total--expense">
                     <th scope="row">{{ labels.total_expense }}</th>
                     {% for cell in pl.expense_totals %}
-                    <td class="text-end text-currency">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
+                    <td class="text-end text-currency stmt-pl__amount">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
                     {% endfor %}
-                    <td class="text-end text-currency">{{ pl.grand_expense|floatformat:2|intcomma }}</td>
+                    <td class="text-end text-currency stmt-pl__amount stmt-pl__cell-total">{{ pl.grand_expense|floatformat:2|intcomma }}</td>
                 </tr>
 
                 <tr class="stmt-pl__net{% if pl.net_positive %} stmt-pl__net--surplus{% else %} stmt-pl__net--deficit{% endif %}">
                     <th scope="row">{{ labels.net_row }}</th>
                     {% for cell in pl.net_totals %}
-                    <td class="text-end text-currency">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
+                    <td class="text-end text-currency stmt-pl__amount">{% if cell %}{{ cell|floatformat:2|intcomma }}{% else %}<span class="stmt-pl__empty">—</span>{% endif %}</td>
                     {% endfor %}
-                    <td class="text-end text-currency fw-semibold">{{ pl.grand_net|floatformat:2|intcomma }}</td>
+                    <td class="text-end text-currency stmt-pl__amount stmt-pl__cell-total">{{ pl.grand_net|floatformat:2|intcomma }}</td>
                 </tr>
             </tbody>
         </table>

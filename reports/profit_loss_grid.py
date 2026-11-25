@@ -20,7 +20,7 @@ GRID_LABELS = {
     "total_column": "Total",
     "income_section": "Income",
     "expense_section": "Expense",
-    "total_income": "Total income",
+    "total_income": "Total receipts",
     "total_expense": "Total expense",
     "net_row": "Net surplus / (deficit)",
 }
@@ -67,10 +67,7 @@ def build_profit_loss_grid(churches, start: date, end: date) -> dict:
     if not columns or not churches.exists():
         return {
             "title": GRID_TITLE,
-            "subtitle": (
-                f"Months through {end.strftime('%d %b %Y')}. "
-                "Amounts from approved journals only."
-            ),
+            "subtitle": "",
             "labels": GRID_LABELS,
             "columns": [],
             "income_rows": [],
@@ -153,10 +150,7 @@ def build_profit_loss_grid(churches, start: date, end: date) -> dict:
 
     return {
         "title": GRID_TITLE,
-        "subtitle": (
-            f"Each column is calendar-month activity through {end.strftime('%d %b %Y')} "
-            "from posted journals. Select an account name to open its journal lines."
-        ),
+        "subtitle": "",
         "labels": GRID_LABELS,
         "columns": columns,
         "income_rows": income_rows,

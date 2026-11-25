@@ -8,75 +8,80 @@
     {% include "includes/page_header.html" with breadcrumbs=breadcrumbs page_subtitle="Analytics" page_title=meta.label page_description=meta.description %}
 
     {% include "includes/filter_disclosure_start.html" with filter_open=filter_open %}
-        <form method="get" class="filter-form filter-form--report" id="report-filter-form">
-            {% if period_presets %}
-            <div class="report-period-presets">
-                {% for slug, label in period_presets %}
-                <a class="btn btn-sm btn-outline-secondary" href="?preset={{ slug }}">{{ label }}</a>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            <div class="filter-form__grid">
-                <div class="filter-field">
-                    <label class="form-label">Period</label>
-                    {{ form.period }}
+        <form method="get" class="filter-form filter-form--report filter-form--compact" id="report-filter-form">
+            <div class="filter-form__toolbar">
+                <div class="filter-form__primary">
+                    <div class="filter-field filter-field--period">
+                        <label class="form-label">Period</label>
+                        {{ form.period }}
+                    </div>
+                    <div class="filter-field filter-field--date">
+                        <label class="form-label">From</label>
+                        {{ form.start_date }}
+                    </div>
+                    <div class="filter-field filter-field--date">
+                        <label class="form-label">To</label>
+                        {{ form.end_date }}
+                    </div>
+                    {% if report_key == 'campaign_register' %}
+                    <div class="filter-field">
+                        <label class="form-label" for="id_campaign_kind">Type</label>
+                        <select name="campaign_kind" id="id_campaign_kind" class="form-select form-select-sm">
+                            <option value="DISTRICT_FUNERAL"{% if campaign_kind == 'DISTRICT_FUNERAL' %} selected{% endif %}>District funerals</option>
+                            <option value="GENERAL"{% if campaign_kind == 'GENERAL' %} selected{% endif %}>Church campaigns</option>
+                            <option value="ALL"{% if campaign_kind == 'ALL' %} selected{% endif %}>All types</option>
+                        </select>
+                    </div>
+                    {% endif %}
+                    <button type="submit" class="btn btn-primary btn-sm filter-form__submit"><i class="bi bi-play-fill me-1"></i>Generate</button>
                 </div>
-                <div class="filter-field">
-                    <label class="form-label">From</label>
-                    {{ form.start_date }}
-                </div>
-                <div class="filter-field">
-                    <label class="form-label">To</label>
-                    {{ form.end_date }}
-                </div>
-                {% if show_hierarchy %}
-                <div class="filter-field">
-                    <label class="form-label">Conference</label>
-                    {{ form.conference }}
-                </div>
-                <div class="filter-field">
-                    <label class="form-label">Zone</label>
-                    {{ form.zone }}
-                </div>
-                <div class="filter-field">
-                    <label class="form-label">District</label>
-                    {{ form.district }}
-                </div>
-                <div class="filter-field">
-                    <label class="form-label">Church</label>
-                    {{ form.church }}
-                </div>
-                {% endif %}
-                {% if report_key == 'campaign_register' %}
-                <div class="filter-field">
-                    <label class="form-label" for="id_campaign_kind">Type</label>
-                    <select name="campaign_kind" id="id_campaign_kind" class="form-select form-select-sm">
-                        <option value="DISTRICT_FUNERAL"{% if campaign_kind == 'DISTRICT_FUNERAL' %} selected{% endif %}>District funeral collections</option>
-                        <option value="GENERAL"{% if campaign_kind == 'GENERAL' %} selected{% endif %}>Church campaigns</option>
-                        <option value="ALL"{% if campaign_kind == 'ALL' %} selected{% endif %}>All types</option>
-                    </select>
-                </div>
-                {% endif %}
-            </div>
-
-            {% if report_key == 'end_of_year_detailed' and eoy_sections %}
-            <fieldset class="report-eoy-sections">
-                <legend class="form-label">Include in pack</legend>
-                <div class="report-eoy-sections__grid">
-                    {% for sec in eoy_sections %}
-                    <label class="form-check form-check-inline report-eoy-sections__item">
-                        <input type="checkbox" class="form-check-input" name="eoy_{{ sec.key }}" value="1"{% if sec.enabled %} checked{% endif %}>
-                        <span class="form-check-label">{{ sec.label }}</span>
-                    </label>
+                {% if period_presets %}
+                <div class="report-period-presets report-period-presets--inline">
+                    {% for slug, label in period_presets %}
+                    <a class="btn btn-sm btn-outline-secondary" href="?preset={{ slug }}">{{ label }}</a>
                     {% endfor %}
                 </div>
-            </fieldset>
-            {% endif %}
-
-            <div class="filter-actions">
-                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-play-fill me-1"></i>Generate</button>
+                {% endif %}
             </div>
+
+            {% if show_hierarchy or eoy_sections %}
+            <details class="filter-form__more"{% if show_hierarchy or eoy_sections %} open{% endif %}>
+                <summary class="filter-form__more-summary">Scope &amp; sections</summary>
+                {% if show_hierarchy %}
+                <div class="filter-form__grid filter-form__grid--scope">
+                    <div class="filter-field">
+                        <label class="form-label">Conference</label>
+                        {{ form.conference }}
+                    </div>
+                    <div class="filter-field">
+                        <label class="form-label">Zone</label>
+                        {{ form.zone }}
+                    </div>
+                    <div class="filter-field">
+                        <label class="form-label">District</label>
+                        {{ form.district }}
+                    </div>
+                    <div class="filter-field">
+                        <label class="form-label">Church</label>
+                        {{ form.church }}
+                    </div>
+                </div>
+                {% endif %}
+                {% if report_key == 'end_of_year_detailed' and eoy_sections %}
+                <fieldset class="report-eoy-sections report-eoy-sections--compact">
+                    <legend class="form-label">Include in pack</legend>
+                    <div class="report-eoy-sections__grid">
+                        {% for sec in eoy_sections %}
+                        <label class="form-check report-eoy-sections__item">
+                            <input type="checkbox" class="form-check-input" name="eoy_{{ sec.key }}" value="1"{% if sec.enabled %} checked{% endif %}>
+                            <span class="form-check-label">{{ sec.label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </fieldset>
+                {% endif %}
+            </details>
+            {% endif %}
         </form>
     {% include "includes/filter_disclosure_end.html" %}
 

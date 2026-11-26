@@ -10,6 +10,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.db.models import Count, Q, Sum
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 
 from church_system.church_scope import filter_by_church
@@ -39,7 +40,20 @@ def policies_for_unit(unit_type, unit_id):
 
 
 def policy_by_pk(pk):
+    """Deprecated: use get_policy_for_user for views (church/policy scope)."""
     return get_object_or_404(RemittancePolicy, pk=pk)
+
+
+def get_policy_for_user(request, pk):
+    from remittance.services import user_can_edit_remittance_policy
+
+    from church_system.church_scope import get_active_church
+
+    policy = get_object_or_404(RemittancePolicy, pk=pk)
+    church = get_active_church(request)
+    if not user_can_edit_remittance_policy(request.user, policy, active_church=church):
+        raise Http404
+    return policy
 
 
 def active_policy_qs(unit_type, unit_id, offering_type, application_scope, as_of_date):
@@ -232,7 +246,19 @@ def settlement_desk_summary(desk_type, desk_id, church_ids):
 
 
 def settlement_by_pk(pk):
+    """Deprecated: use get_settlement_for_user for views."""
     return get_object_or_404(SettlementBatch, pk=pk)
+
+
+def get_settlement_for_user(request, pk):
+    from church_system.church_scope import get_active_church
+    from remittance.settlement_desk import user_can_access_settlement_batch
+
+    batch = get_object_or_404(SettlementBatch, pk=pk)
+    church = get_active_church(request)
+    if not user_can_access_settlement_batch(request.user, batch, church=church):
+        raise Http404
+    return batch
 
 
 def settlement_batch_exists_for_period(

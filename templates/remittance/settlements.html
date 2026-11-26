@@ -10,6 +10,11 @@
     {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Settlement batches" %}
     {% endif %}
 
+    <div class="alert alert-info small py-2 mb-3" role="note">
+        <strong>Reclassification, not a bank payment.</strong>
+        Settlement batches move obligations between units on the chart of accounts. Cash leaves the church only when you record a <em>remittance payment</em> from the Remittance desk or treasury forms.
+    </div>
+
     {% if hierarchy_mode and desk %}
     {% if desk_choices|length > 1 %}
     <form method="get" class="d-flex flex-wrap gap-2 align-items-center mb-3">

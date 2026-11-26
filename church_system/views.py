@@ -59,9 +59,22 @@ def metrics_check(request):
 
 def permission_denied(request, exception=None):
     """Professional 403 page for permission violations."""
+    from church_system.church_scope import get_active_church, get_user_church
+
     if request.user.is_authenticated and not messages.get_messages(request):
         flash_denied(request)
-    return render(request, "403.html", status=403)
+    church = None
+    if request.user.is_authenticated and not getattr(request.user, "is_platform_user", False):
+        church = get_active_church(request) or get_user_church(request.user)
+    return render(
+        request,
+        "403.html",
+        {
+            "scope_church": church,
+            "signed_in": request.user.is_authenticated,
+        },
+        status=403,
+    )
 
 
 @require_GET

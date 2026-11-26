@@ -175,8 +175,12 @@ def reject_transaction_view(request, pk):
     transaction = selectors.transaction_for_request(request, pk)
     if not actor_may_decide(request.user, transaction):
         raise PermissionDenied
+    reason = (request.POST.get("reason") or "").strip()
+    if not reason:
+        flash_warning(request, "A short rejection reason is required for the audit trail.")
+        return redirect("transactions:pending_approvals")
     try:
-        record_rejection(transaction, request.user)
+        record_rejection(transaction, request.user, reason=reason)
         flash_success(request, f"{transaction.reference} rejected.")
     except ValueError as exc:
         flash_exception(request, str(exc))

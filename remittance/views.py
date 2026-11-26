@@ -210,12 +210,8 @@ def policy_create(request):
 
 @_policy_required
 def policy_edit(request, pk):
-    policy = selectors.policy_by_pk(pk)
     church = get_active_church(request)
-    from remittance.services import user_can_edit_remittance_policy
-
-    if not user_can_edit_remittance_policy(request.user, policy, active_church=church):
-        raise PermissionDenied
+    policy = selectors.get_policy_for_user(request, pk)
     form = RemittancePolicyForm(request.POST or None, instance=policy, church=church, user=request.user)
     if request.method == "POST" and form.is_valid():
         try:
@@ -594,10 +590,8 @@ def _batch_can_post(user, batch, church):
 
 @_settlement_access
 def settlement_post(request, pk):
-    batch = selectors.settlement_by_pk(pk)
     church = get_active_church(request)
-    if not user_can_access_settlement_batch(request.user, batch, church=church):
-        raise PermissionDenied
+    batch = selectors.get_settlement_for_user(request, pk)
     if batch.from_unit_type == "CHURCH":
         if not can_manage_finances(request.user):
             raise PermissionDenied

@@ -96,7 +96,7 @@ def pending_transactions_qs(request):
             Transaction.objects.filter(approval_status="PENDING"),
             request,
         )
-        .select_related("member", "church")
+        .select_related("member", "church", "created_by")
         .prefetch_related("lines__account")
         .order_by("-date")
     )

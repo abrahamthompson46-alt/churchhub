@@ -5,20 +5,23 @@
 
 {% block content %}
 <div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Pending Approvals" %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Pending Approvals" page_description="Review maker entries before they post. Rejections require a reason." %}
 
-    <form method="post" action="{% url 'transactions:bulk_approve' %}" id="bulk-form">
+    <form method="post" action="{% url 'transactions:bulk_approve' %}" id="bulk-form"
+        onsubmit="return confirmBulkApprove(this);">
         {% csrf_token %}
         <div class="data-card">
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
-                            {% if can_approve_transactions or can_decide_approvals %}<th style="width:40px"><input type="checkbox" id="select-all" class="form-check-input"></th>{% endif %}
+                            {% if can_approve_transactions or can_decide_approvals %}<th style="width:40px"><input type="checkbox" id="select-all" class="form-check-input" aria-label="Select all on this page"></th>{% endif %}
                             <th>Reference</th>
                             <th>Date</th>
+                            <th>Church</th>
                             <th>Type</th>
                             <th>Description</th>
+                            <th>Entered by</th>
                             <th class="text-end">Amount</th>
                             <th class="text-end">Actions</th>
                         </tr>
@@ -26,23 +29,33 @@
                     <tbody>
                         {% for t in transactions %}
                         <tr>
-                            {% if can_approve_transactions or can_decide_approvals %}<td><input type="checkbox" name="transaction_ids" value="{{ t.id }}" class="form-check-input" form="bulk-form"></td>{% endif %}
+                            {% if can_approve_transactions or can_decide_approvals %}<td><input type="checkbox" name="transaction_ids" value="{{ t.id }}" class="form-check-input txn-select" form="bulk-form" aria-label="Select {{ t.reference }}"></td>{% endif %}
                             <td><a href="{% url 'transactions:transaction_detail' t.id %}" class="table-link"><code class="small">{{ t.reference }}</code></a></td>
                             <td>{{ t.date }}</td>
-                            <td>{{ t.transaction_type }}</td>
-                            <td class="text-muted">{{ t.description|default:"—"|truncatechars:40 }}</td>
+                            <td class="small text-muted">{% if t.church %}{{ t.church.name }}{% else %}—{% endif %}</td>
+                            <td><span class="chip chip-sm">{{ t.transaction_type }}</span></td>
+                            <td class="text-muted small">{{ t.description|default:"—"|truncatechars:60 }}</td>
+                            <td class="small text-muted">{% if t.created_by %}{{ t.created_by.get_full_name|default:t.created_by.username }}{% else %}—{% endif %}</td>
                             <td class="text-end text-currency">{{ t.receipt_total|floatformat:2|intcomma }}</td>
                             <td class="text-end text-nowrap">
                                 {% if can_approve_transactions or can_decide_approvals %}
                                 <form method="post" action="{% url 'transactions:approve_transaction' t.id %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-success">Approve</button></form>
-                                <form method="post" action="{% url 'transactions:reject_transaction' t.id %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-danger">Reject</button></form>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="collapse" data-bs-target="#reject-{{ t.id }}" aria-expanded="false">Reject…</button>
+                                <div class="collapse text-start mt-2" id="reject-{{ t.id }}">
+                                    <form method="post" action="{% url 'transactions:reject_transaction' t.id %}" class="border rounded p-2 bg-light">
+                                        {% csrf_token %}
+                                        <label class="form-label small mb-1" for="reason-{{ t.id }}">Reason (required)</label>
+                                        <textarea class="form-control form-control-sm mb-2" id="reason-{{ t.id }}" name="reason" rows="2" required maxlength="500" placeholder="e.g. missing receipt or wrong fund"></textarea>
+                                        <button type="submit" class="btn btn-sm btn-danger">Confirm reject</button>
+                                    </form>
+                                </div>
                                 {% endif %}
                                 <a href="{% url 'transactions:transaction_detail' t.id %}" class="btn btn-sm btn-outline-secondary">View</a>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7">{% include "includes/empty_state.html" with icon="bi-check-circle" message="All caught up — no pending transactions." %}</td>
+                            <td colspan="9">{% include "includes/empty_state.html" with icon="bi-check-circle" message="All caught up — no pending transactions." %}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -50,7 +63,7 @@
             </div>
         </div>
         {% if transactions and can_approve_transactions or transactions and can_decide_approvals %}
-        <button type="submit" class="btn btn-primary mt-3">Bulk Approve Selected</button>
+        <button type="submit" class="btn btn-primary mt-3" id="bulk-approve-btn">Bulk Approve Selected</button>
         {% endif %}
     </form>
     {% if page_obj.has_other_pages %}
@@ -72,7 +85,15 @@
 {% block extra_js %}
 <script>
 document.getElementById('select-all')?.addEventListener('change', function() {
-    document.querySelectorAll('input[name=transaction_ids]').forEach(cb => cb.checked = this.checked);
+    document.querySelectorAll('.txn-select').forEach(cb => cb.checked = this.checked);
 });
+function confirmBulkApprove(form) {
+    const n = form.querySelectorAll('.txn-select:checked').length;
+    if (n === 0) {
+        alert('Select at least one transaction to approve.');
+        return false;
+    }
+    return window.confirm('Approve ' + n + ' pending transaction(s)? This will post them to the ledger.');
+}
 </script>
 {% endblock %}

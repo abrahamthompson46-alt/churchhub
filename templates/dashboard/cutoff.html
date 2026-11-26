@@ -7,6 +7,11 @@
 <div class="page-container page-shell">
     {% include "includes/page_header.html" with page_subtitle="Treasury" page_title="Remittance desk" %}
 
+    <div class="alert alert-primary small py-2 mb-3" role="note">
+        <strong>Cash and approval path.</strong>
+        Use this desk to see what is payable and to record remittance <em>payments</em> that move money out. Settlement batches under Finance reclassify obligations only — they do not send cash.
+    </div>
+
     {% if desk %}
     <p class="text-muted small mb-3">
         {{ desk.period_label }}

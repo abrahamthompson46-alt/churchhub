@@ -3,7 +3,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from organization.models import Church, Conference, District, Zone
@@ -100,6 +100,31 @@ class SettlementDeskTests(TestCase):
         self.assertFalse(
             user_can_access_settlement_batch(user, out_of_scope, church=self.church)
         )
+
+    def test_settlement_post_returns_404_for_foreign_batch(self):
+        from django.http import Http404
+
+        user = User.objects.create_user(
+            username="idor_settle",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        foreign = SettlementBatch.objects.create(
+            offering_type="TITHE",
+            from_unit_type="CHURCH",
+            from_unit_id=self.other_church.pk,
+            to_unit_type="DISTRICT",
+            to_unit_id=self.other_district.pk,
+            period_start="2026-02-01",
+            period_end="2026-02-28",
+            gross_received=Decimal("10.00"),
+            status="DRAFT",
+        )
+        request = RequestFactory().post("/")
+        request.user = user
+        with self.assertRaises(Http404):
+            selectors.get_settlement_for_user(request, foreign.pk)
 
     def test_settlement_desk_view_for_district_user(self):
         user = User.objects.create_user(

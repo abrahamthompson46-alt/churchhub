@@ -70,6 +70,7 @@ def get_meeting_or_404(request, pk, *, detail=False):
     if detail:
         qs = qs.prefetch_related(
             "attendees__member",
+            "visitor_attendees__visitor",
             "action_items",
             "decisions",
             "attachments__uploaded_by",
@@ -92,14 +93,77 @@ def departments_for_church(church):
 
 
 def active_members_for_church(church):
-    return Member.objects.filter(church=church, is_active=True).order_by("last_name")
+    """Members eligible for meeting/event attendance rolls (active membership only)."""
+    from members.models import MembershipStatus
+
+    return Member.objects.filter(
+        church=church,
+        is_active=True,
+        membership_status=MembershipStatus.ACTIVE,
+    ).order_by("last_name", "first_name")
 
 
 def member_ids_in_church(church, member_ids):
+    """Attendance POST ids: same rules as the on-screen roll (active membership only)."""
+    if not member_ids:
+        return set()
     return set(
-        Member.objects.filter(pk__in=member_ids, church=church).values_list(
-            "pk", flat=True
+        active_members_for_church(church)
+        .filter(pk__in=member_ids)
+        .values_list("pk", flat=True)
+    )
+
+
+def visitors_for_attendance_roll(church):
+    """Open follow-up visitors eligible for optional attendance rolls."""
+    from members.models import Visitor, VisitorFollowUpStatus
+
+    if church is None:
+        return Visitor.objects.none()
+    open_statuses = (
+        VisitorFollowUpStatus.NEW,
+        VisitorFollowUpStatus.CONTACTED,
+        VisitorFollowUpStatus.IN_PROGRESS,
+    )
+    return (
+        Visitor.objects.filter(
+            church=church,
+            follow_up_status__in=open_statuses,
+            is_deleted=False,
         )
+        .order_by("last_name", "first_name")
+    )
+
+
+def visitor_ids_in_church(church, visitor_ids):
+    if not visitor_ids:
+        return set()
+    return set(
+        visitors_for_attendance_roll(church)
+        .filter(pk__in=visitor_ids)
+        .values_list("pk", flat=True)
+    )
+
+
+def meeting_visitor_roll_ids(meeting):
+    return set(meeting.visitor_attendees.values_list("visitor_id", flat=True))
+
+
+def meeting_present_visitor_ids(meeting):
+    return set(
+        meeting.visitor_attendees.filter(is_present=True).values_list(
+            "visitor_id", flat=True
+        )
+    )
+
+
+def event_visitor_roll_ids(event):
+    return set(event.visitor_records.values_list("visitor_id", flat=True))
+
+
+def event_present_visitor_ids(event):
+    return set(
+        event.visitor_records.filter(is_present=True).values_list("visitor_id", flat=True)
     )
 
 
@@ -137,7 +201,7 @@ def attendance_events_for_request(request):
 def get_attendance_event_or_404(request, pk, *, with_records=False):
     qs = filter_by_church(AttendanceEvent.objects.all(), request)
     if with_records:
-        qs = qs.prefetch_related("records__member")
+        qs = qs.prefetch_related("records__member", "visitor_records__visitor")
     return get_object_or_404(qs, pk=pk)
 
 

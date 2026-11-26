@@ -7,7 +7,12 @@ Selectors own read querysets. Do not put authorization or workflow rules here.
 
 from __future__ import annotations
 
-from .models import AttendanceRecord, MeetingAttendance
+from .models import (
+    AttendanceRecord,
+    AttendanceVisitorRecord,
+    MeetingAttendance,
+    MeetingVisitorAttendance,
+)
 
 
 def save_meeting(meeting, *, update_fields=None):
@@ -71,5 +76,29 @@ def upsert_event_attendance(*, event, member_id, is_present):
     return AttendanceRecord.objects.update_or_create(
         event=event,
         member_id=member_id,
+        defaults={"is_present": is_present},
+    )
+
+
+def delete_meeting_visitor_not_in(existing_qs, visitor_ids):
+    return existing_qs.exclude(visitor_id__in=visitor_ids).delete()
+
+
+def delete_event_visitor_not_in(existing_qs, visitor_ids):
+    return existing_qs.exclude(visitor_id__in=visitor_ids).delete()
+
+
+def upsert_meeting_visitor_attendance(*, meeting, visitor_id, is_present):
+    return MeetingVisitorAttendance.objects.update_or_create(
+        meeting=meeting,
+        visitor_id=visitor_id,
+        defaults={"is_present": is_present},
+    )
+
+
+def upsert_event_visitor_attendance(*, event, visitor_id, is_present):
+    return AttendanceVisitorRecord.objects.update_or_create(
+        event=event,
+        visitor_id=visitor_id,
         defaults={"is_present": is_present},
     )

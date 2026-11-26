@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="page-container">
-    {% include "includes/page_header.html" with page_subtitle="Members" page_title=event.title page_description=event.get_event_type_display %}
+    {% include "includes/page_header.html" with page_subtitle="Attendance" page_title=event.title page_description=event.get_event_type_display %}
 
     <div class="metrics-row mb-4">
         <div class="metric-card"><span class="metric-label">Date</span><span class="metric-value" style="font-size:1.1rem">{{ event.event_date }}</span></div>
@@ -12,9 +12,21 @@
         <div class="metric-card"><span class="metric-label">Guests</span><span class="metric-value">{{ event.headcount }}</span></div>
     </div>
 
+    <form method="get" class="mb-3 d-flex flex-wrap align-items-center gap-3">
+        <span class="small text-muted">Roll shows active members only.</span>
+        {% if can_view_members %}
+        <label class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="checkbox" name="include_visitors" value="1" {% if include_visitors %}checked{% endif %}>
+            <span class="form-check-label">Include visitors on roll</span>
+        </label>
+        <button type="submit" class="btn btn-outline-secondary btn-sm">Apply</button>
+        {% endif %}
+    </form>
+
     {% if can_manage_attendance %}
     <form method="post" action="{% url 'meetings:attendance_record' event.pk %}">
         {% csrf_token %}
+        {% if include_visitors %}<input type="hidden" name="include_visitors" value="1">{% endif %}
         <div class="panel">
             <div class="panel-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <span>Member Roll</span>
@@ -42,6 +54,34 @@
                 <a href="{% url 'meetings:attendance_list' %}" class="btn btn-outline-secondary btn-sm">Back</a>
             </div>
         </div>
+        {% if can_show_visitors %}
+        <div class="panel mt-3">
+            <div class="panel-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span>Visitor Roll</span>
+                <span class="small text-muted">Open follow-up visitors</span>
+            </div>
+            <div class="panel-body">
+                {% if visitors %}
+                <div class="roll-grid">
+                    {% for v in visitors %}
+                    <label class="roll-item" for="v{{ v.pk }}">
+                        <input class="form-check-input" type="checkbox" name="visitors" value="{{ v.pk }}" id="v{{ v.pk }}"
+                            {% if v.pk in visitor_present_ids %}checked{% endif %}>
+                        <span>{{ v.full_name }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted small mb-0">No open visitors for this church.</p>
+                {% endif %}
+                <div class="mt-3 d-flex flex-wrap align-items-center gap-2">
+                    <label class="small text-muted mb-0" for="extra_guests">Walk-in guests (not listed)</label>
+                    <input type="number" min="0" class="form-control form-control-sm" name="extra_guests" id="extra_guests"
+                        value="{{ extra_guests }}" style="max-width:6rem;">
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </form>
     {% else %}
     <div class="panel">

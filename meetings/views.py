@@ -1,6 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect, render
+from django.urls import reverse
 
 from church_system.church_scope import require_church
 from church_system.flash import flash_exception, flash_info, flash_success
@@ -9,6 +10,7 @@ from meetings import selectors
 from permissions.checks import (
     any_permission_required,
     can_manage_meetings,
+    can_view_members,
     permission_required,
 )
 from sitecontrol.checks import require_feature
@@ -98,15 +100,32 @@ def meeting_create(request):
     })
 
 
+def _request_include_visitors(request) -> bool:
+    raw = request.GET.get("include_visitors") or request.POST.get("include_visitors")
+    return str(raw).lower() in ("1", "true", "on", "yes")
+
+
 def _meeting_context(request, meeting):
     members = selectors.active_members_for_church(meeting.church)
     attendee_ids = selectors.meeting_attendee_member_ids(meeting)
     present_ids = selectors.meeting_present_member_ids(meeting)
+    include_visitors = _request_include_visitors(request)
+    can_show_visitors = include_visitors and can_view_members(request.user)
+    visitors = (
+        selectors.visitors_for_attendance_roll(meeting.church)
+        if can_show_visitors
+        else []
+    )
     return {
         "meeting": meeting,
         "members": members,
         "attendee_ids": attendee_ids,
         "present_ids": present_ids,
+        "include_visitors": include_visitors,
+        "can_show_visitors": can_show_visitors,
+        "visitors": visitors,
+        "visitor_roll_ids": selectors.meeting_visitor_roll_ids(meeting),
+        "visitor_present_ids": selectors.meeting_present_visitor_ids(meeting),
         "action_form": ActionItemForm(church=meeting.church),
         "decision_form": DecisionForm(),
         "minutes_form": MeetingMinutesForm(instance=meeting),
@@ -299,9 +318,22 @@ def meeting_attendance(request, pk):
     if request.method == "POST":
         member_ids = request.POST.getlist("members")
         present_ids = request.POST.getlist("present")
-        count = record_meeting_attendance(meeting, member_ids, present_ids)
+        visitor_ids = visitor_present_ids = None
+        if _request_include_visitors(request) and can_view_members(request.user):
+            visitor_ids = request.POST.getlist("visitors")
+            visitor_present_ids = request.POST.getlist("visitors_present")
+        count = record_meeting_attendance(
+            meeting,
+            member_ids,
+            present_ids,
+            visitor_ids=visitor_ids,
+            visitor_present_ids=visitor_present_ids,
+        )
         flash_success(request, f"Attendance recorded for {count} member(s).")
-    return redirect("meetings:detail", pk=pk)
+    url = reverse("meetings:detail", kwargs={"pk": pk})
+    if _request_include_visitors(request):
+        url = f"{url}?include_visitors=1"
+    return redirect(url)
 
 
 @login_required
@@ -372,10 +404,22 @@ def attendance_detail(request, pk):
     event = selectors.get_attendance_event_or_404(request, pk, with_records=True)
     members = selectors.active_members_for_church(event.church)
     present_ids = selectors.event_present_member_ids(event)
+    include_visitors = _request_include_visitors(request)
+    can_show_visitors = include_visitors and can_view_members(request.user)
+    visitors = (
+        selectors.visitors_for_attendance_roll(event.church) if can_show_visitors else []
+    )
+    visitor_present_ids = selectors.event_present_visitor_ids(event)
+    extra_guests = max(event.headcount - len(visitor_present_ids), 0)
     return render(request, "meetings/attendance_detail.html", {
         "event": event,
         "members": members,
         "present_ids": present_ids,
+        "include_visitors": include_visitors,
+        "can_show_visitors": can_show_visitors,
+        "visitors": visitors,
+        "visitor_present_ids": visitor_present_ids,
+        "extra_guests": extra_guests,
     })
 
 
@@ -387,6 +431,22 @@ def attendance_record(request, pk):
     if request.method == "POST":
         member_ids = request.POST.getlist("members")
         present_ids = request.POST.getlist("present")
-        count = record_event_attendance(event, member_ids, present_ids)
+        visitor_ids = extra_guests = None
+        if _request_include_visitors(request) and can_view_members(request.user):
+            visitor_ids = request.POST.getlist("visitors")
+            try:
+                extra_guests = int(request.POST.get("extra_guests") or 0)
+            except (TypeError, ValueError):
+                extra_guests = 0
+        count = record_event_attendance(
+            event,
+            member_ids,
+            present_ids,
+            visitor_ids=visitor_ids,
+            extra_guests=extra_guests,
+        )
         flash_success(request, f"Roll saved — {count} member(s).")
-    return redirect("meetings:attendance_detail", pk=pk)
+    url = reverse("meetings:attendance_detail", kwargs={"pk": pk})
+    if _request_include_visitors(request):
+        url = f"{url}?include_visitors=1"
+    return redirect(url)

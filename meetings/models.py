@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-from members.models import Department, Member
+from members.models import Department, Member, Visitor
 from organization.models import Church
 
 
@@ -130,6 +130,25 @@ class MeetingAttendance(models.Model):
         return f"{self.member} @ {self.meeting.title}"
 
 
+class MeetingVisitorAttendance(models.Model):
+    """Visitors marked on a meeting attendance roll (not full members)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    meeting = models.ForeignKey(
+        Meeting, on_delete=models.CASCADE, related_name="visitor_attendees"
+    )
+    visitor = models.ForeignKey(
+        Visitor, on_delete=models.CASCADE, related_name="meeting_attendance"
+    )
+    is_present = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("meeting", "visitor")
+
+    def __str__(self):
+        return f"{self.visitor} @ {self.meeting.title}"
+
+
 class MeetingAttachment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="attachments")
@@ -251,3 +270,23 @@ class AttendanceRecord(models.Model):
     def __str__(self):
         status = "Present" if self.is_present else "Absent"
         return f"{self.member} — {status}"
+
+
+class AttendanceVisitorRecord(models.Model):
+    """Visitor presence on worship / event attendance rolls."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event = models.ForeignKey(
+        AttendanceEvent, on_delete=models.CASCADE, related_name="visitor_records"
+    )
+    visitor = models.ForeignKey(
+        Visitor, on_delete=models.CASCADE, related_name="attendance_event_records"
+    )
+    is_present = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("event", "visitor")
+
+    def __str__(self):
+        status = "Present" if self.is_present else "Absent"
+        return f"{self.visitor} — {status}"

@@ -221,7 +221,18 @@
         <div>
             <div class="panel mb-4">
                 <div class="panel-header">Attendance ({{ meeting.attendees.count }})</div>
+                {% if can_view_members %}
+                <form method="get" class="panel-body py-2 border-bottom d-flex flex-wrap align-items-center gap-2 mb-0">
+                    <span class="small text-muted">Active members only on roll.</span>
+                    <label class="form-check form-check-inline mb-0 small">
+                        <input class="form-check-input" type="checkbox" name="include_visitors" value="1" {% if include_visitors %}checked{% endif %}>
+                        <span class="form-check-label">Include visitors</span>
+                    </label>
+                    <button type="submit" class="btn btn-outline-secondary btn-sm py-0">Apply</button>
+                </form>
+                {% endif %}
                 <form method="post" action="{% url 'meetings:attendance' meeting.pk %}">{% csrf_token %}
+                    {% if include_visitors %}<input type="hidden" name="include_visitors" value="1">{% endif %}
                     <div class="panel-body" style="max-height:320px;overflow-y:auto">
                         <p class="small text-muted">Check members on the roll, then mark who was present.</p>
                         {% for m in members %}
@@ -235,6 +246,23 @@
                         </div>
                         {% endfor %}
                     </div>
+                    {% if can_show_visitors %}
+                    <div class="panel-body border-top" style="max-height:240px;overflow-y:auto">
+                        <p class="small text-muted mb-2">Visitors (open follow-up)</p>
+                        {% for v in visitors %}
+                        <div class="d-flex align-items-center gap-2 py-1 border-bottom">
+                            <input class="form-check-input" type="checkbox" name="visitors" value="{{ v.pk }}" id="vroll{{ v.pk }}" {% if v.pk in visitor_roll_ids %}checked{% endif %}>
+                            <label class="form-check-label flex-grow-1" for="vroll{{ v.pk }}">{{ v.full_name }}</label>
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="checkbox" name="visitors_present" value="{{ v.pk }}" id="vpresent{{ v.pk }}" {% if v.pk in visitor_present_ids %}checked{% endif %}>
+                                <label class="form-check-label small text-muted" for="vpresent{{ v.pk }}">Present</label>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted small mb-0">No open visitors.</p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     {% if can_manage_attendance %}
                     <div class="panel-body border-top pt-2"><button type="submit" class="btn btn-sm btn-primary">Save Attendance</button></div>
                     {% endif %}

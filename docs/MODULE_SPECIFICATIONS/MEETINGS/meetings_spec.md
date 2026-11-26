@@ -54,6 +54,8 @@ erDiagram
 3. Creator/secretary permissions via `can_edit_minutes`, `can_submit_minutes`, `can_approve_meeting_minutes`.  
 4. Attendance recording for meetings and separate AttendanceEvents.  
 5. Unique `(meeting, member)` on MeetingAttendance.  
+5a. Member rolls list **active membership only** (`is_active` + `MembershipStatus.ACTIVE`); POSTed member ids are re-validated server-side.  
+5b. Optional **Include visitors** (users with `view_members`): open follow-up visitors on a separate roll; persisted in `MeetingVisitorAttendance` / `AttendanceVisitorRecord`; event rolls update `AttendanceEvent.headcount` (marked visitors + walk-in count).  
 6. Feature flag: views use `@require_feature("meetings")`.  
 7. **Online / Zoom (Phase A):** optional `join_url`, `join_passcode`, and `show_on_portal`. Portal visibility requires a join link. Members see only `show_on_portal` sessions via `/portal/meetings/<uuid>/` (not staff meeting chrome). Staff calendar still lists all scheduled meetings.  
 8. **Attachments:** validated via `church_system.uploads` (documents ≤10 MB; pdf/office/txt/csv/images; dangerous extensions blocked).

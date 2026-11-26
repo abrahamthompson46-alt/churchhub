@@ -94,15 +94,32 @@ class MeetingsTests(TestCase):
         self.assertTrue(timezone.is_aware(meeting.scheduled_at))
 
     def test_dashboard_home_after_scheduling_meeting(self):
-        """Regression: naive scheduled_at broke dashboard This Week pulse (localtime)."""
-        from datetime import datetime
+        """Regression: calendar merge must sort birthdays (date) with meetings (datetime)."""
+        from datetime import date, datetime, timedelta
 
         from django.urls import reverse as dash_reverse
+        from members.models import Gender, Member, MembershipStatus
 
-        naive = datetime(2032, 3, 10, 18, 0)
+        Member.objects.create(
+            church=self.church,
+            first_name="Calendar",
+            last_name="Sort",
+            gender=Gender.MALE,
+            membership_status=MembershipStatus.ACTIVE,
+            date_of_birth=date.today().replace(year=1988),
+            is_active=True,
+        )
         Meeting.objects.create(
             church=self.church,
             title="Pulse crash test",
+            meeting_type=MeetingType.BOARD,
+            scheduled_at=timezone.now() + timedelta(days=3),
+            status=MeetingStatus.SCHEDULED,
+        )
+        naive = datetime(2032, 3, 10, 18, 0)
+        Meeting.objects.create(
+            church=self.church,
+            title="Naive time test",
             meeting_type=MeetingType.BOARD,
             scheduled_at=naive,
             status=MeetingStatus.SCHEDULED,

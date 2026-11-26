@@ -1,7 +1,7 @@
 """Upcoming birthdays and church events for the Communications calendar."""
 
 from collections import OrderedDict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 from django.utils import timezone
 
@@ -29,9 +29,24 @@ def _birthday_in_window(dob, start, end):
     return None
 
 
+def _ensure_aware(dt: datetime) -> datetime:
+    if timezone.is_aware(dt):
+        return dt
+    return timezone.make_aware(dt, timezone.get_current_timezone())
+
+
 def _as_date(value):
     if isinstance(value, datetime):
-        return value.date()
+        return timezone.localtime(_ensure_aware(value)).date()
+    return value
+
+
+def _calendar_sort_key(value):
+    """Normalize date/datetime so mixed calendar rows can be sorted safely."""
+    if isinstance(value, datetime):
+        return _ensure_aware(value)
+    if isinstance(value, date):
+        return _ensure_aware(datetime.combine(value, time.min))
     return value
 
 
@@ -168,7 +183,13 @@ def get_communications_calendar(request, days=60, category="all", limit=200):
     if category in ("all", "events", "announcements", "announcement"):
         items.extend(get_upcoming_announcement_events(request, days=days, limit=limit))
 
-    items.sort(key=lambda row: (row["sort_key"], row["kind"], row["title"]))
+    items.sort(
+        key=lambda row: (
+            _calendar_sort_key(row["sort_key"]),
+            row["kind"],
+            row["title"],
+        )
+    )
     return items[:limit]
 
 
@@ -214,6 +235,6 @@ def calendar_summary_counts_from_items(items):
         "birthdays": len(birthdays),
         "meetings": len(meetings),
         "events": len(events),
-        "today_birthdays": sum(1 for row in birthdays if row.get("date") == today),
+        "today_birthdays": sum(1 for row in birthdays if _as_date(row.get("date")) == today),
         "total": len(birthdays) + len(meetings) + len(events),
     }

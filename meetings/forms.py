@@ -1,7 +1,10 @@
 from django import forms
 
+from django.utils import timezone
+
 from church_system.widgets import input_attrs, select_attrs, textarea_attrs
 from meetings import selectors
+from meetings.datetime_utils import ensure_aware
 
 from .models import (
     AttendanceEvent,
@@ -54,6 +57,10 @@ class MeetingForm(forms.ModelForm):
         self.fields["join_url"].label = "Zoom join link"
         self.fields["join_passcode"].label = "Zoom passcode"
         self.fields["show_on_portal"].label = "Show on member portal"
+
+    def clean_scheduled_at(self):
+        value = self.cleaned_data.get("scheduled_at")
+        return ensure_aware(value)
 
     def clean(self):
         cleaned = super().clean()

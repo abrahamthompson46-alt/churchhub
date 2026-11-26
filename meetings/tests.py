@@ -91,6 +91,25 @@ class MeetingsTests(TestCase):
         self.assertEqual(response.status_code, 302)
         meeting = Meeting.objects.get(title="Board Meeting")
         self.assertEqual(meeting.meeting_type, MeetingType.BOARD)
+        self.assertTrue(timezone.is_aware(meeting.scheduled_at))
+
+    def test_dashboard_home_after_scheduling_meeting(self):
+        """Regression: naive scheduled_at broke dashboard This Week pulse (localtime)."""
+        from datetime import datetime
+
+        from django.urls import reverse as dash_reverse
+
+        naive = datetime(2032, 3, 10, 18, 0)
+        Meeting.objects.create(
+            church=self.church,
+            title="Pulse crash test",
+            meeting_type=MeetingType.BOARD,
+            scheduled_at=naive,
+            status=MeetingStatus.SCHEDULED,
+        )
+        self.client.login(username="sec_m", password="pass12345")
+        response = self.client.get(dash_reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200, response.content[:500])
 
     def test_minutes_maker_checker_flow(self):
         meeting = self._meeting(status=MeetingStatus.HELD)

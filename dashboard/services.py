@@ -1353,10 +1353,12 @@ def get_this_week_pulse(request):
     meeting_count = 0
     if can_view_meetings(user) or can_manage_meetings(user):
         meetings_qs = selectors.meetings_this_week_for_church(church, now=now, limit=5)
+        from meetings.datetime_utils import format_local_datetime
+
         meetings = [
             {
                 "title": m.title,
-                "subtitle": timezone.localtime(m.scheduled_at).strftime("%a %b %d · %I:%M %p"),
+                "subtitle": format_local_datetime(m.scheduled_at, "%a %b %d · %I:%M %p"),
                 "url": reverse("meetings:detail", kwargs={"pk": m.pk}),
                 "when": m.scheduled_at,
             }

@@ -33,6 +33,19 @@
                             </div>
                         </div>
 
+                        <div id="bank-field-wrap" class="row g-3" hidden>
+                            <div class="col-md-12">
+                                {% include "includes/form_field.html" with field=form.bank_account %}
+                                {% if can_manage_accounts %}
+                                <p class="text-muted small mb-0">
+                                    Need a new account?
+                                    <a href="{% url 'ledger:account_add' %}">Add bank account</a>
+                                    (type <strong>Bank</strong>), then return here and refresh.
+                                </p>
+                                {% endif %}
+                            </div>
+                        </div>
+
                         <div id="account-preview" class="ledger-account-preview mt-1 mb-2" hidden>
                             <div class="row g-2">
                                 <div class="col-md-6">
@@ -81,5 +94,5 @@
 
 {% block extra_js %}
 <script src="{% static 'js/category-picker.js' %}?v=20260909h"></script>
-<script src="{% static 'js/ledger-entry.js' %}"></script>
+<script src="{% static 'js/ledger-entry.js' %}?v=20261127"></script>
 {% endblock %}

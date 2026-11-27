@@ -374,6 +374,7 @@ def entry_create(request):
                     narration=form.cleaned_data["narration"],
                     entry_date=form.cleaned_data["date"],
                     member=form.cleaned_data.get("member"),
+                    bank_account=form.cleaned_data.get("bank_account"),
                 )
                 request.session[SESSION_DRAFT_KEY] = draft
                 return redirect("ledger:entry_confirm")
@@ -386,6 +387,7 @@ def entry_create(request):
     return render(request, "ledger/entry.html", {
         "form": form,
         "business_date": form.initial.get("date") or resolve_transaction_date(church),
+        "can_manage_accounts": can_manage_chart_of_accounts(request.user),
         "breadcrumbs": [
             {"label": "Ledger", "url": reverse("ledger:index")},
             {"label": "New Entry"},

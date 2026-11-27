@@ -11,7 +11,13 @@ from django.utils import timezone
 
 from accounts.models import UserRole
 from ledger.models import LedgerCategory
-from ledger.services import build_entry_draft, post_ledger_entry, seed_ledger
+from ledger.services import (
+    build_entry_draft,
+    create_gl_account,
+    post_ledger_entry,
+    seed_ledger,
+    transfer_bank_leg,
+)
 from members.models import Member
 from organization.models import Church, Conference, District, Zone
 from remittance.services import ensure_default_policies_for_church
@@ -179,6 +185,34 @@ class PostingTests(LedgerTestMixin, TestCase):
         with self.assertRaises(WorkingDayClosedError):
             build_entry_draft(cat, Decimal("10.00"), "No day", None)
 
+    def test_transfer_cash_to_bank_requires_bank_account(self):
+        cat = LedgerCategory.objects.get(church=self.church, code="TRF_CASH_TO_BANK")
+        self.assertEqual(transfer_bank_leg(cat), "debit")
+        with self.assertRaises(ValueError):
+            build_entry_draft(cat, Decimal("100.00"), "Deposit", None)
+
+    def test_transfer_cash_to_bank_uses_selected_bank(self):
+        gcb = create_gl_account(
+            self.church,
+            self.treasury,
+            name="GCB Operating",
+            code="BANK_GCB",
+            account_type="BANK",
+        )
+        cat = LedgerCategory.objects.get(church=self.church, code="TRF_CASH_TO_BANK")
+        draft = build_entry_draft(
+            cat, Decimal("75.00"), "Cash to GCB", None, bank_account=gcb
+        )
+        self.assertEqual(draft["bank_account_name"], "GCB Operating")
+        txn = post_ledger_entry(self.church, self.treasury, draft)
+        amounts = {line.account.name: line.amount for line in txn.lines.all()}
+        self.assertEqual(amounts["GCB Operating"], Decimal("75.00"))
+        self.assertEqual(amounts["Cash"], Decimal("-75.00"))
+
+    def test_remit_transfer_does_not_require_bank(self):
+        cat = LedgerCategory.objects.get(church=self.church, code="TRF_TITHE_REMIT")
+        self.assertIsNone(transfer_bank_leg(cat))
+
     def test_idempotent_confirm(self):
         cat = LedgerCategory.objects.get(church=self.church, code="REC_INCOME_CASH")
         draft = build_entry_draft(cat, Decimal("40.00"), "Idempotent", None)
@@ -238,6 +272,51 @@ class ViewTests(LedgerTestMixin, TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertIn("ledger/entry/confirm", response.url)
+
+    def test_api_category_detail_transfer_bank_flags(self):
+        cat = LedgerCategory.objects.get(church=self.church, code="TRF_BANK_TO_CASH")
+        self.client.login(username="ledger_t", password="pass12345")
+        response = self.client.get(reverse("ledger:api_category_detail", args=[cat.pk]))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["requires_bank_selection"])
+        self.assertEqual(data["bank_leg"], "credit")
+
+    def test_entry_form_transfer_requires_bank_field(self):
+        gcb = create_gl_account(
+            self.church,
+            self.treasury,
+            name="NIB Savings",
+            code="BANK_NIB",
+            account_type="BANK",
+        )
+        cat = LedgerCategory.objects.get(church=self.church, code="TRF_CASH_TO_BANK")
+        self.client.login(username="ledger_t", password="pass12345")
+        missing = self.client.post(
+            reverse("ledger:entry"),
+            {
+                "transaction_type": "TRANSFER",
+                "category": str(cat.pk),
+                "amount": "25.00",
+                "narration": "Deposit",
+                "date": timezone.localdate().isoformat(),
+            },
+        )
+        self.assertEqual(missing.status_code, 200)
+        self.assertContains(missing, "Select the bank account")
+        ok = self.client.post(
+            reverse("ledger:entry"),
+            {
+                "transaction_type": "TRANSFER",
+                "category": str(cat.pk),
+                "bank_account": str(gcb.pk),
+                "amount": "25.00",
+                "narration": "Deposit",
+                "date": timezone.localdate().isoformat(),
+            },
+        )
+        self.assertEqual(ok.status_code, 302)
+        self.assertIn("ledger/entry/confirm", ok.url)
 
 
 class PageTests(LedgerTestMixin, TestCase):

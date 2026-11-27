@@ -5,6 +5,8 @@
     const form = document.getElementById("ledger-entry-form");
     const typeSelect = document.getElementById("id_transaction_type");
     const categorySelect = document.getElementById("id_category");
+    const bankSelect = document.getElementById("id_bank_account");
+    const bankWrap = document.getElementById("bank-field-wrap");
     const narrationField = document.getElementById("id_narration");
     const memberWrap = document.getElementById("member-field-wrap");
     const preview = document.getElementById("account-preview");
@@ -15,6 +17,8 @@
 
     const categoriesUrl = form.dataset.categoriesUrl || "/ledger/api/categories/";
     const categoryDetailTemplate = form.dataset.categoryDetailUrl || "";
+
+    let activeCategory = null;
 
     function categoryDetailUrl(id) {
         if (categoryDetailTemplate && categoryDetailTemplate.indexOf("00000000") !== -1) {
@@ -44,10 +48,37 @@
         }
     }
 
+    function selectedBankName() {
+        if (!bankSelect || !bankSelect.value) return "";
+        const opt = bankSelect.options[bankSelect.selectedIndex];
+        return opt ? opt.textContent.trim() : "";
+    }
+
+    function refreshBankPreview(cat) {
+        if (!cat) return;
+        if (cat.requires_bank_selection && bankWrap) {
+            bankWrap.hidden = false;
+        } else if (bankWrap) {
+            bankWrap.hidden = true;
+        }
+        const bankName = selectedBankName();
+        if (cat.requires_bank_selection && bankName) {
+            if (cat.bank_leg === "debit") {
+                previewDebit.textContent = bankName;
+                previewDebit.title = bankName;
+            } else if (cat.bank_leg === "credit") {
+                previewCredit.textContent = bankName;
+                previewCredit.title = bankName;
+            }
+        }
+    }
+
     function applyCategory(cat) {
+        activeCategory = cat || null;
         if (!cat) {
             preview.hidden = true;
             if (memberWrap) memberWrap.style.display = "";
+            if (bankWrap) bankWrap.hidden = true;
             return;
         }
         preview.hidden = false;
@@ -61,6 +92,19 @@
         if (narrationField && cat.default_narration && !narrationField.value.trim()) {
             narrationField.value = cat.default_narration;
         }
+        if (bankWrap) {
+            bankWrap.hidden = !cat.requires_bank_selection;
+        }
+        if (cat.requires_bank_selection && bankSelect && cat.default_bank_account_id) {
+            const hasOption = Array.prototype.some.call(
+                bankSelect.options,
+                function (o) { return o.value === cat.default_bank_account_id; }
+            );
+            if (hasOption && !bankSelect.value) {
+                bankSelect.value = cat.default_bank_account_id;
+            }
+        }
+        refreshBankPreview(cat);
     }
 
     function loadCategories(type, keepSelection) {
@@ -99,6 +143,12 @@
     });
 
     categorySelect.addEventListener("change", onCategoryChange);
+
+    if (bankSelect) {
+        bankSelect.addEventListener("change", function () {
+            refreshBankPreview(activeCategory);
+        });
+    }
 
     loadCategories(typeSelect.value, true);
 })();

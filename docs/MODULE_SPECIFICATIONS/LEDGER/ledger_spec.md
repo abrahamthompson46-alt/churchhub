@@ -164,7 +164,7 @@ Key functions in `ledger/services.py`:
 
 | Form | Role |
 |------|------|
-| `LedgerEntryForm` | Amount, date, category, narration, member |
+| `LedgerEntryForm` | Amount, date, category, narration, member; **bank account** (required when transfer category has a bank leg — e.g. cash↔bank) |
 | `LedgerCategoryCreateForm` / `LedgerCategoryEditForm` | Template CRUD |
 | `AccountForm` | CoA create/edit |
 

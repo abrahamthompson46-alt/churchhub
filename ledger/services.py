@@ -395,7 +395,60 @@ def export_ledger_entries_table(entries):
     }
 
 
+def transfer_bank_leg(category):
+    """
+    For cash/bank transfer categories, return which side uses a BANK account.
+    None when the category does not involve a single bank leg.
+    """
+    if category.transaction_type != "TRANSFER":
+        return None
+    debit_bank = category.default_debit_account.account_type == "BANK"
+    credit_bank = category.default_credit_account.account_type == "BANK"
+    if debit_bank and not credit_bank:
+        return "debit"
+    if credit_bank and not debit_bank:
+        return "credit"
+    return None
+
+
+def _resolve_bank_account(church, bank_account):
+    from transactions.models import Account
+
+    if bank_account is None:
+        return None
+    if isinstance(bank_account, Account):
+        account = bank_account
+    else:
+        account = selectors.get_account_or_404(church, bank_account)
+    if account.church_id != church.pk:
+        raise ValueError("Bank account does not belong to this church.")
+    if account.account_type != "BANK":
+        raise ValueError("Selected account is not a bank account.")
+    if not account.is_active:
+        raise ValueError(f"Bank account “{account.name}” is inactive.")
+    return account
+
+
+def resolve_transfer_accounts(category, *, bank_account=None):
+    """Debit/credit accounts for a transfer, substituting the user-chosen bank leg."""
+    leg = transfer_bank_leg(category)
+    if not leg:
+        return category.default_debit_account, category.default_credit_account
+    bank = _resolve_bank_account(category.church, bank_account)
+    if not bank:
+        raise ValueError("Select the bank account for this transfer.")
+    if leg == "debit":
+        return bank, category.default_credit_account
+    return category.default_debit_account, bank
+
+
 def category_to_dict(category):
+    bank_leg = transfer_bank_leg(category)
+    default_bank = None
+    if bank_leg == "debit":
+        default_bank = category.default_debit_account
+    elif bank_leg == "credit":
+        default_bank = category.default_credit_account
     return {
         "id": str(category.pk),
         "code": category.code,
@@ -409,6 +462,10 @@ def category_to_dict(category):
         "requires_member": category.requires_member,
         "remit_to_district": category.remit_to_district,
         "offering_type": offering_type_for_category(category),
+        "requires_bank_selection": bank_leg is not None,
+        "bank_leg": bank_leg or "",
+        "default_bank_account_id": str(default_bank.pk) if default_bank else "",
+        "default_bank_account_name": default_bank.name if default_bank else "",
     }
 
 
@@ -437,7 +494,7 @@ def _budget_warning_for_expense(church, category, amount, entry_date):
     return ""
 
 
-def build_entry_draft(category, amount, narration, entry_date, member=None):
+def build_entry_draft(category, amount, narration, entry_date, member=None, bank_account=None):
     """Validate and normalize a ledger entry draft before confirmation."""
     amount = Decimal(str(amount))
     if amount <= 0:
@@ -475,20 +532,23 @@ def build_entry_draft(category, amount, narration, entry_date, member=None):
         debit_name = category.default_debit_account.name
         credit_name = credit_summary or category.default_credit_account.name
     else:
+        debit_account, credit_account = resolve_transfer_accounts(
+            category, bank_account=bank_account
+        )
         lines = [
             {
-                "account_name": category.default_debit_account.name,
+                "account_name": debit_account.name,
                 "debit": str(amount),
                 "credit": None,
             },
             {
-                "account_name": category.default_credit_account.name,
+                "account_name": credit_account.name,
                 "debit": None,
                 "credit": str(amount),
             },
         ]
-        debit_name = category.default_debit_account.name
-        credit_name = category.default_credit_account.name
+        debit_name = debit_account.name
+        credit_name = credit_account.name
         retain = remit = None
 
     budget_warning = _budget_warning_for_expense(
@@ -516,6 +576,17 @@ def build_entry_draft(category, amount, narration, entry_date, member=None):
         "retain_amount": str(retain) if retain is not None else None,
         "remit_amount": str(remit) if remit is not None else None,
         "budget_warning": budget_warning,
+        "bank_account_id": (
+            str(bank_account.pk)
+            if bank_account and transfer_bank_leg(category)
+            else None
+        ),
+        "bank_account_name": (
+            bank_account.name
+            if bank_account and transfer_bank_leg(category)
+            else ""
+        ),
+        "requires_bank_selection": transfer_bank_leg(category) is not None,
     }
 
 
@@ -598,6 +669,8 @@ def post_ledger_entry(church, user, draft, idempotency_key=None):
     )
 
     offering_type = offering_type_for_category(category)
+    posted_debit = category.default_debit_account
+    posted_credit = category.default_credit_account
     if offering_type:
         from remittance.services import (
             ensure_default_policies_for_church,
@@ -610,10 +683,16 @@ def post_ledger_entry(church, user, draft, idempotency_key=None):
             trx, church, offering_type, amount, as_of_date=entry_date
         )
     else:
-        debit_fund = _fund_for_account(category.default_debit_account)
-        credit_fund = _fund_for_account(category.default_credit_account)
-        _post_line(trx, category.default_debit_account, amount, fund=debit_fund)
-        _post_line(trx, category.default_credit_account, -amount, fund=credit_fund)
+        bank_account = None
+        if draft.get("bank_account_id"):
+            bank_account = draft["bank_account_id"]
+        posted_debit, posted_credit = resolve_transfer_accounts(
+            category, bank_account=bank_account
+        )
+        debit_fund = _fund_for_account(posted_debit)
+        credit_fund = _fund_for_account(posted_credit)
+        _post_line(trx, posted_debit, amount, fund=debit_fund)
+        _post_line(trx, posted_credit, -amount, fund=credit_fund)
 
     validate_transaction_balance(trx)
     _log_audit(
@@ -625,8 +704,8 @@ def post_ledger_entry(church, user, draft, idempotency_key=None):
             "source": "ledger",
             "category": category.code,
             "amount": str(amount),
-            "debit": category.default_debit_account.name,
-            "credit": category.default_credit_account.name,
+            "debit": posted_debit.name,
+            "credit": posted_credit.name,
             "offering_type": offering_type,
             "budget_warning": draft.get("budget_warning") or "",
         },

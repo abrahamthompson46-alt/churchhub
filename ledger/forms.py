@@ -54,6 +54,15 @@ class LedgerEntryForm(forms.Form):
         queryset=Member.objects.none(),
         widget=forms.HiddenInput(attrs={"id": "id_member"}),
     )
+    bank_account = forms.ModelChoiceField(
+        label="Bank account",
+        required=False,
+        queryset=Account.objects.none(),
+        widget=forms.Select(
+            attrs=select_attrs(id="id_bank_account", **{"class": "js-bank-account-picker"})
+        ),
+        help_text="Choose which bank receives or sends the transfer.",
+    )
 
     def __init__(self, *args, church=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -71,13 +80,20 @@ class LedgerEntryForm(forms.Form):
             )
             self.fields["category"].label_from_instance = lambda obj: obj.name
             self.fields["member"].queryset = selectors.active_members_for_church_qs(church)
+            self.fields["bank_account"].queryset = selectors.accounts_for_church_qs(
+                church, active_only=True, account_type="BANK"
+            )
+            self.fields["bank_account"].label_from_instance = _account_label
 
     def clean(self):
+        from ledger.services import transfer_bank_leg
+
         cleaned = super().clean()
         if self.church and not cleaned.get("date"):
             cleaned["date"] = resolve_transaction_date(self.church)
         category = cleaned.get("category")
         member = cleaned.get("member")
+        bank_account = cleaned.get("bank_account")
         if category and category.requires_member and not member:
             self.add_error("member", "This category requires a member.")
         if category and self.church and category.church_id != self.church.pk:
@@ -89,6 +105,14 @@ class LedgerEntryForm(forms.Form):
                 raise forms.ValidationError(
                     "Category accounts are misconfigured for this church. Contact an administrator."
                 )
+            if transfer_bank_leg(category):
+                if not bank_account:
+                    self.add_error(
+                        "bank_account",
+                        "Select the bank account for this transfer.",
+                    )
+                elif bank_account.church_id != self.church.pk:
+                    self.add_error("bank_account", "Invalid bank account for this church.")
         return cleaned
 
 

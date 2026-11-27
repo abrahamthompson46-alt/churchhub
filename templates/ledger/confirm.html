@@ -34,6 +34,11 @@
 
                     <dt class="col-sm-4 text-muted">Amount</dt>
                     <dd class="col-sm-8 text-currency fw-bold fs-5">{{ draft.amount|floatformat:2|intcomma }}</dd>
+
+                    {% if draft.bank_account_name %}
+                    <dt class="col-sm-4 text-muted">Bank account</dt>
+                    <dd class="col-sm-8">{{ draft.bank_account_name }}</dd>
+                    {% endif %}
                 </dl>
 
                 {% include "ledger/includes/journal_preview.html" with draft=draft %}

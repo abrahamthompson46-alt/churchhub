@@ -175,7 +175,7 @@ class MakerCheckerPhase2Tests(TestCase):
         txn = self._pending()
         with self.assertRaises(PermissionDenied):
             record_approval(txn, self.treasury)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(PermissionDenied):
             approve_transaction(txn, self.treasury)
         with self.assertRaises(ValueError):
             reject_transaction(txn, self.treasury)

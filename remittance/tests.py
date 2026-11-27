@@ -423,12 +423,24 @@ class RemittancePolicyTests(TestCase):
     def test_remittance_payment_notifies_district_recipients(self):
         from dashboard.models import Notification
 
+        from permissions.org_scope import OrgScopeLevel, apply_org_scope
+        from permissions.services import ensure_permission_matrix
+
+        ensure_permission_matrix()
         district_officer = User.objects.create_user(
             username="district_t",
             password="pass12345",
             role=UserRole.DISTRICT_PASTOR,
             church=self.church,
         )
+        apply_org_scope(
+            district_officer,
+            role=UserRole.DISTRICT_PASTOR,
+            scope_level=OrgScopeLevel.DISTRICT,
+            church=self.church,
+            district=self.church.district,
+        )
+        district_officer.save()
         txn = record_receipt(
             church=self.church,
             created_by=self.treasurer,
@@ -444,7 +456,8 @@ class RemittancePolicyTests(TestCase):
             payment_account_type="BANK",
             month_date=today,
         )
-        approve_transaction(remit, self.pastor)
+        with self.captureOnCommitCallbacks(execute=True):
+            approve_transaction(remit, self.pastor)
         self.assertTrue(
             Notification.objects.filter(
                 user=district_officer,

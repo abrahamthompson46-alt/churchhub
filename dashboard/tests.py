@@ -670,7 +670,7 @@ class ViewTests(DashboardTestMixin, TestCase):
         self.assertEqual(response.context["monthly_total"], Decimal("1005.00"))
         self.assertGreater(response.context["remaining"], Decimal("0.00"))
         self.assertContains(response, "Marked remitted")
-        self.assertContains(response, "Record district remittance")
+        self.assertContains(response, "Record remittance")
 
     def test_cutoff_get_does_not_create_monthly_cutoff(self):
         self._login("treasury")

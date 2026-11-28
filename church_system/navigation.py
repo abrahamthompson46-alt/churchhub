@@ -272,18 +272,7 @@ def _finance_sections(user, active_church=None):
             ledger_items.append(
                 _item("Adjustment Journal", "transactions:adjustment_create", "bi-journal-richtext")
             )
-        sections.append(_section("Books", ledger_items, "accounting", zone="records"))
-
-    planning_items = []
-    if (
-        (can_view_budgets(user) or can_manage_budgets(user))
-        and _church_feature(active_church, "budgets", user)
-    ):
-        planning_items.append(_item("Budgets", "budgets:list", "bi-calculator"))
-    if can_view_reconciliation(user) or can_manage_reconciliation(user):
-        planning_items.append(_item("Bank Reconciliation", "transactions:reconciliation_list", "bi-bank"))
-    if planning_items:
-        sections.append(_section("Planning & cash", planning_items, "planning", zone="records"))
+        sections.append(_section("Books", ledger_items, "accounting", zone="operations"))
 
     if (
         _church_feature(active_church, "remittance", user)
@@ -313,6 +302,17 @@ def _finance_sections(user, active_church=None):
             remittance_items.append(_item("Welfare", "remittance:welfare", "bi-heart-pulse"))
         if remittance_items:
             sections.append(_section("Remittance & welfare", remittance_items, "remittance", zone="operations"))
+
+    planning_items = []
+    if (
+        (can_view_budgets(user) or can_manage_budgets(user))
+        and _church_feature(active_church, "budgets", user)
+    ):
+        planning_items.append(_item("Budgets", "budgets:list", "bi-calculator"))
+    if can_view_reconciliation(user) or can_manage_reconciliation(user):
+        planning_items.append(_item("Bank Reconciliation", "transactions:reconciliation_list", "bi-bank"))
+    if planning_items:
+        sections.append(_section("Planning & cash", planning_items, "planning", zone="records"))
 
     if (can_view_payroll(user) or can_manage_payroll(user)) and _church_feature(active_church, "payroll", user):
         payroll_items = [_item("Dashboard", "payroll:index", "bi-currency-exchange")]

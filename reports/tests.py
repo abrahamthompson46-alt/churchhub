@@ -109,6 +109,8 @@ class ReportsTests(TestCase):
         self._login("treasury_r")
         response = self.client.get(reverse("reports:index"))
         self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["report_groups"])
+        self.assertGreater(response.context["report_count"], 0)
 
     def test_hierarchy_rollup_requires_overseer_access(self):
         overseer = User.objects.create_user(

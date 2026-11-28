@@ -231,26 +231,35 @@
                     <button type="submit" class="btn btn-outline-secondary btn-sm py-0">Apply</button>
                 </form>
                 {% endif %}
-                <form method="post" action="{% url 'meetings:attendance' meeting.pk %}">{% csrf_token %}
+                <form method="post" action="{% url 'meetings:attendance' meeting.pk %}" id="meeting-attendance-form">{% csrf_token %}
                     {% if include_visitors %}<input type="hidden" name="include_visitors" value="1">{% endif %}
+                    <div class="panel-body border-bottom py-2 d-flex flex-wrap align-items-center gap-2">
+                        <label class="small text-muted mb-0" for="meeting-roll-search">Find member</label>
+                        <input type="search" id="meeting-roll-search" class="form-control form-control-sm" placeholder="Name…" style="max-width:14rem;" autocomplete="off">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="meeting-roll-all">All on roll</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="meeting-roll-none">Clear roll</button>
+                    </div>
                     <div class="panel-body" style="max-height:320px;overflow-y:auto">
                         <p class="small text-muted">Check members on the roll, then mark who was present.</p>
+                        <div class="meeting-roll-list">
                         {% for m in members %}
-                        <div class="d-flex align-items-center gap-2 py-1 border-bottom">
+                        <div class="meeting-roll-row d-flex align-items-center gap-2 py-1 border-bottom" data-member-name="{{ m.full_name|lower }}">
                             <input class="form-check-input" type="checkbox" name="members" value="{{ m.pk }}" id="roll{{ m.pk }}" {% if m.pk in attendee_ids %}checked{% endif %}>
                             <label class="form-check-label flex-grow-1" for="roll{{ m.pk }}">{{ m.full_name }}</label>
                             <div class="form-check form-check-inline mb-0">
-                                <input class="form-check-input" type="checkbox" name="present" value="{{ m.pk }}" id="present{{ m.pk }}" {% if m.pk in present_ids %}checked{% endif %}>
+                                <input class="form-check-input meeting-present-check" type="checkbox" name="present" value="{{ m.pk }}" id="present{{ m.pk }}" {% if m.pk in present_ids %}checked{% endif %}>
                                 <label class="form-check-label small text-muted" for="present{{ m.pk }}">Present</label>
                             </div>
                         </div>
                         {% endfor %}
+                        </div>
                     </div>
                     {% if can_show_visitors %}
                     <div class="panel-body border-top" style="max-height:240px;overflow-y:auto">
                         <p class="small text-muted mb-2">Visitors (open follow-up)</p>
+                        <div class="meeting-visitor-list">
                         {% for v in visitors %}
-                        <div class="d-flex align-items-center gap-2 py-1 border-bottom">
+                        <div class="meeting-roll-row d-flex align-items-center gap-2 py-1 border-bottom" data-member-name="{{ v.full_name|lower }}">
                             <input class="form-check-input" type="checkbox" name="visitors" value="{{ v.pk }}" id="vroll{{ v.pk }}" {% if v.pk in visitor_roll_ids %}checked{% endif %}>
                             <label class="form-check-label flex-grow-1" for="vroll{{ v.pk }}">{{ v.full_name }}</label>
                             <div class="form-check form-check-inline mb-0">
@@ -261,6 +270,7 @@
                         {% empty %}
                         <p class="text-muted small mb-0">No open visitors.</p>
                         {% endfor %}
+                        </div>
                     </div>
                     {% endif %}
                     {% if can_manage_attendance %}
@@ -294,4 +304,38 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const search = document.getElementById('meeting-roll-search');
+    const form = document.getElementById('meeting-attendance-form');
+    if (!form) return;
+    const rows = () => form.querySelectorAll('.meeting-roll-row[data-member-name]');
+
+    function visibleRollChecks() {
+        return Array.from(rows()).filter(function (row) {
+            return row.style.display !== 'none';
+        }).map(function (row) {
+            return row.querySelector('input[name="members"], input[name="visitors"]');
+        }).filter(Boolean);
+    }
+
+    search?.addEventListener('input', function () {
+        const q = (search.value || '').trim().toLowerCase();
+        rows().forEach(function (row) {
+            const name = row.getAttribute('data-member-name') || '';
+            row.style.display = !q || name.indexOf(q) !== -1 ? '' : 'none';
+        });
+    });
+
+    document.getElementById('meeting-roll-all')?.addEventListener('click', function () {
+        visibleRollChecks().forEach(function (box) { box.checked = true; });
+    });
+    document.getElementById('meeting-roll-none')?.addEventListener('click', function () {
+        visibleRollChecks().forEach(function (box) { box.checked = false; });
+    });
+})();
+</script>
 {% endblock %}

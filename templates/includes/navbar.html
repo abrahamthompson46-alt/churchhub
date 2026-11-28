@@ -143,8 +143,8 @@
                                 {% if menu.id == "finance" %}
                                 <div class="nav-mega-zones">
                                     <div class="nav-mega-zone nav-mega-zone--operations">
-                                        <p class="nav-mega-zone__label">Daily operations</p>
-                                        <div class="nav-mega-grid nav-mega-grid--finance">
+                                        <p class="nav-mega-zone__label">Treasury, books &amp; remittance</p>
+                                        <div class="nav-mega-grid nav-mega-grid--finance nav-mega-grid--finance-ops">
                                             {% for section in menu.sections %}
                                             {% if section.zone == "operations" %}
                                             <div class="nav-mega-col nav-mega-col--{{ section.theme|default:'default' }}">

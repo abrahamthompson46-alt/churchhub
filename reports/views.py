@@ -71,8 +71,25 @@ def report_index(request):
     if not can_view_reports(request.user):
         raise PermissionDenied
     active = get_active_church(request)
+    all_reports = reports_for_user(request.user, active_church=active)
+    grouped = []
+    group_defs = (
+        ("finance", "Financial reports", "bi-graph-up-arrow"),
+        ("members", "Membership reports", "bi-people"),
+        ("overseer", "Organization & roll-up", "bi-bar-chart-steps"),
+    )
+    by_perm = {}
+    for row in all_reports:
+        perm = REPORT_CATALOG.get(row["key"], {}).get("permission", "finance")
+        by_perm.setdefault(perm, []).append(row)
+    for perm, title, icon in group_defs:
+        items = by_perm.get(perm)
+        if items:
+            grouped.append({"id": perm, "title": title, "icon": icon, "reports": sorted(items, key=lambda r: r["label"])})
     return render(request, "reports/index.html", {
-        "reports": reports_for_user(request.user, active_church=active),
+        "reports": all_reports,
+        "report_groups": grouped,
+        "report_count": len(all_reports),
     })
 
 

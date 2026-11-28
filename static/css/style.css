@@ -528,6 +528,10 @@ body.app-body.auth-page {
         gap: 0.65rem 1rem;
     }
 
+    .nav-mega-grid--finance-ops {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
     .nav-mega-grid--reports {
         grid-template-columns: repeat(4, minmax(0, 1fr));
         max-width: 920px;
@@ -3653,6 +3657,44 @@ form.data-card.permission-matrix-card {
 }
 
 .report-card .btn { align-self: flex-start; }
+
+.report-grid--center {
+    gap: 1rem;
+}
+
+.report-center-toolbar {
+    background: var(--ch-card);
+}
+
+.report-center-search {
+    max-width: min(100%, 22rem);
+}
+
+.report-center-group__head {
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--ch-border);
+}
+
+.report-center-group__icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    background: var(--ch-primary-soft);
+    color: var(--ch-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+.report-center-group__title {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.report-card--catalog h3 {
+    font-size: 1rem;
+}
 
 /* ── Filter panel ── */
 .filter-panel {

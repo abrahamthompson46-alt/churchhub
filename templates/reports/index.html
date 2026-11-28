@@ -7,17 +7,80 @@
 <div class="page-container">
     {% include "includes/page_header.html" with page_subtitle="Analytics" page_title="Report Center" page_description="Generate and export reports by period, church, and department." %}
 
-    <div class="report-grid">
-        {% for r in reports %}
-        <article class="report-card">
-            <div class="report-card-icon"><i class="bi {{ r.icon }}"></i></div>
-            <h3>{{ r.label }}</h3>
-            <p>{{ r.description }}</p>
-            <a href="{% url 'reports:run' r.key %}" class="btn btn-primary btn-sm">Run Report <i class="bi bi-arrow-right ms-1"></i></a>
-        </article>
-        {% empty %}
-        {% include "includes/empty_state.html" with icon="bi-file-bar-graph" message="No reports available for your role." %}
+    {% if report_groups %}
+    <div class="report-center-toolbar card border-0 shadow-sm mb-4">
+        <div class="card-body py-3 d-flex flex-wrap align-items-center gap-3">
+            <p class="report-center-toolbar__meta small text-muted mb-0 flex-grow-1">
+                <strong class="text-body">{{ report_count }}</strong> report{{ report_count|pluralize }} available for your role
+            </p>
+            <label class="visually-hidden" for="report-center-search">Search reports</label>
+            <div class="report-center-search input-group input-group-sm">
+                <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+                <input type="search" id="report-center-search" class="form-control" placeholder="Search by name or description…" autocomplete="off">
+            </div>
+        </div>
+    </div>
+
+    <div id="report-center-groups">
+        {% for group in report_groups %}
+        <section class="report-center-group mb-4" data-report-group="{{ group.id }}">
+            <header class="report-center-group__head d-flex align-items-center gap-2 mb-3">
+                <span class="report-center-group__icon"><i class="bi {{ group.icon }}" aria-hidden="true"></i></span>
+                <h2 class="report-center-group__title h6 mb-0">{{ group.title }}</h2>
+                <span class="badge text-bg-light border report-center-group__count">{{ group.reports|length }}</span>
+            </header>
+            <div class="report-grid report-grid--center">
+                {% for r in group.reports %}
+                <article class="report-card report-card--catalog" data-report-label="{{ r.label|lower }}" data-report-desc="{{ r.description|lower }}">
+                    <div class="report-card-icon"><i class="bi {{ r.icon }}"></i></div>
+                    <h3>{{ r.label }}</h3>
+                    <p>{{ r.description }}</p>
+                    <a href="{% url 'reports:run' r.key %}" class="btn btn-primary btn-sm">Run report <i class="bi bi-arrow-right ms-1"></i></a>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
         {% endfor %}
     </div>
+
+    <div id="report-center-empty" class="d-none">
+        {% include "includes/empty_state.html" with icon="bi-search" message="No reports match your search." %}
+    </div>
+    {% else %}
+    {% include "includes/empty_state.html" with icon="bi-file-bar-graph" message="No reports available for your role." %}
+    {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const search = document.getElementById('report-center-search');
+    const groups = document.getElementById('report-center-groups');
+    const empty = document.getElementById('report-center-empty');
+    if (!search || !groups) return;
+
+    function applyFilter() {
+        const q = (search.value || '').trim().toLowerCase();
+        let visible = 0;
+        groups.querySelectorAll('.report-card--catalog').forEach(function (card) {
+            const label = card.getAttribute('data-report-label') || '';
+            const desc = card.getAttribute('data-report-desc') || '';
+            const on = !q || label.indexOf(q) !== -1 || desc.indexOf(q) !== -1;
+            card.classList.toggle('d-none', !on);
+            if (on) visible += 1;
+        });
+        groups.querySelectorAll('.report-center-group').forEach(function (section) {
+            const cards = section.querySelectorAll('.report-card--catalog:not(.d-none)');
+            section.classList.toggle('d-none', cards.length === 0);
+        });
+        if (empty) {
+            empty.classList.toggle('d-none', visible > 0 || !q);
+            groups.classList.toggle('d-none', visible === 0 && !!q);
+        }
+    }
+
+    search.addEventListener('input', applyFilter);
+})();
+</script>
 {% endblock %}

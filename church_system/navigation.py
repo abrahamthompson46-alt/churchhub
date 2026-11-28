@@ -138,6 +138,7 @@ NAV_REPORTS_FEATURED_MEMBERSHIP = (
     "transfer_report",
     "attendance_summary",
 )
+# Top nav: max 12 financial reports; full catalog stays in Report Center.
 NAV_REPORTS_FEATURED_FINANCE = (
     "financial_summary",
     "tithe_report",
@@ -145,7 +146,14 @@ NAV_REPORTS_FEATURED_FINANCE = (
     "income_statement",
     "balance_sheet",
     "budget_vs_actual",
+    "general_ledger",
+    "end_of_year_detailed",
+    "cash_position",
+    "welfare_register",
+    "settlement_register",
+    "payroll_summary",
 )
+NAV_REPORTS_FINANCE_NAV_MAX = 12
 
 
 def _finance_landing_url(user):
@@ -255,24 +263,16 @@ def _finance_sections(user, active_church=None):
     if treasury_items:
         sections.append(_section("Daily treasury", treasury_items, "treasury", zone="operations"))
 
-    if can_view_ledger(user) and _church_feature(active_church, "ledger", user):
-        ledger_items = []
-        if can_manage_ledger_entries(user):
-            ledger_items.extend([
-                _item("Journal Entry", "ledger:entry", "bi-journal-plus"),
-                _item("Journals", "ledger:entries", "bi-journal-check"),
-            ])
-        ledger_items.append(_item("General Ledger", "ledger:index", "bi-journal-text"))
-        ledger_items.append(_item("By Category", "ledger:category_report", "bi-bar-chart"))
-        if can_view_ledger(user):
-            ledger_items.append(_item("Chart of Accounts", "ledger:accounts", "bi-journal-bookmark"))
-        if can_manage_gl_categories(user):
-            ledger_items.append(_item("Posting Categories", "ledger:categories", "bi-tags"))
-        if can_create_adjustment_journals(user):
-            ledger_items.append(
-                _item("Adjustment Journal", "transactions:adjustment_create", "bi-journal-richtext")
-            )
-        sections.append(_section("Books", ledger_items, "accounting", zone="operations"))
+    planning_items = []
+    if (
+        (can_view_budgets(user) or can_manage_budgets(user))
+        and _church_feature(active_church, "budgets", user)
+    ):
+        planning_items.append(_item("Budgets", "budgets:list", "bi-calculator"))
+    if can_view_reconciliation(user) or can_manage_reconciliation(user):
+        planning_items.append(_item("Bank Reconciliation", "transactions:reconciliation_list", "bi-bank"))
+    if planning_items:
+        sections.append(_section("Planning & cash", planning_items, "planning", zone="operations"))
 
     if (
         _church_feature(active_church, "remittance", user)
@@ -303,16 +303,24 @@ def _finance_sections(user, active_church=None):
         if remittance_items:
             sections.append(_section("Remittance & welfare", remittance_items, "remittance", zone="operations"))
 
-    planning_items = []
-    if (
-        (can_view_budgets(user) or can_manage_budgets(user))
-        and _church_feature(active_church, "budgets", user)
-    ):
-        planning_items.append(_item("Budgets", "budgets:list", "bi-calculator"))
-    if can_view_reconciliation(user) or can_manage_reconciliation(user):
-        planning_items.append(_item("Bank Reconciliation", "transactions:reconciliation_list", "bi-bank"))
-    if planning_items:
-        sections.append(_section("Planning & cash", planning_items, "planning", zone="records"))
+    if can_view_ledger(user) and _church_feature(active_church, "ledger", user):
+        ledger_items = []
+        if can_manage_ledger_entries(user):
+            ledger_items.extend([
+                _item("Journal Entry", "ledger:entry", "bi-journal-plus"),
+                _item("Journals", "ledger:entries", "bi-journal-check"),
+            ])
+        ledger_items.append(_item("General Ledger", "ledger:index", "bi-journal-text"))
+        ledger_items.append(_item("By Category", "ledger:category_report", "bi-bar-chart"))
+        if can_view_ledger(user):
+            ledger_items.append(_item("Chart of Accounts", "ledger:accounts", "bi-journal-bookmark"))
+        if can_manage_gl_categories(user):
+            ledger_items.append(_item("Posting Categories", "ledger:categories", "bi-tags"))
+        if can_create_adjustment_journals(user):
+            ledger_items.append(
+                _item("Adjustment Journal", "transactions:adjustment_create", "bi-journal-richtext")
+            )
+        sections.append(_section("Books", ledger_items, "accounting", zone="records"))
 
     if (can_view_payroll(user) or can_manage_payroll(user)) and _church_feature(active_church, "payroll", user):
         payroll_items = [_item("Dashboard", "payroll:index", "bi-currency-exchange")]
@@ -421,7 +429,6 @@ def _reports_sections(user, active_church=None):
     membership_reports = []
     finance_reports = []
     membership_more = []
-    finance_more = []
     from reports.services import user_may_access_report
 
     def _report_item(key):
@@ -431,13 +438,14 @@ def _reports_sections(user, active_church=None):
         return _item(meta["label"], icon=meta["icon"], report_key=key)
 
     featured_membership = set(NAV_REPORTS_FEATURED_MEMBERSHIP)
-    featured_finance = set(NAV_REPORTS_FEATURED_FINANCE)
 
     for key in NAV_REPORTS_FEATURED_MEMBERSHIP:
         entry = _report_item(key)
         if entry:
             membership_reports.append(entry)
     for key in NAV_REPORTS_FEATURED_FINANCE:
+        if len(finance_reports) >= NAV_REPORTS_FINANCE_NAV_MAX:
+            break
         entry = _report_item(key)
         if entry:
             finance_reports.append(entry)
@@ -445,20 +453,22 @@ def _reports_sections(user, active_church=None):
     for key, meta in sorted(REPORT_CATALOG.items(), key=lambda pair: pair[1].get("label", "")):
         if not user_may_access_report(user, key, active_church=active_church):
             continue
+        if meta["permission"] != "members" and key in NAV_REPORTS_FEATURED_FINANCE:
+            continue
         entry = _item(meta["label"], icon=meta["icon"], report_key=key)
         if meta["permission"] == "members" and key not in featured_membership:
             membership_more.append(entry)
-        elif meta["permission"] != "members" and key not in featured_finance:
-            finance_more.append(entry)
 
     membership_reports.extend(membership_more)
-    finance_reports.extend(finance_more)
 
     if membership_reports:
         sections.append(_section("Membership", membership_reports, "people"))
 
     if _can_access_financial_tools(user):
         if finance_reports:
+            finance_reports.append(
+                _item("All reports in Report Center", "reports:index", "bi-grid")
+            )
             sections.append(_section("Financial", finance_reports, "analytics"))
 
         financial_tools = []

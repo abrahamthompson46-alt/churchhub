@@ -32,7 +32,7 @@
                 <span>Member Roll</span>
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                     <label class="small text-muted mb-0" for="roll-filter">Find</label>
-                    <input type="search" id="roll-filter" class="form-control form-control-sm" placeholder="Filter names" style="max-width:12rem;" autocomplete="off">
+                    <input type="search" id="roll-filter" class="form-control form-control-sm" placeholder="Type to filter…" style="max-width:14rem;" autocomplete="off" spellcheck="false">
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="roll-all">Mark all</button>
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="roll-none">Mark none</button>
                     <button type="submit" class="btn btn-primary btn-sm">Save Roll</button>
@@ -41,7 +41,7 @@
             <div class="panel-body">
                 <div class="roll-grid">
                     {% for m in members %}
-                    <label class="roll-item" for="m{{ m.pk }}">
+                    <label class="roll-item" for="m{{ m.pk }}" data-member-name="{{ m.full_name|lower }}">
                         <input class="form-check-input" type="checkbox" name="members" value="{{ m.pk }}" id="m{{ m.pk }}"
                             {% if m.pk in present_ids %}checked{% endif %}>
                         <span>{{ m.full_name }}</span>
@@ -85,11 +85,14 @@
     </form>
     {% else %}
     <div class="panel">
-        <div class="panel-header">Member Roll</div>
+        <div class="panel-header d-flex flex-wrap align-items-center gap-2 justify-content-between">
+            <span>Member Roll</span>
+            <input type="search" id="roll-filter-readonly" class="form-control form-control-sm" placeholder="Type to filter…" style="max-width:14rem;" autocomplete="off" spellcheck="false">
+        </div>
         <div class="panel-body">
             <div class="roll-grid">
                 {% for m in members %}
-                <label class="roll-item" for="m{{ m.pk }}">
+                <label class="roll-item" for="m{{ m.pk }}" data-member-name="{{ m.full_name|lower }}">
                     <input class="form-check-input" type="checkbox" disabled {% if m.pk in present_ids %}checked{% endif %}>
                     <span>{{ m.full_name }}</span>
                 </label>
@@ -102,34 +105,38 @@
     </div>
     {% endif %}
 </div>
-{% if can_manage_attendance %}
 <script>
 (function () {
-    const form = document.querySelector('.roll-grid');
-    if (!form) return;
-    const items = Array.from(document.querySelectorAll('.roll-item'));
-    const filter = document.getElementById('roll-filter');
-    function visibleCheckboxes() {
-        return items.filter(function (item) {
-            return item.style.display !== 'none';
-        }).map(function (item) {
-            return item.querySelector('input[type="checkbox"]');
-        }).filter(Boolean);
+    const items = Array.from(document.querySelectorAll('.roll-item[data-member-name]'));
+    const filter = document.getElementById('roll-filter') || document.getElementById('roll-filter-readonly');
+    if (!items.length || !filter) return;
+
+    function applyFilter() {
+        const raw = (filter.value || '').trim().toLowerCase();
+        const tokens = raw ? raw.split(/\s+/).filter(Boolean) : [];
+        items.forEach(function (item) {
+            const name = item.getAttribute('data-member-name') || '';
+            const match = !tokens.length || tokens.every(function (t) { return name.indexOf(t) !== -1; });
+            item.classList.toggle('d-none', !match);
+        });
     }
+
+    function visibleCheckboxes() {
+        return items.filter(function (item) { return !item.classList.contains('d-none'); })
+            .map(function (item) { return item.querySelector('input[type="checkbox"]'); })
+            .filter(Boolean);
+    }
+
+    filter.addEventListener('input', applyFilter);
+    filter.addEventListener('search', applyFilter);
+    filter.addEventListener('keyup', applyFilter);
+
     document.getElementById('roll-all')?.addEventListener('click', function () {
         visibleCheckboxes().forEach(function (box) { box.checked = true; });
     });
     document.getElementById('roll-none')?.addEventListener('click', function () {
         visibleCheckboxes().forEach(function (box) { box.checked = false; });
     });
-    filter?.addEventListener('input', function () {
-        const q = (filter.value || '').trim().toLowerCase();
-        items.forEach(function (item) {
-            const name = (item.textContent || '').toLowerCase();
-            item.style.display = !q || name.indexOf(q) !== -1 ? '' : 'none';
-        });
-    });
 })();
 </script>
-{% endif %}
 {% endblock %}

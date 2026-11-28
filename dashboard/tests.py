@@ -400,8 +400,10 @@ class NavigationDensityTests(DashboardTestMixin, TestCase):
         zones = {s.get("zone") for s in finance["sections"]}
         self.assertIn("operations", zones)
         self.assertIn("records", zones)
-        titles = {s["title"] for s in finance["sections"] if s.get("zone") == "operations"}
-        self.assertIn("Books", titles)
+        op_titles = {s["title"] for s in finance["sections"] if s.get("zone") == "operations"}
+        rec_titles = {s["title"] for s in finance["sections"] if s.get("zone") == "records"}
+        self.assertIn("Planning & cash", op_titles)
+        self.assertIn("Books", rec_titles)
 
     def test_page_eyebrow_for_finance_pending(self):
         from church_system.navigation import get_module_tabs, get_page_eyebrow

@@ -314,21 +314,29 @@
     if (!form) return;
     const rows = () => form.querySelectorAll('.meeting-roll-row[data-member-name]');
 
+    function applyRollFilter() {
+        const raw = (search && search.value) ? search.value.trim().toLowerCase() : '';
+        const tokens = raw ? raw.split(/\s+/).filter(Boolean) : [];
+        rows().forEach(function (row) {
+            const name = row.getAttribute('data-member-name') || '';
+            const match = !tokens.length || tokens.every(function (t) { return name.indexOf(t) !== -1; });
+            row.classList.toggle('d-none', !match);
+        });
+    }
+
     function visibleRollChecks() {
         return Array.from(rows()).filter(function (row) {
-            return row.style.display !== 'none';
+            return !row.classList.contains('d-none');
         }).map(function (row) {
             return row.querySelector('input[name="members"], input[name="visitors"]');
         }).filter(Boolean);
     }
 
-    search?.addEventListener('input', function () {
-        const q = (search.value || '').trim().toLowerCase();
-        rows().forEach(function (row) {
-            const name = row.getAttribute('data-member-name') || '';
-            row.style.display = !q || name.indexOf(q) !== -1 ? '' : 'none';
-        });
-    });
+    if (search) {
+        search.addEventListener('input', applyRollFilter);
+        search.addEventListener('search', applyRollFilter);
+        search.addEventListener('keyup', applyRollFilter);
+    }
 
     document.getElementById('meeting-roll-all')?.addEventListener('click', function () {
         visibleRollChecks().forEach(function (box) { box.checked = true; });

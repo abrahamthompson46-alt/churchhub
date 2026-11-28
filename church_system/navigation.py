@@ -132,7 +132,7 @@ def _section(title, items, theme="default", zone="records"):
     return {"title": title, "theme": theme, "items": items, "zone": zone}
 
 
-# Reports surfaced in the top nav mega menu; full catalog stays on Report Center.
+# Reports listed first in the Reports mega menu (remaining catalog entries follow, sorted by name).
 NAV_REPORTS_FEATURED_MEMBERSHIP = (
     "member_summary",
     "transfer_report",
@@ -420,22 +420,39 @@ def _reports_sections(user, active_church=None):
 
     membership_reports = []
     finance_reports = []
+    membership_more = []
+    finance_more = []
     from reports.services import user_may_access_report
 
-    def _featured_report(key):
+    def _report_item(key):
         meta = REPORT_CATALOG.get(key)
         if not meta or not user_may_access_report(user, key, active_church=active_church):
             return None
         return _item(meta["label"], icon=meta["icon"], report_key=key)
 
+    featured_membership = set(NAV_REPORTS_FEATURED_MEMBERSHIP)
+    featured_finance = set(NAV_REPORTS_FEATURED_FINANCE)
+
     for key in NAV_REPORTS_FEATURED_MEMBERSHIP:
-        entry = _featured_report(key)
+        entry = _report_item(key)
         if entry:
             membership_reports.append(entry)
     for key in NAV_REPORTS_FEATURED_FINANCE:
-        entry = _featured_report(key)
+        entry = _report_item(key)
         if entry:
             finance_reports.append(entry)
+
+    for key, meta in sorted(REPORT_CATALOG.items(), key=lambda pair: pair[1].get("label", "")):
+        if not user_may_access_report(user, key, active_church=active_church):
+            continue
+        entry = _item(meta["label"], icon=meta["icon"], report_key=key)
+        if meta["permission"] == "members" and key not in featured_membership:
+            membership_more.append(entry)
+        elif meta["permission"] != "members" and key not in featured_finance:
+            finance_more.append(entry)
+
+    membership_reports.extend(membership_more)
+    finance_reports.extend(finance_more)
 
     if membership_reports:
         sections.append(_section("Membership", membership_reports, "people"))

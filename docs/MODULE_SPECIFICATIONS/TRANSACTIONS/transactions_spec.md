@@ -111,7 +111,7 @@ erDiagram
 
 **Also:** `treasury.py`, `idempotency.py`, `account_codes.py`, `reporting.py`, **`adjustment_services.py`** (church-scoped manual correction journals).
 
-**Adjustment journals (Current):** `Transaction.transaction_type = ADJUSTMENT`; permissions `create_adjustment_journals` (maker) and `approve_adjustment_journals` (checker, or `approve_transactions`). Routes `/transactions/adjustments/new/` + confirm. Balanced multi-line DR/CR; remittance payables/clearing accounts blocked; narration required (≥10 chars); attachments optional; same period/working-day and pending approval as other journals.
+**Adjustment journals (Current):** `Transaction.transaction_type = ADJUSTMENT`; permissions `create_adjustment_journals` (maker) and `approve_adjustment_journals` (checker, or `approve_transactions`). Routes `/transactions/adjustments/new/` + confirm. UI: one debit account, one credit account, single amount, narration (two balanced lines server-side); remittance payables/clearing accounts blocked; narration required (≥10 chars); dashboard Finance shortcuts when church-focused; same period/working-day and pending approval as other journals.
 
 **Signals:** `post_save` Church → seed accounts/offerings if not provisioned.
 

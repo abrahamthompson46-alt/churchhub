@@ -132,6 +132,51 @@ class AdjustmentJournalTests(TestCase):
         self.assertTrue(actor_may_decide(self.checker, trx))
         self.assertFalse(actor_may_decide(self.maker, trx))
 
+    def test_simple_form_post_to_confirm(self):
+        client = Client()
+        client.login(username="adj_maker", password="pass12345")
+        response = client.post(
+            reverse("transactions:adjustment_create"),
+            {
+                "debit_account": str(self.welfare.pk),
+                "credit_account": str(self.cash.pk),
+                "amount": "40.00",
+                "narration": "Simple JV welfare correction path",
+                "date": timezone.localdate().isoformat(),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("confirm", response.url)
+
+    def test_same_debit_and_credit_rejected(self):
+        from transactions.adjustment_forms import AdjustmentJournalForm
+
+        form = AdjustmentJournalForm(
+            church=self.church,
+            data={
+                "debit_account": str(self.cash.pk),
+                "credit_account": str(self.cash.pk),
+                "amount": "10.00",
+                "narration": "Same account should fail",
+            },
+        )
+        self.assertFalse(form.is_valid())
+
+    def test_same_debit_credit_rejected(self):
+        client = Client()
+        client.login(username="adj_maker", password="pass12345")
+        response = client.post(
+            reverse("transactions:adjustment_create"),
+            {
+                "debit_account": str(self.cash.pk),
+                "credit_account": str(self.cash.pk),
+                "amount": "10.00",
+                "narration": "Same account should fail validation",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "must be different")
+
     def test_create_view_requires_permission(self):
         client = Client()
         client.login(username="adj_maker", password="pass12345")

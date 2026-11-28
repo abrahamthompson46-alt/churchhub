@@ -30,6 +30,7 @@ from permissions.checks import (
     can_manage_institution_branding,
     can_manage_system_settings,
     can_manage_leadership,
+    can_create_adjustment_journals,
     can_manage_ledger_entries,
     can_manage_meetings,
     can_manage_members,
@@ -237,6 +238,10 @@ def _finance_sections(user, active_church=None):
             ledger_items.append(_item("Chart of Accounts", "ledger:accounts", "bi-journal-bookmark"))
         if can_manage_gl_categories(user):
             ledger_items.append(_item("Posting Categories", "ledger:categories", "bi-tags"))
+        if can_create_adjustment_journals(user):
+            ledger_items.append(
+                _item("Adjustment Journal", "transactions:adjustment_create", "bi-journal-richtext")
+            )
         sections.append(_section("Books", ledger_items, "accounting"))
 
     planning_items = []

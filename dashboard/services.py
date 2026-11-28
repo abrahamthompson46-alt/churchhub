@@ -18,6 +18,7 @@ from permissions.checks import (
     can_approve_minutes,
     can_approve_transactions,
     can_approve_welfare,
+    can_create_adjustment_journals,
     can_create_announcements,
     can_manage_expenses,
     can_manage_finances,
@@ -472,7 +473,7 @@ def get_role_focus(role):
     return focus_map.get(role, focus_map["member"])
 
 
-def get_quick_actions(user):
+def get_quick_actions(user, active_church=None):
     """Permission- and role-based shortcut links for the dashboard."""
     from church_system.navigation import _item
     from sitecontrol.services import church_has_feature
@@ -488,11 +489,19 @@ def get_quick_actions(user):
         seen_labels.add(label)
         actions.append(item)
 
+    def _add_adjustment_journal(church=None):
+        if not can_create_adjustment_journals(user):
+            return
+        church = church or getattr(user, "church", None)
+        if church and church_has_feature(church, "ledger"):
+            _add(_item("Adjustment Journal", "transactions:adjustment_create", "bi-journal-text"))
+
     if role == "treasury":
         if can_manage_receipts(user):
             _add(_item("Record Receipt", "transactions:record_receipt", "bi-plus-circle"))
         if can_manage_ledger_entries(user):
             _add(_item("Journal Entry", "ledger:entry", "bi-journal-plus"))
+        _add_adjustment_journal(active_church or getattr(user, "church", None))
         if can_view_pending_approvals(user) or can_approve_transactions(user):
             _add(_item("Pending Approvals", "transactions:pending_approvals", "bi-hourglass-split"))
         if (
@@ -533,6 +542,7 @@ def get_quick_actions(user):
     else:
         if can_manage_finances(user) or can_manage_ledger_entries(user):
             _add(_item("Journal Entry", "ledger:entry", "bi-journal-plus"))
+        _add_adjustment_journal(active_church or getattr(user, "church", None))
         if can_view_pending_approvals(user) or can_approve_transactions(user):
             _add(_item("Pending Approvals", "transactions:pending_approvals", "bi-hourglass-split"))
         if can_manage_members(user):
@@ -1424,7 +1434,9 @@ def build_home_context(request):
     church_focused = scope.level == "CHURCH" and scope.primary_church is not None
     as_of = finance_as_of_date(scope)
 
-    actions = apply_pinned_quick_actions(request, get_quick_actions(user))
+    actions = apply_pinned_quick_actions(
+        request, get_quick_actions(user, active_church=scope.primary_church if scope.level == "CHURCH" else None)
+    )
     alerts = get_alerts(request, user)
     show_finance_charts = show_money_kpis and role in (
         "treasury",

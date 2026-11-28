@@ -13,7 +13,7 @@ from church_system.church_scope import require_church
 from church_system.flash import flash_exception, flash_success
 from permissions.checks import can_create_adjustment_journals, permission_required
 from sitecontrol.checks import require_feature
-from transactions.adjustment_forms import AdjustmentJournalForm, AdjustmentLineFormSet
+from transactions.adjustment_forms import AdjustmentJournalForm
 from transactions.adjustment_services import build_adjustment_draft, post_adjustment_journal
 from transactions.idempotency import IdempotencyReplay, MissingIdempotencyKey
 from transactions.services import PeriodLockedError, WorkingDayClosedError
@@ -32,64 +32,59 @@ def adjustment_create_required(view_func):
     return _wrapped
 
 
-def _lines_from_formset(formset):
-    lines = []
-    for form in formset:
-        if not form.cleaned_data or form.cleaned_data.get("empty"):
-            continue
-        account = form.cleaned_data["account"]
-        lines.append(
-            {
-                "account_id": str(account.pk),
-                "account_name": account.name,
-                "side": form.cleaned_data["side"],
-                "amount": form.cleaned_data["amount"],
-            }
-        )
-    return lines
+def _lines_from_simple_form(cleaned_data) -> list:
+    amount = cleaned_data["amount"]
+    debit = cleaned_data["debit_account"]
+    credit = cleaned_data["credit_account"]
+    return [
+        {
+            "account_id": str(debit.pk),
+            "account_name": debit.name,
+            "side": "DEBIT",
+            "amount": amount,
+        },
+        {
+            "account_id": str(credit.pk),
+            "account_name": credit.name,
+            "side": "CREDIT",
+            "amount": amount,
+        },
+    ]
 
 
 @adjustment_create_required
 @require_http_methods(["GET", "POST"])
 def adjustment_create(request):
     church = require_church(request)
-    line_formset = AdjustmentLineFormSet(
-        request.POST or None,
-        prefix="lines",
-        form_kwargs={"church": church},
-    )
-    header_form = AdjustmentJournalForm(
-        request.POST or None,
-        church=church,
-        prefix="hdr",
-    )
+    form = AdjustmentJournalForm(request.POST or None, church=church)
 
-    if request.method == "POST":
-        if header_form.is_valid() and line_formset.is_valid():
-            try:
-                draft = build_adjustment_draft(
-                    church,
-                    narration=header_form.cleaned_data["narration"],
-                    entry_date=header_form.cleaned_data.get("date"),
-                    lines=_lines_from_formset(line_formset),
-                )
-                request.session[SESSION_DRAFT_KEY] = draft
-                return redirect("transactions:adjustment_confirm")
-            except (ValueError, PeriodLockedError, WorkingDayClosedError) as exc:
-                flash_exception(request, exc, title="Adjustment could not be prepared")
+    if request.method == "POST" and form.is_valid():
+        try:
+            draft = build_adjustment_draft(
+                church,
+                narration=form.cleaned_data["narration"],
+                entry_date=form.cleaned_data.get("date"),
+                lines=_lines_from_simple_form(form.cleaned_data),
+            )
+            request.session[SESSION_DRAFT_KEY] = draft
+            return redirect("transactions:adjustment_confirm")
+        except (ValueError, PeriodLockedError, WorkingDayClosedError) as exc:
+            flash_exception(request, exc, title="Adjustment could not be prepared")
+
+    business_date = None
+    if form.is_bound and form.is_valid():
+        business_date = form.cleaned_data.get("date")
+    elif not form.is_bound:
+        business_date = form.fields["date"].initial
 
     return render(
         request,
         "transactions/adjustment_entry.html",
         {
-            "header_form": header_form,
-            "line_formset": line_formset,
-            "business_date": header_form.fields["date"].initial
-            or header_form.cleaned_data.get("date")
-            if header_form.is_bound and header_form.is_valid()
-            else header_form.fields["date"].initial,
+            "form": form,
+            "business_date": business_date,
             "breadcrumbs": [
-                {"label": "Ledger", "url": reverse("ledger:index")},
+                {"label": "Dashboard", "url": reverse("dashboard:home")},
                 {"label": "Adjustment journal"},
             ],
         },
@@ -145,7 +140,7 @@ def adjustment_confirm(request):
             "draft": draft,
             "idempotency_key": str(uuid.uuid4()),
             "breadcrumbs": [
-                {"label": "Ledger", "url": reverse("ledger:index")},
+                {"label": "Dashboard", "url": reverse("dashboard:home")},
                 {
                     "label": "Adjustment journal",
                     "url": reverse("transactions:adjustment_create"),

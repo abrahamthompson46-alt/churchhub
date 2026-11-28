@@ -165,6 +165,9 @@
                 {% if can_manage_receipts or can_manage_finances %}
                 <a href="{% url 'transactions:record_receipt' %}" class="btn btn-primary btn-sm">New receipt</a>
                 {% endif %}
+                {% if church_focused and can_create_adjustment_journals %}
+                <a href="{% url 'transactions:adjustment_create' %}" class="btn btn-outline-primary btn-sm">Adjustment journal</a>
+                {% endif %}
             </div>
         </div>
         {% if cash_position %}
@@ -232,6 +235,9 @@
                 <h2 class="cc-panel__title"><i class="bi bi-graph-up"></i> Financial trend{% if dashboard_scope.finance_scope_label %} · {{ dashboard_scope.finance_scope_label }}{% endif %}</h2>
                 <p class="cc-member-chart__meta mb-0">Approved amounts by posting month.</p>
             </div>
+            {% if church_focused and can_create_adjustment_journals %}
+            <a href="{% url 'transactions:adjustment_create' %}" class="btn btn-outline-primary btn-sm align-self-start">Adjustment journal</a>
+            {% endif %}
         </div>
         <div class="cc-member-chart__controls px-3 pt-2">
             <div class="cc-finance-seg" role="tablist" aria-label="Financial series">

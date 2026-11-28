@@ -135,7 +135,11 @@ def work_inbox(request):
 def pin_quick_action(request):
     """Pin or unpin a quick-action label in session (max 3)."""
     label = (request.POST.get("label") or "").strip()
-    actions = get_quick_actions(request.user)
+    from dashboard.scope import resolve_dashboard_scope
+
+    scope = resolve_dashboard_scope(request)
+    church = scope.primary_church if scope.level == "CHURCH" else None
+    actions = get_quick_actions(request.user, active_church=church)
     valid = {a.get("label") for a in actions if a.get("label")}
     pinned = list(request.session.get("dashboard_pinned_labels") or [])
     if label in valid:

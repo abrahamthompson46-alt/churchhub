@@ -14,55 +14,38 @@
         </ol>
     </nav>
 
-    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Adjustment Journal" page_description="Manual correction entries for this church only. Remittance clearing accounts are not available. A checker must approve." %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Adjustment Journal" page_description="One debit, one credit, single amount. Church-scoped corrections only; remittance clearing accounts are blocked. A checker must approve." %}
 
-    <div class="form-card-inner card">
+    <div class="form-card-inner card col-lg-8">
         <div class="card-body">
             <form method="post" novalidate>
                 {% csrf_token %}
-                {{ header_form.date }}
-                {% include "includes/form_field.html" with field=header_form.narration %}
+                {{ form.date }}
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        {% include "includes/form_field.html" with field=form.debit_account %}
+                    </div>
+                    <div class="col-md-6">
+                        {% include "includes/form_field.html" with field=form.credit_account %}
+                    </div>
+                    <div class="col-md-6">
+                        {% include "includes/form_field.html" with field=form.amount %}
+                    </div>
+                    <div class="col-12">
+                        {% include "includes/form_field.html" with field=form.narration %}
+                    </div>
+                </div>
                 {% if business_date %}
                 <p class="text-muted small mb-3">
                     <i class="bi bi-calendar-check me-1"></i>Posting date: <strong>{{ business_date|date:"j M Y" }}</strong>
                 </p>
                 {% endif %}
-
-                <div class="table-responsive mb-3">
-                    {{ line_formset.management_form }}
-                    <table class="table table-sm align-middle">
-                        <thead>
-                            <tr>
-                                <th>Account</th>
-                                <th style="width: 8rem;">Side</th>
-                                <th class="text-end" style="width: 9rem;">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for form in line_formset %}
-                            <tr>
-                                <td>{{ form.account }}{% if form.account.errors %}<div class="text-danger small">{{ form.account.errors.0 }}</div>{% endif %}</td>
-                                <td>{{ form.side }}</td>
-                                <td class="text-end">{{ form.amount }}</td>
-                            </tr>
-                            {% if form.non_field_errors %}
-                            <tr><td colspan="3" class="text-danger small">{{ form.non_field_errors }}</td></tr>
-                            {% endif %}
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                {% if line_formset.non_form_errors %}
-                <div class="alert alert-danger small">{{ line_formset.non_form_errors }}</div>
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger small">{{ form.non_field_errors }}</div>
                 {% endif %}
-                {% if header_form.non_field_errors %}
-                <div class="alert alert-danger small">{{ header_form.non_field_errors }}</div>
-                {% endif %}
-
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 mt-2">
                     <button type="submit" class="btn btn-primary btn-sm">Review journal</button>
-                    <a href="{% url 'ledger:index' %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+                    <a href="{% url 'dashboard:home' %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
                 </div>
             </form>
         </div>

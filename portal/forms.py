@@ -31,7 +31,7 @@ class MemberPortalLoginForm(AuthenticationForm):
         label="Email",
         widget=forms.EmailInput(
             attrs={
-                "class": "form-control ps-5",
+                "class": "form-control form-control-lg ps-5 auth-input",
                 "autocomplete": "username email",
                 "placeholder": "you@example.com",
                 "autofocus": True,
@@ -43,9 +43,9 @@ class MemberPortalLoginForm(AuthenticationForm):
         strip=False,
         widget=forms.PasswordInput(
             attrs={
-                "class": "form-control ps-5",
+                "class": "form-control form-control-lg ps-5 auth-input",
                 "autocomplete": "current-password",
-                "placeholder": "Password",
+                "placeholder": "Your password",
             }
         ),
         help_text="Use the password you chose after following the email we sent you.",

@@ -4,28 +4,38 @@
 {% block body_class %}auth-page auth-page--portal{% endblock %}
 
 {% block content %}
-<div class="auth-split auth-split--portal">
-    <aside class="auth-split-brand auth-split-brand--portal">
+<div class="auth-split auth-split--portal auth-split--pro">
+    <aside class="auth-split-brand auth-split-brand--portal auth-split-brand--pro">
+        <div class="auth-split-brand__decor" aria-hidden="true">
+            <span class="auth-split-brand__orb auth-split-brand__orb--1"></span>
+            <span class="auth-split-brand__orb auth-split-brand__orb--2 auth-split-brand__orb--teal"></span>
+            <span class="auth-split-brand__grid"></span>
+        </div>
         <div class="auth-split-brand-inner">
             {% if denomination_logo or tenant_logo or site_logo %}
             <img src="{% if denomination_logo %}{{ denomination_logo.url }}{% elif tenant_logo %}{{ tenant_logo.url }}{% else %}{{ site_logo.url }}{% endif %}" alt="{{ institution_display_name|default:site_name }}" class="auth-platform-logo mb-4">
             {% else %}
             <div class="brand-mark auth-platform-mark mb-4" aria-hidden="true"><i class="bi bi-people-fill"></i></div>
             {% endif %}
-            <p class="auth-platform-eyebrow mb-2">Member Portal</p>
+            <p class="auth-platform-eyebrow mb-2">Member portal</p>
             <h2 class="auth-split-title">{{ institution_display_name|default:site_name }}</h2>
             <p class="auth-split-tagline">
                 Sign in with the email on your member record and the password you chose.
             </p>
             <ul class="auth-feature-list">
-                <li><i class="bi bi-person-badge"></i> Membership profile</li>
-                <li><i class="bi bi-cash-stack"></i> Giving history</li>
-                <li><i class="bi bi-megaphone"></i> Church announcements</li>
+                <li><i class="bi bi-person-badge" aria-hidden="true"></i> Membership profile</li>
+                <li><i class="bi bi-cash-stack" aria-hidden="true"></i> Giving history</li>
+                <li><i class="bi bi-megaphone" aria-hidden="true"></i> Church announcements</li>
             </ul>
+            <div class="auth-split-brand__chips" role="list">
+                <span class="auth-trust-chip" role="listitem"><i class="bi bi-heart" aria-hidden="true"></i> Prayer requests</span>
+                <span class="auth-trust-chip" role="listitem"><i class="bi bi-receipt" aria-hidden="true"></i> Giving statements</span>
+                <span class="auth-trust-chip" role="listitem"><i class="bi bi-bell" aria-hidden="true"></i> Updates</span>
+            </div>
         </div>
     </aside>
     <section class="auth-split-form">
-        <div class="auth-mobile-brand d-lg-none">
+        <div class="auth-mobile-brand auth-mobile-brand--pro d-lg-none">
             <div class="auth-mobile-brand__logo">
                 {% if denomination_logo or tenant_logo or site_logo %}
                 <img src="{% if denomination_logo %}{{ denomination_logo.url }}{% elif tenant_logo %}{{ tenant_logo.url }}{% else %}{{ site_logo.url }}{% endif %}" alt="{{ institution_display_name|default:site_name }}" class="auth-platform-logo-sm">
@@ -34,33 +44,40 @@
                 {% endif %}
             </div>
             <div class="auth-mobile-brand__text">
-                <p class="auth-platform-eyebrow mb-0">Member Portal</p>
+                <p class="auth-platform-eyebrow mb-0">Member portal</p>
                 <p class="auth-mobile-brand__name mb-0">{{ institution_display_name|default:site_name }}</p>
             </div>
         </div>
 
-        <div class="auth-card card">
+        <div class="auth-card card auth-card--pro">
+            <div class="auth-card__accent auth-card__accent--portal" aria-hidden="true"></div>
             <div class="card-body p-4 p-md-5">
-                <h1 class="auth-form-title text-center">Member sign in</h1>
-                <p class="text-muted small mb-4 text-center">
-                    First time? Request a sign-in email. New browsers may also need a confirmation link.
-                </p>
+                <div class="auth-form-intro text-center">
+                    <p class="auth-form-kicker mb-2">
+                        <span class="auth-form-kicker__pill auth-form-kicker__pill--portal"><i class="bi bi-people-fill" aria-hidden="true"></i> Members</span>
+                    </p>
+                    <h1 class="auth-form-title mb-1">Member sign in</h1>
+                    <p class="auth-form-lead text-muted small mb-0">
+                        First time? Request a sign-in email. New browsers may need a confirmation link.
+                    </p>
+                </div>
 
                 {% if form.non_field_errors %}
-                <div class="alert alert-danger py-2 small d-flex align-items-start gap-2 mb-3">
-                    <i class="bi bi-exclamation-circle mt-1"></i>
+                <div class="alert alert-danger auth-alert py-2 small d-flex align-items-start gap-2 mb-3 mt-3" role="alert">
+                    <i class="bi bi-exclamation-circle-fill mt-1" aria-hidden="true"></i>
                     <div>{{ form.non_field_errors.0 }}</div>
                 </div>
                 {% elif form.errors %}
-                <div class="alert alert-danger py-2 small d-flex align-items-center gap-2 mb-3">
-                    <i class="bi bi-exclamation-circle"></i> Check your email and password, then try again.
+                <div class="alert alert-danger auth-alert py-2 small d-flex align-items-center gap-2 mb-3 mt-3" role="alert">
+                    <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
+                    <span>Check your email and password, then try again.</span>
                 </div>
                 {% endif %}
 
-                <form method="post" novalidate>
+                <form method="post" novalidate class="auth-form mt-4">
                     {% csrf_token %}
                     {{ form.website }}
-                    <div class="form-group">
+                    <div class="form-group mb-3">
                         <label class="form-label" for="id_username">Email</label>
                         <div class="input-icon-wrap">
                             <i class="bi bi-envelope input-icon" aria-hidden="true"></i>
@@ -68,29 +85,39 @@
                         </div>
                         {% if form.username.errors %}<div class="form-error">{{ form.username.errors.0 }}</div>{% endif %}
                     </div>
-                    <div class="form-group">
-                        <label class="form-label" for="id_password">Password</label>
-                        <div class="input-icon-wrap input-icon-wrap--password">
+                    <div class="form-group mb-3">
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                            <label class="form-label mb-0" for="id_password">Password</label>
+                            <a href="{% url 'portal:password_reset' %}" class="auth-forgot-link small">Help signing in</a>
+                        </div>
+                        <div class="input-icon-wrap input-icon-wrap--password mt-1">
                             <i class="bi bi-lock input-icon" aria-hidden="true"></i>
                             {{ form.password }}
                             <button type="button" class="password-toggle" data-toggle-password="id_password" aria-label="Show password">
                                 <i class="bi bi-eye" aria-hidden="true"></i>
                             </button>
                         </div>
-                        <div class="form-hint">{{ form.password.help_text }}</div>
+                        <div class="form-hint small text-muted mt-1">{{ form.password.help_text }}</div>
                         {% if form.password.errors %}<div class="form-error">{{ form.password.errors.0 }}</div>{% endif %}
                     </div>
-                    <button type="submit" class="btn btn-primary w-100 py-2 mt-2">Enter Portal</button>
+                    <button type="submit" class="btn btn-primary btn-lg auth-submit auth-submit--portal w-100">
+                        Enter portal <i class="bi bi-arrow-right-short ms-1" aria-hidden="true"></i>
+                    </button>
                 </form>
-                <p class="text-center mt-3 mb-0 small">
-                    <a href="{% url 'portal:password_reset' %}" class="text-muted text-decoration-none">First time or forgot password? Request a sign-in email</a>
-                </p>
-                <p class="auth-secondary-links text-center mt-3 mb-0 small">
-                    <a href="{% url 'login' %}" class="text-decoration-none">Staff sign in</a>
-                </p>
+
+                <ul class="auth-trust-row list-unstyled d-flex flex-wrap justify-content-center gap-2 gap-md-3 mt-3 mb-0 small text-muted" aria-label="Privacy">
+                    <li><i class="bi bi-envelope-check text-primary" aria-hidden="true"></i> Email verified access</li>
+                    <li><i class="bi bi-eye-slash text-primary" aria-hidden="true"></i> Your data stays private</li>
+                </ul>
+
+                <div class="auth-login-footer auth-staff-panel text-center">
+                    <p class="auth-staff-panel__title small fw-semibold text-body mb-1">Church staff?</p>
+                    <p class="text-muted small mb-3">Treasury, clerks, and administrators use the staff workspace.</p>
+                    <a href="{% url 'login' %}" class="btn btn-outline-secondary w-100 auth-staff-btn">Staff sign in</a>
+                </div>
             </div>
         </div>
-        <p class="text-center small text-muted mt-3 mb-0 d-none d-lg-block">Powered by {{ site_name }}</p>
+        <p class="text-center small text-muted mt-3 mb-0 d-none d-lg-block auth-powered-by">Powered by {{ site_name }}</p>
     </section>
 </div>
 {% endblock %}

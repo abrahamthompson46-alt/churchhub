@@ -4,10 +4,10 @@
 {% block body_class %}auth-page{% endblock %}
 
 {% block content %}
-<div class="auth-split auth-split--square">
+<div class="auth-split auth-split--square auth-split--pro">
     {% include "includes/auth_platform_panel.html" %}
     <section class="auth-split-form">
-        <div class="auth-mobile-brand d-lg-none">
+        <div class="auth-mobile-brand auth-mobile-brand--pro d-lg-none">
             <div class="auth-mobile-brand__logo">
                 {% if site_logo %}
                 <img src="{{ site_logo.url }}" alt="{{ platform_name|default:site_settings.site_name|default:site_name }}" class="auth-platform-logo-sm">
@@ -21,56 +21,71 @@
             </div>
         </div>
 
-        <div class="auth-card card">
+        <div class="auth-card card auth-card--pro">
+            <div class="auth-card__accent" aria-hidden="true"></div>
             <div class="card-body p-4 p-md-5">
                 {% include "includes/auth_tenant_header.html" %}
 
-                <h1 class="auth-form-title text-center">Sign in</h1>
-                <p class="text-muted small mb-4 text-center">Continue to your church workspace. <a href="{% url 'public_home' %}" class="text-decoration-none">Back to home</a></p>
+                <div class="auth-form-intro text-center">
+                    <p class="auth-form-kicker mb-2">
+                        <span class="auth-form-kicker__pill"><i class="bi bi-shield-lock" aria-hidden="true"></i> Staff workspace</span>
+                    </p>
+                    <h1 class="auth-form-title mb-1">Welcome back</h1>
+                    <p class="auth-form-lead text-muted small mb-0">
+                        Sign in to treasury, members, and reports for your church.
+                        <a href="{% url 'public_home' %}" class="auth-form-lead__link">Home</a>
+                    </p>
+                </div>
 
                 {% if form.errors %}
-                <div class="alert alert-danger py-2 small d-flex align-items-center gap-2 mb-3">
-                    <i class="bi bi-exclamation-circle"></i> Invalid username or password.
+                <div class="alert alert-danger auth-alert py-2 small d-flex align-items-center gap-2 mb-3 mt-3" role="alert">
+                    <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
+                    <span>Invalid username or password.</span>
                 </div>
                 {% endif %}
 
-                <form method="post" novalidate>
+                <form method="post" novalidate class="auth-form mt-4">
                     {% csrf_token %}
-                    <div class="form-group">
+                    <div class="form-group mb-3">
                         <label class="form-label" for="id_username">Username</label>
                         <div class="input-icon-wrap">
                             <i class="bi bi-person input-icon" aria-hidden="true"></i>
-                            <input type="text" name="username" id="id_username" class="form-control ps-5" autofocus required autocomplete="username" placeholder="Username">
+                            <input type="text" name="username" id="id_username" class="form-control form-control-lg ps-5 auth-input" autofocus required autocomplete="username" placeholder="Your username">
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label" for="id_password">Password</label>
-                        <div class="input-icon-wrap input-icon-wrap--password">
+                    <div class="form-group mb-3">
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                            <label class="form-label mb-0" for="id_password">Password</label>
+                            <a href="{% url 'password_reset' %}" class="auth-forgot-link small">Forgot?</a>
+                        </div>
+                        <div class="input-icon-wrap input-icon-wrap--password mt-1">
                             <i class="bi bi-lock input-icon" aria-hidden="true"></i>
-                            <input type="password" name="password" id="id_password" class="form-control ps-5" required autocomplete="current-password" placeholder="Password">
+                            <input type="password" name="password" id="id_password" class="form-control form-control-lg ps-5 auth-input" required autocomplete="current-password" placeholder="Your password">
                             <button type="button" class="password-toggle" data-toggle-password="id_password" aria-label="Show password">
                                 <i class="bi bi-eye" aria-hidden="true"></i>
                             </button>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100 py-2 mt-2">Sign In</button>
+                    <button type="submit" class="btn btn-primary btn-lg auth-submit w-100">
+                        Sign in <i class="bi bi-arrow-right-short ms-1" aria-hidden="true"></i>
+                    </button>
                 </form>
-                <p class="text-center mt-2 mb-0 small">
-                    <a href="{% url 'password_reset' %}" class="text-muted text-decoration-none">Forgot password?</a>
-                </p>
 
-                <div class="auth-login-footer text-center">
-                    <p class="text-muted small mb-2">
-                        Members use the member portal. Church staff sign in above.
-                    </p>
-                    <a href="{% url 'portal:login' %}" class="btn btn-outline-primary btn-sm w-100">Go to member portal</a>
-                    <p class="auth-login-footer__note small mb-0">
-                        <span class="text-muted">Church staff use the sign-in form above.</span>
-                        {% if public_registration_allowed %}
-                        <span class="text-muted" aria-hidden="true">·</span>
+                <ul class="auth-trust-row list-unstyled d-flex flex-wrap justify-content-center gap-2 gap-md-3 mt-3 mb-0 small text-muted" aria-label="Security">
+                    <li><i class="bi bi-lock-fill text-primary" aria-hidden="true"></i> Encrypted session</li>
+                    <li><i class="bi bi-building-check text-primary" aria-hidden="true"></i> Church-scoped access</li>
+                </ul>
+
+                <div class="auth-login-footer auth-portal-panel text-center">
+                    <p class="auth-portal-panel__title small fw-semibold text-body mb-1">Are you a member?</p>
+                    <p class="text-muted small mb-3">Giving statements, prayer requests, and announcements live in the member portal.</p>
+                    <a href="{% url 'portal:login' %}" class="btn btn-outline-primary w-100 auth-portal-btn">Go to member portal</a>
+                    {% if public_registration_allowed %}
+                    <p class="auth-login-footer__note small mb-0 mt-3">
                         <a href="{% url 'church_apply' %}" class="text-decoration-none">Start a {{ public_demo_trial_days }}-day demo</a>
-                        {% endif %}
+                        for your institution
                     </p>
+                    {% endif %}
                 </div>
             </div>
         </div>

@@ -1,4 +1,9 @@
-<aside class="auth-split-brand auth-split-brand--platform">
+<aside class="auth-split-brand auth-split-brand--platform auth-split-brand--pro">
+    <div class="auth-split-brand__decor" aria-hidden="true">
+        <span class="auth-split-brand__orb auth-split-brand__orb--1"></span>
+        <span class="auth-split-brand__orb auth-split-brand__orb--2"></span>
+        <span class="auth-split-brand__grid"></span>
+    </div>
     <div class="auth-split-brand-inner">
         {% if site_logo %}
         <img src="{{ site_logo.url }}" alt="{{ platform_name|default:site_settings.site_name|default:site_name }}" class="auth-platform-logo mb-4">
@@ -17,5 +22,10 @@
             {% endfor %}
         </ul>
         {% endif %}
+        <div class="auth-split-brand__chips" role="list">
+            <span class="auth-trust-chip" role="listitem"><i class="bi bi-diagram-3" aria-hidden="true"></i> Multi-level org</span>
+            <span class="auth-trust-chip" role="listitem"><i class="bi bi-journal-check" aria-hidden="true"></i> Audited finance</span>
+            <span class="auth-trust-chip" role="listitem"><i class="bi bi-people" aria-hidden="true"></i> One member record</span>
+        </div>
     </div>
 </aside>

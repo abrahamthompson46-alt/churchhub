@@ -57,6 +57,8 @@ class PortalTests(TestCase):
         self.assertContains(response, "Member sign in")
         self.assertContains(response, "Email")
         self.assertContains(response, "Request a sign-in email")
+        self.assertContains(response, "auth-card--pro")
+        self.assertContains(response, "Staff sign in")
         self.assertNotContains(response, "YYYY-MM-DD")
         self.assertNotContains(response, "date of birth")
 

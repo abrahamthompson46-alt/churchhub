@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Confirm Adjustment — ChurchHub{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb small mb-0">
+            {% for crumb in breadcrumbs %}
+            <li class="breadcrumb-item{% if forloop.last %} active{% endif %}">
+                {% if crumb.url and not forloop.last %}<a href="{{ crumb.url }}">{{ crumb.label }}</a>{% else %}{{ crumb.label }}{% endif %}
+            </li>
+            {% endfor %}
+        </ol>
+    </nav>
+
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Confirm Adjustment Journal" page_description="Balanced correction journal — pending approval after save." %}
+
+    <div class="data-card p-4 col-lg-8 mx-auto">
+        <dl class="row mb-3">
+            <dt class="col-sm-4 text-muted">Date</dt>
+            <dd class="col-sm-8">{{ draft.date }}</dd>
+            <dt class="col-sm-4 text-muted">Reason</dt>
+            <dd class="col-sm-8">{{ draft.narration }}</dd>
+        </dl>
+
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Account</th>
+                        <th class="text-end">Debit</th>
+                        <th class="text-end">Credit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for line in draft.lines %}
+                    <tr>
+                        <td>{{ line.account_name }}</td>
+                        <td class="text-end text-currency">{% if line.side == "DEBIT" %}{{ line.amount|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                        <td class="text-end text-currency">{% if line.side == "CREDIT" %}{{ line.amount|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <p class="text-muted small mt-3 mb-4">
+            Supporting documents are optional. This journal is church-scoped and cannot use remittance clearing accounts.
+        </p>
+
+        <form method="post" class="d-flex justify-content-between gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
+            <button type="submit" name="action" value="back" class="btn btn-outline-secondary btn-sm">Edit</button>
+            <button type="submit" name="action" value="confirm" class="btn btn-primary btn-sm">Confirm &amp; save</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

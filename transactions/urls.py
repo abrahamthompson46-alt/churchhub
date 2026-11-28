@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from . import views_adjustment
 
 app_name = "transactions"
 
@@ -29,4 +30,14 @@ urlpatterns = [
     path("reconciliations/", views.reconciliation_list, name="reconciliation_list"),
     path("reconciliations/add/", views.reconciliation_create, name="reconciliation_create"),
     path("reconciliations/<uuid:pk>/", views.reconciliation_detail, name="reconciliation_detail"),
+    path(
+        "adjustments/new/",
+        views_adjustment.adjustment_create,
+        name="adjustment_create",
+    ),
+    path(
+        "adjustments/confirm/",
+        views_adjustment.adjustment_confirm,
+        name="adjustment_confirm",
+    ),
 ]

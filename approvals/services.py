@@ -115,6 +115,12 @@ def actor_may_decide(user, transaction) -> bool:
         return False
     if is_superadmin(user):
         return True
+    if transaction.transaction_type == "ADJUSTMENT":
+        if user_has_permission(user, "approve_adjustment_journals"):
+            return True
+        if user_has_permission(user, "approve_transactions"):
+            return True
+        return _valid_delegation(user, transaction.church, _journal_amount(transaction))
     if user_has_permission(user, "approve_transactions"):
         return True
     return _valid_delegation(user, transaction.church, _journal_amount(transaction))

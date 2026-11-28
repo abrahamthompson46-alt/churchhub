@@ -109,7 +109,9 @@ erDiagram
 
 **`services.py`:** `validate_transaction_balance`; period/working-day helpers; `create_default_accounts` / offerings; `record_receipt` (multi-amount API), `record_receipt_by_category` (teller UI → ledger category posting), `record_expense`, `record_transfer`, `record_district_remittance`; `approve_transaction`, `reject_transaction`, `void_transaction`; `generate_monthly_cutoff`; recon create/match/finalize; `budget_vs_actual` (delegates to budgets).
 
-**Also:** `treasury.py`, `idempotency.py`, `account_codes.py`, `reporting.py`.
+**Also:** `treasury.py`, `idempotency.py`, `account_codes.py`, `reporting.py`, **`adjustment_services.py`** (church-scoped manual correction journals).
+
+**Adjustment journals (Current):** `Transaction.transaction_type = ADJUSTMENT`; permissions `create_adjustment_journals` (maker) and `approve_adjustment_journals` (checker, or `approve_transactions`). Routes `/transactions/adjustments/new/` + confirm. Balanced multi-line DR/CR; remittance payables/clearing accounts blocked; narration required (≥10 chars); attachments optional; same period/working-day and pending approval as other journals.
 
 **Signals:** `post_save` Church → seed accounts/offerings if not provisioned.
 
@@ -127,7 +129,7 @@ erDiagram
 
 ## 10. Views (Current)
 
-Pending approvals; approve/reject/bulk; receipt/expense/remittance record; **post-record confirmation slip** (`transaction_confirm` / `transaction_receipt`); transaction list/detail/void; financial dashboard + exports; audit log; periods + working day open/close; reconciliations; `budget_report` redirects to `/budgets/`.
+Pending approvals; approve/reject/bulk; receipt/expense/remittance record; **adjustment journal** create/confirm (`views_adjustment.py`); **post-record confirmation slip** (`transaction_confirm` / `transaction_receipt`); transaction list/detail/void; financial dashboard + exports; audit log; periods + working day open/close; reconciliations; `budget_report` redirects to `/budgets/`.
 
 Decorator `_finance_required`: login + view/manage finances or receipts/expenses.
 

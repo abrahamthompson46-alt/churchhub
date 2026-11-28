@@ -85,6 +85,7 @@ class Transaction(models.Model):
         ("TRANSFER", "Transfer"),
         ("PAYROLL", "Payroll"),
         ("CAPITAL", "Capital / Fixed Asset"),
+        ("ADJUSTMENT", "Adjustment"),
     ]
 
     APPROVAL_STATUS = [
@@ -215,6 +216,7 @@ class Transaction(models.Model):
                 "TRANSFER": "TRF",
                 "PAYROLL": "PAY",
                 "CAPITAL": "CAP",
+                "ADJUSTMENT": "ADJ",
             }.get(self.transaction_type, "TXN")
 
             post_date = self.date or timezone.localdate()
@@ -683,6 +685,7 @@ class FinancialIdempotencyKey(models.Model):
         ("PAYROLL_POST", "Payroll Post"),
         ("PAYROLL_PAY", "Payroll Pay"),
         ("CONTRIBUTION", "Member Contribution"),
+        ("ADJUSTMENT", "Adjustment Journal"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

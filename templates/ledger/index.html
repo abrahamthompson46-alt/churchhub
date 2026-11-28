@@ -8,8 +8,19 @@
     {% if can_manage_ledger_entries %}
     {% url 'ledger:entry' as new_entry_url %}
     {% include "includes/page_header.html" with page_subtitle="Finance" page_title="General Ledger" page_description="Posted journals for this church." action_url=new_entry_url action_label="Journal Entry" action_icon="bi-journal-plus" %}
+    {% elif can_create_adjustment_journals %}
+    {% include "includes/page_header.html" with page_subtitle="Finance" page_title="General Ledger" page_description="Posted journals for this church." %}
     {% else %}
     {% include "includes/page_header.html" with page_subtitle="Finance" page_title="General Ledger" page_description="Posted journals for this church." %}
+    {% endif %}
+
+    {% if can_create_adjustment_journals %}
+    <div class="mb-3">
+        <a href="{% url 'transactions:adjustment_create' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-journal-medical me-1"></i>Adjustment journal
+        </a>
+        <span class="text-muted small ms-2">Corrections only — remittance accounts blocked.</span>
+    </div>
     {% endif %}
 
     <div class="dash-inline-stats mb-4">

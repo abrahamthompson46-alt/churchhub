@@ -77,6 +77,8 @@ def can_lock_periods(user): return _p(user, "lock_periods")
 def can_unlock_periods(user): return _p(user, "unlock_periods")
 def can_run_cutoff(user): return _p(user, "run_cutoff")
 def can_export_transactions(user): return _p(user, "export_transactions")
+def can_create_adjustment_journals(user): return _p(user, "create_adjustment_journals")
+def can_approve_adjustment_journals(user): return _p(user, "approve_adjustment_journals")
 
 # ── Ledger ────────────────────────────────────────────────────────
 def can_view_ledger(user): return _p(user, "view_ledger")

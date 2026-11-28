@@ -39,6 +39,7 @@ from ledger.services import (
 )
 from permissions.checks import (
     any_permission_required,
+    can_create_adjustment_journals,
     can_manage_chart_of_accounts,
     can_manage_gl_categories,
     permission_required,
@@ -114,6 +115,7 @@ def index(request):
     return render(request, "ledger/index.html", {
         "summary": summary,
         "recent_entries": recent,
+        "can_create_adjustment_journals": can_create_adjustment_journals(request.user),
     })
 
 

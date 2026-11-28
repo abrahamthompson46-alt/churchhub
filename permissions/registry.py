@@ -263,6 +263,23 @@ PERMISSION_REGISTRY = {
             "approve_welfare", "disburse_welfare",
         ],
     },
+    "create_adjustment_journals": {
+        "name": "Create Adjustment Journals",
+        "category": "Finance",
+        "description": (
+            "Post manual correction journals (church-scoped). "
+            "Remittance clearing accounts are blocked."
+        ),
+        "default_roles": _ROLE_TREASURY_OPS | {"LOCAL_PASTOR"},
+        "implies": ["view_transactions"],
+    },
+    "approve_adjustment_journals": {
+        "name": "Approve Adjustment Journals",
+        "category": "Finance",
+        "description": "Approve manual correction journals (checker).",
+        "default_roles": _ROLE_JOURNAL_APPROVE,
+        "implies": ["view_pending_approvals", "view_transactions"],
+    },
     "reject_transactions": {
         "name": "Reject Transactions",
         "category": "Finance",

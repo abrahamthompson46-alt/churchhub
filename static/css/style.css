@@ -501,6 +501,44 @@ body.app-body.auth-page {
 
 .nav-mega-link.active i { color: var(--ch-primary); }
 
+.nav-mega-zones {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.nav-mega-zone__label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ch-muted);
+    margin: 0 0 0.45rem;
+    padding: 0 0.15rem;
+}
+
+.nav-mega-zone--operations {
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid var(--ch-border);
+}
+
+@media (min-width: 992px) {
+    .nav-mega-grid--finance {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.65rem 1rem;
+    }
+
+    .nav-mega-grid--reports {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        max-width: 920px;
+    }
+}
+
+.nav-mega-col--config .nav-mega-title { border-left-color: #64748b; background: rgba(100, 116, 139, 0.1); color: #475569; }
+.nav-mega-col--institution .nav-mega-title { border-left-color: #7c3aed; background: rgba(124, 58, 237, 0.08); color: #6d28d9; }
+.nav-mega-col--controls .nav-mega-title { border-left-color: #dc2626; background: rgba(220, 38, 38, 0.08); color: #b91c1c; }
+.nav-mega-col--history .nav-mega-title { border-left-color: #57534e; background: rgba(87, 83, 78, 0.1); color: #44403c; }
+
 /* Navbar tools */
 .navbar-tools {
     display: flex;
@@ -4992,6 +5030,18 @@ main .page-container,
 .quick-action-btn i {
     font-size: 0.85rem;
     opacity: 0.9;
+}
+
+.quick-action-btn--primary {
+    background: #fff;
+    border-color: #fff;
+    color: var(--ch-primary) !important;
+}
+
+.quick-action-btn--primary:hover {
+    background: var(--ch-primary-soft);
+    border-color: #fff;
+    color: var(--ch-primary) !important;
 }
 
 

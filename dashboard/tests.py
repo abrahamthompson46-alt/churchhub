@@ -380,8 +380,26 @@ class NavigationDensityTests(DashboardTestMixin, TestCase):
         names = {t["url_name"] for t in tabs}
         self.assertIn("ledger:entry", names)
         self.assertIn("transactions:transaction_list", names)
+        self.assertIn("transactions:record_expense", names)
         self.assertNotIn("ledger:accounts", names)
         self.assertNotIn("ledger:categories", names)
+        self.assertLessEqual(len(tabs), 6)
+
+    def test_finance_menu_has_landing_and_operation_zones(self):
+        from church_system.navigation import get_main_navigation
+
+        treasury = User.objects.create_user(
+            username="navtreasury",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        nav = get_main_navigation(treasury, active_church=self.church)
+        finance = next(item for item in nav if item.get("id") == "finance")
+        self.assertEqual(finance.get("url_name"), "transactions:record_receipt")
+        zones = {s.get("zone") for s in finance["sections"]}
+        self.assertIn("operations", zones)
+        self.assertIn("records", zones)
 
     def test_page_eyebrow_for_finance_pending(self):
         from church_system.navigation import get_module_tabs, get_page_eyebrow

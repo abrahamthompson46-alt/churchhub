@@ -140,7 +140,53 @@
                         <div class="dropdown-menu nav-mega nav-mega--full" aria-labelledby="nav-{{ menu.id }}">
                             <div class="nav-mega-inner">
                                 {% if menu.sections %}
-                                <div class="nav-mega-grid">
+                                {% if menu.id == "finance" %}
+                                <div class="nav-mega-zones">
+                                    <div class="nav-mega-zone nav-mega-zone--operations">
+                                        <p class="nav-mega-zone__label">Daily operations</p>
+                                        <div class="nav-mega-grid nav-mega-grid--finance">
+                                            {% for section in menu.sections %}
+                                            {% if section.zone == "operations" %}
+                                            <div class="nav-mega-col nav-mega-col--{{ section.theme|default:'default' }}">
+                                                <p class="nav-mega-title">{{ section.title }}</p>
+                                                <div class="nav-mega-links">
+                                                    {% for item in section.items %}
+                                                    <a class="nav-mega-link{% if item.report_key and report_key == item.report_key %} active{% elif not item.report_key and current_view == item.url_name %} active{% endif %}"
+                                                       href="{% if item.report_key %}{% url 'reports:run' item.report_key %}{% else %}{% url item.url_name %}{% if item.query %}?{{ item.query }}{% endif %}{% endif %}">
+                                                        {% if item.icon %}<i class="bi {{ item.icon }}"></i>{% endif %}
+                                                        <span>{{ item.label }}</span>
+                                                    </a>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    <div class="nav-mega-zone nav-mega-zone--records">
+                                        <p class="nav-mega-zone__label">Books &amp; programs</p>
+                                        <div class="nav-mega-grid nav-mega-grid--finance">
+                                            {% for section in menu.sections %}
+                                            {% if section.zone != "operations" %}
+                                            <div class="nav-mega-col nav-mega-col--{{ section.theme|default:'default' }}">
+                                                <p class="nav-mega-title">{{ section.title }}</p>
+                                                <div class="nav-mega-links">
+                                                    {% for item in section.items %}
+                                                    <a class="nav-mega-link{% if item.report_key and report_key == item.report_key %} active{% elif not item.report_key and current_view == item.url_name %} active{% endif %}"
+                                                       href="{% if item.report_key %}{% url 'reports:run' item.report_key %}{% else %}{% url item.url_name %}{% if item.query %}?{{ item.query }}{% endif %}{% endif %}">
+                                                        {% if item.icon %}<i class="bi {{ item.icon }}"></i>{% endif %}
+                                                        <span>{{ item.label }}</span>
+                                                    </a>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <div class="nav-mega-grid{% if menu.id == 'reports' %} nav-mega-grid--reports{% endif %}">
                                     {% for section in menu.sections %}
                                     <div class="nav-mega-col nav-mega-col--{{ section.theme|default:'default' }}">
                                         <p class="nav-mega-title">{{ section.title }}</p>
@@ -156,6 +202,7 @@
                                     </div>
                                     {% endfor %}
                                 </div>
+                                {% endif %}
                                 {% elif menu.items %}
                                 <div class="nav-mega-grid nav-mega-grid--single">
                                     <div class="nav-mega-col nav-mega-col--default">

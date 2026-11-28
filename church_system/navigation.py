@@ -127,8 +127,38 @@ def _dropdown(menu_id, label, icon, sections=None, items=None, url_name=""):
     return entry
 
 
-def _section(title, items, theme="default"):
-    return {"title": title, "theme": theme, "items": items}
+def _section(title, items, theme="default", zone="records"):
+    """zone: operations = daily workflows; records = GL, planning, programs (Finance mega menu)."""
+    return {"title": title, "theme": theme, "items": items, "zone": zone}
+
+
+# Reports surfaced in the top nav mega menu; full catalog stays on Report Center.
+NAV_REPORTS_FEATURED_MEMBERSHIP = (
+    "member_summary",
+    "transfer_report",
+    "attendance_summary",
+)
+NAV_REPORTS_FEATURED_FINANCE = (
+    "financial_summary",
+    "tithe_report",
+    "trial_balance",
+    "income_statement",
+    "balance_sheet",
+    "budget_vs_actual",
+)
+
+
+def _finance_landing_url(user):
+    """Primary click target for the Finance top-level menu (like Members → directory)."""
+    if can_manage_receipts(user):
+        return "transactions:record_receipt"
+    if can_view_transactions(user):
+        return "transactions:transaction_list"
+    if can_view_ledger(user):
+        return "ledger:index"
+    if can_view_pending_approvals(user):
+        return "transactions:pending_approvals"
+    return ""
 
 
 def _can_access_finance(user):
@@ -223,7 +253,7 @@ def _finance_sections(user, active_church=None):
     if can_manage_working_day(user):
         treasury_items.append(_item("Working day", "transactions:period_list", "bi-calendar2-week"))
     if treasury_items:
-        sections.append(_section("Daily treasury", treasury_items, "treasury"))
+        sections.append(_section("Daily treasury", treasury_items, "treasury", zone="operations"))
 
     if can_view_ledger(user) and _church_feature(active_church, "ledger", user):
         ledger_items = []
@@ -242,7 +272,7 @@ def _finance_sections(user, active_church=None):
             ledger_items.append(
                 _item("Adjustment Journal", "transactions:adjustment_create", "bi-journal-richtext")
             )
-        sections.append(_section("Books", ledger_items, "accounting"))
+        sections.append(_section("Books", ledger_items, "accounting", zone="records"))
 
     planning_items = []
     if (
@@ -253,7 +283,7 @@ def _finance_sections(user, active_church=None):
     if can_view_reconciliation(user) or can_manage_reconciliation(user):
         planning_items.append(_item("Bank Reconciliation", "transactions:reconciliation_list", "bi-bank"))
     if planning_items:
-        sections.append(_section("Planning & cash", planning_items, "planning"))
+        sections.append(_section("Planning & cash", planning_items, "planning", zone="records"))
 
     if (
         _church_feature(active_church, "remittance", user)
@@ -282,7 +312,7 @@ def _finance_sections(user, active_church=None):
         if can_view_welfare(user) and _church_feature(active_church, "remittance", user):
             remittance_items.append(_item("Welfare", "remittance:welfare", "bi-heart-pulse"))
         if remittance_items:
-            sections.append(_section("Remittance & welfare", remittance_items, "remittance"))
+            sections.append(_section("Remittance & welfare", remittance_items, "remittance", zone="operations"))
 
     if (can_view_payroll(user) or can_manage_payroll(user)) and _church_feature(active_church, "payroll", user):
         payroll_items = [_item("Dashboard", "payroll:index", "bi-currency-exchange")]
@@ -293,7 +323,7 @@ def _finance_sections(user, active_church=None):
                 _item("Roll-up", "payroll:hierarchy", "bi-bar-chart-steps"),
                 _item("Policies", "payroll:policy_index", "bi-sliders"),
             ])
-        sections.append(_section("Payroll", payroll_items, "payroll"))
+        sections.append(_section("Payroll", payroll_items, "payroll", zone="records"))
 
     if (
         can_view_assets(user) or can_manage_assets(user) or can_manage_asset_policy(user)
@@ -312,7 +342,7 @@ def _finance_sections(user, active_church=None):
             ])
         if can_view_all_churches(user):
             asset_items.append(_item("Roll-up", "assets:hierarchy", "bi-bar-chart-steps"))
-        sections.append(_section("Fixed Assets", asset_items, "assets"))
+        sections.append(_section("Fixed Assets", asset_items, "assets", zone="records"))
 
     giving_items = []
     if _church_feature(active_church, "contribution_campaigns", user) and (
@@ -325,7 +355,7 @@ def _finance_sections(user, active_church=None):
         if can_manage_contribution_campaigns(user) or can_manage_finances(user):
             giving_items.append(_item("New Campaign", "contributions:campaign_create", "bi-plus-circle"))
     if giving_items:
-        sections.append(_section("Contribution campaigns", giving_items, "giving"))
+        sections.append(_section("Contribution campaigns", giving_items, "giving", zone="records"))
 
     return sections
 
@@ -392,13 +422,19 @@ def _reports_sections(user, active_church=None):
     finance_reports = []
     from reports.services import user_may_access_report
 
-    for key, meta in REPORT_CATALOG.items():
-        if not user_may_access_report(user, key, active_church=active_church):
-            continue
-        entry = _item(meta["label"], icon=meta["icon"], report_key=key)
-        if meta["permission"] == "members":
+    def _featured_report(key):
+        meta = REPORT_CATALOG.get(key)
+        if not meta or not user_may_access_report(user, key, active_church=active_church):
+            return None
+        return _item(meta["label"], icon=meta["icon"], report_key=key)
+
+    for key in NAV_REPORTS_FEATURED_MEMBERSHIP:
+        entry = _featured_report(key)
+        if entry:
             membership_reports.append(entry)
-        else:
+    for key in NAV_REPORTS_FEATURED_FINANCE:
+        entry = _featured_report(key)
+        if entry:
             finance_reports.append(entry)
 
     if membership_reports:
@@ -469,7 +505,13 @@ def get_main_navigation(user, active_church=None):
     if _can_access_finance(user):
         finance_sections = _finance_sections(user, active_church)
         if finance_sections:
-            nav.append(_dropdown("finance", "Finance", "bi-wallet2", sections=finance_sections))
+            nav.append(_dropdown(
+                "finance",
+                "Finance",
+                "bi-wallet2",
+                sections=finance_sections,
+                url_name=_finance_landing_url(user),
+            ))
 
     if _can_access_reports(user):
         nav.append(_dropdown("reports", "Reports", "bi-bar-chart-line", sections=_reports_sections(user, active_church)))
@@ -524,12 +566,7 @@ def get_main_navigation(user, active_church=None):
         org_sections = [
             _section("Browse", [
                 _item("Organization Tree", "organization:hierarchy", "bi-diagram-3"),
-                _item("All Units Directory", "organization:directory", "bi-list-ul"),
-                _item("Churches", "organization:directory", "bi-building", query="level=church"),
-                _item("Conferences", "organization:directory", "bi-globe", query="level=conference"),
-                _item("Zones", "organization:directory", "bi-layers", query="level=zone"),
-                _item("Districts", "organization:directory", "bi-pin-map", query="level=district"),
-                _item("Unions", "organization:directory", "bi-globe2", query="level=union"),
+                _item("Units Directory", "organization:directory", "bi-list-ul"),
             ], "hierarchy"),
         ]
         if institution_onboarding_allowed() and can_onboard_churches(user):
@@ -700,14 +737,16 @@ MODULE_TABS = {
         _item("Transfers", "members:transfer_list", "bi-arrow-left-right"),
     ],
     "finance": [
-        _item("Receipts", "transactions:record_receipt", "bi-plus-circle"),
+        _item("Receipt", "transactions:record_receipt", "bi-plus-circle"),
+        _item("Expense", "transactions:record_expense", "bi-dash-circle"),
         _item("Pending", "transactions:pending_approvals", "bi-hourglass-split"),
         _item("Transactions", "transactions:transaction_list", "bi-list-check"),
-        _item("Journals", "ledger:entry", "bi-journal-plus"),
+        _item("Journal", "ledger:entry", "bi-journal-plus"),
+        _item("Adjustment", "transactions:adjustment_create", "bi-journal-richtext"),
+        _item("Ledger", "ledger:index", "bi-journal-text"),
         _item("Budgets", "budgets:list", "bi-calculator"),
         _item("Remittance", "remittance:index", "bi-percent"),
         _item("Reconcile", "transactions:reconciliation_list", "bi-bank"),
-        _item("Ledger", "ledger:index", "bi-journal-text"),
         _item("Payroll", "payroll:index", "bi-currency-exchange"),
         _item("Assets", "assets:index", "bi-box-seam"),
     ],
@@ -747,9 +786,12 @@ MODULE_TABS = {
 # Role-pruned finance tabs (url_name allow-lists). Admins / overseers keep full set.
 FINANCE_TABS_TREASURY = frozenset({
     "transactions:record_receipt",
+    "transactions:record_expense",
     "transactions:pending_approvals",
     "transactions:transaction_list",
     "ledger:entry",
+    "transactions:adjustment_create",
+    "ledger:index",
     "budgets:list",
     "remittance:index",
 })
@@ -774,41 +816,62 @@ def _prune_finance_tabs(user, tabs):
         # Cap dense mega-modules at six daily tabs for everyone.
         priority = [
             "transactions:record_receipt",
+            "transactions:record_expense",
             "transactions:pending_approvals",
             "transactions:transaction_list",
+            "ledger:entry",
+            "transactions:adjustment_create",
             "remittance:index",
+            "ledger:index",
+            "budgets:list",
             "payroll:index",
             "assets:index",
-            "ledger:entry",
-            "budgets:list",
             "transactions:reconciliation_list",
-            "ledger:index",
         ]
         by_name = {t.get("url_name"): t for t in tabs}
         return [by_name[name] for name in priority if name in by_name][:6]
 
     if user.role == UserRole.TREASURY:
         allow = FINANCE_TABS_TREASURY
+        priority = [
+            "transactions:record_receipt",
+            "transactions:record_expense",
+            "transactions:pending_approvals",
+            "transactions:transaction_list",
+            "ledger:entry",
+            "transactions:adjustment_create",
+            "ledger:index",
+            "budgets:list",
+            "remittance:index",
+        ]
     elif user.role == UserRole.LOCAL_PASTOR:
         allow = FINANCE_TABS_LEADERSHIP
-    else:
-        allow = FINANCE_TABS_TREASURY | {"payroll:index", "assets:index", "transactions:reconciliation_list"}
         priority = [
             "transactions:record_receipt",
             "transactions:pending_approvals",
             "transactions:transaction_list",
+            "remittance:index",
+            "budgets:list",
+        ]
+    else:
+        allow = FINANCE_TABS_TREASURY | {"payroll:index", "assets:index", "transactions:reconciliation_list"}
+        priority = [
+            "transactions:record_receipt",
+            "transactions:record_expense",
+            "transactions:pending_approvals",
+            "transactions:transaction_list",
             "ledger:entry",
+            "transactions:adjustment_create",
             "remittance:index",
             "budgets:list",
             "transactions:reconciliation_list",
+            "ledger:index",
             "payroll:index",
             "assets:index",
-            "ledger:index",
         ]
-        by_name = {t.get("url_name"): t for t in tabs if t.get("url_name") in allow}
-        return [by_name[name] for name in priority if name in by_name][:6]
 
-    return [t for t in tabs if t.get("url_name") in allow]
+    by_name = {t.get("url_name"): t for t in tabs if t.get("url_name") in allow}
+    return [by_name[name] for name in priority if name in by_name][:6]
 
 
 MODULE_LABELS = {
@@ -889,6 +952,9 @@ def _tab_allowed(user, url_name, active_church=None):
             can_manage_gl_categories(user) or can_view_ledger(user)
         ) and _church_feature(active_church, "ledger", user),
         "ledger:entry": lambda: can_manage_ledger_entries(user) and _church_feature(active_church, "ledger", user),
+        "transactions:adjustment_create": lambda: (
+            can_create_adjustment_journals(user) and _church_feature(active_church, "ledger", user)
+        ),
         "transactions:record_receipt": lambda: can_manage_receipts(user),
         "transactions:record_expense": lambda: can_manage_expenses(user),
         "transactions:record_remittance": lambda: can_manage_expenses(user) or can_manage_receipts(user) or can_manage_finances(user),

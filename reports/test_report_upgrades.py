@@ -21,6 +21,35 @@ class PeriodPresetTests(SimpleTestCase):
         self.assertEqual(start, date(2026, 2, 1))
         self.assertEqual(end, date(2026, 2, 28))
 
+    def test_current_calendar_year(self):
+        period, start, end = resolve_period_preset(
+            "current_calendar_year", today=date(2026, 3, 10)
+        )
+        self.assertEqual(period, "custom")
+        self.assertEqual(start, date(2026, 1, 1))
+        self.assertEqual(end, date(2026, 12, 31))
+
+
+class ReportRunContextTests(SimpleTestCase):
+    def test_trial_balance_defaults_to_current_year(self):
+        from django.contrib.sessions.backends.db import SessionStore
+        from django.http import HttpRequest, QueryDict
+        from django.contrib.auth.models import AnonymousUser
+
+        from reports.run_context import prepare_report_querydict
+
+        request = HttpRequest()
+        request.GET = QueryDict()
+        request.session = SessionStore()
+        request.user = AnonymousUser()
+        from django.utils import timezone
+
+        year = timezone.localdate().year
+        params = prepare_report_querydict(request, "trial_balance")
+        self.assertEqual(params.get("period"), "custom")
+        self.assertEqual(params.get("start_date"), f"{year}-01-01")
+        self.assertEqual(params.get("end_date"), f"{year}-12-31")
+
 
 class ProfitLossGridTests(SimpleTestCase):
     def test_month_columns_span_year(self):

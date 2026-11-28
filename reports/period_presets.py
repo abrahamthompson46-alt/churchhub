@@ -20,6 +20,10 @@ def resolve_period_preset(preset: str, *, today: date | None = None) -> tuple[st
         year = today.year - 1
         return "custom", date(year, 1, 1), date(year, 12, 31)
 
+    if preset == "current_calendar_year":
+        year = today.year
+        return "custom", date(year, 1, 1), date(year, 12, 31)
+
     if preset == "ytd":
         return "annual", None, None
 
@@ -41,8 +45,14 @@ def resolve_period_preset(preset: str, *, today: date | None = None) -> tuple[st
 
 
 REPORT_PERIOD_PRESETS = [
+    ("current_calendar_year", "Current calendar year"),
     ("last_calendar_year", "Last calendar year"),
     ("ytd", "Year to date"),
     ("last_month", "Last month"),
     ("last_quarter", "Last quarter"),
 ]
+
+# First open (no query string / session): default period for core GL statements.
+CURRENT_YEAR_DEFAULT_REPORTS = frozenset(
+    {"trial_balance", "balance_sheet", "income_statement"}
+)

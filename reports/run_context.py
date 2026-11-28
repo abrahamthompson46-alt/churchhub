@@ -5,7 +5,11 @@ from __future__ import annotations
 from django.http import QueryDict
 
 from .eoy_sections import EOY_SECTION_KEYS, EOY_SECTION_SPECS, default_eoy_sections, parse_eoy_sections
-from .period_presets import REPORT_PERIOD_PRESETS, resolve_period_preset
+from .period_presets import (
+    CURRENT_YEAR_DEFAULT_REPORTS,
+    REPORT_PERIOD_PRESETS,
+    resolve_period_preset,
+)
 
 SESSION_KEY = "report_center_filters"
 
@@ -59,6 +63,13 @@ def prepare_report_querydict(request, report_key: str) -> QueryDict:
                     data["end_date"] = end.isoformat()
                 for key in EOY_SECTION_KEYS:
                     data[f"eoy_{key}"] = "1" if default_eoy_sections()[key] else "0"
+            elif report_key in CURRENT_YEAR_DEFAULT_REPORTS:
+                period, start, end = resolve_period_preset("current_calendar_year")
+                data["period"] = period
+                if start:
+                    data["start_date"] = start.isoformat()
+                if end:
+                    data["end_date"] = end.isoformat()
 
     preset = data.get("preset")
     if preset:

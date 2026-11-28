@@ -7,10 +7,19 @@
 <div class="page-container">
     {% include "includes/page_header.html" with page_subtitle="Finance" page_title="Pending Approvals" page_description="Review maker entries before they post. Rejections require a reason." %}
 
+    {% if page_obj.paginator.count %}
+    <div class="finance-queue-summary d-flex flex-wrap align-items-center gap-2 mb-3" role="status">
+        <span class="finance-queue-summary__badge badge rounded-pill text-bg-warning border border-warning-subtle">
+            {{ page_obj.paginator.count }} awaiting approval
+        </span>
+        <span class="small text-muted">Approve individually or select rows for bulk approve.</span>
+    </div>
+    {% endif %}
+
     <form method="post" action="{% url 'transactions:bulk_approve' %}" id="bulk-form"
         onsubmit="return confirmBulkApprove(this);">
         {% csrf_token %}
-        <div class="data-card">
+        <div class="data-card finance-queue-card">
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead>

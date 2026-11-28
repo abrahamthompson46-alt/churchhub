@@ -5918,6 +5918,7 @@ a.alert-banner:hover {
     border-color: color-mix(in srgb, var(--ch-primary) 35%, var(--ch-border));
     background: var(--ch-primary-soft);
     border-bottom-color: color-mix(in srgb, var(--ch-primary) 35%, var(--ch-border));
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--ch-primary) 14%, transparent);
 }
 
 .module-tabs--section .module-tab i {
@@ -6935,4 +6936,277 @@ a.alert-banner:hover {
     }
     .gl__journal { break-inside: avoid; }
     .main-content { padding: 0; }
+}
+
+/* ============================================================
+   Design System v4 — Professional smart UI (global polish)
+   ============================================================ */
+
+:root {
+    --ch-content-gap: 1rem;
+    --ch-page-pad-y: 1.35rem;
+}
+
+.main-content:not(.main-content--auth) {
+    padding: var(--ch-page-pad-y) 0 2.25rem;
+}
+
+.app-chrome-secondary {
+    box-shadow: 0 1px 0 rgba(15, 41, 66, 0.06);
+    background: color-mix(in srgb, var(--ch-surface) 92%, #fff);
+}
+
+nav.page-eyebrow {
+    padding: 0.35rem 0 0.15rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--ch-border) 65%, transparent);
+}
+
+nav.page-eyebrow .page-eyebrow__inner {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.page-header-block--standard {
+    padding: 0.35rem 0 1rem;
+    margin-bottom: 0.15rem;
+    border-bottom: 1px solid var(--ch-border);
+}
+
+.page-header-block--standard .page-title {
+    letter-spacing: -0.035em;
+}
+
+.page-header-block--standard + .panel,
+.page-header-block--standard + .cc-panel,
+.page-header-block--standard + .form-card-inner,
+.page-header-block--standard + .data-card,
+.page-header-block--standard + .report-center-toolbar {
+    margin-top: 0.15rem;
+}
+
+.main-content .btn {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    border-radius: var(--ch-radius-xs);
+    transition:
+        background-color var(--ch-transition),
+        border-color var(--ch-transition),
+        color var(--ch-transition),
+        box-shadow var(--ch-transition),
+        transform 0.12s ease;
+}
+
+.main-content .btn-primary {
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--ch-primary) 25%, transparent);
+}
+
+.main-content .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--ch-primary) 22%, transparent);
+}
+
+.main-content .btn-outline-primary:hover:not(:disabled),
+.main-content .btn-outline-secondary:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.main-content .form-control,
+.main-content .form-select {
+    border-color: var(--ch-border);
+    background-color: #fff;
+}
+
+.main-content .form-control:focus,
+.main-content .form-select:focus {
+    border-color: color-mix(in srgb, var(--ch-primary) 45%, var(--ch-border));
+    box-shadow: 0 0 0 3px var(--ch-focus-ring);
+}
+
+.main-content label.form-label,
+.main-content .form-group > label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ch-text-secondary);
+    margin-bottom: 0.35rem;
+}
+
+.panel,
+.form-card-inner.card,
+.data-card,
+.report-center-toolbar,
+.filter-panel {
+    border-radius: var(--ch-radius);
+    border-color: color-mix(in srgb, var(--ch-border) 90%, #fff);
+    box-shadow: var(--ch-shadow-sm);
+}
+
+.panel-header {
+    background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+    font-size: 0.84rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    padding: 0.75rem 1.15rem;
+}
+
+.cc-panel__header {
+    background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+}
+
+.main-content .table {
+    --bs-table-bg: transparent;
+    margin-bottom: 0;
+}
+
+.main-content .table thead th {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ch-muted);
+    border-bottom-width: 1px;
+    background: #f8fafc;
+}
+
+.main-content .table-hover tbody tr:hover {
+    background-color: color-mix(in srgb, var(--ch-primary-soft) 55%, #fff);
+}
+
+.main-content .table tbody td {
+    font-size: 0.875rem;
+    vertical-align: middle;
+}
+
+.chip,
+.cc-panel__badge,
+.badge {
+    font-weight: 600;
+}
+
+.ch-empty-state {
+    background: linear-gradient(180deg, #fafbfd 0%, #fff 100%);
+    border: 1px dashed var(--ch-border);
+    border-radius: var(--ch-radius);
+    padding: 2rem 1.25rem;
+}
+
+.ch-empty-state__icon {
+    font-size: 2rem;
+    color: color-mix(in srgb, var(--ch-primary) 40%, var(--ch-muted));
+}
+
+.flash-stack {
+    max-width: min(1320px, calc(100% - 2.5rem));
+    margin: 0.75rem auto 0;
+}
+
+.app-flash {
+    border-radius: var(--ch-radius-sm);
+    box-shadow: var(--ch-shadow);
+}
+
+.report-card {
+    border-radius: var(--ch-radius);
+    border-color: color-mix(in srgb, var(--ch-border) 85%, #fff);
+}
+
+.report-card:hover {
+    border-color: color-mix(in srgb, var(--ch-primary) 28%, var(--ch-border));
+    box-shadow: var(--ch-shadow);
+}
+
+.report-center-toolbar {
+    background: linear-gradient(180deg, #fff 0%, #fafbfd 100%);
+}
+
+.roll-grid,
+.meeting-roll-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.35rem 0.75rem;
+}
+
+.roll-item,
+.meeting-roll-row {
+    border-radius: var(--ch-radius-xs);
+    padding: 0.25rem 0.35rem;
+    transition: background var(--ch-transition);
+}
+
+.roll-item:hover,
+.meeting-roll-row:hover {
+    background: var(--ch-primary-soft);
+}
+
+.metric-card {
+    border-radius: var(--ch-radius-sm);
+    border: 1px solid var(--ch-border);
+    background: #fff;
+    box-shadow: var(--ch-shadow-sm);
+}
+
+.pagination .page-link {
+    border-radius: var(--ch-radius-xs);
+    font-weight: 600;
+    font-size: 0.8125rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .main-content .btn-primary:hover:not(:disabled),
+    .main-content .btn-outline-primary:hover:not(:disabled),
+    .main-content .btn-outline-secondary:hover:not(:disabled) {
+        transform: none;
+    }
+}
+
+/* Design System v4.1 — targeted module polish */
+.control-center--home .cc-hero {
+    border: 1px solid color-mix(in srgb, var(--ch-border) 80%, #fff);
+    box-shadow: var(--ch-shadow-sm);
+}
+
+.control-center--home .cc-kpi-card,
+.control-center--home .cc-panel {
+    border-color: color-mix(in srgb, var(--ch-border) 88%, #fff);
+}
+
+.page-container.page-shell .filter-bar--sticky {
+    position: sticky;
+    top: 0.35rem;
+    z-index: 20;
+    background: color-mix(in srgb, var(--ch-surface) 94%, #fff);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--ch-border);
+    border-radius: var(--ch-radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    box-shadow: var(--ch-shadow-sm);
+}
+
+.finance-queue-summary__badge {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 0.45em 0.85em;
+}
+
+.finance-queue-card .table tbody tr:has(.btn-outline-danger[aria-expanded="true"]) {
+    background: color-mix(in srgb, var(--ch-danger, #dc3545) 6%, #fff);
+}
+
+.permission-denied-state {
+    max-width: 34rem;
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--ch-danger, #dc3545) 18%, var(--ch-border));
+}
+
+.report-center-toolbar__lead {
+    min-width: min(100%, 18rem);
+}
+
+@media (min-width: 768px) {
+    .report-center-search {
+        max-width: 22rem;
+    }
 }

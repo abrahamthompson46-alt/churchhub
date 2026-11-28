@@ -923,6 +923,8 @@ def get_page_eyebrow(module_key, module_tabs, current_view="", report_key=""):
         return {"section": "Dashboard", "page": "Remittance desk"}
     if module_key == "home" and current_view == "dashboard:work_inbox":
         return {"section": "Dashboard", "page": "Work inbox"}
+    if module_key == "reports" and current_view == "reports:index":
+        return {"section": section, "page": "Report Center"}
     page = None
     for tab in module_tabs or []:
         if tab.get("report_key") and report_key and tab["report_key"] == report_key:
@@ -931,6 +933,12 @@ def get_page_eyebrow(module_key, module_tabs, current_view="", report_key=""):
         if not tab.get("report_key") and tab.get("url_name") == current_view:
             page = tab["label"]
             break
+    if report_key and not page:
+        from reports.registry import REPORT_CATALOG
+
+        meta = REPORT_CATALOG.get(report_key)
+        if meta:
+            page = meta.get("label")
     return {"section": section, "page": page}
 
 

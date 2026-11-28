@@ -10,9 +10,14 @@
     {% if report_groups %}
     <div class="report-center-toolbar card border-0 shadow-sm mb-4">
         <div class="card-body py-3 d-flex flex-wrap align-items-center gap-3">
-            <p class="report-center-toolbar__meta small text-muted mb-0 flex-grow-1">
-                <strong class="text-body">{{ report_count }}</strong> report{{ report_count|pluralize }} available for your role
-            </p>
+            <div class="report-center-toolbar__lead flex-grow-1">
+                <p class="report-center-toolbar__meta small text-muted mb-1">
+                    <strong class="text-body">{{ report_count }}</strong> report{{ report_count|pluralize }} available for your role
+                </p>
+                <p class="report-center-toolbar__hint small text-muted mb-0">
+                    Finance menu lists frequent reports only — use search below for the full catalog (e.g. End of Year Detailed).
+                </p>
+            </div>
             <label class="visually-hidden" for="report-center-search">Search reports</label>
             <div class="report-center-search input-group input-group-sm">
                 <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>

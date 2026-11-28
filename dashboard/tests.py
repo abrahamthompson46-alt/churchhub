@@ -421,6 +421,24 @@ class NavigationDensityTests(DashboardTestMixin, TestCase):
         self.assertEqual(eyebrow["section"], "Finance")
         self.assertEqual(eyebrow["page"], "Pending")
 
+    def test_page_eyebrow_resolves_report_catalog_label(self):
+        from church_system.navigation import get_module_tabs, get_page_eyebrow
+        from reports.registry import REPORT_CATALOG
+
+        treasury = User.objects.create_user(
+            username="eyebrowreport",
+            password="pass12345",
+            role=UserRole.TREASURY,
+            church=self.church,
+        )
+        key, tabs = get_module_tabs(
+            treasury, "reports", "reports:run", active_church=self.church
+        )
+        report_key = "end_of_year_detailed"
+        eyebrow = get_page_eyebrow(key, tabs, "reports:run", report_key=report_key)
+        self.assertEqual(eyebrow["section"], "Reports")
+        self.assertEqual(eyebrow["page"], REPORT_CATALOG[report_key]["label"])
+
     def test_people_tabs_are_six_operational(self):
         from church_system.navigation import get_module_tabs
 
@@ -629,6 +647,17 @@ class ViewTests(DashboardTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Open the working day")
         self.assertContains(response, "Record the bank remittance")
+
+    def test_pending_approvals_renders_page_eyebrow(self):
+        self._login("treasury")
+        session = self.client.session
+        session["current_church_id"] = str(self.church.id)
+        session.save()
+        response = self.client.get(reverse("transactions:pending_approvals"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "page-eyebrow")
+        self.assertContains(response, "Finance")
+        self.assertContains(response, "Pending")
 
     def test_work_inbox_for_treasury(self):
         self._login("treasury")

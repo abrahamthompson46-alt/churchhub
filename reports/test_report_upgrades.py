@@ -37,20 +37,20 @@ class ProfitLossGridTests(SimpleTestCase):
         from django.template import Context, Template
 
         snippet = Template(
-            '{% with pl=data.profit_loss_grid %}{{ pl.labels.total_income }}{% endwith %}'
+            '{% with pl=data.profit_loss_grid %}{{ pl.labels.total_operating }}{% endwith %}'
         )
         html = snippet.render(
             Context(
                 {
                     "data": {
                         "profit_loss_grid": {
-                            "labels": {"total_income": "Total receipts"},
+                            "labels": {"total_operating": "Total operating receipts"},
                         }
                     }
                 }
             )
         )
-        self.assertEqual(html, "Total receipts")
+        self.assertEqual(html, "Total operating receipts")
 
     def test_grid_include_shows_total_labels(self):
         from decimal import Decimal
@@ -64,15 +64,19 @@ class ProfitLossGridTests(SimpleTestCase):
         request = rf.get("/reports/end_of_year_detailed/")
         data = {
             "profit_loss_grid": {
-                "title": "Monthly income and expense (posted books)",
+                "title": "Monthly receipts and expense (posted books)",
+                "subtitle": "Approved journals only.",
                 "labels": GRID_LABELS,
                 "columns": [{"label": "Jan", "key": "2025-01"}],
-                "income_rows": [],
+                "operating_rows": [],
+                "fund_rows": [],
                 "expense_rows": [],
-                "income_totals": [Decimal("0")],
+                "operating_totals": [Decimal("0")],
+                "fund_totals": [Decimal("0")],
                 "expense_totals": [Decimal("0")],
                 "net_totals": [Decimal("0")],
-                "grand_income": Decimal("0"),
+                "grand_operating": Decimal("0"),
+                "grand_fund": Decimal("0"),
                 "grand_expense": Decimal("0"),
                 "grand_net": Decimal("0"),
                 "net_positive": True,
@@ -83,9 +87,10 @@ class ProfitLossGridTests(SimpleTestCase):
             "reports/includes/profit_loss_grid.html",
             {"data": data, "request": request},
         )
-        self.assertIn("Total receipts", html)
+        self.assertIn("Total operating receipts", html)
+        self.assertIn("Total fund contributions", html)
         self.assertIn("Total expense", html)
-        self.assertIn("Net total", html)
+        self.assertIn("Net surplus / (deficit)", html)
 
 
 class EoySectionTests(SimpleTestCase):

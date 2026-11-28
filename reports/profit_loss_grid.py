@@ -1,4 +1,4 @@
-"""Monthly income and expense matrix for End of Year and income views."""
+"""Monthly receipts and expense matrix for End of Year and income views."""
 
 from __future__ import annotations
 
@@ -11,19 +11,33 @@ from django.db.models.functions import ExtractMonth, ExtractYear
 
 from transactions.models import TransactionLine
 
-INCOME_TYPES = {"TITHE", "COMBINED", "INCOME", "COMBINED_RETENTION"}
+# Operating receipts: retain + income per remittance policy (not remit payables).
+OPERATING_RECEIPT_TYPES = {"TITHE", "COMBINED", "INCOME", "COMBINED_RETENTION"}
+# Fund contributions (equity/funds); shown for information, excluded from net.
+FUND_RECEIPT_TYPES = {"WELFARE_FUND"}
 EXPENSE_TYPES = {"EXPENSE", "SALARY_EXPENSE", "EMPLOYER_SSNIT_EXPENSE", "DEPRECIATION_EXPENSE"}
 
-GRID_TITLE = "Monthly income and expense (posted books)"
+GRID_INCLUDED_TYPES = OPERATING_RECEIPT_TYPES | FUND_RECEIPT_TYPES | EXPENSE_TYPES
+
+GRID_TITLE = "Monthly receipts and expense (posted books)"
+GRID_SUBTITLE = (
+    "Approved journals only. Net uses operating receipts minus expense. "
+    "Remittance payables are excluded. Fund contributions are informational."
+)
 GRID_LABELS = {
     "account_column": "Account",
     "total_column": "Total",
-    "income_section": "Income",
+    "operating_section": "Operating receipts",
+    "fund_section": "Fund receipts",
     "expense_section": "Expense",
-    "total_income": "Total receipts",
+    "total_operating": "Total operating receipts",
+    "total_fund": "Total fund contributions",
     "total_expense": "Total expense",
     "net_row": "Net surplus / (deficit)",
-    "net_total": "Net total",
+    # Backward-compatible keys (tests / legacy snippets)
+    "income_section": "Operating receipts",
+    "total_income": "Total operating receipts",
+    "net_total": "Net surplus / (deficit)",
 }
 
 
@@ -58,28 +72,40 @@ def _display_amount(account_type: str, signed_total: Decimal) -> Decimal:
     return abs(Decimal(str(signed_total)))
 
 
+def _empty_grid() -> dict:
+    return {
+        "title": GRID_TITLE,
+        "subtitle": GRID_SUBTITLE,
+        "labels": GRID_LABELS,
+        "columns": [],
+        "operating_rows": [],
+        "fund_rows": [],
+        "expense_rows": [],
+        "income_rows": [],
+        "operating_totals": [],
+        "fund_totals": [],
+        "expense_totals": [],
+        "income_totals": [],
+        "net_totals": [],
+        "grand_operating": Decimal("0"),
+        "grand_fund": Decimal("0"),
+        "grand_expense": Decimal("0"),
+        "grand_net": Decimal("0"),
+        "grand_income": Decimal("0"),
+        "net_positive": True,
+    }
+
+
 def build_profit_loss_grid(churches, start: date, end: date) -> dict:
     """
-    Posted-books matrix: income and expense accounts × fiscal months in range.
+    Posted-books matrix: operating receipts, fund receipts, and expense accounts
+    × fiscal months in range.
 
     Amounts use approved, non-voided journal line totals per calendar month.
     """
     columns = _month_columns(start, end)
     if not columns or not churches.exists():
-        return {
-            "title": GRID_TITLE,
-            "subtitle": "",
-            "labels": GRID_LABELS,
-            "columns": [],
-            "income_rows": [],
-            "expense_rows": [],
-            "income_totals": [],
-            "expense_totals": [],
-            "net_totals": [],
-            "grand_income": Decimal("0"),
-            "grand_expense": Decimal("0"),
-            "grand_net": Decimal("0"),
-        }
+        return _empty_grid()
 
     qs = (
         TransactionLine.objects.filter(
@@ -88,7 +114,7 @@ def build_profit_loss_grid(churches, start: date, end: date) -> dict:
             transaction__is_voided=False,
             transaction__date__gte=start,
             transaction__date__lte=end,
-            account__account_type__in=list(INCOME_TYPES | EXPENSE_TYPES),
+            account__account_type__in=list(GRID_INCLUDED_TYPES),
         )
         .annotate(
             month=ExtractMonth("transaction__date"),
@@ -119,7 +145,8 @@ def build_profit_loss_grid(churches, start: date, end: date) -> dict:
             entry["cells"][col_key] = display
             entry["total"] += display
 
-    income_rows = []
+    operating_rows = []
+    fund_rows = []
     expense_rows = []
     for (_aid, _name, acc_type), entry in sorted(bucket.items(), key=lambda x: x[0][1]):
         row = {
@@ -128,14 +155,16 @@ def build_profit_loss_grid(churches, start: date, end: date) -> dict:
             "cells": [entry["cells"][c["key"]] for c in columns],
             "total": entry["total"],
         }
-        if acc_type in INCOME_TYPES:
-            income_rows.append(row)
+        if acc_type in OPERATING_RECEIPT_TYPES:
+            operating_rows.append(row)
+        elif acc_type in FUND_RECEIPT_TYPES:
+            fund_rows.append(row)
         elif acc_type in EXPENSE_TYPES:
             expense_rows.append(row)
 
     def _column_totals(rows):
         if not columns:
-            return []
+            return [], Decimal("0")
         totals = [Decimal("0") for _ in columns]
         grand = Decimal("0")
         for row in rows:
@@ -144,23 +173,30 @@ def build_profit_loss_grid(churches, start: date, end: date) -> dict:
                 totals[idx] += val
         return totals, grand
 
-    income_totals, grand_income = _column_totals(income_rows)
+    operating_totals, grand_operating = _column_totals(operating_rows)
+    fund_totals, grand_fund = _column_totals(fund_rows)
     expense_totals, grand_expense = _column_totals(expense_rows)
-    net_totals = [income_totals[i] - expense_totals[i] for i in range(len(columns))]
-    grand_net = grand_income - grand_expense
+    net_totals = [operating_totals[i] - expense_totals[i] for i in range(len(columns))]
+    grand_net = grand_operating - grand_expense
 
     return {
         "title": GRID_TITLE,
-        "subtitle": "",
+        "subtitle": GRID_SUBTITLE,
         "labels": GRID_LABELS,
         "columns": columns,
-        "income_rows": income_rows,
+        "operating_rows": operating_rows,
+        "fund_rows": fund_rows,
         "expense_rows": expense_rows,
-        "income_totals": income_totals,
+        "income_rows": operating_rows,
+        "operating_totals": operating_totals,
+        "fund_totals": fund_totals,
         "expense_totals": expense_totals,
+        "income_totals": operating_totals,
         "net_totals": net_totals,
-        "grand_income": grand_income,
+        "grand_operating": grand_operating,
+        "grand_fund": grand_fund,
         "grand_expense": grand_expense,
         "grand_net": grand_net,
+        "grand_income": grand_operating,
         "net_positive": grand_net >= 0,
     }

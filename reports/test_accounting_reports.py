@@ -1,9 +1,11 @@
 """Tests for accounting reports."""
 
+from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, RequestFactory
+from django.test import RequestFactory, TestCase
+from django.utils import timezone
 
 from organization.models import Church, Conference, District, Zone
 from permissions.roles import UserRole
@@ -117,6 +119,43 @@ class AccountingReportTests(TestCase):
         self.assertIn("income", data["summary"])
         self.assertEqual(len(data["statement"]["sections"]), 2)
         self.assertEqual(data["statement"]["kpis"][0]["value"], data["summary"]["income"])
+        pl = data.get("profit_loss_grid") or {}
+        self.assertEqual(pl.get("title"), "Monthly receipts and expense (posted books)")
+        self.assertIn("operating_rows", pl)
+
+    def test_profit_loss_grid_shows_welfare_under_fund_receipts(self):
+        from reports.profit_loss_grid import build_profit_loss_grid
+
+        welfare = Account.objects.filter(church=self.church, account_type="WELFARE_FUND").first()
+        if not welfare:
+            welfare = Account.objects.create(
+                name="Welfare Fund",
+                account_type="WELFARE_FUND",
+                church=self.church,
+            )
+        cash = Account.objects.filter(church=self.church, account_type="CASH").first()
+        biz = timezone.localdate()
+        txn = Transaction.objects.create(
+            transaction_type="RECEIPT",
+            church=self.church,
+            created_by=self.treasury,
+            description="Welfare offering",
+            date=biz,
+            approval_status="APPROVED",
+        )
+        TransactionLine.objects.create(transaction=txn, account=cash, amount=Decimal("40.00"))
+        TransactionLine.objects.create(transaction=txn, account=welfare, amount=Decimal("-40.00"))
+        validate_transaction_balance(txn)
+
+        churches = Church.objects.filter(pk=self.church.pk)
+        start = biz.replace(day=1)
+        grid = build_profit_loss_grid(churches, start, biz)
+        fund_names = [row["account_name"] for row in grid["fund_rows"]]
+        self.assertIn(welfare.name, fund_names)
+        welfare_row = next(r for r in grid["fund_rows"] if r["account_name"] == welfare.name)
+        self.assertEqual(welfare_row["total"], Decimal("40.00"))
+        self.assertEqual(grid["grand_fund"], Decimal("40.00"))
+        self.assertNotIn(welfare.name, [r["account_name"] for r in grid["operating_rows"]])
 
     def test_cash_position_builds(self):
         data = build_report("cash_position", self._request(), period="monthly")
